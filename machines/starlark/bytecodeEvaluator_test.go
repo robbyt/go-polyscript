@@ -12,9 +12,9 @@ import (
 
 	"github.com/robbyt/go-polyscript/execution/constants"
 	"github.com/robbyt/go-polyscript/execution/data"
-	"github.com/robbyt/go-polyscript/execution/data/helpers"
 	"github.com/robbyt/go-polyscript/execution/script"
 	"github.com/robbyt/go-polyscript/execution/script/loader"
+	"github.com/robbyt/go-polyscript/internal/helpers"
 )
 
 var emptyScriptData = make(map[string]any)

@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/robbyt/go-polyscript/execution/data/helpers"
+	"github.com/robbyt/go-polyscript/internal/helpers"
 )
 
 type FromDisk struct {
