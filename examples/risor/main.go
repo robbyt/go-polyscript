@@ -1,4 +1,4 @@
-package main
+package risor
 
 import (
 	"context"
@@ -12,20 +12,9 @@ import (
 	"github.com/robbyt/go-polyscript/machines/risor"
 )
 
-func main() {
-	// Create a logger
-	handler := slog.NewTextHandler(os.Stdout, nil)
-	logger := slog.New(handler)
-
-	// Define globals that will be available to the script
-	globals := []string{constants.Ctx}
-
-	// Create a compiler for Risor scripts
-	compilerOptions := &risor.BasicCompilerOptions{Globals: globals}
-	compiler := risor.NewCompiler(handler, compilerOptions)
-
-	// Load script from a string
-	scriptContent := `
+// GetRisorScript returns the script content for the Risor example
+func GetRisorScript() string {
+	return `
 		// Script has access to ctx variable passed from Go
 		name := ctx["name"]
 		message := "Hello, " + name + "!"
@@ -36,17 +25,35 @@ func main() {
 			"length": len(message)
 		}
 	`
+}
+
+// RunRisorExample executes a Risor script and returns the result
+func RunRisorExample(handler slog.Handler) (map[string]any, error) {
+	if handler == nil {
+		handler = slog.NewTextHandler(os.Stdout, nil)
+	}
+	logger := slog.New(handler)
+
+	// Define globals that will be available to the script
+	globals := []string{constants.Ctx}
+
+	// Create a compiler for Risor scripts
+	compilerOptions := &risor.BasicCompilerOptions{Globals: globals}
+	compiler := risor.NewCompiler(handler, compilerOptions)
+
+	// Load script from a string
+	scriptContent := GetRisorScript()
 	fromString, err := loader.NewFromString(scriptContent)
 	if err != nil {
 		logger.Error("Failed to create string loader", "error", err)
-		return
+		return nil, err
 	}
 
 	// Create an executable unit
 	unit, err := script.NewExecutableUnit(handler, "", fromString, compiler, nil)
 	if err != nil {
 		logger.Error("Failed to create executable unit", "error", err)
-		return
+		return nil, err
 	}
 
 	// Create an evaluator for Risor scripts
@@ -63,9 +70,23 @@ func main() {
 	result, err := evaluator.Eval(ctx, unit)
 	if err != nil {
 		logger.Error("Script evaluation failed", "error", err)
+		return nil, err
+	}
+
+	return result.Interface().(map[string]any), nil
+}
+
+func main() {
+	// Create a logger
+	handler := slog.NewTextHandler(os.Stdout, nil)
+
+	// Run the example
+	result, err := RunRisorExample(handler)
+	if err != nil {
+		fmt.Printf("Error: %v\n", err)
 		return
 	}
 
-	// Use the result
-	fmt.Printf("Result: %v\n", result.Interface())
+	// Print the result
+	fmt.Printf("Result: %v\n", result)
 }
