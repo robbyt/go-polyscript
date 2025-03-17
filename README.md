@@ -4,13 +4,11 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/robbyt/go-polyscript)](https://goreportcard.com/report/github.com/robbyt/go-polyscript)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 
-A Go library providing a unified interface for embedding and running various scripting languages and WebAssembly modules in your Go applications.
+A Go package providing a unified interface for loading and running various scripting languages and WebAssembly modules in your Go applications.
 
 ## Overview
 
-go-polyscript enables you to embed and execute scripts written in multiple languages within your Go applications. It offers a consistent API across different scripting engines, allowing for easy interchangeability and minimizing lock-in to a specific scripting language.
-
-All components accept a structured logger (`slog.Handler`) for consistent logging across your application, making it easy to integrate with your existing logging infrastructure.
+go-polyscript enables a consistent API across different scripting engines, allowing for easy interchangeability and minimizing lock-in to a specific scripting language.
 
 Currently supported scripting engines ("machines"):
 
@@ -115,11 +113,13 @@ func main() {
 
 go-polyscript is structured around a few key concepts:
 
-1. **Loader**: Loads script content from various sources (files, strings, etc.)
-2. **Compiler**: Validates and compiles scripts into bytecode
+1. **Loader**: Loads script content from various sources (files, strings, http, etc.)
+2. **Compiler**: Validates and compiles scripts into internal "bytecode"
 3. **ExecutableUnit**: Represents a compiled script ready for execution
-4. **Evaluator**: Executes compiled scripts with provided input data
-5. **Machine**: A specific implementation of a scripting engine (Risor, Starlark, Extism)
+4. **ExecutionPackage** Contains an **ExecutableUnit** and other metadata
+5. **Evaluator**: Executes compiled scripts with provided input data
+6. **Machine**: A specific implementation of a scripting engine (Risor, Starlark, Extism)
+7. **EvaluatorResponse** The response object returned from all **Machine**s
 
 ## Advanced Usage
 
