@@ -1,5 +1,9 @@
 # go-polyscript
 
+[![Go Reference](https://pkg.go.dev/badge/github.com/robbyt/go-polyscript.svg)](https://pkg.go.dev/github.com/robbyt/go-polyscript)
+[![Go Report Card](https://goreportcard.com/badge/github.com/robbyt/go-polyscript)](https://goreportcard.com/report/github.com/robbyt/go-polyscript)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
+
 A Go library providing a unified interface for embedding and running various scripting languages and WebAssembly modules in your Go applications.
 
 ## Overview
@@ -42,7 +46,7 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/robbyt/go-polyscript/engine"
+	"github.com/robbyt/go-polyscript/execution/constants"
 	"github.com/robbyt/go-polyscript/execution/script"
 	"github.com/robbyt/go-polyscript/execution/script/loader"
 	"github.com/robbyt/go-polyscript/machines/risor"
@@ -54,7 +58,7 @@ func main() {
 	logger := slog.New(handler)
 
 	// Define globals that will be available to the script
-	globals := []string{"ctx"}
+	globals := []string{constants.Ctx}
 
 	// Create a compiler for Risor scripts
 	compilerOptions := &risor.BasicCompilerOptions{Globals: globals}
@@ -72,10 +76,14 @@ func main() {
 			"length": len(message)
 		}
 	`
-	scriptLoader := loader.NewStringLoader(scriptContent)
+	fromString, err := loader.NewFromString(scriptContent)
+	if err != nil {
+		logger.Error("Failed to create string loader", "error", err)
+		return
+	}
 
 	// Create an executable unit
-	unit, err := script.NewExecutableUnit(handler, "", scriptLoader, compiler, nil)
+	unit, err := script.NewExecutableUnit(handler, "", fromString, compiler, nil)
 	if err != nil {
 		logger.Error("Failed to create executable unit", "error", err)
 		return
@@ -89,7 +97,7 @@ func main() {
 	input := map[string]any{
 		"name": "World",
 	}
-	ctx = context.WithValue(ctx, "eval_data", input)
+	ctx = context.WithValue(ctx, constants.EvalData, input)
 
 	// Execute the script
 	result, err := evaluator.Eval(ctx, unit)
@@ -119,10 +127,24 @@ go-polyscript is structured around a few key concepts:
 
 ```go
 // Create a Starlark compiler
-compiler := starlark.NewCompiler(handler, &starlark.BasicCompilerOptions{Globals: []string{"ctx"}})
+compiler := starlark.NewCompiler(handler, &starlark.BasicCompilerOptions{Globals: []string{constants.Ctx}})
 
-// Rest of the code is similar to the Risor example
-// Just use starlark.NewBytecodeEvaluator(handler) for evaluation
+// Load a Starlark script
+content := `
+    # Starlark has access to ctx variable
+    name = ctx["name"]
+    message = "Hello, " + name + "!"
+    
+    # Return a dict with our result
+    {"greeting": message, "length": len(message)}
+`
+fromString, _ := loader.NewFromString(content)
+
+// Create executable unit and evaluator
+unit, _ := script.NewExecutableUnit(handler, "", fromString, compiler, nil)
+evaluator := starlark.NewBytecodeEvaluator(handler)
+
+// Execute using the same context setup as the Risor example
 ```
 
 ### Using WebAssembly with Extism
@@ -132,10 +154,13 @@ compiler := starlark.NewCompiler(handler, &starlark.BasicCompilerOptions{Globals
 compiler := extism.NewCompiler(handler, &extism.BasicCompilerOptions{EntryPoint: "main"})
 
 // Load a WASM module from file
-wasmLoader := loader.NewFileLoader("/path/to/module.wasm")
+fileLoader, _ := loader.NewFromDisk("/path/to/module.wasm")
 
-// Rest of the code follows the same pattern
-// Use extism.NewBytecodeEvaluator(handler) for evaluation
+// Create executable unit and evaluator
+unit, _ := script.NewExecutableUnit(handler, "", fileLoader, compiler, nil)
+evaluator := extism.NewBytecodeEvaluator(handler)
+
+// Execute using the same context setup as the Risor example
 ```
 
 ## License
