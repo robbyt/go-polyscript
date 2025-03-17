@@ -50,7 +50,9 @@ func NewExecutableUnit(handler slog.Handler, versionID string, loader loader.Loa
 	if handler == nil {
 		defaultHandler := slog.NewTextHandler(os.Stdout, nil)
 		handler = defaultHandler.WithGroup("script")
-		slog.New(handler).Warn("Handler is nil, using the default logger configuration.")
+		// Create a logger from the handler rather than using slog directly
+		defaultLogger := slog.New(handler)
+		defaultLogger.Warn("Handler is nil, using the default logger configuration.")
 	}
 
 	if compiler == nil {
@@ -144,8 +146,14 @@ func (ver *ExecutableUnit) BuildEvalContext(ctx context.Context, r *http.Request
 
 	rMap, err := helpers.RequestToMap(r)
 	if err != nil {
-		// Use slog directly if logger is nil to avoid panic
-		slog.Error("Failed to convert request to map", "error", err)
+		// Use the configured logger to log the error
+		if ver.logger != nil {
+			ver.logger.Error("Failed to convert request to map", "error", err)
+		} else {
+			// Fallback to default logger as a last resort
+			defaultLogger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+			defaultLogger.Error("Failed to convert request to map - logger was nil", "error", err)
+		}
 		rMap = make(map[string]any)
 	}
 	evalData[constants.Request] = rMap

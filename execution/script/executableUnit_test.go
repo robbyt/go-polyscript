@@ -470,8 +470,14 @@ func TestExecutableUnit_BuildEvalContext(t *testing.T) {
 	})
 
 	t.Run("request conversion error", func(t *testing.T) {
+		// Create a test logger
+		logHandler := slog.NewTextHandler(os.Stdout, nil)
+		logger := slog.New(logHandler.WithGroup("test"))
+		
 		unit := &ExecutableUnit{
-			ID: "test-unit",
+			ID:         "test-unit",
+			logHandler: logHandler,
+			logger:     logger,
 		}
 
 		// Create invalid request that won't panic but will cause conversion error

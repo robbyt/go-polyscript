@@ -23,7 +23,9 @@ func newEvalResult(handler slog.Handler, value interface{}, execTime time.Durati
 	if handler == nil {
 		defaultHandler := slog.NewTextHandler(os.Stdout, nil)
 		handler = defaultHandler.WithGroup("extism")
-		slog.New(handler).Warn("Handler is nil, using the default logger configuration.")
+		// Create a logger from the handler rather than using slog directly
+		defaultLogger := slog.New(handler)
+		defaultLogger.Warn("Handler is nil, using the default logger configuration.")
 	}
 
 	return &execResult{

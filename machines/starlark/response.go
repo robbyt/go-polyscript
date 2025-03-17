@@ -24,7 +24,9 @@ func newEvalResult(handler slog.Handler, obj starlarkLib.Value, execTime time.Du
 	if handler == nil {
 		defaultHandler := slog.NewTextHandler(os.Stdout, nil)
 		handler = defaultHandler.WithGroup("starlark")
-		slog.New(handler).Warn("Handler is nil, using the default logger configuration.")
+		// Create a logger from the handler rather than using slog directly
+		defaultLogger := slog.New(handler)
+		defaultLogger.Warn("Handler is nil, using the default logger configuration.")
 	}
 
 	if obj == nil {

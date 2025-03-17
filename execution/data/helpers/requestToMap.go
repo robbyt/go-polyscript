@@ -7,8 +7,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-
-	"log/slog"
 )
 
 // httpRequestWrapper is a struct that mirrors the http.Request fields we are interested in.
@@ -102,13 +100,11 @@ func RequestToMap(r *http.Request) (map[string]any, error) {
 	// Transform http.Request to httpRequest struct
 	reqStruct, err := newHttpRequestWrapper(r)
 	if err != nil {
-		slog.Error("Failed to transform http.Request to httpRequest struct", "error", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to transform http.Request to httpRequest struct: %w", err)
 	}
 
 	if reqStruct == nil {
-		slog.Error("Failed to transform http.Request to httpRequest struct", "error", "reqStruct is nil")
-		return nil, err
+		return nil, errors.New("failed to transform http.Request to httpRequest struct: result is nil")
 	}
 
 	// Convert httpRequest struct to map[string]any
