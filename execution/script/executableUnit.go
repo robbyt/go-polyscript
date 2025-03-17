@@ -91,10 +91,6 @@ func NewExecutableUnit(handler slog.Handler, versionID string, loader loader.Loa
 	}, nil
 }
 
-func (ver *ExecutableUnit) getLogger() *slog.Logger {
-	return ver.logger
-}
-
 func (ver *ExecutableUnit) String() string {
 	return fmt.Sprintf("ExecutableUnit{ID: %s, CreatedAt: %s, Compiler: %s, Loader: %s}",
 		ver.ID, ver.CreatedAt, ver.Compiler, ver.Loader)

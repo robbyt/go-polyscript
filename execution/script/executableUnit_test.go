@@ -473,7 +473,7 @@ func TestExecutableUnit_BuildEvalContext(t *testing.T) {
 		// Create a test logger
 		logHandler := slog.NewTextHandler(os.Stdout, nil)
 		logger := slog.New(logHandler.WithGroup("test"))
-		
+
 		unit := &ExecutableUnit{
 			ID:         "test-unit",
 			logHandler: logHandler,
