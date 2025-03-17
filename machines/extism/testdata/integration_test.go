@@ -149,10 +149,10 @@ func TestExtismWasmIntegration(t *testing.T) {
 		defer instance.Close(instanceCtx)
 
 		// Create a test request
-		complexRequest := map[string]interface{}{
+		complexRequest := map[string]any{
 			"id":        "test-123",
 			"timestamp": time.Now().Unix(),
-			"data": map[string]interface{}{
+			"data": map[string]any{
 				"temperature": 72.5,
 				"humidity":    45,
 				"status":      "operational",
@@ -177,7 +177,7 @@ func TestExtismWasmIntegration(t *testing.T) {
 		require.Equal(t, uint32(0), exit, "Process_complex returned non-zero exit code")
 
 		// Parse and verify the response
-		var response map[string]interface{}
+		var response map[string]any
 		err = json.Unmarshal(output, &response)
 		require.NoError(t, err, "Failed to parse complex response")
 
@@ -210,7 +210,7 @@ func TestExtismWasmIntegration(t *testing.T) {
 		require.Equal(t, uint32(0), exit, "Count_vowels returned non-zero exit code")
 
 		// Parse and verify result
-		var vowelResult map[string]interface{}
+		var vowelResult map[string]any
 		err = json.Unmarshal(output, &vowelResult)
 		require.NoError(t, err, "Failed to parse vowel result")
 

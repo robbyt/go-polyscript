@@ -323,7 +323,7 @@ func TestValidScript(t *testing.T) {
 				input:         []byte("World"),
 				expected:      "Hello, World!",
 				expectedType:  data.MAP,
-				expectedValue: map[string]interface{}{"greeting": "Hello, World!"},
+				expectedValue: map[string]any{"greeting": "Hello, World!"},
 			},
 			{
 				name:          "reverse string",
@@ -331,7 +331,7 @@ func TestValidScript(t *testing.T) {
 				input:         []byte("Hello"),
 				expected:      "olleH",
 				expectedType:  data.MAP,
-				expectedValue: map[string]interface{}{"reversed": "olleH"},
+				expectedValue: map[string]any{"reversed": "olleH"},
 			},
 			{
 				name:         "count vowels",
@@ -362,7 +362,7 @@ func TestValidScript(t *testing.T) {
 
 				assert.Equal(t, tt.expectedType, response.Type())
 				if tt.expectedValue != nil {
-					// Direct comparison - response.Interface() already returns interface{}
+					// Direct comparison - response.Interface() already returns any
 					assert.Equal(t, tt.expectedValue, response.Interface())
 				}
 			})
@@ -372,10 +372,10 @@ func TestValidScript(t *testing.T) {
 	t.Run("complex processing", func(t *testing.T) {
 		exe, evaluator := evalBuilder(t, "process_complex")
 
-		request := map[string]interface{}{
+		request := map[string]any{
 			"id":        "test-123",
 			"timestamp": time.Now().Unix(),
-			"data": map[string]interface{}{
+			"data": map[string]any{
 				"key1": "value1",
 				"key2": 42,
 			},
@@ -397,7 +397,7 @@ func TestValidScript(t *testing.T) {
 
 		assert.Equal(t, data.MAP, response.Type())
 
-		result := response.Interface().(map[string]interface{})
+		result := response.Interface().(map[string]any)
 		assert.Equal(t, "test-123", result["request_id"])
 		assert.Equal(t, 2, result["tag_count"])
 		assert.Equal(t, 2, result["meta_count"])

@@ -12,14 +12,14 @@ import (
 
 // execResult is a wrapper around the WASM execution result
 type execResult struct {
-	value       interface{}
+	value       any
 	execTime    time.Duration
 	scriptExeID string
 	logHandler  slog.Handler
 	logger      *slog.Logger
 }
 
-func newEvalResult(handler slog.Handler, value interface{}, execTime time.Duration, scriptExeID string) *execResult {
+func newEvalResult(handler slog.Handler, value any, execTime time.Duration, scriptExeID string) *execResult {
 	if handler == nil {
 		defaultHandler := slog.NewTextHandler(os.Stdout, nil)
 		handler = defaultHandler.WithGroup("extism")
@@ -61,9 +61,9 @@ func (r *execResult) Type() data.Types {
 		return data.FLOAT
 	case string:
 		return data.STRING
-	case []interface{}:
+	case []any:
 		return data.LIST
-	case map[string]interface{}:
+	case map[string]any:
 		return data.MAP
 	default:
 		r.getLogger().Error("Unknown type", "type", fmt.Sprintf("%T", v))

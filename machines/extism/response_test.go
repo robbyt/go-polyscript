@@ -18,10 +18,10 @@ func TestNewEvalResult(t *testing.T) {
 
 	tests := []struct {
 		name        string
-		value       interface{}
+		value       any
 		execTime    time.Duration
 		versionID   string
-		expectValue interface{}
+		expectValue any
 	}{
 		{
 			name:        "string value",
@@ -72,7 +72,7 @@ func TestExecResult_Type(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name     string
-		value    interface{}
+		value    any
 		expected data.Types
 	}{
 		{"nil value", nil, data.NONE},
@@ -84,16 +84,16 @@ func TestExecResult_Type(t *testing.T) {
 		{"float32 value", float32(3.14), data.FLOAT},
 		{"float64 value", float64(3.14), data.FLOAT},
 		{"string value", "hello", data.STRING},
-		{"empty list", []interface{}{}, data.LIST},
-		{"list value", []interface{}{1, 2, 3}, data.LIST},
-		{"empty dict", map[string]interface{}{}, data.MAP},
-		{"dict value", map[string]interface{}{"key": "value"}, data.MAP},
-		{"complex dict", map[string]interface{}{
+		{"empty list", []any{}, data.LIST},
+		{"list value", []any{1, 2, 3}, data.LIST},
+		{"empty dict", map[string]any{}, data.MAP},
+		{"dict value", map[string]any{"key": "value"}, data.MAP},
+		{"complex dict", map[string]any{
 			"str":   "value",
 			"num":   42,
 			"bool":  true,
-			"list":  []interface{}{1, 2, 3},
-			"inner": map[string]interface{}{"key": "value"},
+			"list":  []any{1, 2, 3},
+			"inner": map[string]any{"key": "value"},
 		}, data.MAP},
 	}
 
@@ -112,7 +112,7 @@ func TestExecResult_String(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name      string
-		value     interface{}
+		value     any
 		execTime  time.Duration
 		versionID string
 		expected  string
@@ -162,7 +162,7 @@ func TestExecResult_Inspect(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name     string
-		value    interface{}
+		value    any
 		expected string
 	}{
 		{"string value", "hello", "hello"},
@@ -170,9 +170,9 @@ func TestExecResult_Inspect(t *testing.T) {
 		{"bool value", true, "true"},
 		{"nil value", nil, "<nil>"},
 		{"float value", 3.14159, "3.14159"},
-		{"list value", []interface{}{1, 2, 3}, "[1 2 3]"},
-		{"dict value", map[string]interface{}{"key": "value"}, "{\"key\":\"value\"}"},
-		{"complex dict", map[string]interface{}{
+		{"list value", []any{1, 2, 3}, "[1 2 3]"},
+		{"dict value", map[string]any{"key": "value"}, "{\"key\":\"value\"}"},
+		{"complex dict", map[string]any{
 			"num":  42,
 			"str":  "test",
 			"bool": true,

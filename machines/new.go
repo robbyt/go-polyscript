@@ -39,7 +39,7 @@ func NewEvaluator(handler slog.Handler, ver *script.ExecutableUnit) (engine.Eval
 }
 
 // NewCompiler creates a compiler for the specified machine type with given globals
-func NewCompiler(handler slog.Handler, machineType machineTypes.Type, compilerOptions interface{}) (script.Compiler, error) {
+func NewCompiler(handler slog.Handler, machineType machineTypes.Type, compilerOptions any) (script.Compiler, error) {
 	switch machineType {
 	case machineTypes.Risor:
 		// Risor VM: https://github.com/risor-io/risor

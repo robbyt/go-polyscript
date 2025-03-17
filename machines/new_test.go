@@ -88,7 +88,7 @@ func (m *mockExecutableContent) GetSource() string {
 	return args.String(0)
 }
 
-func (m *mockExecutableContent) GetByteCode() interface{} {
+func (m *mockExecutableContent) GetByteCode() any {
 	args := m.Called()
 	return args.Get(0)
 }

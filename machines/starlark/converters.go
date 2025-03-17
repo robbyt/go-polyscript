@@ -9,7 +9,7 @@ import (
 	"github.com/robbyt/go-polyscript/execution/constants"
 )
 
-// convertStarlarkValueToInterface converts a Starlark value to a Go interface{} value
+// convertStarlarkValueToInterface converts a Starlark value to a Go any value
 func convertStarlarkValueToInterface(v starlarkLib.Value) (any, error) {
 	if v == nil {
 		return nil, nil
