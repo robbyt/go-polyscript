@@ -96,13 +96,17 @@ func DefaultHTTPOptions() *HTTPOptions {
 	}
 }
 
+type httpRequester interface {
+	Do(req *http.Request) (*http.Response, error)
+}
+
 // FromHTTP implements a loader for HTTP/HTTPS URLs.
 // It allows loading scripts from remote web servers with various authentication options.
 type FromHTTP struct {
 	url       string
 	sourceURL *url.URL
 	options   *HTTPOptions
-	client    *http.Client
+	client    httpRequester
 }
 
 // NewFromHTTP creates a new HTTP loader with the given URL and default options.

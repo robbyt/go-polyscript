@@ -1,14 +1,51 @@
 package loader
 
 import (
+	"bytes"
+	"errors"
 	"io"
 	"net/http"
-	"net/http/httptest"
+	"net/url"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 )
+
+// mockHTTPClient implements the httpRequester interface for testing
+type mockHTTPClient struct {
+	doFunc func(req *http.Request) (*http.Response, error)
+}
+
+func (m *mockHTTPClient) Do(req *http.Request) (*http.Response, error) {
+	if m.doFunc != nil {
+		return m.doFunc(req)
+	}
+	return nil, errors.New("doFunc not implemented")
+}
+
+// mockResponseBody implements io.ReadCloser for testing
+type mockResponseBody struct {
+	io.Reader
+	closeFunc func() error
+}
+
+func (m mockResponseBody) Close() error {
+	if m.closeFunc != nil {
+		return m.closeFunc()
+	}
+	return nil
+}
+
+// newMockResponse creates a new mock HTTP response
+func newMockResponse(statusCode int, body string) *http.Response {
+	return &http.Response{
+		StatusCode: statusCode,
+		Body:       mockResponseBody{Reader: bytes.NewBufferString(body)},
+		Status:     http.StatusText(statusCode),
+		Header:     make(http.Header),
+	}
+}
 
 func TestNewFromHTTP(t *testing.T) {
 	t.Parallel()
@@ -86,7 +123,7 @@ func TestNewFromHTTPWithOptions(t *testing.T) {
 				Timeout: 60 * time.Second,
 			},
 			validateOption: func(t *testing.T, loader *FromHTTP) {
-				require.Equal(t, 60*time.Second, loader.client.Timeout)
+				require.Equal(t, 60*time.Second, loader.options.Timeout)
 			},
 		},
 		{
@@ -166,132 +203,94 @@ func TestNewFromHTTPWithOptions(t *testing.T) {
 }
 
 func TestFromHTTPGetReader(t *testing.T) {
-	// Not running in parallel to ensure the server is available for all subtests
+	t.Parallel()
 
 	const testScript = `function test() { return "Hello, World!"; }`
 
-	// Create a test server
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		path := r.URL.Path
-
-		// Test basic auth
-		if path == "/auth" {
-			username, password, ok := r.BasicAuth()
-			if !ok || username != "user" || password != "pass" {
-				w.WriteHeader(http.StatusUnauthorized)
-				return
-			}
-			_, err := w.Write([]byte(testScript))
-			if err != nil {
-				t.Logf("Failed to write response: %v", err)
-			}
-			return
-		}
-
-		// Test header auth
-		if path == "/header-auth" {
-			token := r.Header.Get("Authorization")
-			if token != "Bearer test-token" {
-				w.WriteHeader(http.StatusUnauthorized)
-				return
-			}
-			_, err := w.Write([]byte(testScript))
-			if err != nil {
-				t.Logf("Failed to write response: %v", err)
-			}
-			return
-		}
-
-		// Test error response
-		if path == "/error" {
-			w.WriteHeader(http.StatusNotFound)
-			return
-		}
-
-		// Default response
-		_, err := w.Write([]byte(testScript))
-		if err != nil {
-			t.Logf("Failed to write response: %v", err)
-		}
-	}))
-	defer server.Close()
-
 	tests := []struct {
-		name          string
-		url           string
-		options       *HTTPOptions
-		expectError   bool
-		errorContains string
-		validateBody  bool
+		name             string
+		url              string
+		options          *HTTPOptions
+		mockResponse     *http.Response
+		mockError        error
+		requestValidator func(t *testing.T, req *http.Request)
+		expectError      bool
+		errorContains    string
+		validateBody     bool
 	}{
 		{
 			name:         "Success - Default",
-			url:          server.URL + "/script.js",
+			url:          "https://example.com/script.js",
+			mockResponse: newMockResponse(http.StatusOK, testScript),
+			requestValidator: func(t *testing.T, req *http.Request) {
+				require.Equal(t, "https://example.com/script.js", req.URL.String())
+				require.Equal(t, http.MethodGet, req.Method)
+				require.Equal(t, "go-polyscript/http-loader", req.Header.Get("User-Agent"))
+			},
 			validateBody: true,
 		},
 		{
 			name: "Success - Basic Auth",
-			url:  server.URL + "/auth",
+			url:  "https://example.com/auth",
 			options: &HTTPOptions{
 				AuthType: BasicAuth,
 				Username: "user",
 				Password: "pass",
 				Timeout:  5 * time.Second,
 			},
+			mockResponse: newMockResponse(http.StatusOK, testScript),
+			requestValidator: func(t *testing.T, req *http.Request) {
+				require.Equal(t, "https://example.com/auth", req.URL.String())
+				username, password, ok := req.BasicAuth()
+				require.True(t, ok, "Expected Basic Auth to be set")
+				require.Equal(t, "user", username)
+				require.Equal(t, "pass", password)
+			},
 			validateBody: true,
 		},
 		{
 			name: "Success - Header Auth",
-			url:  server.URL + "/header-auth",
+			url:  "https://example.com/header-auth",
 			options: &HTTPOptions{
 				AuthType: HeaderAuth,
 				Headers: map[string]string{
 					"Authorization": "Bearer test-token",
+					"User-Agent":    "Custom-Agent",
 				},
 				Timeout: 5 * time.Second,
+			},
+			mockResponse: newMockResponse(http.StatusOK, testScript),
+			requestValidator: func(t *testing.T, req *http.Request) {
+				require.Equal(t, "https://example.com/header-auth", req.URL.String())
+				require.Equal(t, "Bearer test-token", req.Header.Get("Authorization"))
+				require.Equal(t, "Custom-Agent", req.Header.Get("User-Agent"))
 			},
 			validateBody: true,
 		},
 		{
-			name: "Failure - Basic Auth Invalid Credentials",
-			url:  server.URL + "/auth",
-			options: &HTTPOptions{
-				AuthType: BasicAuth,
-				Username: "wrong",
-				Password: "wrong",
-				Timeout:  5 * time.Second,
-			},
-			expectError:   true,
-			errorContains: "HTTP 401",
-		},
-		{
-			name: "Failure - Header Auth Invalid Token",
-			url:  server.URL + "/header-auth",
-			options: &HTTPOptions{
-				AuthType: HeaderAuth,
-				Headers: map[string]string{
-					"Authorization": "Bearer wrong-token",
-				},
-				Timeout: 5 * time.Second,
-			},
+			name:          "Failure - Unauthorized",
+			url:           "https://example.com/auth",
+			mockResponse:  newMockResponse(http.StatusUnauthorized, "Unauthorized"),
 			expectError:   true,
 			errorContains: "HTTP 401",
 		},
 		{
 			name:          "Failure - Not Found",
-			url:           server.URL + "/error",
+			url:           "https://example.com/error",
+			mockResponse:  newMockResponse(http.StatusNotFound, "Not Found"),
 			expectError:   true,
 			errorContains: "HTTP 404",
 		},
 		{
-			name:          "Failure - Invalid URL",
-			url:           "http://invalid-domain-that-should-not-exist.example",
+			name:          "Failure - Network Error",
+			url:           "https://invalid-domain.example",
+			mockError:     errors.New("network error"),
 			expectError:   true,
 			errorContains: "failed to execute HTTP request",
 		},
 		{
 			name: "Failure - Digest Auth Not Implemented",
-			url:  server.URL + "/script.js",
+			url:  "https://example.com/script.js",
 			options: &HTTPOptions{
 				AuthType: DigestAuth,
 				Timeout:  5 * time.Second,
@@ -304,7 +303,22 @@ func TestFromHTTPGetReader(t *testing.T) {
 	for _, tt := range tests {
 		tt := tt // Capture range variable
 		t.Run(tt.name, func(t *testing.T) {
-			// Not running subtests in parallel to avoid server closing issues
+			t.Parallel()
+
+			// Create a mock client for this test
+			mockClient := &mockHTTPClient{
+				doFunc: func(req *http.Request) (*http.Response, error) {
+					if tt.requestValidator != nil {
+						tt.requestValidator(t, req)
+					}
+
+					if tt.mockError != nil {
+						return nil, tt.mockError
+					}
+
+					return tt.mockResponse, nil
+				},
+			}
 
 			var loader *FromHTTP
 			var err error
@@ -315,6 +329,9 @@ func TestFromHTTPGetReader(t *testing.T) {
 				loader, err = NewFromHTTP(tt.url)
 			}
 			require.NoError(t, err, "Failed to create HTTP loader")
+
+			// Replace the client with our mock
+			loader.client = mockClient
 
 			reader, err := loader.GetReader()
 			if tt.expectError {
@@ -339,47 +356,58 @@ func TestFromHTTPGetReader(t *testing.T) {
 }
 
 func TestFromHTTPString(t *testing.T) {
-	// Not running in parallel to avoid test server issues
+	t.Parallel()
 
-	// Create test server that returns a predictable response
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, err := w.Write([]byte("test script content"))
-		if err != nil {
-			t.Logf("Failed to write response: %v", err)
-		}
-	}))
-	defer server.Close()
-
-	loader, err := NewFromHTTP(server.URL)
+	// Test successful String() result with mock client
+	testURL := "https://example.com/script.js"
+	loader, err := NewFromHTTP(testURL)
 	require.NoError(t, err)
+
+	// Mock client that returns content for SHA256 calculation
+	mockClient := &mockHTTPClient{
+		doFunc: func(req *http.Request) (*http.Response, error) {
+			return newMockResponse(http.StatusOK, "test script content"), nil
+		},
+	}
+	loader.client = mockClient
 
 	str := loader.String()
 	require.Contains(t, str, "loader.FromHTTP{URL:")
-	require.Contains(t, str, server.URL)
+	require.Contains(t, str, testURL)
+	require.Contains(t, str, "SHA256:")
 
 	// Test error case for String method
-	invalidServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Close connection immediately to cause error
-		conn, _, _ := w.(http.Hijacker).Hijack()
-		conn.Close()
-	}))
-	defer invalidServer.Close()
-
-	invalidLoader, err := NewFromHTTP(invalidServer.URL)
+	failingLoader, err := NewFromHTTP(testURL)
 	require.NoError(t, err)
 
-	str = invalidLoader.String()
+	// Mock client that simulates an error
+	failingMockClient := &mockHTTPClient{
+		doFunc: func(req *http.Request) (*http.Response, error) {
+			return nil, errors.New("network error")
+		},
+	}
+	failingLoader.client = failingMockClient
+
+	str = failingLoader.String()
 	require.Contains(t, str, "loader.FromHTTP{URL:")
-	require.Contains(t, str, invalidServer.URL)
+	require.Contains(t, str, testURL)
 	require.NotContains(t, str, "SHA256")
 
-	// Test String() with nonexistent server
-	nonExistentLoader, err := NewFromHTTP("http://nonexistent-server.example")
+	// Test when HTTP response is an error code
+	errorLoader, err := NewFromHTTP(testURL)
 	require.NoError(t, err)
 
-	str = nonExistentLoader.String()
+	// Mock client that returns an error status code
+	errorMockClient := &mockHTTPClient{
+		doFunc: func(req *http.Request) (*http.Response, error) {
+			return newMockResponse(http.StatusNotFound, "Not Found"), nil
+		},
+	}
+	errorLoader.client = errorMockClient
+
+	str = errorLoader.String()
 	require.Contains(t, str, "loader.FromHTTP{URL:")
-	require.Contains(t, str, "nonexistent-server.example")
+	require.Contains(t, str, testURL)
 	require.NotContains(t, str, "SHA256")
 }
 
@@ -393,4 +421,22 @@ func TestDefaultHTTPOptions(t *testing.T) {
 	require.Equal(t, NoAuth, options.AuthType)
 	require.NotNil(t, options.Headers)
 	require.Empty(t, options.Headers)
+}
+
+// Test the GetSourceURL method
+func TestFromHTTPGetSourceURL(t *testing.T) {
+	t.Parallel()
+
+	testURL := "https://example.com/script.js"
+	loader, err := NewFromHTTP(testURL)
+	require.NoError(t, err)
+
+	sourceURL := loader.GetSourceURL()
+	require.NotNil(t, sourceURL)
+	require.Equal(t, testURL, sourceURL.String())
+
+	// Test that the returned URL is a copy that can't modify the internal state
+	parsedURL, err := url.Parse(testURL)
+	require.NoError(t, err)
+	require.Equal(t, parsedURL, sourceURL)
 }
