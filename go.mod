@@ -3,7 +3,7 @@ module github.com/robbyt/go-polyscript
 go 1.24.1
 
 require (
-	github.com/extism/go-sdk v1.7.0
+	github.com/extism/go-sdk v1.7.1
 	github.com/risor-io/risor v1.7.0
 	github.com/stretchr/testify v1.10.0
 	github.com/tetratelabs/wazero v1.9.0
