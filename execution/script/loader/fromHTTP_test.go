@@ -2,6 +2,7 @@ package loader
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"io"
 	"net/http"
@@ -9,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/robbyt/go-polyscript/execution/script/loader/httpauth"
 	"github.com/stretchr/testify/require"
 )
 
@@ -109,18 +111,18 @@ func TestNewFromHTTPWithOptions(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name           string
-		url            string
-		options        *HTTPOptions
-		validateOption func(t *testing.T, loader *FromHTTP)
-		expectError    bool
-		errorContains  string
+		name            string
+		url             string
+		optionsModifier func(options *HTTPOptions) *HTTPOptions
+		validateOption  func(t *testing.T, loader *FromHTTP)
+		expectError     bool
+		errorContains   string
 	}{
 		{
 			name: "Custom timeout",
 			url:  "https://example.com/script.js",
-			options: &HTTPOptions{
-				Timeout: 60 * time.Second,
+			optionsModifier: func(options *HTTPOptions) *HTTPOptions {
+				return options.WithTimeout(60 * time.Second)
 			},
 			validateOption: func(t *testing.T, loader *FromHTTP) {
 				require.Equal(t, 60*time.Second, loader.options.Timeout)
@@ -129,30 +131,38 @@ func TestNewFromHTTPWithOptions(t *testing.T) {
 		{
 			name: "Basic auth",
 			url:  "https://example.com/script.js",
-			options: &HTTPOptions{
-				AuthType: BasicAuth,
-				Username: "user",
-				Password: "pass",
+			optionsModifier: func(options *HTTPOptions) *HTTPOptions {
+				return options.WithBasicAuth("user", "pass")
 			},
 			validateOption: func(t *testing.T, loader *FromHTTP) {
-				require.Equal(t, BasicAuth, loader.options.AuthType)
-				require.Equal(t, "user", loader.options.Username)
-				require.Equal(t, "pass", loader.options.Password)
+				auth, ok := loader.options.Authenticator.(*httpauth.BasicAuth)
+				require.True(t, ok, "Expected BasicAuth authenticator")
+				require.Equal(t, "user", auth.Username)
+				require.Equal(t, "pass", auth.Password)
+			},
+		},
+		{
+			name: "Bearer auth",
+			url:  "https://example.com/script.js",
+			optionsModifier: func(options *HTTPOptions) *HTTPOptions {
+				return options.WithBearerAuth("token123")
+			},
+			validateOption: func(t *testing.T, loader *FromHTTP) {
+				auth, ok := loader.options.Authenticator.(*httpauth.HeaderAuth)
+				require.True(t, ok, "Expected HeaderAuth authenticator")
+				require.Equal(t, "Bearer token123", auth.Headers["Authorization"])
 			},
 		},
 		{
 			name: "Custom headers",
 			url:  "https://example.com/script.js",
-			options: &HTTPOptions{
-				AuthType: HeaderAuth,
-				Headers: map[string]string{
-					"Authorization": "Bearer token",
-					"User-Agent":    "Test-Agent",
-				},
+			optionsModifier: func(options *HTTPOptions) *HTTPOptions {
+				options.Headers["X-Custom"] = "TestValue"
+				options.Headers["User-Agent"] = "Test-Agent"
+				return options
 			},
 			validateOption: func(t *testing.T, loader *FromHTTP) {
-				require.Equal(t, HeaderAuth, loader.options.AuthType)
-				require.Equal(t, "Bearer token", loader.options.Headers["Authorization"])
+				require.Equal(t, "TestValue", loader.options.Headers["X-Custom"])
 				require.Equal(t, "Test-Agent", loader.options.Headers["User-Agent"])
 			},
 		},
@@ -163,19 +173,10 @@ func TestNewFromHTTPWithOptions(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			// Use either provided options or default options
-			options := tt.options
-			if options == nil {
-				options = DefaultHTTPOptions()
-			} else {
-				// Fill in any unset fields with defaults
-				defaultOptions := DefaultHTTPOptions()
-				if options.Timeout == 0 {
-					options.Timeout = defaultOptions.Timeout
-				}
-				if options.Headers == nil {
-					options.Headers = defaultOptions.Headers
-				}
+			// Start with default options and apply modifier if provided
+			options := DefaultHTTPOptions()
+			if tt.optionsModifier != nil {
+				options = tt.optionsModifier(options)
 			}
 
 			loader, err := NewFromHTTPWithOptions(tt.url, options)
@@ -210,7 +211,7 @@ func TestFromHTTPGetReader(t *testing.T) {
 	tests := []struct {
 		name             string
 		url              string
-		options          *HTTPOptions
+		optionsModifier  func(options *HTTPOptions) *HTTPOptions
 		mockResponse     *http.Response
 		mockError        error
 		requestValidator func(t *testing.T, req *http.Request)
@@ -232,11 +233,8 @@ func TestFromHTTPGetReader(t *testing.T) {
 		{
 			name: "Success - Basic Auth",
 			url:  "https://example.com/auth",
-			options: &HTTPOptions{
-				AuthType: BasicAuth,
-				Username: "user",
-				Password: "pass",
-				Timeout:  5 * time.Second,
+			optionsModifier: func(options *HTTPOptions) *HTTPOptions {
+				return options.WithBasicAuth("user", "pass").WithTimeout(5 * time.Second)
 			},
 			mockResponse: newMockResponse(http.StatusOK, testScript),
 			requestValidator: func(t *testing.T, req *http.Request) {
@@ -249,21 +247,30 @@ func TestFromHTTPGetReader(t *testing.T) {
 			validateBody: true,
 		},
 		{
-			name: "Success - Header Auth",
+			name: "Success - Bearer Auth",
 			url:  "https://example.com/header-auth",
-			options: &HTTPOptions{
-				AuthType: HeaderAuth,
-				Headers: map[string]string{
-					"Authorization": "Bearer test-token",
-					"User-Agent":    "Custom-Agent",
-				},
-				Timeout: 5 * time.Second,
+			optionsModifier: func(options *HTTPOptions) *HTTPOptions {
+				return options.WithBearerAuth("test-token").WithTimeout(5 * time.Second)
 			},
 			mockResponse: newMockResponse(http.StatusOK, testScript),
 			requestValidator: func(t *testing.T, req *http.Request) {
 				require.Equal(t, "https://example.com/header-auth", req.URL.String())
 				require.Equal(t, "Bearer test-token", req.Header.Get("Authorization"))
+			},
+			validateBody: true,
+		},
+		{
+			name: "Success - Custom Headers",
+			url:  "https://example.com/header-auth",
+			optionsModifier: func(options *HTTPOptions) *HTTPOptions {
+				options.Headers["User-Agent"] = "Custom-Agent"
+				options.Headers["X-Custom"] = "value"
+				return options
+			},
+			mockResponse: newMockResponse(http.StatusOK, testScript),
+			requestValidator: func(t *testing.T, req *http.Request) {
 				require.Equal(t, "Custom-Agent", req.Header.Get("User-Agent"))
+				require.Equal(t, "value", req.Header.Get("X-Custom"))
 			},
 			validateBody: true,
 		},
@@ -287,16 +294,6 @@ func TestFromHTTPGetReader(t *testing.T) {
 			mockError:     errors.New("network error"),
 			expectError:   true,
 			errorContains: "failed to execute HTTP request",
-		},
-		{
-			name: "Failure - Digest Auth Not Implemented",
-			url:  "https://example.com/script.js",
-			options: &HTTPOptions{
-				AuthType: DigestAuth,
-				Timeout:  5 * time.Second,
-			},
-			expectError:   true,
-			errorContains: "digest authentication not implemented",
 		},
 	}
 
@@ -323,11 +320,13 @@ func TestFromHTTPGetReader(t *testing.T) {
 			var loader *FromHTTP
 			var err error
 
-			if tt.options != nil {
-				loader, err = NewFromHTTPWithOptions(tt.url, tt.options)
-			} else {
-				loader, err = NewFromHTTP(tt.url)
+			// Start with default options and apply modifier if provided
+			options := DefaultHTTPOptions()
+			if tt.optionsModifier != nil {
+				options = tt.optionsModifier(options)
 			}
+
+			loader, err = NewFromHTTPWithOptions(tt.url, options)
 			require.NoError(t, err, "Failed to create HTTP loader")
 
 			// Replace the client with our mock
@@ -351,6 +350,83 @@ func TestFromHTTPGetReader(t *testing.T) {
 				require.NoError(t, err)
 				require.Equal(t, testScript, string(content))
 			}
+		})
+	}
+}
+
+func TestFromHTTPGetReaderWithContext(t *testing.T) {
+	t.Parallel()
+
+	const testScript = `function test() { return "Hello, World!"; }`
+
+	tests := []struct {
+		name          string
+		url           string
+		ctx           context.Context
+		cancelFunc    func()
+		mockResponse  *http.Response
+		expectError   bool
+		errorContains string
+	}{
+		{
+			name:         "Success - Background Context",
+			url:          "https://example.com/script.js",
+			ctx:          context.Background(),
+			mockResponse: newMockResponse(http.StatusOK, testScript),
+		},
+		{
+			name:          "Failure - Cancelled Context",
+			url:           "https://example.com/script.js",
+			ctx:           func() context.Context { ctx, cancel := context.WithCancel(context.Background()); cancel(); return ctx }(),
+			expectError:   true,
+			errorContains: "context canceled",
+		},
+		{
+			name: "Failure - Timeout Context",
+			url:  "https://example.com/script.js",
+			ctx: func() context.Context {
+				ctx, cancel := context.WithTimeout(context.Background(), 1*time.Nanosecond)
+				defer cancel()
+				time.Sleep(5 * time.Millisecond)
+				return ctx
+			}(),
+			expectError:   true,
+			errorContains: "context deadline exceeded",
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt // Capture range variable
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			loader, err := NewFromHTTP(tt.url)
+			require.NoError(t, err)
+
+			mockClient := &mockHTTPClient{
+				doFunc: func(req *http.Request) (*http.Response, error) {
+					// Check if context error happens before we'd even make the request
+					if err := req.Context().Err(); err != nil {
+						return nil, err
+					}
+					return tt.mockResponse, nil
+				},
+			}
+			loader.client = mockClient
+
+			reader, err := loader.GetReaderWithContext(tt.ctx)
+
+			if tt.expectError {
+				require.Error(t, err)
+				if tt.errorContains != "" {
+					require.Contains(t, err.Error(), tt.errorContains)
+				}
+				return
+			}
+
+			require.NoError(t, err)
+			require.NotNil(t, reader)
+			defer reader.Close()
 		})
 	}
 }
@@ -418,9 +494,27 @@ func TestDefaultHTTPOptions(t *testing.T) {
 	require.NotNil(t, options)
 	require.Equal(t, 30*time.Second, options.Timeout)
 	require.False(t, options.InsecureSkipVerify)
-	require.Equal(t, NoAuth, options.AuthType)
+	require.NotNil(t, options.Authenticator)
+	require.Equal(t, "None", options.Authenticator.Name())
 	require.NotNil(t, options.Headers)
 	require.Empty(t, options.Headers)
+}
+
+func TestHTTPOptionsWithMethods(t *testing.T) {
+	t.Parallel()
+
+	// Test chaining of option methods
+	options := DefaultHTTPOptions().
+		WithTimeout(60*time.Second).
+		WithBasicAuth("user", "pass")
+
+	require.Equal(t, 60*time.Second, options.Timeout)
+
+	// Check authenticator
+	auth, ok := options.Authenticator.(*httpauth.BasicAuth)
+	require.True(t, ok, "Expected BasicAuth authenticator")
+	require.Equal(t, "user", auth.Username)
+	require.Equal(t, "pass", auth.Password)
 }
 
 // Test the GetSourceURL method

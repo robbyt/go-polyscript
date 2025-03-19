@@ -1,7 +1,17 @@
 // Package loader provides implementations of the Loader interface for various source types.
+//
+// This file implements the HTTP loader, which allows fetching scripts from HTTP/HTTPS URLs.
+// The loader supports various authentication methods via the httpauth package:
+//   - No authentication: Use loader.WithNoAuth()
+//   - Basic authentication: Use loader.WithBasicAuth(username, password)
+//   - Bearer token: Use loader.WithBearerAuth(token)
+//   - Custom headers: Use loader.WithHeaderAuth(headers)
+//
+// The loader also supports context-based operations for timeout and cancellation control.
 package loader
 
 import (
+	"context"
 	"crypto/tls"
 	"fmt"
 	"io"
@@ -9,35 +19,8 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/robbyt/go-polyscript/execution/script/loader/httpauth"
 	"github.com/robbyt/go-polyscript/internal/helpers"
-)
-
-// HTTPAuthType defines the authentication type for HTTP loader.
-// Different authentication methods can be used when fetching scripts from HTTP sources.
-type HTTPAuthType string
-
-const (
-	// NoAuth represents no authentication
-	NoAuth HTTPAuthType = "none"
-
-	// BasicAuth represents HTTP Basic Authentication
-	// When using this auth type, provide Username and Password fields in HTTPOptions.
-	// Example:
-	//   options.AuthType = loader.BasicAuth
-	//   options.Username = "user"
-	//   options.Password = "pass"
-	BasicAuth HTTPAuthType = "basic"
-
-	// HeaderAuth represents authentication via custom headers
-	// When using this auth type, provide Headers map in HTTPOptions.
-	// Example for Bearer token:
-	//   options.AuthType = loader.HeaderAuth
-	//   options.Headers["Authorization"] = "Bearer your-token-here"
-	HeaderAuth HTTPAuthType = "header"
-
-	// DigestAuth represents HTTP Digest Authentication
-	// Note: This auth type is not currently implemented and will return an error if used.
-	DigestAuth HTTPAuthType = "digest"
 )
 
 // HTTPOptions contains configuration options for HTTP loader.
@@ -47,9 +30,7 @@ const (
 //
 //	options := loader.DefaultHTTPOptions()
 //	options.Timeout = 10 * time.Second
-//	options.AuthType = loader.BasicAuth
-//	options.Username = "user"
-//	options.Password = "pass"
+//	options = options.WithBasicAuth("user", "pass")
 type HTTPOptions struct {
 	// Timeout specifies a time limit for requests made by this Client
 	// Default is 30 seconds if using DefaultHTTPOptions()
@@ -64,18 +45,10 @@ type HTTPOptions struct {
 	// Warning: Setting to true reduces security and should only be done in test environments
 	InsecureSkipVerify bool
 
-	// AuthType specifies the authentication type to use
-	// Default is NoAuth in DefaultHTTPOptions()
-	AuthType HTTPAuthType
+	// Authentication to use for HTTP requests
+	Authenticator httpauth.Authenticator
 
-	// Username and Password for BasicAuth
-	// Only used when AuthType is set to BasicAuth
-	Username string
-	Password string
-
-	// Headers for HeaderAuth or additional headers
-	// When AuthType is HeaderAuth, add authentication information here
-	// Example: headers["Authorization"] = "Bearer token123"
+	// Headers for additional headers not related to authentication
 	Headers map[string]string
 }
 
@@ -85,15 +58,50 @@ type HTTPOptions struct {
 // Default values:
 // - Timeout: 30 seconds
 // - InsecureSkipVerify: false (certificate validation enabled)
-// - AuthType: NoAuth (no authentication)
+// - Authenticator: NoAuth (no authentication)
 // - Headers: empty map (initialized, ready for values)
 func DefaultHTTPOptions() *HTTPOptions {
 	return &HTTPOptions{
 		Timeout:            30 * time.Second,
 		InsecureSkipVerify: false,
-		AuthType:           NoAuth,
+		Authenticator:      httpauth.NewNoAuth(),
 		Headers:            make(map[string]string),
 	}
+}
+
+// WithBasicAuth returns a copy of options with Basic authentication set.
+func (o *HTTPOptions) WithBasicAuth(username, password string) *HTTPOptions {
+	newOpts := *o
+	newOpts.Authenticator = httpauth.NewBasicAuth(username, password)
+	return &newOpts
+}
+
+// WithBearerAuth returns a copy of options with Bearer token authentication set.
+func (o *HTTPOptions) WithBearerAuth(token string) *HTTPOptions {
+	newOpts := *o
+	newOpts.Authenticator = httpauth.NewBearerAuth(token)
+	return &newOpts
+}
+
+// WithHeaderAuth returns a copy of options with custom header authentication set.
+func (o *HTTPOptions) WithHeaderAuth(headers map[string]string) *HTTPOptions {
+	newOpts := *o
+	newOpts.Authenticator = httpauth.NewHeaderAuth(headers)
+	return &newOpts
+}
+
+// WithNoAuth returns a copy of options with no authentication set.
+func (o *HTTPOptions) WithNoAuth() *HTTPOptions {
+	newOpts := *o
+	newOpts.Authenticator = httpauth.NewNoAuth()
+	return &newOpts
+}
+
+// WithTimeout returns a copy of options with the specified timeout.
+func (o *HTTPOptions) WithTimeout(timeout time.Duration) *HTTPOptions {
+	newOpts := *o
+	newOpts.Timeout = timeout
+	return &newOpts
 }
 
 type httpRequester interface {
@@ -130,21 +138,15 @@ func NewFromHTTP(rawURL string) (*FromHTTP, error) {
 // Examples:
 //
 //	// With basic auth
-//	options := loader.DefaultHTTPOptions()
-//	options.AuthType = loader.BasicAuth
-//	options.Username = "user"
-//	options.Password = "pass"
+//	options := loader.DefaultHTTPOptions().WithBasicAuth("user", "pass")
 //	loader, err := loader.NewFromHTTPWithOptions("https://example.com/script.js", options)
 //
 //	// With bearer token
-//	options := loader.DefaultHTTPOptions()
-//	options.AuthType = loader.HeaderAuth
-//	options.Headers["Authorization"] = "Bearer token123"
+//	options := loader.DefaultHTTPOptions().WithBearerAuth("token123")
 //	loader, err := loader.NewFromHTTPWithOptions("https://example.com/script.js", options)
 //
 //	// With custom timeout
-//	options := loader.DefaultHTTPOptions()
-//	options.Timeout = 10 * time.Second
+//	options := loader.DefaultHTTPOptions().WithTimeout(10 * time.Second)
 //	loader, err := loader.NewFromHTTPWithOptions("https://example.com/script.js", options)
 func NewFromHTTPWithOptions(rawURL string, options *HTTPOptions) (*FromHTTP, error) {
 	sourceURL, err := url.Parse(rawURL)
@@ -189,31 +191,30 @@ func NewFromHTTPWithOptions(rawURL string, options *HTTPOptions) (*FromHTTP, err
 // The returned io.ReadCloser must be closed by the caller when done.
 // HTTP errors are handled and converted to appropriate error types.
 func (l *FromHTTP) GetReader() (io.ReadCloser, error) {
-	req, err := http.NewRequest(http.MethodGet, l.url, nil)
+	return l.GetReaderWithContext(context.Background())
+}
+
+// GetReaderWithContext returns a reader for the HTTP content with context support.
+// This allows for request cancellation and timeouts via context.
+//
+// The returned io.ReadCloser must be closed by the caller when done.
+// HTTP errors are handled and converted to appropriate error types.
+func (l *FromHTTP) GetReaderWithContext(ctx context.Context) (io.ReadCloser, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, l.url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
-	// Apply authentication based on auth type
-	switch l.options.AuthType {
-	case BasicAuth:
-		if l.options.Username != "" {
-			req.SetBasicAuth(l.options.Username, l.options.Password)
+	// Apply authentication
+	if l.options.Authenticator != nil {
+		if err := l.options.Authenticator.AuthenticateWithContext(ctx, req); err != nil {
+			return nil, fmt.Errorf("authentication failed: %w", err)
 		}
-	case HeaderAuth:
-		// Apply custom headers
-		for key, value := range l.options.Headers {
-			req.Header.Set(key, value)
-		}
-	case DigestAuth:
-		return nil, fmt.Errorf("digest authentication not implemented")
 	}
 
 	// Add any additional headers
-	if l.options.AuthType != HeaderAuth {
-		for key, value := range l.options.Headers {
-			req.Header.Set(key, value)
-		}
+	for key, value := range l.options.Headers {
+		req.Header.Set(key, value)
 	}
 
 	// Set a default User-Agent if not specified
