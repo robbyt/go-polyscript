@@ -3,7 +3,7 @@ module github.com/robbyt/go-polyscript/machines/extism/testdata
 go 1.23.5
 
 require (
-	github.com/extism/go-pdk v1.1.1
+	github.com/extism/go-pdk v1.1.3
 	github.com/extism/go-sdk v1.7.0
 	github.com/stretchr/testify v1.9.0
 	github.com/tetratelabs/wazero v1.9.0
