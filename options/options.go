@@ -16,7 +16,7 @@ type Config struct {
 	// Type of machine to use (starlark, risor, extism)
 	machineType types.Type
 	// Data provider for passing values to the script
-	dataProvider data.InputDataProvider
+	dataProvider data.Provider
 	// Loader for the script content
 	loader loader.Loader
 	// Machine-specific options
@@ -37,7 +37,7 @@ func WithLogger(handler slog.Handler) Option {
 }
 
 // WithDataProvider sets the data provider for the script engine
-func WithDataProvider(provider data.InputDataProvider) Option {
+func WithDataProvider(provider data.Provider) Option {
 	return func(c *Config) error {
 		if provider != nil {
 			c.dataProvider = provider
@@ -88,12 +88,12 @@ func (c *Config) SetMachineType(machineType types.Type) {
 }
 
 // GetDataProvider returns the configured data provider
-func (c *Config) GetDataProvider() data.InputDataProvider {
+func (c *Config) GetDataProvider() data.Provider {
 	return c.dataProvider
 }
 
 // SetDataProvider sets the data provider
-func (c *Config) SetDataProvider(provider data.InputDataProvider) {
+func (c *Config) SetDataProvider(provider data.Provider) {
 	c.dataProvider = provider
 }
 

@@ -4,6 +4,7 @@ import (
 	"log/slog"
 	"os"
 
+	"github.com/robbyt/go-polyscript/execution/constants"
 	"github.com/robbyt/go-polyscript/execution/data"
 	"github.com/robbyt/go-polyscript/machines/types"
 )
@@ -12,26 +13,26 @@ import (
 func DefaultConfig(machineType types.Type) *Config {
 	cfg := &Config{}
 	cfg.SetMachineType(machineType)
-	cfg.SetHandler(DefaultHandler())
+	cfg.SetHandler(DefaultLoggingHandler())
 	cfg.SetDataProvider(DefaultDataProvider())
 	return cfg
 }
 
-// DefaultHandler returns the default logging handler
-func DefaultHandler() slog.Handler {
+// DefaultLoggingHandler returns the default logging handler
+func DefaultLoggingHandler() slog.Handler {
 	return slog.NewTextHandler(os.Stdout, nil)
 }
 
 // DefaultDataProvider returns the default data provider
-func DefaultDataProvider() data.InputDataProvider {
-	return data.NewStaticProvider(map[string]any{})
+func DefaultDataProvider() data.Provider {
+	return data.NewContextProvider(constants.EvalData)
 }
 
 // WithDefaults applies default values to any config properties that are nil
 func WithDefaults() Option {
 	return func(c *Config) error {
 		if c.handler == nil {
-			c.handler = DefaultHandler()
+			c.handler = DefaultLoggingHandler()
 		}
 
 		if c.dataProvider == nil {

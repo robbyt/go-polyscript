@@ -10,7 +10,6 @@ import (
 
 	"github.com/robbyt/go-polyscript/engine"
 	"github.com/robbyt/go-polyscript/execution/constants"
-	"github.com/robbyt/go-polyscript/execution/data"
 	"github.com/robbyt/go-polyscript/execution/script"
 
 	starlarkLib "go.starlark.net/starlark"
@@ -21,26 +20,21 @@ type BytecodeEvaluator struct {
 	// universe is the global variable map for the Starlark VM
 	universe starlarkLib.StringDict
 
-	// dataProvider is responsible for retrieving input data for evaluation
-	dataProvider data.InputDataProvider
+	// execUnit contains the compiled script and data provider
+	execUnit *script.ExecutableUnit
 
 	logHandler slog.Handler
 	logger     *slog.Logger
 }
 
 // NewBytecodeEvaluator creates a new BytecodeEvaluator object
-func NewBytecodeEvaluator(handler slog.Handler, dataProvider data.InputDataProvider) *BytecodeEvaluator {
+func NewBytecodeEvaluator(handler slog.Handler, execUnit *script.ExecutableUnit) *BytecodeEvaluator {
 	if handler == nil {
 		defaultHandler := slog.NewTextHandler(os.Stdout, nil)
 		handler = defaultHandler.WithGroup("starlark")
 		// Create a logger from the handler rather than using slog directly
 		defaultLogger := slog.New(handler)
 		defaultLogger.Warn("Handler is nil, using the default logger configuration.")
-	}
-
-	// If no provider is specified, use the default context provider
-	if dataProvider == nil {
-		dataProvider = data.NewContextProvider(constants.EvalData)
 	}
 
 	// Get universe with standard modules
@@ -51,10 +45,10 @@ func NewBytecodeEvaluator(handler slog.Handler, dataProvider data.InputDataProvi
 	universe[string(constants.EvalData)] = starlarkLib.None
 
 	return &BytecodeEvaluator{
-		universe:     universe,
-		dataProvider: dataProvider,
-		logHandler:   handler,
-		logger:       slog.New(handler.WithGroup("BytecodeEvaluator")),
+		universe:   universe,
+		execUnit:   execUnit,
+		logHandler: handler,
+		logger:     slog.New(handler.WithGroup("BytecodeEvaluator")),
 	}
 }
 
@@ -108,24 +102,34 @@ func (be *BytecodeEvaluator) exec(ctx context.Context, prog *starlarkLib.Program
 	}
 
 	// Get the main value from globals
+	// The "_" key contains the last value evaluated in the Starlark script
 	mainVal := finalGlobals["_"]
 	if mainVal == nil {
 		mainVal = starlarkLib.None
 	}
 	logger.InfoContext(ctx, "execution complete", "mainVal", mainVal)
 
+	// Check if the value is None and try to find a valid result variable
+	if mainVal == starlarkLib.None {
+		// Look for a variable named "result" which is a common pattern
+		if resultVal, ok := finalGlobals["result"]; ok {
+			logger.InfoContext(ctx, "found explicit result variable", "result", resultVal)
+			mainVal = resultVal
+		}
+	}
+
 	return newEvalResult(be.logHandler, mainVal, execTime, ""), nil
 }
 
 // Eval evaluates the loaded bytecode and passes the provided data into the Starlark VM
-func (be *BytecodeEvaluator) Eval(ctx context.Context, exe *script.ExecutableUnit) (engine.EvaluatorResponse, error) {
+func (be *BytecodeEvaluator) Eval(ctx context.Context) (engine.EvaluatorResponse, error) {
 	logger := be.getLogger()
-	if exe == nil {
+	if be.execUnit == nil {
 		return nil, fmt.Errorf("executable unit is nil")
 	}
 
 	// Get bytecode from executable unit
-	bytecode := exe.GetContent().GetByteCode()
+	bytecode := be.execUnit.GetContent().GetByteCode()
 	if bytecode == nil {
 		return nil, fmt.Errorf("bytecode is nil")
 	}
@@ -136,16 +140,24 @@ func (be *BytecodeEvaluator) Eval(ctx context.Context, exe *script.ExecutableUni
 		return nil, fmt.Errorf("invalid bytecode type: expected *starlark.Program, got %T", bytecode)
 	}
 
-	exeID := exe.GetID()
+	exeID := be.execUnit.GetID()
 	if exeID == "" {
 		return nil, fmt.Errorf("execution ID is empty")
 	}
 	logger = logger.With("exeID", exeID)
 
-	// Get input data from the provider
-	inputData, err := be.dataProvider.GetInputData(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get input data from provider: %w", err)
+	// Get input data from the provider in the executable unit
+	var inputData map[string]any
+	var err error
+
+	if be.execUnit.GetDataProvider() != nil {
+		inputData, err = be.execUnit.GetDataProvider().GetData(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get input data from provider: %w", err)
+		}
+	} else {
+		// If no provider is specified, use an empty map
+		inputData = make(map[string]any)
 	}
 
 	// Convert input data to Starlark values

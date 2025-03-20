@@ -9,7 +9,7 @@ import (
 // It's useful for testing and for cases where the input data is known in advance
 // and doesn't need to be retrieved from the context or external sources.
 type StaticProvider struct {
-	// data is the static map of data that will be returned by GetInputData
+	// data is the static map of data that will be returned by GetData
 	data map[string]any
 }
 
@@ -23,9 +23,9 @@ func NewStaticProvider(data map[string]any) *StaticProvider {
 	}
 }
 
-// GetInputData implements InputDataProvider.GetInputData
+// GetData implements Provider.GetData
 // It simply returns the static data map regardless of the context
-func (p *StaticProvider) GetInputData(ctx context.Context) (map[string]any, error) {
+func (p *StaticProvider) GetData(ctx context.Context) (map[string]any, error) {
 	// Return a clone of the data to prevent modification of the original
 	return maps.Clone(p.data), nil
 }

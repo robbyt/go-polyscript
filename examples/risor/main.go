@@ -66,7 +66,7 @@ func RunRisorExample(handler slog.Handler) (map[string]any, error) {
 		logger.Error("Evaluator is nil")
 		return nil, fmt.Errorf("evaluator is nil")
 	}
-	result, err := evaluator.Eval(ctx, nil)
+	result, err := evaluator.Eval(ctx)
 	if err != nil {
 		logger.Error("Script evaluation failed", "error", err, "evaluator", fmt.Sprintf("%T", evaluator))
 		return nil, err

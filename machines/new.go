@@ -8,7 +8,6 @@ import (
 	"log/slog"
 
 	"github.com/robbyt/go-polyscript/engine"
-	"github.com/robbyt/go-polyscript/execution/data"
 	"github.com/robbyt/go-polyscript/execution/script"
 	extismMachine "github.com/robbyt/go-polyscript/machines/extism"
 	risorMachine "github.com/robbyt/go-polyscript/machines/risor"
@@ -19,7 +18,8 @@ import (
 
 // NewEvaluator creates a new VM with the given CPU type and globals
 // This will load a script from a ExecutableUnit object into the VM, and can be run immediately.
-func NewEvaluator(handler slog.Handler, ver *script.ExecutableUnit, dataProvider data.InputDataProvider) (engine.Evaluator, error) {
+// The ExecutableUnit contains a DataProvider that provides runtime data for evaluation.
+func NewEvaluator(handler slog.Handler, ver *script.ExecutableUnit) (engine.Evaluator, error) {
 	if ver == nil {
 		return nil, fmt.Errorf("version is nil")
 	}
@@ -27,13 +27,13 @@ func NewEvaluator(handler slog.Handler, ver *script.ExecutableUnit, dataProvider
 	switch ver.GetMachineType() {
 	case machineTypes.Risor:
 		// Risor VM: https://github.com/risor-io/risor
-		return risorMachine.NewBytecodeEvaluator(handler, dataProvider), nil
+		return risorMachine.NewBytecodeEvaluator(handler, ver), nil
 	case machineTypes.Starlark:
 		// Starlark VM: https://github.com/google/starlark-go
-		return starlarkMachine.NewBytecodeEvaluator(handler, dataProvider), nil
+		return starlarkMachine.NewBytecodeEvaluator(handler, ver), nil
 	case machineTypes.Extism:
 		// Extism WASM VM: https://extism.org/
-		return extismMachine.NewBytecodeEvaluator(handler, dataProvider), nil
+		return extismMachine.NewBytecodeEvaluator(handler, ver), nil
 	default:
 		return nil, fmt.Errorf("%w: %s", machineTypes.ErrInvalidMachineType, ver.GetMachineType())
 	}

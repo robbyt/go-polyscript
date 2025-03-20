@@ -17,6 +17,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/robbyt/go-polyscript/execution/constants"
+	"github.com/robbyt/go-polyscript/execution/data"
 	"github.com/robbyt/go-polyscript/execution/script/loader"
 	machineTypes "github.com/robbyt/go-polyscript/machines/types"
 )
@@ -24,6 +25,7 @@ import (
 var emptyScriptData = make(map[string]any)
 
 // Mock implementations
+
 type mockLoader struct {
 	mock.Mock
 }
@@ -123,7 +125,7 @@ func TestNewVersion(t *testing.T) {
 		comp.On("Compile", reader).Return(&MockExecutableContent{}, nil)
 
 		// Create executable unit
-		exe, err := NewExecutableUnit(logHandler, t.Name(), mockLoader, comp, emptyScriptData)
+		exe, err := NewExecutableUnit(logHandler, t.Name(), mockLoader, comp, data.NewStaticProvider(emptyScriptData), emptyScriptData)
 		require.NoError(t, err, "Expected no error when creating executable unit")
 		require.NotNil(t, exe, "Expected executable unit to be non-nil")
 		require.Equal(t, t.Name(), exe.GetID(), "Expected ID to match")
@@ -145,7 +147,7 @@ func TestNewVersion(t *testing.T) {
 		mockContent := new(MockExecutableContent)
 		comp.On("Compile", reader).Return(mockContent, nil).Once()
 
-		exe, err := NewExecutableUnit(logHandler, t.Name(), lod, comp, emptyScriptData)
+		exe, err := NewExecutableUnit(logHandler, t.Name(), lod, comp, data.NewStaticProvider(emptyScriptData), emptyScriptData)
 		require.NoError(t, err, "Expected no error when creating a new version with valid content")
 		require.NotNil(t, exe, "Expected version to be non-nil")
 		require.Equal(t, mockContent, exe.GetContent(), "Expected content to match the mock content")
@@ -169,7 +171,7 @@ func TestNewVersion(t *testing.T) {
 		validationError := errors.New("validation failed")
 		comp.On("Compile", reader).Return(nil, validationError).Once()
 
-		exe, err := NewExecutableUnit(logHandler, t.Name(), lod, comp, emptyScriptData)
+		exe, err := NewExecutableUnit(logHandler, t.Name(), lod, comp, data.NewStaticProvider(emptyScriptData), emptyScriptData)
 		require.Error(t, err)
 		require.Nil(t, exe)
 		require.ErrorIs(t, err, validationError)
@@ -200,7 +202,7 @@ func TestNewVersion(t *testing.T) {
 		mockCompiler.On("Compile", reader).Return(mockContent, nil)
 
 		// Create executable unit with empty ID
-		exe, err := NewExecutableUnit(logHandler, "", mockLoader, mockCompiler, emptyScriptData)
+		exe, err := NewExecutableUnit(logHandler, "", mockLoader, mockCompiler, data.NewStaticProvider(emptyScriptData), emptyScriptData)
 		require.NoError(t, err)
 		require.NotNil(t, exe)
 
@@ -216,7 +218,7 @@ func TestNewVersion(t *testing.T) {
 	})
 
 	t.Run("NilCompiler", func(t *testing.T) {
-		exe, err := NewExecutableUnit(logHandler, "test", &mockLoader{}, nil, emptyScriptData)
+		exe, err := NewExecutableUnit(logHandler, "test", &mockLoader{}, nil, data.NewStaticProvider(emptyScriptData), emptyScriptData)
 		require.Error(t, err)
 		require.Nil(t, exe)
 		require.Contains(t, err.Error(), "compiler is nil")
@@ -241,7 +243,7 @@ func TestNewVersion(t *testing.T) {
 		mockCompiler := new(MockCompiler)
 		mockCompiler.On("Compile", mockReader).Return(nil, errors.New("empty content"))
 		// Create executable unit
-		exe, err := NewExecutableUnit(logHandler, "test", mockLoader, mockCompiler, emptyScriptData)
+		exe, err := NewExecutableUnit(logHandler, "test", mockLoader, mockCompiler, data.NewStaticProvider(emptyScriptData), emptyScriptData)
 		require.Error(t, err)
 		require.Nil(t, exe)
 
@@ -257,7 +259,7 @@ func TestNewVersion(t *testing.T) {
 		mockLoader := new(mockLoader)
 		mockLoader.On("GetReader").Return(mockReader, errors.New("get reader error")).Once()
 
-		exe, err := NewExecutableUnit(logHandler, "test", mockLoader, new(MockCompiler), emptyScriptData)
+		exe, err := NewExecutableUnit(logHandler, "test", mockLoader, new(MockCompiler), data.NewStaticProvider(emptyScriptData), emptyScriptData)
 		require.Error(t, err)
 		require.Nil(t, exe)
 
@@ -278,7 +280,7 @@ func TestNewVersion(t *testing.T) {
 		mockCompiler.On("Compile", mockReader).Return(nil, errors.New("compile failed")).Once()
 
 		// Create executable unit
-		exe, err := NewExecutableUnit(logHandler, "test", mockLoader, mockCompiler, emptyScriptData)
+		exe, err := NewExecutableUnit(logHandler, "test", mockLoader, mockCompiler, data.NewStaticProvider(emptyScriptData), emptyScriptData)
 		require.Error(t, err)
 		require.Nil(t, exe)
 
@@ -345,7 +347,7 @@ func TestNewVersionWithScriptData(t *testing.T) {
 		}
 
 		// Create executable unit
-		exe, err := NewExecutableUnit(logHandler, t.Name(), loader, mockCompiler, scriptData)
+		exe, err := NewExecutableUnit(logHandler, t.Name(), loader, mockCompiler, data.NewStaticProvider(scriptData), scriptData)
 		require.NoError(t, err, "Expected no error creating executable unit")
 		require.NotNil(t, exe, "Expected executable unit to be non-nil")
 		require.Equal(t, scriptData, exe.GetScriptData(), "Expected script data to match")
@@ -369,7 +371,7 @@ func TestNewVersionWithScriptData(t *testing.T) {
 
 		comp.On("Compile", reader).Return(mockContent, nil).Once()
 
-		exe, err := NewExecutableUnit(logHandler, t.Name(), lod, comp, nil)
+		exe, err := NewExecutableUnit(logHandler, t.Name(), lod, comp, data.NewStaticProvider(nil), nil)
 		require.NoError(t, err, "Expected no error when creating a new version with nil script data")
 		require.NotNil(t, exe, "Expected version to be non-nil")
 		require.Empty(t, exe.GetScriptData(), "Expected script data to be empty")

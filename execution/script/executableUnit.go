@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/robbyt/go-polyscript/execution/constants"
+	"github.com/robbyt/go-polyscript/execution/data"
 	"github.com/robbyt/go-polyscript/execution/script/loader"
 	"github.com/robbyt/go-polyscript/internal/helpers"
 	machineTypes "github.com/robbyt/go-polyscript/machines/types"
@@ -39,14 +40,26 @@ type ExecutableUnit struct {
 	// This data is made available to the script during evaluation.
 	ScriptData map[string]any
 
+	// DataProvider provides runtime data for script evaluation.
+	// When using the "compile once, run many times" pattern, a ContextProvider
+	// is recommended to pass different data for each evaluation.
+	DataProvider data.Provider
+
 	// Logging components
 	logHandler slog.Handler
 	logger     *slog.Logger
 }
 
 // NewExecutableUnit creates a new ExecutableUnit from the provided loader and compiler.
-// The EvalContext parameter allows passing variables from Go into the VM at evaluation time.
-func NewExecutableUnit(handler slog.Handler, versionID string, loader loader.Loader, compiler Compiler, sData map[string]any) (*ExecutableUnit, error) {
+// The dataProvider parameter provides runtime data for script evaluation.
+func NewExecutableUnit(
+	handler slog.Handler,
+	versionID string,
+	loader loader.Loader,
+	compiler Compiler,
+	dataProvider data.Provider,
+	sData map[string]any,
+) (*ExecutableUnit, error) {
 	if handler == nil {
 		defaultHandler := slog.NewTextHandler(os.Stdout, nil)
 		handler = defaultHandler.WithGroup("script")
@@ -80,14 +93,15 @@ func NewExecutableUnit(handler slog.Handler, versionID string, loader loader.Loa
 	logger = logger.With("ID", versionID)
 
 	return &ExecutableUnit{
-		ID:         versionID,
-		CreatedAt:  time.Now(),
-		Loader:     loader,
-		Content:    exe,
-		Compiler:   compiler,
-		ScriptData: sData,
-		logHandler: handler,
-		logger:     logger,
+		ID:           versionID,
+		CreatedAt:    time.Now(),
+		Loader:       loader,
+		Content:      exe,
+		Compiler:     compiler,
+		ScriptData:   sData,
+		DataProvider: dataProvider,
+		logHandler:   handler,
+		logger:       logger,
 	}, nil
 }
 
@@ -132,6 +146,19 @@ func (ver *ExecutableUnit) GetScriptData() map[string]any {
 		return ver.ScriptData
 	}
 	return make(map[string]any)
+}
+
+// GetDataProvider returns the data provider for this executable unit.
+func (ver *ExecutableUnit) GetDataProvider() data.Provider {
+	return ver.DataProvider
+}
+
+// WithDataProvider returns a copy of this executable unit with the specified data provider.
+// This is useful for the "compile once, run many times" pattern.
+func (ver *ExecutableUnit) WithDataProvider(provider data.Provider) *ExecutableUnit {
+	clone := *ver
+	clone.DataProvider = provider
+	return &clone
 }
 
 // BuildEvalContext builds and returns the a context object associated with this version. It packs

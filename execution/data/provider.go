@@ -4,12 +4,11 @@ import (
 	"context"
 )
 
-// InputDataProvider is an interface for retrieving input data for script evaluation
-// This allows different strategies for data retrieval to be implemented and used
-// interchangeably with the script evaluators.
-type InputDataProvider interface {
-	// GetInputData retrieves the input data map from the given context
+// Provider is an interface for retrieving data for script evaluation
+// This is the new interface that should be used going forward with the simplified evaluator pattern
+type Provider interface {
+	// GetData retrieves the data map from the given context
 	// Returns a map of string keys to arbitrary values that will be passed to the script
 	// If an error occurs during data retrieval, it will be returned
-	GetInputData(ctx context.Context) (map[string]any, error)
+	GetData(ctx context.Context) (map[string]any, error)
 }

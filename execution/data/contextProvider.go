@@ -24,9 +24,9 @@ func NewContextProvider(contextKey constants.ContextKey) *ContextProvider {
 	}
 }
 
-// GetInputData implements InputDataProvider.GetInputData
+// GetData implements Provider.GetData
 // It extracts a map[string]any from the context using the configured key
-func (p *ContextProvider) GetInputData(ctx context.Context) (map[string]any, error) {
+func (p *ContextProvider) GetData(ctx context.Context) (map[string]any, error) {
 	if p.contextKey == "" {
 		return nil, fmt.Errorf("context key is empty")
 	}

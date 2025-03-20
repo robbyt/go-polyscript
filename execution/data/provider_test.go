@@ -80,7 +80,7 @@ func TestContextProvider(t *testing.T) {
 				ctx = context.WithValue(ctx, tt.contextKey, tt.contextValue)
 			}
 
-			result, err := provider.GetInputData(ctx)
+			result, err := provider.GetData(ctx)
 
 			if tt.expectedSuccess {
 				assert.NoError(t, err)
@@ -151,7 +151,7 @@ func TestStaticProvider(t *testing.T) {
 
 			// Context is not used by StaticProvider, so we can pass an empty one
 			ctx := context.Background()
-			result, err := provider.GetInputData(ctx)
+			result, err := provider.GetData(ctx)
 
 			assert.NoError(t, err)
 
@@ -165,7 +165,7 @@ func TestStaticProvider(t *testing.T) {
 				originalLength := len(result)
 				result["newKey"] = "newValue"
 
-				newResult, _ := provider.GetInputData(ctx)
+				newResult, _ := provider.GetData(ctx)
 				assert.Len(t, newResult, originalLength)
 				assert.NotContains(t, newResult, "newKey")
 			}
@@ -178,19 +178,19 @@ func TestCompositeProvider(t *testing.T) {
 
 	tests := []struct {
 		name           string
-		providers      []InputDataProvider
+		providers      []Provider
 		expectedKeys   []string
 		expectedValues map[string]any
 	}{
 		{
 			name:           "empty providers",
-			providers:      []InputDataProvider{},
+			providers:      []Provider{},
 			expectedKeys:   []string{},
 			expectedValues: map[string]any{},
 		},
 		{
 			name: "single provider",
-			providers: []InputDataProvider{
+			providers: []Provider{
 				NewStaticProvider(map[string]any{
 					"key1": "value1",
 					"key2": 2,
@@ -204,7 +204,7 @@ func TestCompositeProvider(t *testing.T) {
 		},
 		{
 			name: "multiple providers with unique keys",
-			providers: []InputDataProvider{
+			providers: []Provider{
 				NewStaticProvider(map[string]any{
 					"key1": "value1",
 					"key2": 2,
@@ -224,7 +224,7 @@ func TestCompositeProvider(t *testing.T) {
 		},
 		{
 			name: "multiple providers with overlapping keys (last one wins)",
-			providers: []InputDataProvider{
+			providers: []Provider{
 				NewStaticProvider(map[string]any{
 					"key1": "original1",
 					"key2": "original2",
@@ -243,7 +243,7 @@ func TestCompositeProvider(t *testing.T) {
 		},
 		{
 			name: "provider with error (should stop merging)",
-			providers: []InputDataProvider{
+			providers: []Provider{
 				NewStaticProvider(map[string]any{
 					"key1": "value1",
 				}),
@@ -267,7 +267,7 @@ func TestCompositeProvider(t *testing.T) {
 			require.NotNil(t, provider)
 
 			ctx := context.Background()
-			result, err := provider.GetInputData(ctx)
+			result, err := provider.GetData(ctx)
 
 			if tt.expectedValues == nil {
 				assert.Error(t, err)
@@ -292,6 +292,6 @@ func TestCompositeProvider(t *testing.T) {
 // Mock provider that always returns an error
 type mockErrorProvider struct{}
 
-func (m *mockErrorProvider) GetInputData(ctx context.Context) (map[string]any, error) {
+func (m *mockErrorProvider) GetData(ctx context.Context) (map[string]any, error) {
 	return nil, assert.AnError
 }

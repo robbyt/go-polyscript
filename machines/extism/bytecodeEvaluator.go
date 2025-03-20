@@ -13,7 +13,6 @@ import (
 
 	"github.com/robbyt/go-polyscript/engine"
 	"github.com/robbyt/go-polyscript/execution/constants"
-	"github.com/robbyt/go-polyscript/execution/data"
 	"github.com/robbyt/go-polyscript/execution/script"
 
 	extismSDK "github.com/extism/go-sdk"
@@ -22,13 +21,13 @@ import (
 
 // BytecodeEvaluator executes compiled WASM modules with provided runtime data
 type BytecodeEvaluator struct {
-	ctxKey       string // Variable name used to access data in WASM
-	dataProvider data.InputDataProvider
-	logHandler   slog.Handler
-	logger       *slog.Logger
+	ctxKey     string // Variable name used to access data in WASM
+	execUnit   *script.ExecutableUnit
+	logHandler slog.Handler
+	logger     *slog.Logger
 }
 
-func NewBytecodeEvaluator(handler slog.Handler, dataProvider data.InputDataProvider) *BytecodeEvaluator {
+func NewBytecodeEvaluator(handler slog.Handler, execUnit *script.ExecutableUnit) *BytecodeEvaluator {
 	if handler == nil {
 		defaultHandler := slog.NewTextHandler(os.Stdout, nil)
 		handler = defaultHandler.WithGroup("extism")
@@ -37,16 +36,11 @@ func NewBytecodeEvaluator(handler slog.Handler, dataProvider data.InputDataProvi
 		defaultLogger.Warn("Handler is nil, using the default logger configuration.")
 	}
 
-	// If no provider is specified, use the default context provider
-	if dataProvider == nil {
-		dataProvider = data.NewContextProvider(constants.EvalData)
-	}
-
 	return &BytecodeEvaluator{
-		ctxKey:       constants.Ctx,
-		dataProvider: dataProvider,
-		logHandler:   handler,
-		logger:       slog.New(handler.WithGroup("BytecodeEvaluator")),
+		ctxKey:     constants.Ctx,
+		execUnit:   execUnit,
+		logHandler: handler,
+		logger:     slog.New(handler.WithGroup("BytecodeEvaluator")),
 	}
 }
 
@@ -136,13 +130,19 @@ func (be *BytecodeEvaluator) exec(
 	return newEvalResult(be.logHandler, result, execTime, ""), nil
 }
 
-// loadInputData retrieves input data using the configured data provider.
+// loadInputData retrieves input data using the data provider in the executable unit.
 // Returns a map that will be used as input for the WASM module.
 func (be *BytecodeEvaluator) loadInputData(ctx context.Context) (map[string]any, error) {
 	logger := be.getLogger()
 
+	// If no executable unit or data provider, return empty map
+	if be.execUnit == nil || be.execUnit.GetDataProvider() == nil {
+		logger.WarnContext(ctx, "no data provider available, using empty data")
+		return make(map[string]any), nil
+	}
+
 	// Get input data from provider
-	inputData, err := be.dataProvider.GetInputData(ctx)
+	inputData, err := be.execUnit.GetDataProvider().GetData(ctx)
 	if err != nil {
 		logger.ErrorContext(ctx, "failed to get input data from provider", "error", err)
 		return nil, err
@@ -150,30 +150,6 @@ func (be *BytecodeEvaluator) loadInputData(ctx context.Context) (map[string]any,
 
 	logger.DebugContext(ctx, "input data loaded from provider", "inputData", inputData)
 	return inputData, nil
-}
-
-// loadInputDataFromCtx is a legacy method used by tests
-// It should be removed once all tests are updated to use the new InputDataProvider system
-func (be *BytecodeEvaluator) loadInputDataFromCtx(ctx context.Context) map[string]any {
-	logger := be.getLogger()
-
-	// Get input data from context
-	inputData := make(map[string]any)
-	if ctxData := ctx.Value(constants.EvalData); ctxData != nil {
-		var ok bool
-		inputData, ok = ctxData.(map[string]any)
-		if !ok {
-			logger.ErrorContext(ctx, "invalid input data type",
-				"expected", "map[string]any",
-				"got", fmt.Sprintf("%T", ctxData))
-			return inputData
-		}
-	}
-
-	logger.DebugContext(ctx, "input data loaded from context",
-		"inputData", inputData,
-		"contextStorageKey", constants.EvalData)
-	return inputData
 }
 
 func marshalInputData(inputData map[string]any) ([]byte, error) {
@@ -186,28 +162,28 @@ func marshalInputData(inputData map[string]any) ([]byte, error) {
 // Eval implements engine.Evaluator
 // TODO: Some error paths in this method are hard to test with the current design
 // Consider adding more integration tests to cover these paths.
-func (be *BytecodeEvaluator) Eval(ctx context.Context, exe *script.ExecutableUnit) (engine.EvaluatorResponse, error) {
+func (be *BytecodeEvaluator) Eval(ctx context.Context) (engine.EvaluatorResponse, error) {
 	logger := be.getLogger()
 
-	// Validate inputs
-	if exe == nil {
+	// Validate executable unit
+	if be.execUnit == nil {
 		return nil, fmt.Errorf("executable unit is nil")
 	}
 
-	if exe.GetContent() == nil {
+	if be.execUnit.GetContent() == nil {
 		return nil, fmt.Errorf("content is nil")
 	}
 
 	// Get and validate bytecode
-	bytecode := exe.GetContent().GetByteCode()
+	bytecode := be.execUnit.GetContent().GetByteCode()
 	if bytecode == nil {
 		return nil, fmt.Errorf("bytecode is nil")
 	}
 
 	// Type assert to WASM module
-	wasmExe, ok := exe.GetContent().(*Executable)
+	wasmExe, ok := be.execUnit.GetContent().(*Executable)
 	if !ok {
-		return nil, fmt.Errorf("invalid executable type: expected *Executable, got %T", exe.GetContent())
+		return nil, fmt.Errorf("invalid executable type: expected *Executable, got %T", be.execUnit.GetContent())
 	}
 
 	// Get compiled plugin
@@ -217,7 +193,7 @@ func (be *BytecodeEvaluator) Eval(ctx context.Context, exe *script.ExecutableUni
 	}
 
 	// Get execution ID
-	exeID := exe.GetID()
+	exeID := be.execUnit.GetID()
 	if exeID == "" {
 		return nil, fmt.Errorf("execution ID is empty")
 	}

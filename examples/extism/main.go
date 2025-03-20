@@ -77,7 +77,7 @@ func RunExtismExample(handler slog.Handler) (map[string]any, error) {
 	defer cancel()
 
 	// Evaluate the script
-	response, err := evaluator.Eval(ctx, nil)
+	response, err := evaluator.Eval(ctx)
 	if err != nil {
 		logger.Error("Failed to evaluate script", "error", err)
 		return nil, err

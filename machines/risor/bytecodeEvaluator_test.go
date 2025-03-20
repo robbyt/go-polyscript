@@ -47,16 +47,21 @@ handle(ctx["request"])
 	require.NoError(t, err, "Failed to create new loader")
 
 	opt := &RisorOptions{Globals: []string{constants.Ctx}}
+
+	// Create a context provider to use with our test context
+	ctxProvider := data.NewContextProvider(constants.EvalData)
+
 	exe, err := script.NewExecutableUnit(
 		handler,
 		scriptContent,
 		loader,
 		NewCompiler(handler, opt),
+		ctxProvider,
 		emptyScriptData,
 	)
 	require.NoError(t, err, "Failed to create new version")
 
-	evaluator := NewBytecodeEvaluator(handler, nil)
+	evaluator := NewBytecodeEvaluator(handler, exe)
 	require.NotNil(t, evaluator, "BytecodeEvaluator should not be nil")
 
 	t.Run("get request", func(t *testing.T) {
@@ -76,7 +81,7 @@ handle(ctx["request"])
 		ctx := context.WithValue(context.Background(), constants.EvalData, evalData)
 
 		// Evaluate the script with the provided HttpRequest
-		response, err := evaluator.Eval(ctx, exe)
+		response, err := evaluator.Eval(ctx)
 		require.NoError(t, err, "Did not expect an error but got one")
 		require.NotNil(t, response, "Response should not be nil")
 
@@ -106,7 +111,7 @@ handle(ctx["request"])
 		ctx := context.WithValue(context.Background(), constants.EvalData, evalData)
 
 		// Evaluate the script with the provided HttpRequest
-		response, err := evaluator.Eval(ctx, exe)
+		response, err := evaluator.Eval(ctx)
 		require.NoError(t, err, "Did not expect an error but got one")
 		require.NotNil(t, response, "Response should not be nil")
 
@@ -135,7 +140,7 @@ handle(ctx["request"])
 		ctx := context.WithValue(context.Background(), constants.EvalData, evalData)
 
 		// Evaluate the script with the provided HttpRequest
-		response, err := evaluator.Eval(ctx, exe)
+		response, err := evaluator.Eval(ctx)
 		require.NoError(t, err, "Did not expect an error but got one")
 		require.NotNil(t, response, "Response should not be nil")
 

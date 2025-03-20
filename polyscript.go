@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/robbyt/go-polyscript/engine"
+	"github.com/robbyt/go-polyscript/execution/data"
 	"github.com/robbyt/go-polyscript/execution/script"
 	"github.com/robbyt/go-polyscript/execution/script/loader"
 	"github.com/robbyt/go-polyscript/machines"
@@ -12,31 +13,40 @@ import (
 	"github.com/robbyt/go-polyscript/options"
 )
 
-// evaluatorWrapper wraps a machine-specific evaluator and stores the ExecutableUnit
-// This allows callers to avoid passing the ExecutableUnit on each evaluation
-type evaluatorWrapper struct {
+// EvaluatorWrapper wraps a machine-specific evaluator and stores the ExecutableUnit
+// This allows callers to follow the "compile once, run many times" pattern
+type EvaluatorWrapper struct {
 	delegate engine.Evaluator
 	execUnit *script.ExecutableUnit
 }
 
 // NewEvaluatorWrapper creates a new evaluator wrapper
 func NewEvaluatorWrapper(delegate engine.Evaluator, execUnit *script.ExecutableUnit) engine.Evaluator {
-	return &evaluatorWrapper{
+	return &EvaluatorWrapper{
 		delegate: delegate,
 		execUnit: execUnit,
 	}
 }
 
 // Eval implements the engine.Evaluator interface
-// It delegates to the wrapped evaluator, passing the stored ExecutableUnit
-// If another ExecutableUnit is passed, it uses that instead
-func (e *evaluatorWrapper) Eval(ctx context.Context, exe *script.ExecutableUnit) (engine.EvaluatorResponse, error) {
-	// If a new ExecutableUnit is provided, use it, otherwise use the stored one
-	unitToUse := e.execUnit
-	if exe != nil {
-		unitToUse = exe
+// It delegates to the wrapped evaluator using the stored ExecutableUnit
+func (e *EvaluatorWrapper) Eval(ctx context.Context) (engine.EvaluatorResponse, error) {
+	return e.delegate.Eval(ctx)
+}
+
+// GetExecutableUnit returns the stored ExecutableUnit
+// This is useful for examining or modifying the unit
+func (e *EvaluatorWrapper) GetExecutableUnit() *script.ExecutableUnit {
+	return e.execUnit
+}
+
+// WithExecutableUnit returns a new evaluator wrapper with the specified ExecutableUnit
+// This is useful for creating evaluator variants with different data providers
+func (e *EvaluatorWrapper) WithExecutableUnit(execUnit *script.ExecutableUnit) engine.Evaluator {
+	return &EvaluatorWrapper{
+		delegate: e.delegate,
+		execUnit: execUnit,
 	}
-	return e.delegate.Eval(ctx, unitToUse)
 }
 
 // NewStarlarkEvaluator creates a new evaluator for Starlark scripts
@@ -130,11 +140,15 @@ func createEvaluator(cfg *options.Config) (engine.Evaluator, error) {
 	}
 
 	// Create executable unit (this will compile the script internally)
+	// Use the Provider directly
+	var dataProvider data.Provider = cfg.GetDataProvider()
+
 	execUnit, err := script.NewExecutableUnit(
 		cfg.GetHandler(),
 		execUnitID,
 		cfg.GetLoader(),
 		compiler,
+		dataProvider,
 		nil, // No script data for now
 	)
 	if err != nil {
@@ -142,7 +156,7 @@ func createEvaluator(cfg *options.Config) (engine.Evaluator, error) {
 	}
 
 	// Create the machine-specific evaluator
-	machineEvaluator, err := machines.NewEvaluator(cfg.GetHandler(), execUnit, cfg.GetDataProvider())
+	machineEvaluator, err := machines.NewEvaluator(cfg.GetHandler(), execUnit)
 	if err != nil {
 		return nil, err
 	}
