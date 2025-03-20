@@ -150,7 +150,7 @@ func TestNewVersion(t *testing.T) {
 		require.NotNil(t, exe, "Expected version to be non-nil")
 		require.Equal(t, mockContent, exe.GetContent(), "Expected content to match the mock content")
 		require.NotNil(t, exe.GetLoader().GetSourceURL(), "Expected SourceURI to be non-nil")
-		require.Equal(t, "string:", exe.GetLoader().GetSourceURL().String())
+		require.Contains(t, exe.GetLoader().GetSourceURL().String(), "string://inline/")
 		require.WithinDuration(t, time.Now(), exe.GetCreatedAt(), time.Second, "Expected CreatedAt to be within the last second")
 
 		comp.AssertExpectations(t)

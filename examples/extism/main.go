@@ -8,12 +8,10 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/robbyt/go-polyscript/execution/constants"
+	"github.com/robbyt/go-polyscript"
 	"github.com/robbyt/go-polyscript/execution/data"
-	"github.com/robbyt/go-polyscript/execution/script"
-	"github.com/robbyt/go-polyscript/execution/script/loader"
-	"github.com/robbyt/go-polyscript/machines"
-	machineTypes "github.com/robbyt/go-polyscript/machines/types"
+	"github.com/robbyt/go-polyscript/machines/extism"
+	"github.com/robbyt/go-polyscript/options"
 )
 
 // FindWasmFile searches for the Extism WASM file in various likely locations
@@ -40,15 +38,6 @@ func FindWasmFile(logger *slog.Logger) (string, error) {
 	return "", fmt.Errorf("WASM file not found in any of the expected locations")
 }
 
-// SimpleOptions implements the extism.CompilerOptions interface
-type SimpleOptions struct {
-	entryPoint string
-}
-
-func (s SimpleOptions) GetEntryPointName() string {
-	return s.entryPoint
-}
-
 // RunExtismExample executes an Extism WASM module and returns the result
 func RunExtismExample(handler slog.Handler) (map[string]any, error) {
 	if handler == nil {
@@ -65,51 +54,30 @@ func RunExtismExample(handler slog.Handler) (map[string]any, error) {
 		return nil, err
 	}
 
-	// Create a compiler for Extism scripts
-	compilerOptions := SimpleOptions{entryPoint: "greet"}
-	compiler, err := machines.NewCompiler(handler,
-		machineTypes.Extism,
-		compilerOptions)
-	if err != nil {
-		logger.Error("Failed to create compiler", "error", err)
-		return nil, err
+	// Create input data
+	inputData := map[string]any{
+		"input": "World",
 	}
+	dataProvider := data.NewStaticProvider(inputData)
 
-	// Load the script from disk
-	scriptContent, err := loader.NewFromDisk(wasmFilePath)
-	if err != nil {
-		logger.Error("Failed to load script", "error", err)
-		return nil, err
-	}
-
-	// Create an executable unit
-	executableUnit, err := script.NewExecutableUnit(handler, "", scriptContent, compiler, nil)
-	if err != nil {
-		logger.Error("Failed to create executable unit", "error", err)
-		return nil, err
-	}
-
-	// Create an evaluator with a context data provider
-	dataProvider := data.NewContextProvider(constants.EvalData)
-	evaluator, err := machines.NewEvaluator(handler, executableUnit, dataProvider)
+	// Create evaluator using the functional options pattern
+	evaluator, err := polyscript.FromExtismFile(
+		wasmFilePath,
+		options.WithLogger(handler),
+		options.WithDataProvider(dataProvider),
+		extism.WithEntryPoint("greet"),
+	)
 	if err != nil {
 		logger.Error("Failed to create evaluator", "error", err)
 		return nil, err
 	}
 
-	// Create a context with input data
-	ctx := context.Background()
-	inputData := map[string]any{
-		"input": "World",
-	}
-	ctx = context.WithValue(ctx, constants.EvalData, inputData)
-
 	// Set a timeout for script execution
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	// Evaluate the script
-	response, err := evaluator.Eval(ctx, executableUnit)
+	response, err := evaluator.Eval(ctx, nil)
 	if err != nil {
 		logger.Error("Failed to evaluate script", "error", err)
 		return nil, err

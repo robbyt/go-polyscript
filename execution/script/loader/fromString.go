@@ -5,6 +5,8 @@ import (
 	"io"
 	"net/url"
 	"strings"
+
+	"github.com/robbyt/go-polyscript/internal/helpers"
 )
 
 type FromString struct {
@@ -19,9 +21,10 @@ func NewFromString(content string) (*FromString, error) {
 		return nil, fmt.Errorf("%w: content is empty", ErrScriptNotAvailable)
 	}
 
-	u, err := url.Parse("string://")
+	// Use a more complete URL with a unique identifier
+	u, err := url.Parse("string://inline/" + helpers.SHA256(content)[:8])
 	if err != nil {
-		return nil, fmt.Errorf("this should never happen: %w", err)
+		return nil, fmt.Errorf("failed to create source URL: %w", err)
 	}
 
 	return &FromString{

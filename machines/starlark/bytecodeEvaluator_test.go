@@ -52,7 +52,7 @@ _ = request_handler(ctx.get("request"))
 			handler,
 			scriptContent,
 			loader,
-			NewCompiler(handler, &BasicCompilerOptions{Globals: []string{constants.Ctx}}),
+			NewCompiler(handler, &StarlarkOptions{Globals: []string{constants.Ctx}}),
 			emptyScriptData,
 		)
 		require.NoError(t, err, "Failed to create new version")

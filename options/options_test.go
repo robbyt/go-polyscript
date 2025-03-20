@@ -26,7 +26,7 @@ func (m *mockLoader) GetSourceURL() *url.URL {
 
 func TestWithOptions(t *testing.T) {
 	// Create test config
-	cfg := &config{
+	cfg := &Config{
 		machineType: types.Starlark,
 	}
 
@@ -56,27 +56,27 @@ func TestWithOptions(t *testing.T) {
 
 func TestConfigValidation(t *testing.T) {
 	// Test with missing loader
-	cfg1 := &config{
+	cfg1 := &Config{
 		machineType: types.Starlark,
 	}
-	err := cfg1.validate()
+	err := cfg1.Validate()
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "no loader specified")
 
 	// Test with missing machine type
-	cfg2 := &config{
+	cfg2 := &Config{
 		loader: &mockLoader{},
 	}
-	err = cfg2.validate()
+	err = cfg2.Validate()
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "no machine type specified")
 
 	// Test with valid config
-	cfg3 := &config{
+	cfg3 := &Config{
 		machineType: types.Starlark,
 		loader:      &mockLoader{},
 	}
-	err = cfg3.validate()
+	err = cfg3.Validate()
 	require.NoError(t, err)
 }
 
@@ -86,7 +86,7 @@ func TestConfigGetters(t *testing.T) {
 	testLoader := &mockLoader{}
 	testCompilerOpts := "test-options"
 
-	cfg := &config{
+	cfg := &Config{
 		handler:         testHandler,
 		machineType:     types.Starlark,
 		dataProvider:    testDataProvider,

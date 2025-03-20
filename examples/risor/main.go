@@ -6,11 +6,11 @@ import (
 	"log/slog"
 	"os"
 
+	"github.com/robbyt/go-polyscript"
 	"github.com/robbyt/go-polyscript/execution/constants"
 	"github.com/robbyt/go-polyscript/execution/data"
-	"github.com/robbyt/go-polyscript/execution/script"
-	"github.com/robbyt/go-polyscript/execution/script/loader"
 	"github.com/robbyt/go-polyscript/machines/risor"
+	"github.com/robbyt/go-polyscript/options"
 )
 
 // GetRisorScript returns the script content for the Risor example
@@ -38,40 +38,37 @@ func RunRisorExample(handler slog.Handler) (map[string]any, error) {
 	// Define globals that will be available to the script
 	globals := []string{constants.Ctx}
 
-	// Create a compiler for Risor scripts
-	compilerOptions := &risor.BasicCompilerOptions{Globals: globals}
-	compiler := risor.NewCompiler(handler, compilerOptions)
-
-	// Load script from a string
+	// Create a script string
 	scriptContent := GetRisorScript()
-	fromString, err := loader.NewFromString(scriptContent)
-	if err != nil {
-		logger.Error("Failed to create string loader", "error", err)
-		return nil, err
-	}
 
-	// Create an executable unit
-	unit, err := script.NewExecutableUnit(handler, "", fromString, compiler, nil)
-	if err != nil {
-		logger.Error("Failed to create executable unit", "error", err)
-		return nil, err
-	}
-
-	// Create an evaluator for Risor scripts with a context data provider
-	dataProvider := data.NewContextProvider(constants.EvalData)
-	evaluator := risor.NewBytecodeEvaluator(handler, dataProvider)
-
-	// Create context with input data
-	ctx := context.Background()
+	// Create input data
 	input := map[string]any{
 		"name": "World",
 	}
-	ctx = context.WithValue(ctx, constants.EvalData, input)
+	dataProvider := data.NewStaticProvider(input)
+
+	// Create evaluator using the functional options pattern
+	evaluator, err := polyscript.FromRisorString(
+		scriptContent,
+		options.WithDefaults(), // Add defaults option to ensure all required fields are set
+		options.WithLogger(handler),
+		options.WithDataProvider(dataProvider),
+		risor.WithGlobals(globals),
+	)
+	if err != nil {
+		logger.Error("Failed to create evaluator", "error", err)
+		return nil, err
+	}
 
 	// Execute the script
-	result, err := evaluator.Eval(ctx, unit)
+	ctx := context.Background()
+	if evaluator == nil {
+		logger.Error("Evaluator is nil")
+		return nil, fmt.Errorf("evaluator is nil")
+	}
+	result, err := evaluator.Eval(ctx, nil)
 	if err != nil {
-		logger.Error("Script evaluation failed", "error", err)
+		logger.Error("Script evaluation failed", "error", err, "evaluator", fmt.Sprintf("%T", evaluator))
 		return nil, err
 	}
 

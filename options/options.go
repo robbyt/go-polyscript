@@ -10,8 +10,7 @@ import (
 )
 
 // Config holds all configuration for creating a script engine
-// It is not exported as it should only be modified via Option functions
-type config struct {
+type Config struct {
 	// Logger for the engine
 	handler slog.Handler
 	// Type of machine to use (starlark, risor, extism)
@@ -24,12 +23,12 @@ type config struct {
 	compilerOptions any
 }
 
-// Option is a function that modifies config
-type Option func(*config) error
+// Option is a function that modifies Config
+type Option func(*Config) error
 
 // WithLogger sets the logger for the script engine
 func WithLogger(handler slog.Handler) Option {
-	return func(c *config) error {
+	return func(c *Config) error {
 		if handler != nil {
 			c.handler = handler
 		}
@@ -39,7 +38,7 @@ func WithLogger(handler slog.Handler) Option {
 
 // WithDataProvider sets the data provider for the script engine
 func WithDataProvider(provider data.InputDataProvider) Option {
-	return func(c *config) error {
+	return func(c *Config) error {
 		if provider != nil {
 			c.dataProvider = provider
 		}
@@ -49,7 +48,7 @@ func WithDataProvider(provider data.InputDataProvider) Option {
 
 // WithLoader sets the script loader
 func WithLoader(l loader.Loader) Option {
-	return func(c *config) error {
+	return func(c *Config) error {
 		if l != nil {
 			c.loader = l
 		}
@@ -57,8 +56,8 @@ func WithLoader(l loader.Loader) Option {
 	}
 }
 
-// validate performs basic validation on the configuration
-func (c *config) validate() error {
+// Validate performs basic validation on the configuration
+func (c *Config) Validate() error {
 	if c.loader == nil {
 		return fmt.Errorf("no loader specified")
 	}
@@ -69,26 +68,46 @@ func (c *config) validate() error {
 }
 
 // GetHandler returns the configured logger
-func (c *config) GetHandler() slog.Handler {
+func (c *Config) GetHandler() slog.Handler {
 	return c.handler
 }
 
+// SetHandler sets the logger
+func (c *Config) SetHandler(handler slog.Handler) {
+	c.handler = handler
+}
+
 // GetMachineType returns the configured machine type
-func (c *config) GetMachineType() types.Type {
+func (c *Config) GetMachineType() types.Type {
 	return c.machineType
 }
 
+// SetMachineType sets the machine type
+func (c *Config) SetMachineType(machineType types.Type) {
+	c.machineType = machineType
+}
+
 // GetDataProvider returns the configured data provider
-func (c *config) GetDataProvider() data.InputDataProvider {
+func (c *Config) GetDataProvider() data.InputDataProvider {
 	return c.dataProvider
 }
 
+// SetDataProvider sets the data provider
+func (c *Config) SetDataProvider(provider data.InputDataProvider) {
+	c.dataProvider = provider
+}
+
 // GetLoader returns the configured loader
-func (c *config) GetLoader() loader.Loader {
+func (c *Config) GetLoader() loader.Loader {
 	return c.loader
 }
 
 // GetCompilerOptions returns the machine-specific compiler options
-func (c *config) GetCompilerOptions() any {
+func (c *Config) GetCompilerOptions() any {
 	return c.compilerOptions
+}
+
+// SetCompilerOptions sets the machine-specific compiler options
+func (c *Config) SetCompilerOptions(options any) {
+	c.compilerOptions = options
 }

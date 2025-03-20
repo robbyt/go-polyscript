@@ -46,7 +46,7 @@ handle(ctx["request"])
 	loader, err := loader.NewFromString(scriptContent)
 	require.NoError(t, err, "Failed to create new loader")
 
-	opt := &BasicCompilerOptions{Globals: []string{constants.Ctx}}
+	opt := &RisorOptions{Globals: []string{constants.Ctx}}
 	exe, err := script.NewExecutableUnit(
 		handler,
 		scriptContent,
