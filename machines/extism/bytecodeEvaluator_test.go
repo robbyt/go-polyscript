@@ -160,7 +160,7 @@ func TestLoadInputDataFromCtx(t *testing.T) {
 			t.Parallel()
 
 			handler := slog.NewTextHandler(os.Stdout, nil)
-			evaluator := NewBytecodeEvaluator(handler)
+			evaluator := NewBytecodeEvaluator(handler, nil)
 			ctx := context.Background()
 
 			if tt.ctxData != nil {
@@ -168,6 +168,8 @@ func TestLoadInputDataFromCtx(t *testing.T) {
 				ctx = context.WithValue(ctx, constants.EvalData, tt.ctxData)
 			}
 
+			// Note: We're still testing the old method during the transition,
+			// but in production we'll use the new dataProvider.GetInputData()
 			result := evaluator.loadInputDataFromCtx(ctx)
 
 			if tt.expectedEmpty {
@@ -247,7 +249,7 @@ func TestBytecodeEvaluatorInvalidInputs(t *testing.T) {
 			t.Parallel()
 
 			handler := slog.NewTextHandler(os.Stdout, nil)
-			evaluator := NewBytecodeEvaluator(handler)
+			evaluator := NewBytecodeEvaluator(handler, nil)
 			ctx := context.Background()
 
 			exe := tt.setupExe(t)
@@ -302,7 +304,7 @@ func TestValidScript(t *testing.T) {
 		require.NotNil(t, exe)
 
 		handlerEval := slog.NewTextHandler(os.Stdout, nil)
-		evaluator := NewBytecodeEvaluator(handlerEval)
+		evaluator := NewBytecodeEvaluator(handlerEval, nil)
 		require.NotNil(t, evaluator)
 
 		return exe, evaluator

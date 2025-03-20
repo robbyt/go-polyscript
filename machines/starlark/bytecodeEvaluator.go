@@ -10,6 +10,7 @@ import (
 
 	"github.com/robbyt/go-polyscript/engine"
 	"github.com/robbyt/go-polyscript/execution/constants"
+	"github.com/robbyt/go-polyscript/execution/data"
 	"github.com/robbyt/go-polyscript/execution/script"
 
 	starlarkLib "go.starlark.net/starlark"
@@ -17,18 +18,18 @@ import (
 
 // BytecodeEvaluator is an abstraction layer for evaluating code on the Starlark VM
 type BytecodeEvaluator struct {
-	// evalDataKey is the variable used to load input data from the context object (eval_data)
-	evalDataKey string
-
 	// universe is the global variable map for the Starlark VM
 	universe starlarkLib.StringDict
+
+	// dataProvider is responsible for retrieving input data for evaluation
+	dataProvider data.InputDataProvider
 
 	logHandler slog.Handler
 	logger     *slog.Logger
 }
 
 // NewBytecodeEvaluator creates a new BytecodeEvaluator object
-func NewBytecodeEvaluator(handler slog.Handler) *BytecodeEvaluator {
+func NewBytecodeEvaluator(handler slog.Handler, dataProvider data.InputDataProvider) *BytecodeEvaluator {
 	if handler == nil {
 		defaultHandler := slog.NewTextHandler(os.Stdout, nil)
 		handler = defaultHandler.WithGroup("starlark")
@@ -37,18 +38,23 @@ func NewBytecodeEvaluator(handler slog.Handler) *BytecodeEvaluator {
 		defaultLogger.Warn("Handler is nil, using the default logger configuration.")
 	}
 
+	// If no provider is specified, use the default context provider
+	if dataProvider == nil {
+		dataProvider = data.NewContextProvider(constants.EvalData)
+	}
+
 	// Get universe with standard modules
 	universe := standardModules()
 
 	// Add eval-time contextual globals
 	universe[constants.Ctx] = starlarkLib.None
-	universe[constants.EvalData] = starlarkLib.None
+	universe[string(constants.EvalData)] = starlarkLib.None
 
 	return &BytecodeEvaluator{
-		evalDataKey: constants.EvalData,
-		universe:    universe,
-		logHandler:  handler,
-		logger:      slog.New(handler.WithGroup("BytecodeEvaluator")),
+		universe:     universe,
+		dataProvider: dataProvider,
+		logHandler:   handler,
+		logger:       slog.New(handler.WithGroup("BytecodeEvaluator")),
 	}
 }
 
@@ -136,12 +142,10 @@ func (be *BytecodeEvaluator) Eval(ctx context.Context, exe *script.ExecutableUni
 	}
 	logger = logger.With("exeID", exeID)
 
-	inputData := make(map[string]any)
-	if ctxData := ctx.Value(be.evalDataKey); ctxData != nil {
-		inputData, ok = ctxData.(map[string]any)
-		if !ok {
-			return nil, fmt.Errorf("invalid input data type: expected map[string]any, got %T", ctxData)
-		}
+	// Get input data from the provider
+	inputData, err := be.dataProvider.GetInputData(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get input data from provider: %w", err)
 	}
 
 	// Convert input data to Starlark values

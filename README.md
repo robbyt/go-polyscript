@@ -20,7 +20,7 @@ Currently supported scripting engines ("machines"):
 
 - **Unified API**: Common interfaces for all supported scripting languages
 - **Flexible Engine Selection**: Easily switch between different script engines
-- **Powerful Context Passing**: Pass data from Go to scripts and vice versa
+- **Powerful Data Passing**: Multiple ways to provide input data to scripts
 - **Comprehensive Logging**: Structured logging with `slog` support
 - **Error Handling**: Robust error handling and reporting from script execution
 - **Compilation and Evaluation Separation**: Compile once, run multiple times with different inputs
@@ -45,6 +45,7 @@ import (
 	"os"
 
 	"github.com/robbyt/go-polyscript/execution/constants"
+	"github.com/robbyt/go-polyscript/execution/data"
 	"github.com/robbyt/go-polyscript/execution/script"
 	"github.com/robbyt/go-polyscript/execution/script/loader"
 	"github.com/robbyt/go-polyscript/machines/risor"
@@ -87,17 +88,17 @@ func main() {
 		return
 	}
 
-	// Create an evaluator for Risor scripts
-	evaluator := risor.NewBytecodeEvaluator(handler)
-
-	// Create context with input data
-	ctx := context.Background()
-	input := map[string]any{
+	// Create input data provider
+	inputData := map[string]any{
 		"name": "World",
 	}
-	ctx = context.WithValue(ctx, constants.EvalData, input)
+	dataProvider := data.NewStaticProvider(inputData)
 
-	// Execute the script
+	// Create an evaluator for Risor scripts
+	evaluator := risor.NewBytecodeEvaluator(handler, dataProvider)
+
+	// Execute the script with a context
+	ctx := context.Background()
 	result, err := evaluator.Eval(ctx, unit)
 	if err != nil {
 		logger.Error("Script evaluation failed", "error", err)
@@ -109,6 +110,56 @@ func main() {
 }
 ```
 
+## Working with InputDataProvider
+
+go-polyscript uses the `InputDataProvider` interface to supply data to scripts during evaluation. Several built-in providers are available:
+
+### ContextProvider (Backward Compatibility)
+
+Uses a context value to retrieve script input data:
+
+```go
+// Create a context provider (this is used internally by default)
+provider := data.NewContextProvider(constants.EvalData)
+
+// Prepare context with input data
+ctx := context.Background()
+input := map[string]any{"name": "World"}
+ctx = context.WithValue(ctx, constants.EvalData, input)
+
+// Create evaluator with the provider
+evaluator := risor.NewBytecodeEvaluator(handler, provider)
+```
+
+### StaticProvider
+
+Provides fixed data for all evaluations:
+
+```go
+// Create a static provider with predefined data
+inputData := map[string]any{"name": "World"}
+provider := data.NewStaticProvider(inputData)
+
+// Create evaluator with the provider
+evaluator := risor.NewBytecodeEvaluator(handler, provider)
+```
+
+### CompositeProvider
+
+Combines multiple providers, checking each in sequence:
+
+```go
+// Create providers for different data sources
+ctxProvider := data.NewContextProvider(constants.EvalData)
+defaultProvider := data.NewStaticProvider(map[string]any{"defaultKey": "value"})
+
+// Create a composite provider that tries ctxProvider first, then defaultProvider
+provider := data.NewCompositeProvider(ctxProvider, defaultProvider)
+
+// Create evaluator with the provider
+evaluator := risor.NewBytecodeEvaluator(handler, provider)
+```
+
 ## Architecture
 
 go-polyscript is structured around a few key concepts:
@@ -118,8 +169,9 @@ go-polyscript is structured around a few key concepts:
 3. **ExecutableUnit**: Represents a compiled script ready for execution
 4. **ExecutionPackage** Contains an **ExecutableUnit** and other metadata
 5. **Evaluator**: Executes compiled scripts with provided input data
-6. **Machine**: A specific implementation of a scripting engine (Risor, Starlark, Extism)
-7. **EvaluatorResponse** The response object returned from all **Machine**s
+6. **InputDataProvider**: Supplies data to scripts during evaluation
+7. **Machine**: A specific implementation of a scripting engine (Risor, Starlark, Extism)
+8. **EvaluatorResponse** The response object returned from all **Machine**s
 
 ## Advanced Usage
 
@@ -140,11 +192,15 @@ content := `
 `
 fromString, _ := loader.NewFromString(content)
 
-// Create executable unit and evaluator
+// Create executable unit
 unit, _ := script.NewExecutableUnit(handler, "", fromString, compiler, nil)
-evaluator := starlark.NewBytecodeEvaluator(handler)
 
-// Execute using the same context setup as the Risor example
+// Create data provider and evaluator
+dataProvider := data.NewStaticProvider(map[string]any{"name": "World"})
+evaluator := starlark.NewBytecodeEvaluator(handler, dataProvider)
+
+// Execute with a context
+result, _ := evaluator.Eval(context.Background(), unit)
 ```
 
 ### Using WebAssembly with Extism
@@ -156,11 +212,15 @@ compiler := extism.NewCompiler(handler, &extism.BasicCompilerOptions{EntryPoint:
 // Load a WASM module from file
 fileLoader, _ := loader.NewFromDisk("/path/to/module.wasm")
 
-// Create executable unit and evaluator
+// Create executable unit
 unit, _ := script.NewExecutableUnit(handler, "", fileLoader, compiler, nil)
-evaluator := extism.NewBytecodeEvaluator(handler)
 
-// Execute using the same context setup as the Risor example
+// Create data provider and evaluator
+dataProvider := data.NewStaticProvider(map[string]any{"name": "World"})
+evaluator := extism.NewBytecodeEvaluator(handler, dataProvider)
+
+// Execute with a context
+result, _ := evaluator.Eval(context.Background(), unit)
 ```
 
 ## License

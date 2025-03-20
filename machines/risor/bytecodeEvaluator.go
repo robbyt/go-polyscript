@@ -12,6 +12,7 @@ import (
 
 	"github.com/robbyt/go-polyscript/engine"
 	"github.com/robbyt/go-polyscript/execution/constants"
+	"github.com/robbyt/go-polyscript/execution/data"
 	"github.com/robbyt/go-polyscript/execution/script"
 )
 
@@ -20,15 +21,15 @@ type BytecodeEvaluator struct {
 	// ctxKey is the variable name used to access input data inside the vm (ctx)
 	ctxKey string
 
-	// evalDataKey is the variable used to load input data from the context object (eval_data)
-	evalDataKey string
+	// dataProvider is responsible for retrieving input data for evaluation
+	dataProvider data.InputDataProvider
 
 	logHandler slog.Handler
 	logger     *slog.Logger
 }
 
 // NewBytecodeEvaluator creates a new BytecodeEvaluator object
-func NewBytecodeEvaluator(handler slog.Handler) *BytecodeEvaluator {
+func NewBytecodeEvaluator(handler slog.Handler, dataProvider data.InputDataProvider) *BytecodeEvaluator {
 	if handler == nil {
 		defaultHandler := slog.NewTextHandler(os.Stdout, nil)
 		handler = defaultHandler.WithGroup("risor")
@@ -37,11 +38,16 @@ func NewBytecodeEvaluator(handler slog.Handler) *BytecodeEvaluator {
 		defaultLogger.Warn("Handler is nil, using the default logger configuration.")
 	}
 
+	// If no provider is specified, use the default context provider
+	if dataProvider == nil {
+		dataProvider = data.NewContextProvider(constants.EvalData)
+	}
+
 	return &BytecodeEvaluator{
-		ctxKey:      constants.Ctx,
-		evalDataKey: constants.EvalData,
-		logHandler:  handler,
-		logger:      slog.New(handler.WithGroup("BytecodeEvaluator")),
+		ctxKey:       constants.Ctx,
+		dataProvider: dataProvider,
+		logHandler:   handler,
+		logger:       slog.New(handler.WithGroup("BytecodeEvaluator")),
 	}
 }
 
@@ -77,26 +83,26 @@ func (be *BytecodeEvaluator) exec(ctx context.Context, bytecode *risorCompiler.C
 //	    "baz": 123,
 //	  }),
 //	}
-func (be *BytecodeEvaluator) convertInputData(ctx context.Context) []risorLib.Option {
+func (be *BytecodeEvaluator) convertInputData(ctx context.Context) ([]risorLib.Option, error) {
 	// setup input data, which will be sent from the input request to the eval VM
 	logger := be.getLogger()
 
-	ctxData := ctx.Value(be.evalDataKey)
-	if ctxData == nil {
-		logger.ErrorContext(ctx, "input data not found in context")
-		return []risorLib.Option{}
+	// Use the data provider to get the input data
+	inputData, err := be.dataProvider.GetInputData(ctx)
+	if err != nil {
+		logger.ErrorContext(ctx, "failed to get input data from provider", "error", err)
+		return []risorLib.Option{}, err
 	}
 
-	inputData, ok := ctxData.(map[string]any)
-	if !ok {
-		logger.ErrorContext(ctx, "invalid input data type: expected map[string]any", "ctxData", ctxData)
-		return []risorLib.Option{}
+	if len(inputData) == 0 {
+		logger.WarnContext(ctx, "empty input data returned from provider")
+	} else {
+		logger.DebugContext(ctx, "input data loaded from provider", "inputData", inputData)
 	}
 
-	logger.DebugContext(ctx, "input data loaded", "inputData", inputData, "contextStorageKey", be.evalDataKey)
 	return []risorLib.Option{
 		risorLib.WithGlobal(be.ctxKey, inputData),
-	}
+	}, nil
 }
 
 // Eval evaluates the loaded bytecode and uses the provided EvalData to pass data in to the Risor VM execution
@@ -118,8 +124,11 @@ func (be *BytecodeEvaluator) Eval(ctx context.Context, exe *script.ExecutableUni
 	}
 	logger = logger.With("exeID", exeID)
 
-	inputDataOptions := be.convertInputData(ctx)
-	// logger.Debug("input data conversion complete", "inputDataOptions", inputDataOptions)
+	// Get input data options using the data provider
+	inputDataOptions, err := be.convertInputData(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get input data: %w", err)
+	}
 
 	// assert the bytecode into *risorCompiler.Code that can be run by *this* BytecodeEvaluator
 	risorByteCode, ok := bytecode.(*risorCompiler.Code)

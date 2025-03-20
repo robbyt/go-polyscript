@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/robbyt/go-polyscript/execution/constants"
+	"github.com/robbyt/go-polyscript/execution/data"
 	"github.com/robbyt/go-polyscript/execution/script"
 	"github.com/robbyt/go-polyscript/execution/script/loader"
 	"github.com/robbyt/go-polyscript/machines/risor"
@@ -56,8 +57,9 @@ func RunRisorExample(handler slog.Handler) (map[string]any, error) {
 		return nil, err
 	}
 
-	// Create an evaluator for Risor scripts
-	evaluator := risor.NewBytecodeEvaluator(handler)
+	// Create an evaluator for Risor scripts with a context data provider
+	dataProvider := data.NewContextProvider(constants.EvalData)
+	evaluator := risor.NewBytecodeEvaluator(handler, dataProvider)
 
 	// Create context with input data
 	ctx := context.Background()

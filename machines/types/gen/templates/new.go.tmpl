@@ -8,6 +8,7 @@ import (
 	"log/slog"
 
 	"github.com/robbyt/go-polyscript/engine"
+	"github.com/robbyt/go-polyscript/execution/data"
 	"github.com/robbyt/go-polyscript/execution/script"
 {{- range .Types}}
 	{{.Value}}Machine "github.com/robbyt/go-polyscript/machines/{{.Value}}"
@@ -18,7 +19,7 @@ import (
 
 // NewEvaluator creates a new VM with the given CPU type and globals
 // This will load a script from a ExecutableUnit object into the VM, and can be run immediately.
-func NewEvaluator(handler slog.Handler, ver *script.ExecutableUnit) (engine.Evaluator, error) {
+func NewEvaluator(handler slog.Handler, ver *script.ExecutableUnit, dataProvider data.InputDataProvider) (engine.Evaluator, error) {
 	if ver == nil {
 		return nil, fmt.Errorf("version is nil")
 	}
@@ -27,7 +28,7 @@ func NewEvaluator(handler slog.Handler, ver *script.ExecutableUnit) (engine.Eval
 	{{- range .Types}}
 	case machineTypes.{{.Name}}:
 		// {{.Description}}
-		return {{.Value}}Machine.NewBytecodeEvaluator(handler), nil
+		return {{.Value}}Machine.NewBytecodeEvaluator(handler, dataProvider), nil
 	{{- end}}
 	default:
 		return nil, fmt.Errorf("%w: %s", machineTypes.ErrInvalidMachineType, ver.GetMachineType())

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/robbyt/go-polyscript/execution/constants"
+	"github.com/robbyt/go-polyscript/execution/data"
 	"github.com/robbyt/go-polyscript/execution/script"
 	"github.com/robbyt/go-polyscript/execution/script/loader"
 	"github.com/robbyt/go-polyscript/machines"
@@ -88,8 +89,9 @@ func RunExtismExample(handler slog.Handler) (map[string]any, error) {
 		return nil, err
 	}
 
-	// Create an evaluator
-	evaluator, err := machines.NewEvaluator(handler, executableUnit)
+	// Create an evaluator with a context data provider
+	dataProvider := data.NewContextProvider(constants.EvalData)
+	evaluator, err := machines.NewEvaluator(handler, executableUnit, dataProvider)
 	if err != nil {
 		logger.Error("Failed to create evaluator", "error", err)
 		return nil, err

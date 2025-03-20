@@ -57,7 +57,7 @@ _ = request_handler(ctx.get("request"))
 		)
 		require.NoError(t, err, "Failed to create new version")
 
-		evaluator := NewBytecodeEvaluator(handler)
+		evaluator := NewBytecodeEvaluator(handler, nil)
 		require.NotNil(t, evaluator, "BytecodeEvaluator should not be nil")
 
 		return exe, evaluator

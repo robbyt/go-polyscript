@@ -7,6 +7,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/robbyt/go-polyscript/execution/data"
 	"github.com/robbyt/go-polyscript/execution/script"
 	machineTypes "github.com/robbyt/go-polyscript/machines/types"
 	"github.com/stretchr/testify/mock"
@@ -58,7 +59,9 @@ func TestNewEvaluator(t *testing.T) {
 			}
 
 			handler := slog.NewTextHandler(os.Stdout, nil)
-			evaluator, err := NewEvaluator(handler, ver)
+			// Use a test data provider
+			dataProvider := data.NewContextProvider("test_key")
+			evaluator, err := NewEvaluator(handler, ver, dataProvider)
 
 			if tt.expectError {
 				require.Error(t, err)
