@@ -72,6 +72,10 @@ func NewExecutableUnit(
 		return nil, errors.New("compiler is nil")
 	}
 
+	if sData == nil {
+		sData = make(map[string]any)
+	}
+
 	reader, err := loader.GetReader()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get reader from loader: %w", err)
@@ -142,10 +146,7 @@ func (ver *ExecutableUnit) GetLoader() loader.Loader {
 
 // GetScriptData returns the script data associated with this version.
 func (ver *ExecutableUnit) GetScriptData() map[string]any {
-	if ver.ScriptData != nil {
-		return ver.ScriptData
-	}
-	return make(map[string]any)
+	return ver.ScriptData
 }
 
 // GetDataProvider returns the data provider for this executable unit.
@@ -165,7 +166,13 @@ func (ver *ExecutableUnit) WithDataProvider(provider data.Provider) *ExecutableU
 // the script data and request data into the context, accessible with a call to ctx.Value(constants.EvalDataKey).
 func (ver *ExecutableUnit) BuildEvalContext(ctx context.Context, r *http.Request) context.Context {
 	evalData := make(map[string]any)
-	evalData[constants.ScriptData] = ver.GetScriptData()
+
+	// Get script data, ensuring we never store nil in the evalData map
+	scriptData := ver.GetScriptData()
+	if scriptData == nil {
+		scriptData = make(map[string]any)
+	}
+	evalData[constants.ScriptData] = scriptData
 
 	rMap, err := helpers.RequestToMap(r)
 	if err != nil {
