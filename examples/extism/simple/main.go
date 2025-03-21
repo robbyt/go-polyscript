@@ -1,4 +1,4 @@
-package extism
+package main
 
 import (
 	"context"
@@ -17,10 +17,11 @@ import (
 // FindWasmFile searches for the Extism WASM file in various likely locations
 func FindWasmFile(logger *slog.Logger) (string, error) {
 	paths := []string{
-		"main.wasm",                 // Current directory
-		"extism/main.wasm",          // extism subdirectory
-		"examples/extism/main.wasm", // examples/extism subdirectory
-		"../machines/extism/testdata/examples/main.wasm", // From machines testdata
+		"main.wasm",                        // Current directory
+		"simple/main.wasm",                 // simple subdirectory
+		"extism/simple/main.wasm",          // extism/simple subdirectory
+		"examples/extism/simple/main.wasm", // examples/extism/simple subdirectory
+		"../../../machines/extism/testdata/examples/main.wasm", // From machines testdata
 	}
 
 	for _, path := range paths {
@@ -45,7 +46,7 @@ func RunExtismExample(handler slog.Handler) (map[string]any, error) {
 			Level: slog.LevelDebug,
 		})
 	}
-	logger := slog.New(handler.WithGroup("extism-example"))
+	logger := slog.New(handler.WithGroup("extism-simple-example"))
 
 	// Find the WASM file
 	wasmFilePath, err := FindWasmFile(logger)
@@ -84,7 +85,11 @@ func RunExtismExample(handler slog.Handler) (map[string]any, error) {
 	}
 
 	// Return the result
-	return response.Interface().(map[string]any), nil
+	result, ok := response.Interface().(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("unexpected response type: %T", response.Interface())
+	}
+	return result, nil
 }
 
 func main() {
