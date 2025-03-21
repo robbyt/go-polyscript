@@ -28,8 +28,12 @@ func newHttpRequestWrapper(r *http.Request) (*httpRequestWrapper, error) {
 		return nil, errors.New("request is nil")
 	}
 
-	// Validate URL if present
-	if r.URL != nil {
+	// Ensure and validate the URL
+	if r.URL == nil {
+		// If URL is nil, provide a default one
+		r.URL = &url.URL{Path: "/"}
+	} else {
+		// If URL is not nil, validate it
 		if _, err := url.Parse(r.URL.String()); err != nil {
 			return nil, fmt.Errorf("invalid URL: %w", err)
 		}

@@ -10,6 +10,17 @@ import (
 	"github.com/robbyt/go-polyscript/execution/constants"
 )
 
+// Mock provider that always returns an error
+type mockErrorProvider struct{}
+
+func (m *mockErrorProvider) GetData(ctx context.Context) (map[string]any, error) {
+	return nil, assert.AnError
+}
+
+func (m *mockErrorProvider) AddDataToContext(ctx context.Context, data ...any) (context.Context, error) {
+	return ctx, assert.AnError
+}
+
 func TestContextProvider(t *testing.T) {
 	t.Parallel()
 
@@ -287,11 +298,4 @@ func TestCompositeProvider(t *testing.T) {
 			}
 		})
 	}
-}
-
-// Mock provider that always returns an error
-type mockErrorProvider struct{}
-
-func (m *mockErrorProvider) GetData(ctx context.Context) (map[string]any, error) {
-	return nil, assert.AnError
 }

@@ -9,7 +9,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/robbyt/go-polyscript/execution/constants"
 	"github.com/robbyt/go-polyscript/execution/data"
 	"github.com/robbyt/go-polyscript/execution/script/loader"
 	"github.com/robbyt/go-polyscript/internal/helpers"
@@ -162,32 +161,53 @@ func (ver *ExecutableUnit) WithDataProvider(provider data.Provider) *ExecutableU
 	return &clone
 }
 
-// BuildEvalContext builds and returns the a context object associated with this version. It packs
-// the script data and request data into the context, accessible with a call to ctx.Value(constants.EvalDataKey).
-func (ver *ExecutableUnit) BuildEvalContext(ctx context.Context, r *http.Request) context.Context {
-	evalData := make(map[string]any)
-
-	// Get script data, ensuring we never store nil in the evalData map
-	scriptData := ver.GetScriptData()
-	if scriptData == nil {
-		scriptData = make(map[string]any)
-	}
-	evalData[constants.ScriptData] = scriptData
-
-	rMap, err := helpers.RequestToMap(r)
-	if err != nil {
-		// Use the configured logger to log the error
+// StoreDataInContext enriches the provided context with script and request data
+// using the ExecutableUnit's configured DataProvider.
+//
+// This method is a replacement for the legacy BuildEvalContext method and provides
+// a more flexible approach to storing data for script execution. It supports the
+// "compile once, run many times with different data" pattern by using a Provider
+// to manage the data.
+//
+// Key behaviors:
+// 1. Delegates data storage to the DataProvider's AddDataToContext method
+// 2. Different provider types handle data in context-appropriate ways:
+//   - ContextProvider: Stores in the context under a specific key
+//   - StaticProvider: Already has predefined data, doesn't support adding more
+//   - CompositeProvider: Distributes data to multiple providers in a chain
+//
+// 3. Sends both the HTTP request and the ExecutableUnit's script data to the provider
+// 4. Returns the original context if no provider is configured or if there's an error
+// 5. Logs errors using the ExecutableUnit's logger
+//
+// Even if the provider encounters errors (e.g., can't convert a request to a map),
+// all providers are designed to store whatever data they can process successfully.
+// This ensures scripts always have a predictable data structure to work with.
+func (ver *ExecutableUnit) StoreDataInContext(ctx context.Context, r *http.Request) context.Context {
+	// If no DataProvider is configured, log an error and return original context
+	if ver.DataProvider == nil {
 		if ver.logger != nil {
-			ver.logger.Error("Failed to convert request to map", "error", err)
-		} else {
-			// Fallback to default logger as a last resort
-			defaultLogger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-			defaultLogger.Error("Failed to convert request to map - logger was nil", "error", err)
+			ver.logger.Error("Cannot store data in context: no DataProvider configured")
 		}
-		rMap = make(map[string]any)
+		return ctx
 	}
-	evalData[constants.Request] = rMap
 
-	//nolint:staticcheck // Temporarily ignoring the "string as context key" warning until type system is fixed
-	return context.WithValue(ctx, constants.EvalData, evalData)
+	// Use the DataProvider to store data
+	// Note: We send both the request and script data to be handled by the provider
+	// The provider will handle converting the request to a map and merging script data
+	newCtx, err := ver.DataProvider.AddDataToContext(ctx, r, ver.GetScriptData())
+
+	// If there's an error, log it but still return the context that was created
+	// This allows for partial success - some data may have been stored successfully
+	if err != nil {
+		if ver.logger != nil {
+			ver.logger.Error("Failed to add data to context using provider", "error", err)
+		} else {
+			defaultLogger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+			defaultLogger.Error("Failed to add data to context using provider - logger was nil", "error", err)
+		}
+	}
+
+	// Return the updated context, which may have partial data even if there was an error
+	return newCtx
 }
