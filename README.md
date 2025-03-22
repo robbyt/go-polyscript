@@ -24,6 +24,7 @@ Currently supported scripting engines ("machines"):
 - **Comprehensive Logging**: Structured logging with `slog` support
 - **Error Handling**: Robust error handling and reporting from script execution
 - **Compilation and Evaluation Separation**: Compile once, run multiple times with different inputs
+- **Data Preparation and Evaluation Separation**: Prepare data in one step/system, evaluate in another
 
 ## Installation
 
@@ -44,11 +45,11 @@ import (
 	"log/slog"
 	"os"
 
+	"github.com/robbyt/go-polyscript"
 	"github.com/robbyt/go-polyscript/execution/constants"
 	"github.com/robbyt/go-polyscript/execution/data"
-	"github.com/robbyt/go-polyscript/execution/script"
-	"github.com/robbyt/go-polyscript/execution/script/loader"
 	"github.com/robbyt/go-polyscript/machines/risor"
+	"github.com/robbyt/go-polyscript/options"
 )
 
 func main() {
@@ -56,14 +57,7 @@ func main() {
 	handler := slog.NewTextHandler(os.Stdout, nil)
 	logger := slog.New(handler)
 
-	// Define globals that will be available to the script
-	globals := []string{constants.Ctx}
-
-	// Create a compiler for Risor scripts
-	compilerOptions := &risor.BasicCompilerOptions{Globals: globals}
-	compiler := risor.NewCompiler(handler, compilerOptions)
-
-	// Load script from a string
+	// Script content
 	scriptContent := `
 		// Script has access to ctx variable passed from Go
 		name := ctx["name"]
@@ -75,39 +69,52 @@ func main() {
 			"length": len(message)
 		}
 	`
-	fromString, err := loader.NewFromString(scriptContent)
-	if err != nil {
-		logger.Error("Failed to create string loader", "error", err)
-		return
-	}
-
-	// Create an executable unit
-	unit, err := script.NewExecutableUnit(handler, "", fromString, compiler, nil)
-	if err != nil {
-		logger.Error("Failed to create executable unit", "error", err)
-		return
-	}
-
-	// Create input data provider
+	
+	// Input data
 	inputData := map[string]any{
 		"name": "World",
 	}
 	dataProvider := data.NewStaticProvider(inputData)
-
-	// Create an evaluator for Risor scripts
-	evaluator := risor.NewBytecodeEvaluator(handler, dataProvider)
-
+	
+	// Create evaluator with functional options
+	evaluator, err := polyscript.FromRisorString(
+		scriptContent,
+		options.WithDefaults(),
+		options.WithLogger(handler),
+		options.WithDataProvider(dataProvider),
+		risor.WithGlobals([]string{constants.Ctx}),
+	)
+	if err != nil {
+		logger.Error("Failed to create evaluator", "error", err)
+		return
+	}
+	
 	// Execute the script with a context
 	ctx := context.Background()
-	result, err := evaluator.Eval(ctx, unit)
+	result, err := evaluator.Eval(ctx)
 	if err != nil {
 		logger.Error("Script evaluation failed", "error", err)
 		return
 	}
-
+	
 	// Use the result
 	fmt.Printf("Result: %v\n", result.Interface())
 }
+```
+
+You can also separate data preparation from evaluation:
+
+```go
+// Prepare context with data
+ctx := context.Background()
+enrichedCtx, err := evaluator.PrepareContext(ctx, inputData)
+if err != nil {
+	logger.Error("Failed to prepare context", "error", err)
+	return
+}
+
+// Evaluate with the prepared context
+result, err := evaluator.Eval(enrichedCtx)
 ```
 
 ## Working with InputDataProvider
@@ -169,9 +176,37 @@ go-polyscript is structured around a few key concepts:
 3. **ExecutableUnit**: Represents a compiled script ready for execution
 4. **ExecutionPackage** Contains an **ExecutableUnit** and other metadata
 5. **Evaluator**: Executes compiled scripts with provided input data
-6. **InputDataProvider**: Supplies data to scripts during evaluation
-7. **Machine**: A specific implementation of a scripting engine (Risor, Starlark, Extism)
-8. **EvaluatorResponse** The response object returned from all **Machine**s
+6. **EvalDataPreparer**: Prepares data for evaluation (can be separated from evaluation)
+7. **InputDataProvider**: Supplies data to scripts during evaluation
+8. **Machine**: A specific implementation of a scripting engine (Risor, Starlark, Extism)
+9. **EvaluatorResponse** The response object returned from all **Machine**s
+
+## Preparing Data Separately from Evaluation
+
+go-polyscript provides the `EvalDataPreparer` interface to separate data preparation from script evaluation, which is useful for distributed architectures and multi-step data processing:
+
+```go
+// Create an evaluator (implements EvaluatorWithPrep interface)
+evaluator, err := polyscript.FromRisorString(script, options...)
+if err != nil {
+    // handle error
+}
+
+// Prepare context with data (could happen on a web server)
+requestData := map[string]any{"name": "World"}
+enrichedCtx, err := evaluator.PrepareContext(ctx, requestData)
+if err != nil {
+    // handle error
+}
+
+// Later, or on a different system, evaluate with the prepared context
+result, err := evaluator.Eval(enrichedCtx)
+if err != nil {
+    // handle error
+}
+```
+
+For more detailed examples of this pattern, see the [data-prep examples](examples/data-prep/).
 
 ## Advanced Usage
 
