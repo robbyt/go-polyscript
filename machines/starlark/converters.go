@@ -16,6 +16,9 @@ func convertStarlarkValueToInterface(v starlarkLib.Value) (any, error) {
 	}
 
 	switch v := v.(type) {
+	case starlarkLib.NoneType:
+		// Return nil for None values
+		return nil, nil
 	case starlarkLib.Bool:
 		return bool(v), nil
 	case starlarkLib.Int:
@@ -58,20 +61,32 @@ func convertStarlarkValueToInterface(v starlarkLib.Value) (any, error) {
 			dict[string(kStr)] = vv
 		}
 		return dict, nil
+	// NoneType is already handled in the first case
 	default:
 		return nil, fmt.Errorf("unsupported Starlark type %T", v)
 	}
 }
 
 func convertInputData(inputData map[string]any) (starlarkLib.StringDict, error) {
-	converted, err := convertToStarlarkValue(inputData)
-	if err != nil {
-		return nil, fmt.Errorf("failed to convert input data: %w", err)
+	// Start with the ctx dict
+	sDict := make(starlarkLib.StringDict, 1)
+
+	// Create a Starlark dict for the ctx global variable
+	ctxDict := starlarkLib.NewDict(len(inputData))
+
+	// Convert each input data key-value pair and add to the ctx dict
+	for k, v := range inputData {
+		starlarkVal, err := convertToStarlarkValue(v)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert input value for key %q: %w", k, err)
+		}
+		if err := ctxDict.SetKey(starlarkLib.String(k), starlarkVal); err != nil {
+			return nil, fmt.Errorf("failed to set ctx dict key %q: %w", k, err)
+		}
 	}
 
-	// TODO, move the constants.Ctx sub-key back to the bytecode evaluator
-	sDict := make(starlarkLib.StringDict, 1)
-	sDict[constants.Ctx] = converted
+	// Set the ctx global variable to the dictionary
+	sDict[constants.Ctx] = ctxDict
 	return sDict, nil
 }
 

@@ -381,7 +381,7 @@ func TestConvertInputData(t *testing.T) {
 			t.Run(tt.name, func(t *testing.T) {
 				_, err := convertInputData(tt.input)
 				require.Error(t, err)
-				require.Contains(t, err.Error(), "failed to convert input data")
+				require.Contains(t, err.Error(), "failed to convert input value")
 			})
 		}
 	})

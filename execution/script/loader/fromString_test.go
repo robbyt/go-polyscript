@@ -94,6 +94,6 @@ func TestFromString_GetSourceURL(t *testing.T) {
 		url := loader.GetSourceURL()
 		require.NotNil(t, url)
 		require.Equal(t, "string", url.Scheme)
-		require.Equal(t, "string:", url.String())
+		require.Contains(t, url.String(), "string://inline/")
 	})
 }

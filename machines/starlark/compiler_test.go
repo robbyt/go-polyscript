@@ -120,7 +120,7 @@ main()
 
 			// Create mock compiler and reader
 			handler := slog.NewTextHandler(os.Stdout, nil)
-			comp := NewCompiler(handler, &BasicCompilerOptions{Globals: tt.globals})
+			comp := NewCompiler(handler, &StarlarkOptions{Globals: tt.globals})
 			reader := newMockScriptReaderCloser(tt.script)
 			reader.On("Close").Return(nil)
 

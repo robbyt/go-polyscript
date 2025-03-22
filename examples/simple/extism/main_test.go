@@ -1,4 +1,4 @@
-package extism
+package main
 
 import (
 	"log/slog"

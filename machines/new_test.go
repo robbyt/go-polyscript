@@ -54,14 +54,13 @@ func TestNewEvaluator(t *testing.T) {
 				mockContent := new(mockExecutableContent)
 				mockContent.On("GetMachineType").Return(tt.machineType)
 				ver = &script.ExecutableUnit{
-					Content: mockContent,
+					Content:      mockContent,
+					DataProvider: data.NewContextProvider("test_key"),
 				}
 			}
 
 			handler := slog.NewTextHandler(os.Stdout, nil)
-			// Use a test data provider
-			dataProvider := data.NewContextProvider("test_key")
-			evaluator, err := NewEvaluator(handler, ver, dataProvider)
+			evaluator, err := NewEvaluator(handler, ver)
 
 			if tt.expectError {
 				require.Error(t, err)

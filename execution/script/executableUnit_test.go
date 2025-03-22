@@ -17,6 +17,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/robbyt/go-polyscript/execution/constants"
+	"github.com/robbyt/go-polyscript/execution/data"
 	"github.com/robbyt/go-polyscript/execution/script/loader"
 	machineTypes "github.com/robbyt/go-polyscript/machines/types"
 )
@@ -24,6 +25,7 @@ import (
 var emptyScriptData = make(map[string]any)
 
 // Mock implementations
+
 type mockLoader struct {
 	mock.Mock
 }
@@ -123,7 +125,7 @@ func TestNewVersion(t *testing.T) {
 		comp.On("Compile", reader).Return(&MockExecutableContent{}, nil)
 
 		// Create executable unit
-		exe, err := NewExecutableUnit(logHandler, t.Name(), mockLoader, comp, emptyScriptData)
+		exe, err := NewExecutableUnit(logHandler, t.Name(), mockLoader, comp, data.NewStaticProvider(emptyScriptData), emptyScriptData)
 		require.NoError(t, err, "Expected no error when creating executable unit")
 		require.NotNil(t, exe, "Expected executable unit to be non-nil")
 		require.Equal(t, t.Name(), exe.GetID(), "Expected ID to match")
@@ -145,12 +147,12 @@ func TestNewVersion(t *testing.T) {
 		mockContent := new(MockExecutableContent)
 		comp.On("Compile", reader).Return(mockContent, nil).Once()
 
-		exe, err := NewExecutableUnit(logHandler, t.Name(), lod, comp, emptyScriptData)
+		exe, err := NewExecutableUnit(logHandler, t.Name(), lod, comp, data.NewStaticProvider(emptyScriptData), emptyScriptData)
 		require.NoError(t, err, "Expected no error when creating a new version with valid content")
 		require.NotNil(t, exe, "Expected version to be non-nil")
 		require.Equal(t, mockContent, exe.GetContent(), "Expected content to match the mock content")
 		require.NotNil(t, exe.GetLoader().GetSourceURL(), "Expected SourceURI to be non-nil")
-		require.Equal(t, "string:", exe.GetLoader().GetSourceURL().String())
+		require.Contains(t, exe.GetLoader().GetSourceURL().String(), "string://inline/")
 		require.WithinDuration(t, time.Now(), exe.GetCreatedAt(), time.Second, "Expected CreatedAt to be within the last second")
 
 		comp.AssertExpectations(t)
@@ -169,7 +171,7 @@ func TestNewVersion(t *testing.T) {
 		validationError := errors.New("validation failed")
 		comp.On("Compile", reader).Return(nil, validationError).Once()
 
-		exe, err := NewExecutableUnit(logHandler, t.Name(), lod, comp, emptyScriptData)
+		exe, err := NewExecutableUnit(logHandler, t.Name(), lod, comp, data.NewStaticProvider(emptyScriptData), emptyScriptData)
 		require.Error(t, err)
 		require.Nil(t, exe)
 		require.ErrorIs(t, err, validationError)
@@ -200,7 +202,7 @@ func TestNewVersion(t *testing.T) {
 		mockCompiler.On("Compile", reader).Return(mockContent, nil)
 
 		// Create executable unit with empty ID
-		exe, err := NewExecutableUnit(logHandler, "", mockLoader, mockCompiler, emptyScriptData)
+		exe, err := NewExecutableUnit(logHandler, "", mockLoader, mockCompiler, data.NewStaticProvider(emptyScriptData), emptyScriptData)
 		require.NoError(t, err)
 		require.NotNil(t, exe)
 
@@ -216,7 +218,7 @@ func TestNewVersion(t *testing.T) {
 	})
 
 	t.Run("NilCompiler", func(t *testing.T) {
-		exe, err := NewExecutableUnit(logHandler, "test", &mockLoader{}, nil, emptyScriptData)
+		exe, err := NewExecutableUnit(logHandler, "test", &mockLoader{}, nil, data.NewStaticProvider(emptyScriptData), emptyScriptData)
 		require.Error(t, err)
 		require.Nil(t, exe)
 		require.Contains(t, err.Error(), "compiler is nil")
@@ -241,7 +243,7 @@ func TestNewVersion(t *testing.T) {
 		mockCompiler := new(MockCompiler)
 		mockCompiler.On("Compile", mockReader).Return(nil, errors.New("empty content"))
 		// Create executable unit
-		exe, err := NewExecutableUnit(logHandler, "test", mockLoader, mockCompiler, emptyScriptData)
+		exe, err := NewExecutableUnit(logHandler, "test", mockLoader, mockCompiler, data.NewStaticProvider(emptyScriptData), emptyScriptData)
 		require.Error(t, err)
 		require.Nil(t, exe)
 
@@ -257,7 +259,7 @@ func TestNewVersion(t *testing.T) {
 		mockLoader := new(mockLoader)
 		mockLoader.On("GetReader").Return(mockReader, errors.New("get reader error")).Once()
 
-		exe, err := NewExecutableUnit(logHandler, "test", mockLoader, new(MockCompiler), emptyScriptData)
+		exe, err := NewExecutableUnit(logHandler, "test", mockLoader, new(MockCompiler), data.NewStaticProvider(emptyScriptData), emptyScriptData)
 		require.Error(t, err)
 		require.Nil(t, exe)
 
@@ -278,7 +280,7 @@ func TestNewVersion(t *testing.T) {
 		mockCompiler.On("Compile", mockReader).Return(nil, errors.New("compile failed")).Once()
 
 		// Create executable unit
-		exe, err := NewExecutableUnit(logHandler, "test", mockLoader, mockCompiler, emptyScriptData)
+		exe, err := NewExecutableUnit(logHandler, "test", mockLoader, mockCompiler, data.NewStaticProvider(emptyScriptData), emptyScriptData)
 		require.Error(t, err)
 		require.Nil(t, exe)
 
@@ -345,7 +347,7 @@ func TestNewVersionWithScriptData(t *testing.T) {
 		}
 
 		// Create executable unit
-		exe, err := NewExecutableUnit(logHandler, t.Name(), loader, mockCompiler, scriptData)
+		exe, err := NewExecutableUnit(logHandler, t.Name(), loader, mockCompiler, data.NewStaticProvider(scriptData), scriptData)
 		require.NoError(t, err, "Expected no error creating executable unit")
 		require.NotNil(t, exe, "Expected executable unit to be non-nil")
 		require.Equal(t, scriptData, exe.GetScriptData(), "Expected script data to match")
@@ -369,7 +371,7 @@ func TestNewVersionWithScriptData(t *testing.T) {
 
 		comp.On("Compile", reader).Return(mockContent, nil).Once()
 
-		exe, err := NewExecutableUnit(logHandler, t.Name(), lod, comp, nil)
+		exe, err := NewExecutableUnit(logHandler, t.Name(), lod, comp, data.NewStaticProvider(nil), nil)
 		require.NoError(t, err, "Expected no error when creating a new version with nil script data")
 		require.NotNil(t, exe, "Expected version to be non-nil")
 		require.Empty(t, exe.GetScriptData(), "Expected script data to be empty")
@@ -379,7 +381,105 @@ func TestNewVersionWithScriptData(t *testing.T) {
 	})
 }
 
-func TestExecutableUnit_BuildEvalContext(t *testing.T) {
+func TestExecutableUnit_StoreDataInContext(t *testing.T) {
+	t.Run("with context provider", func(t *testing.T) {
+		// Create a context provider for testing
+		provider := data.NewContextProvider(constants.EvalData)
+
+		// Create an executable unit with the provider
+		unit := &ExecutableUnit{
+			ID:           "test-unit",
+			DataProvider: provider,
+			ScriptData:   map[string]any{"config": "value"},
+		}
+
+		// Create a test request
+		req := httptest.NewRequest("GET", "/test", nil)
+		req.Header.Set("Content-Type", "application/json")
+
+		// Store data in context
+		ctx := context.Background()
+		resultCtx := unit.StoreDataInContext(ctx, req)
+
+		// Get the data using the provider
+		actualData, err := provider.GetData(resultCtx)
+		require.NoError(t, err, "Error retrieving data from context")
+		require.NotNil(t, actualData, "Data should not be nil")
+
+		// Check for request data
+		requestData, ok := actualData[constants.Request].(map[string]any)
+		require.True(t, ok, "Request data should be in the context")
+		require.Equal(t, "GET", requestData["Method"], "Request method should match")
+		require.Equal(t, "/test", requestData["URL_Path"], "Request path should match")
+		require.Contains(t, requestData["Headers"], "Content-Type", "Headers should contain Content-Type")
+
+		// Check for script data
+		scriptData, ok := actualData[constants.ScriptData].(map[string]any)
+		require.True(t, ok, "Script data should be in the context")
+		require.Equal(t, "value", scriptData["config"], "Script data should match")
+	})
+
+	t.Run("with nil provider", func(t *testing.T) {
+		// Create a logger to capture errors
+		logHandler := slog.NewTextHandler(os.Stdout, nil)
+		logger := slog.New(logHandler.WithGroup("test"))
+
+		// Create an executable unit with no provider
+		unit := &ExecutableUnit{
+			ID:         "test-unit",
+			logHandler: logHandler,
+			logger:     logger,
+			ScriptData: map[string]any{"config": "value"},
+		}
+
+		// Create a test request
+		req := httptest.NewRequest("GET", "/test", nil)
+
+		// Store data in context
+		ctx := context.Background()
+		resultCtx := unit.StoreDataInContext(ctx, req)
+
+		// The original context should be returned unchanged
+		require.Equal(t, ctx, resultCtx, "Original context should be returned when provider is nil")
+	})
+
+	t.Run("with provider error", func(t *testing.T) {
+		// Create a mock provider that always returns an error
+		mockProvider := &mockErrorProvider{}
+
+		// Create an executable unit with the mock provider
+		unit := &ExecutableUnit{
+			ID:           "test-unit",
+			DataProvider: mockProvider,
+			ScriptData:   map[string]any{"config": "value"},
+		}
+
+		// Create a test request
+		req := httptest.NewRequest("GET", "/test", nil)
+
+		// Store data in context
+		ctx := context.Background()
+		resultCtx := unit.StoreDataInContext(ctx, req)
+
+		// The original context should be returned unchanged when there's an error
+		require.Equal(t, ctx, resultCtx, "Original context should be returned when provider returns an error")
+	})
+}
+
+// Mock provider for testing error cases
+type mockErrorProvider struct{}
+
+func (m *mockErrorProvider) GetData(ctx context.Context) (map[string]any, error) {
+	return nil, errors.New("mock provider error")
+}
+
+func (m *mockErrorProvider) AddDataToContext(ctx context.Context, data ...any) (context.Context, error) {
+	return ctx, errors.New("mock provider error")
+}
+
+// Legacy test function - TO BE REMOVED after full implementation of AddDataToContext
+// This test now uses StoreDataInContext with a ContextProvider
+func TestExecutableUnit_LegacyContext(t *testing.T) {
 	t.Run("request data handling", func(t *testing.T) {
 		tests := []struct {
 			name       string
@@ -450,7 +550,10 @@ func TestExecutableUnit_BuildEvalContext(t *testing.T) {
 				}
 
 				ctx := context.Background()
-				resultCtx := unit.BuildEvalContext(ctx, tt.request)
+				// Note: Using legacy pattern - will be removed soon
+				contextProvider := data.NewContextProvider(constants.EvalData)
+				unit.DataProvider = contextProvider
+				resultCtx := unit.StoreDataInContext(ctx, tt.request)
 
 				// Get the eval data from context
 				evalData, ok := resultCtx.Value(constants.EvalData).(map[string]any)
@@ -496,7 +599,10 @@ func TestExecutableUnit_BuildEvalContext(t *testing.T) {
 		}
 
 		ctx := context.Background()
-		resultCtx := unit.BuildEvalContext(ctx, req)
+		// Note: Using legacy pattern - will be removed soon
+		contextProvider := data.NewContextProvider(constants.EvalData)
+		unit.DataProvider = contextProvider
+		resultCtx := unit.StoreDataInContext(ctx, req)
 
 		// Get the eval data from context
 		evalData, ok := resultCtx.Value(constants.EvalData).(map[string]any)

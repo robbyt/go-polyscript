@@ -1,4 +1,4 @@
-package risor
+package main
 
 import (
 	"log/slog"

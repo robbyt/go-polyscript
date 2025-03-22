@@ -12,7 +12,6 @@ import (
 
 	"github.com/robbyt/go-polyscript/engine"
 	"github.com/robbyt/go-polyscript/execution/constants"
-	"github.com/robbyt/go-polyscript/execution/data"
 	"github.com/robbyt/go-polyscript/execution/script"
 )
 
@@ -21,15 +20,15 @@ type BytecodeEvaluator struct {
 	// ctxKey is the variable name used to access input data inside the vm (ctx)
 	ctxKey string
 
-	// dataProvider is responsible for retrieving input data for evaluation
-	dataProvider data.InputDataProvider
+	// execUnit contains the compiled script and data provider
+	execUnit *script.ExecutableUnit
 
 	logHandler slog.Handler
 	logger     *slog.Logger
 }
 
 // NewBytecodeEvaluator creates a new BytecodeEvaluator object
-func NewBytecodeEvaluator(handler slog.Handler, dataProvider data.InputDataProvider) *BytecodeEvaluator {
+func NewBytecodeEvaluator(handler slog.Handler, execUnit *script.ExecutableUnit) *BytecodeEvaluator {
 	if handler == nil {
 		defaultHandler := slog.NewTextHandler(os.Stdout, nil)
 		handler = defaultHandler.WithGroup("risor")
@@ -38,16 +37,11 @@ func NewBytecodeEvaluator(handler slog.Handler, dataProvider data.InputDataProvi
 		defaultLogger.Warn("Handler is nil, using the default logger configuration.")
 	}
 
-	// If no provider is specified, use the default context provider
-	if dataProvider == nil {
-		dataProvider = data.NewContextProvider(constants.EvalData)
-	}
-
 	return &BytecodeEvaluator{
-		ctxKey:       constants.Ctx,
-		dataProvider: dataProvider,
-		logHandler:   handler,
-		logger:       slog.New(handler.WithGroup("BytecodeEvaluator")),
+		ctxKey:     constants.Ctx,
+		execUnit:   execUnit,
+		logHandler: handler,
+		logger:     slog.New(handler.WithGroup("BytecodeEvaluator")),
 	}
 }
 
@@ -87,8 +81,15 @@ func (be *BytecodeEvaluator) convertInputData(ctx context.Context) ([]risorLib.O
 	// setup input data, which will be sent from the input request to the eval VM
 	logger := be.getLogger()
 
+	if be.execUnit == nil || be.execUnit.GetDataProvider() == nil {
+		logger.WarnContext(ctx, "no data provider available, using empty data")
+		return []risorLib.Option{
+			risorLib.WithGlobal(be.ctxKey, map[string]any{}),
+		}, nil
+	}
+
 	// Use the data provider to get the input data
-	inputData, err := be.dataProvider.GetInputData(ctx)
+	inputData, err := be.execUnit.GetDataProvider().GetData(ctx)
 	if err != nil {
 		logger.ErrorContext(ctx, "failed to get input data from provider", "error", err)
 		return []risorLib.Option{}, err
@@ -106,19 +107,19 @@ func (be *BytecodeEvaluator) convertInputData(ctx context.Context) ([]risorLib.O
 }
 
 // Eval evaluates the loaded bytecode and uses the provided EvalData to pass data in to the Risor VM execution
-func (be *BytecodeEvaluator) Eval(ctx context.Context, exe *script.ExecutableUnit) (engine.EvaluatorResponse, error) {
+func (be *BytecodeEvaluator) Eval(ctx context.Context) (engine.EvaluatorResponse, error) {
 	logger := be.getLogger()
-	if exe == nil {
-		return nil, fmt.Errorf("version is nil")
+	if be.execUnit == nil {
+		return nil, fmt.Errorf("executable unit is nil")
 	}
 
 	// Get the bytecode from the executable unit
-	bytecode := exe.GetContent().GetByteCode()
+	bytecode := be.execUnit.GetContent().GetByteCode()
 	if bytecode == nil {
 		return nil, fmt.Errorf("bytecode is nil")
 	}
 
-	exeID := exe.GetID()
+	exeID := be.execUnit.GetID()
 	if exeID == "" {
 		return nil, fmt.Errorf("exeID is empty")
 	}
@@ -159,4 +160,38 @@ func (be *BytecodeEvaluator) Eval(ctx context.Context, exe *script.ExecutableUni
 	}
 
 	return result, nil
+}
+
+// PrepareContext implements the EvalDataPreparer interface for Risor scripts.
+// It enriches the provided context with data for script evaluation, using the
+// ExecutableUnit's DataProvider to store the data.
+//
+// The method accepts HTTP requests, maps, and other data types, converting them
+// appropriately for Risor execution. This enables separation of data preparation
+// from evaluation, supporting distributed processing architectures.
+//
+// Example:
+//  scriptData := map[string]any{"greeting": "Hello, World!"}
+//  enrichedCtx, err := evaluator.PrepareContext(ctx, request, scriptData)
+//  if err != nil {
+//      return err
+//  }
+//  result, err := evaluator.Eval(enrichedCtx)
+func (be *BytecodeEvaluator) PrepareContext(ctx context.Context, data ...any) (context.Context, error) {
+	logger := be.getLogger()
+
+	// Check if we have a data provider
+	if be.execUnit == nil || be.execUnit.GetDataProvider() == nil {
+		logger.WarnContext(ctx, "no data provider available for context preparation")
+		return ctx, fmt.Errorf("no data provider available")
+	}
+
+	// Use the data provider to store the raw data
+	enrichedCtx, err := be.execUnit.GetDataProvider().AddDataToContext(ctx, data...)
+	if err != nil {
+		logger.ErrorContext(ctx, "failed to prepare context", "error", err)
+		// Return the partial context even with errors, as it may have some usable data
+	}
+
+	return enrichedCtx, err
 }
