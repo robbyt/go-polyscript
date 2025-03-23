@@ -8,11 +8,9 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/robbyt/go-polyscript/engine"
-	"github.com/robbyt/go-polyscript/execution/constants"
 	"github.com/robbyt/go-polyscript/execution/script"
 
 	extismSDK "github.com/extism/go-sdk"
@@ -21,7 +19,6 @@ import (
 
 // BytecodeEvaluator executes compiled WASM modules with provided runtime data
 type BytecodeEvaluator struct {
-	ctxKey     string // Variable name used to access data in WASM
 	execUnit   *script.ExecutableUnit
 	logHandler slog.Handler
 	logger     *slog.Logger
@@ -37,7 +34,6 @@ func NewBytecodeEvaluator(handler slog.Handler, execUnit *script.ExecutableUnit)
 	}
 
 	return &BytecodeEvaluator{
-		ctxKey:     constants.Ctx,
 		execUnit:   execUnit,
 		logHandler: handler,
 		logger:     slog.New(handler.WithGroup("BytecodeEvaluator")),
@@ -67,9 +63,51 @@ func (be *BytecodeEvaluator) getPluginInstanceConfig() extismSDK.PluginInstanceC
 	}
 }
 
+// execHelper is a utility function to handle common execution logic
+// Extracted to make unit testing easier
+func execHelper(
+	ctx context.Context,
+	logger *slog.Logger,
+	instance sdkPluginInstanceConfig,
+	entryPoint string,
+	inputJSON []byte,
+) (any, time.Duration, error) {
+	// Call the function (context handles timeout)
+	startTime := time.Now()
+	exit, output, err := instance.CallWithContext(ctx, entryPoint, inputJSON)
+	execTime := time.Since(startTime)
+	if err != nil {
+		if ctx.Err() != nil {
+			return nil, execTime, fmt.Errorf("execution cancelled: %w", ctx.Err())
+		}
+		return nil, execTime, fmt.Errorf("execution failed: %w", err)
+	}
+	if exit != 0 {
+		// TODO should we return the output in this case?
+		return nil, execTime, fmt.Errorf("function returned non-zero exit code: %d", exit)
+	}
+
+	// Try to parse output as JSON with number handling
+	var result any
+	d := json.NewDecoder(bytes.NewReader(output))
+	d.UseNumber() // Preserve number types
+	if err := d.Decode(&result); err != nil {
+		// If not JSON, use raw output as string
+		result = string(output)
+	}
+
+	result = fixJSONNumberTypes(result)
+
+	logger.Debug("execution complete",
+		"result", result,
+		"execTime", execTime,
+	)
+
+	return result, execTime, nil
+}
+
 // exec handles WASM-specific execution details
-// TODO: Consider refactoring to use interfaces instead of concrete types for better testability
-// Currently, the error paths are difficult to test because Extism SDK uses concrete types.
+// Using the interface and helper function to improve testability
 func (be *BytecodeEvaluator) exec(
 	ctx context.Context,
 	plugin compiledPlugin,
@@ -85,47 +123,11 @@ func (be *BytecodeEvaluator) exec(
 	}
 	defer instance.Close(ctx)
 
-	// Call the function (context handles timeout)
-	startTime := time.Now()
-	exit, output, err := instance.CallWithContext(ctx, entryPoint, inputJSON)
-	execTime := time.Since(startTime)
+	// Use the helper function for execution
+	result, execTime, err := execHelper(ctx, logger, instance, entryPoint, inputJSON)
 	if err != nil {
-		if ctx.Err() != nil {
-			return nil, fmt.Errorf("execution cancelled: %w", ctx.Err())
-		}
-		return nil, fmt.Errorf("execution failed: %w", err)
+		return nil, err
 	}
-	if exit != 0 {
-		// TODO should we return the output in this case?
-		return nil, fmt.Errorf("function returned non-zero exit code: %d", exit)
-	}
-
-	// Try to parse output as JSON with number handling
-	var result any
-	d := json.NewDecoder(bytes.NewReader(output))
-	d.UseNumber() // Preserve number types
-	if err := d.Decode(&result); err != nil {
-		// If not JSON, use raw output as string
-		result = string(output)
-	}
-
-	// Convert json.Number to int for specific fields
-	if m, ok := result.(map[string]any); ok {
-		for k, v := range m {
-			if num, ok := v.(json.Number); ok {
-				if strings.HasSuffix(k, "_count") || k == "count" {
-					if n, err := num.Int64(); err == nil {
-						m[k] = int(n)
-					}
-				}
-			}
-		}
-	}
-
-	logger.Debug("execution complete",
-		"result", result,
-		"execTime", execTime,
-	)
 
 	return newEvalResult(be.logHandler, result, execTime, ""), nil
 }
@@ -150,13 +152,6 @@ func (be *BytecodeEvaluator) loadInputData(ctx context.Context) (map[string]any,
 
 	logger.DebugContext(ctx, "input data loaded from provider", "inputData", inputData)
 	return inputData, nil
-}
-
-func marshalInputData(inputData map[string]any) ([]byte, error) {
-	if len(inputData) == 0 {
-		return nil, nil
-	}
-	return json.Marshal(inputData)
 }
 
 // Eval implements engine.Evaluator
@@ -237,12 +232,13 @@ func (be *BytecodeEvaluator) Eval(ctx context.Context) (engine.EvaluatorResponse
 // from evaluation, supporting distributed processing architectures.
 //
 // Example:
-//  scriptData := map[string]any{"greeting": "Hello, World!"}
-//  enrichedCtx, err := evaluator.PrepareContext(ctx, request, scriptData)
-//  if err != nil {
-//      return err
-//  }
-//  result, err := evaluator.Eval(enrichedCtx)
+//
+//	scriptData := map[string]any{"greeting": "Hello, World!"}
+//	enrichedCtx, err := evaluator.PrepareContext(ctx, request, scriptData)
+//	if err != nil {
+//	    return err
+//	}
+//	result, err := evaluator.Eval(enrichedCtx)
 func (be *BytecodeEvaluator) PrepareContext(ctx context.Context, data ...any) (context.Context, error) {
 	logger := be.getLogger()
 

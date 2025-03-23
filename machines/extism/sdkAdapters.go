@@ -11,6 +11,7 @@ import (
 // It provides:
 // - sdkCompiledPluginAdapter: Adapts extismSDK.CompiledPlugin to our compiledPlugin interface
 // - sdkPluginAdapter: Adapts extismSDK.Plugin to our pluginInstance interface
+// - plugInstConfig: An interface that wraps Extism extismSDK.PluginInstanceConfig
 //
 // These adapters wrap the SDK's concrete types (CompiledPlugin and Plugin), allowing
 // our code to work with our internal interfaces instead of directly depending on the
@@ -65,4 +66,11 @@ func (a *sdkPluginAdapter) FunctionExists(name string) bool {
 // Close releases resources associated with the instance
 func (a *sdkPluginAdapter) Close(ctx context.Context) error {
 	return a.instance.Close(ctx)
+}
+
+// sdkPluginInstanceConfig is an interface that wraps Extism extismSDK.PluginInstanceConfig
+// This interface is used here to enable testing and to abstract the methods exposed by extism.
+type sdkPluginInstanceConfig interface {
+	CallWithContext(ctx context.Context, functionName string, input []byte) (uint32, []byte, error)
+	Close(ctx context.Context) error
 }
