@@ -209,12 +209,13 @@ func (be *BytecodeEvaluator) Eval(ctx context.Context) (engine.EvaluatorResponse
 // from evaluation, supporting distributed processing architectures.
 //
 // Example:
-//  scriptData := map[string]any{"greeting": "Hello, World!"}
-//  enrichedCtx, err := evaluator.PrepareContext(ctx, request, scriptData)
-//  if err != nil {
-//      return err
-//  }
-//  result, err := evaluator.Eval(enrichedCtx)
+//
+//	scriptData := map[string]any{"greeting": "Hello, World!"}
+//	enrichedCtx, err := evaluator.PrepareContext(ctx, request, scriptData)
+//	if err != nil {
+//	    return err
+//	}
+//	result, err := evaluator.Eval(enrichedCtx)
 func (be *BytecodeEvaluator) PrepareContext(ctx context.Context, data ...any) (context.Context, error) {
 	logger := be.getLogger()
 
