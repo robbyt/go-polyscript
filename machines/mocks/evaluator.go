@@ -31,3 +31,9 @@ func (m *Evaluator) Load(newVersion script.ExecutableUnit) error {
 	args := m.Called(newVersion)
 	return args.Error(0)
 }
+
+// PrepareContext is a mock implementation of the PrepareContext method.
+func (m *Evaluator) PrepareContext(ctx context.Context, d ...any) (context.Context, error) {
+	args := m.Called(ctx, d)
+	return args.Get(0).(context.Context), args.Error(1)
+}
