@@ -42,10 +42,6 @@ func newEvalResult(handler slog.Handler, obj starlarkLib.Value, execTime time.Du
 	}
 }
 
-func (c *execResult) getLogger() *slog.Logger {
-	return c.logger
-}
-
 func (r *execResult) String() string {
 	return fmt.Sprintf(
 		"ExecResult{Type: %s, Value: %v, ExecTime: %s, ScriptExeID: %s}",
@@ -76,7 +72,7 @@ func (r *execResult) Type() data.Types {
 	case "function":
 		return data.FUNCTION
 	default:
-		r.getLogger().Error("Unknown type", "type", r.Value.Type())
+		r.logger.Error("Unknown type", "type", r.Value.Type())
 		return data.ERROR
 	}
 }
@@ -97,7 +93,7 @@ func (r *execResult) Inspect() string {
 func (r *execResult) Interface() any {
 	v, err := convertStarlarkValueToInterface(r.Value)
 	if err != nil {
-		r.getLogger().Error("Failed to convert Starlark value to interface", "error", err)
+		r.logger.Error("Failed to convert Starlark value to interface", "error", err)
 		return nil
 	}
 	return v

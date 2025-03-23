@@ -45,10 +45,6 @@ func NewBytecodeEvaluator(handler slog.Handler, execUnit *script.ExecutableUnit)
 	}
 }
 
-func (r *BytecodeEvaluator) getLogger() *slog.Logger {
-	return r.logger
-}
-
 func (c *BytecodeEvaluator) String() string {
 	return "risor.BytecodeEvaluator"
 }
@@ -79,7 +75,7 @@ func (be *BytecodeEvaluator) exec(ctx context.Context, bytecode *risorCompiler.C
 //	}
 func (be *BytecodeEvaluator) convertInputData(ctx context.Context) ([]risorLib.Option, error) {
 	// setup input data, which will be sent from the input request to the eval VM
-	logger := be.getLogger()
+	logger := be.logger.WithGroup("convertInputData")
 
 	if be.execUnit == nil || be.execUnit.GetDataProvider() == nil {
 		logger.WarnContext(ctx, "no data provider available, using empty data")
@@ -108,7 +104,7 @@ func (be *BytecodeEvaluator) convertInputData(ctx context.Context) ([]risorLib.O
 
 // Eval evaluates the loaded bytecode and uses the provided EvalData to pass data in to the Risor VM execution
 func (be *BytecodeEvaluator) Eval(ctx context.Context) (engine.EvaluatorResponse, error) {
-	logger := be.getLogger()
+	logger := be.logger.WithGroup("Eval")
 	if be.execUnit == nil {
 		return nil, fmt.Errorf("executable unit is nil")
 	}
@@ -179,7 +175,7 @@ func (be *BytecodeEvaluator) Eval(ctx context.Context) (engine.EvaluatorResponse
 //	}
 //	result, err := evaluator.Eval(enrichedCtx)
 func (be *BytecodeEvaluator) PrepareContext(ctx context.Context, data ...any) (context.Context, error) {
-	logger := be.getLogger()
+	logger := be.logger.WithGroup("PrepareContext")
 
 	// Check if we have a data provider
 	if be.execUnit == nil || be.execUnit.GetDataProvider() == nil {

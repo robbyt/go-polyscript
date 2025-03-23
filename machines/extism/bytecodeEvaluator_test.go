@@ -291,15 +291,6 @@ func TestEvaluatorString(t *testing.T) {
 	require.Equal(t, "extism.BytecodeEvaluator", strRep)
 }
 
-func TestGetLogger(t *testing.T) {
-	handler := slog.NewTextHandler(os.Stdout, nil)
-	evaluator := NewBytecodeEvaluator(handler, nil)
-
-	// getLogger should return the logger from the evaluator
-	logger := evaluator.getLogger()
-	require.NotNil(t, logger)
-}
-
 func TestGetPluginInstanceConfig(t *testing.T) {
 	handler := slog.NewTextHandler(os.Stdout, nil)
 	evaluator := NewBytecodeEvaluator(handler, nil)

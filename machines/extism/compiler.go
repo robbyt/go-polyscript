@@ -56,10 +56,6 @@ func NewCompiler(handler slog.Handler, compilerOptions CompilerOptions) *Compile
 	}
 }
 
-func (c *Compiler) getLogger() *slog.Logger {
-	return c.logger
-}
-
 func (c *Compiler) String() string {
 	return "extism.Compiler"
 }
@@ -68,6 +64,8 @@ func (c *Compiler) String() string {
 // TODO: Some error paths are difficult to test with the current design
 // Consider adding integration tests for hard-to-reach error cases.
 func (c *Compiler) Compile(scriptReader io.ReadCloser) (script.ExecutableContent, error) {
+	logger := c.logger.WithGroup("compile")
+
 	if scriptReader == nil {
 		return nil, ErrContentNil
 	}
@@ -81,8 +79,6 @@ func (c *Compiler) Compile(scriptReader io.ReadCloser) (script.ExecutableContent
 	if err != nil {
 		return nil, fmt.Errorf("failed to close reader: %w", err)
 	}
-
-	logger := c.getLogger()
 
 	if len(scriptBytes) == 0 {
 		logger.Error("Compile called with empty script")

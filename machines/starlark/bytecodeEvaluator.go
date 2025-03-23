@@ -52,10 +52,6 @@ func NewBytecodeEvaluator(handler slog.Handler, execUnit *script.ExecutableUnit)
 	}
 }
 
-func (r *BytecodeEvaluator) getLogger() *slog.Logger {
-	return r.logger
-}
-
 func (c *BytecodeEvaluator) String() string {
 	return "starlark.BytecodeEvaluator"
 }
@@ -76,7 +72,7 @@ func (be *BytecodeEvaluator) prepareGlobals(ctx context.Context, inputGlobals st
 
 // exec executes the bytecode with the provided globals
 func (be *BytecodeEvaluator) exec(ctx context.Context, prog *starlarkLib.Program, globals starlarkLib.StringDict) (*execResult, error) {
-	logger := be.getLogger()
+	logger := be.logger.WithGroup("exec")
 	startTime := time.Now()
 
 	// Create thread with cancellation support
@@ -123,7 +119,7 @@ func (be *BytecodeEvaluator) exec(ctx context.Context, prog *starlarkLib.Program
 
 // Eval evaluates the loaded bytecode and passes the provided data into the Starlark VM
 func (be *BytecodeEvaluator) Eval(ctx context.Context) (engine.EvaluatorResponse, error) {
-	logger := be.getLogger()
+	logger := be.logger.WithGroup("Eval")
 	if be.execUnit == nil {
 		return nil, fmt.Errorf("executable unit is nil")
 	}
@@ -217,7 +213,7 @@ func (be *BytecodeEvaluator) Eval(ctx context.Context) (engine.EvaluatorResponse
 //	}
 //	result, err := evaluator.Eval(enrichedCtx)
 func (be *BytecodeEvaluator) PrepareContext(ctx context.Context, data ...any) (context.Context, error) {
-	logger := be.getLogger()
+	logger := be.logger.WithGroup("PrepareContext")
 
 	// Check if we have a data provider
 	if be.execUnit == nil || be.execUnit.GetDataProvider() == nil {

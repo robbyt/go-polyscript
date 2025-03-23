@@ -40,10 +40,6 @@ func NewBytecodeEvaluator(handler slog.Handler, execUnit *script.ExecutableUnit)
 	}
 }
 
-func (be *BytecodeEvaluator) getLogger() *slog.Logger {
-	return be.logger
-}
-
 func (be *BytecodeEvaluator) String() string {
 	return "extism.BytecodeEvaluator"
 }
@@ -115,7 +111,7 @@ func (be *BytecodeEvaluator) exec(
 	instanceConfig extismSDK.PluginInstanceConfig,
 	inputJSON []byte,
 ) (*execResult, error) {
-	logger := be.getLogger()
+	logger := be.logger.WithGroup("exec")
 
 	instance, err := plugin.Instance(ctx, instanceConfig)
 	if err != nil {
@@ -135,7 +131,7 @@ func (be *BytecodeEvaluator) exec(
 // loadInputData retrieves input data using the data provider in the executable unit.
 // Returns a map that will be used as input for the WASM module.
 func (be *BytecodeEvaluator) loadInputData(ctx context.Context) (map[string]any, error) {
-	logger := be.getLogger()
+	logger := be.logger.WithGroup("loadInputData")
 
 	// If no executable unit or data provider, return empty map
 	if be.execUnit == nil || be.execUnit.GetDataProvider() == nil {
@@ -158,7 +154,7 @@ func (be *BytecodeEvaluator) loadInputData(ctx context.Context) (map[string]any,
 // TODO: Some error paths in this method are hard to test with the current design
 // Consider adding more integration tests to cover these paths.
 func (be *BytecodeEvaluator) Eval(ctx context.Context) (engine.EvaluatorResponse, error) {
-	logger := be.getLogger()
+	logger := be.logger.WithGroup("Eval")
 
 	// Validate executable unit
 	if be.execUnit == nil {
@@ -240,7 +236,7 @@ func (be *BytecodeEvaluator) Eval(ctx context.Context) (engine.EvaluatorResponse
 //	}
 //	result, err := evaluator.Eval(enrichedCtx)
 func (be *BytecodeEvaluator) PrepareContext(ctx context.Context, data ...any) (context.Context, error) {
-	logger := be.getLogger()
+	logger := be.logger.WithGroup("PrepareContext")
 
 	// Check if we have a data provider
 	if be.execUnit == nil || be.execUnit.GetDataProvider() == nil {

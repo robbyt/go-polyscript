@@ -38,12 +38,8 @@ func NewCompiler(handler slog.Handler, compilerOptions CompilerOptions) *Compile
 	}
 }
 
-func (c *Compiler) getLogger() *slog.Logger {
-	return c.logger
-}
-
 func (c *Compiler) compile(scriptBodyBytes []byte) (*Executable, error) {
-	logger := c.getLogger()
+	logger := c.logger.WithGroup("compile")
 	if len(scriptBodyBytes) == 0 {
 		return nil, ErrContentNil
 	}
