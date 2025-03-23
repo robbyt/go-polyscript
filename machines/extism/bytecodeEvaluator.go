@@ -7,11 +7,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"os"
 	"time"
 
 	"github.com/robbyt/go-polyscript/engine"
+	"github.com/robbyt/go-polyscript/execution/data"
 	"github.com/robbyt/go-polyscript/execution/script"
+	"github.com/robbyt/go-polyscript/internal/helpers"
 
 	extismSDK "github.com/extism/go-sdk"
 	"github.com/tetratelabs/wazero"
@@ -25,18 +26,12 @@ type BytecodeEvaluator struct {
 }
 
 func NewBytecodeEvaluator(handler slog.Handler, execUnit *script.ExecutableUnit) *BytecodeEvaluator {
-	if handler == nil {
-		defaultHandler := slog.NewTextHandler(os.Stdout, nil)
-		handler = defaultHandler.WithGroup("extism")
-		// Create a logger from the handler rather than using slog directly
-		defaultLogger := slog.New(handler)
-		defaultLogger.Warn("Handler is nil, using the default logger configuration.")
-	}
+	handler, logger := helpers.SetupLogger(handler, "extism", "BytecodeEvaluator")
 
 	return &BytecodeEvaluator{
 		execUnit:   execUnit,
 		logHandler: handler,
-		logger:     slog.New(handler.WithGroup("BytecodeEvaluator")),
+		logger:     logger,
 	}
 }
 
@@ -222,34 +217,18 @@ func (be *BytecodeEvaluator) Eval(ctx context.Context) (engine.EvaluatorResponse
 // PrepareContext implements the EvalDataPreparer interface for Extism WebAssembly modules.
 // It enriches the provided context with data for script evaluation, using the
 // ExecutableUnit's DataProvider to store the data.
-//
-// The method accepts HTTP requests, maps, and other data types, converting them
-// appropriately for WebAssembly execution. This enables separation of data preparation
-// from evaluation, supporting distributed processing architectures.
-//
-// Example:
-//
-//	scriptData := map[string]any{"greeting": "Hello, World!"}
-//	enrichedCtx, err := evaluator.PrepareContext(ctx, request, scriptData)
-//	if err != nil {
-//	    return err
-//	}
-//	result, err := evaluator.Eval(enrichedCtx)
-func (be *BytecodeEvaluator) PrepareContext(ctx context.Context, data ...any) (context.Context, error) {
+func (be *BytecodeEvaluator) PrepareContext(ctx context.Context, d ...any) (context.Context, error) {
 	logger := be.logger.WithGroup("PrepareContext")
 
-	// Check if we have a data provider
+	// Use the shared helper function for context preparation
 	if be.execUnit == nil || be.execUnit.GetDataProvider() == nil {
-		logger.WarnContext(ctx, "no data provider available for context preparation")
 		return ctx, fmt.Errorf("no data provider available")
 	}
 
-	// Use the data provider to store the raw data
-	enrichedCtx, err := be.execUnit.GetDataProvider().AddDataToContext(ctx, data...)
-	if err != nil {
-		logger.ErrorContext(ctx, "failed to prepare context", "error", err)
-		// Return the partial context even with errors, as it may have some usable data
-	}
-
-	return enrichedCtx, err
+	return data.PrepareContextHelper(
+		ctx,
+		logger,
+		be.execUnit.GetDataProvider(),
+		d...,
+	)
 }
