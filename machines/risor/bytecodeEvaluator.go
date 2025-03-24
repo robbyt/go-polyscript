@@ -40,7 +40,7 @@ func NewBytecodeEvaluator(handler slog.Handler, execUnit *script.ExecutableUnit)
 	}
 }
 
-func (c *BytecodeEvaluator) String() string {
+func (be *BytecodeEvaluator) String() string {
 	return "risor.BytecodeEvaluator"
 }
 
@@ -145,9 +145,9 @@ func (be *BytecodeEvaluator) Eval(ctx context.Context) (engine.EvaluatorResponse
 
 	switch result.Object.Type() {
 	case "error":
-		return result, fmt.Errorf("error returned from script: %s", result.Object.Inspect())
+		return result, fmt.Errorf("error returned from script: %s", result.Inspect())
 	case "function":
-		return result, fmt.Errorf("function object returned from script: %s", result.Object.Inspect())
+		return result, fmt.Errorf("function object returned from script: %s", result.Inspect())
 	}
 
 	return result, nil

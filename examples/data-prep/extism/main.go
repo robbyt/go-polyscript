@@ -188,9 +188,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Verify the evaluator implements the EvaluatorWithPrep interface
-	if _, ok := evaluator.(engine.EvaluatorWithPrep); !ok {
-		logger.Error("Evaluator does not implement EvaluatorWithPrep interface")
+	// Verify the evaluator is properly initialized
+	if evaluator == nil {
+		logger.Error("Evaluator is nil")
 		os.Exit(1)
 	}
 

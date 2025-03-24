@@ -47,7 +47,7 @@ func NewBytecodeEvaluator(handler slog.Handler, execUnit *script.ExecutableUnit)
 	}
 }
 
-func (c *BytecodeEvaluator) String() string {
+func (be *BytecodeEvaluator) String() string {
 	return "starlark.BytecodeEvaluator"
 }
 

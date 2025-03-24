@@ -15,7 +15,7 @@ func TestHeaderAuth(t *testing.T) {
 	tests := []struct {
 		name        string
 		factory     func() Authenticator
-		setup       func() (*http.Request, context.Context, context.CancelFunc)
+		setup       func(t *testing.T) (*http.Request, context.Context, context.CancelFunc)
 		expectError bool
 		verifyReq   func(t *testing.T, req *http.Request)
 	}{
@@ -28,8 +28,9 @@ func TestHeaderAuth(t *testing.T) {
 					"X-Custom":      "value",
 				})
 			},
-			setup: func() (*http.Request, context.Context, context.CancelFunc) {
-				req, _ := http.NewRequest(http.MethodGet, "https://example.com", nil)
+			setup: func(t *testing.T) (*http.Request, context.Context, context.CancelFunc) {
+				req, err := http.NewRequest(http.MethodGet, "https://example.com", nil)
+				require.NoError(t, err)
 				return req, nil, nil
 			},
 			verifyReq: func(t *testing.T, req *http.Request) {
@@ -43,8 +44,9 @@ func TestHeaderAuth(t *testing.T) {
 			factory: func() Authenticator {
 				return NewHeaderAuth(map[string]string{})
 			},
-			setup: func() (*http.Request, context.Context, context.CancelFunc) {
-				req, _ := http.NewRequest(http.MethodGet, "https://example.com", nil)
+			setup: func(t *testing.T) (*http.Request, context.Context, context.CancelFunc) {
+				req, err := http.NewRequest(http.MethodGet, "https://example.com", nil)
+				require.NoError(t, err)
 				return req, nil, nil
 			},
 			verifyReq: func(t *testing.T, req *http.Request) {
@@ -56,8 +58,9 @@ func TestHeaderAuth(t *testing.T) {
 			factory: func() Authenticator {
 				return NewHeaderAuth(nil)
 			},
-			setup: func() (*http.Request, context.Context, context.CancelFunc) {
-				req, _ := http.NewRequest(http.MethodGet, "https://example.com", nil)
+			setup: func(t *testing.T) (*http.Request, context.Context, context.CancelFunc) {
+				req, err := http.NewRequest(http.MethodGet, "https://example.com", nil)
+				require.NoError(t, err)
 				return req, nil, nil
 			},
 			verifyReq: func(t *testing.T, req *http.Request) {
@@ -69,8 +72,9 @@ func TestHeaderAuth(t *testing.T) {
 			factory: func() Authenticator {
 				return NewBearerAuth("my-test-token")
 			},
-			setup: func() (*http.Request, context.Context, context.CancelFunc) {
-				req, _ := http.NewRequest(http.MethodGet, "https://example.com", nil)
+			setup: func(t *testing.T) (*http.Request, context.Context, context.CancelFunc) {
+				req, err := http.NewRequest(http.MethodGet, "https://example.com", nil)
+				require.NoError(t, err)
 				return req, nil, nil
 			},
 			verifyReq: func(t *testing.T, req *http.Request) {
@@ -84,8 +88,9 @@ func TestHeaderAuth(t *testing.T) {
 					"Authorization": "Bearer token123",
 				})
 			},
-			setup: func() (*http.Request, context.Context, context.CancelFunc) {
-				req, _ := http.NewRequest(http.MethodGet, "https://example.com", nil)
+			setup: func(t *testing.T) (*http.Request, context.Context, context.CancelFunc) {
+				req, err := http.NewRequest(http.MethodGet, "https://example.com", nil)
+				require.NoError(t, err)
 				ctx := context.Background()
 				return req, ctx, nil
 			},
@@ -100,8 +105,9 @@ func TestHeaderAuth(t *testing.T) {
 					"Authorization": "Bearer token123",
 				})
 			},
-			setup: func() (*http.Request, context.Context, context.CancelFunc) {
-				req, _ := http.NewRequest(http.MethodGet, "https://example.com", nil)
+			setup: func(t *testing.T) (*http.Request, context.Context, context.CancelFunc) {
+				req, err := http.NewRequest(http.MethodGet, "https://example.com", nil)
+				require.NoError(t, err)
 				ctx, cancel := context.WithCancel(context.Background())
 				cancel() // Cancel immediately
 				return req, ctx, nil
@@ -115,8 +121,9 @@ func TestHeaderAuth(t *testing.T) {
 					"Authorization": "Bearer token123",
 				})
 			},
-			setup: func() (*http.Request, context.Context, context.CancelFunc) {
-				req, _ := http.NewRequest(http.MethodGet, "https://example.com", nil)
+			setup: func(t *testing.T) (*http.Request, context.Context, context.CancelFunc) {
+				req, err := http.NewRequest(http.MethodGet, "https://example.com", nil)
+				require.NoError(t, err)
 				ctx, cancel := context.WithTimeout(context.Background(), 1*time.Nanosecond)
 				time.Sleep(5 * time.Millisecond) // Ensure the timeout occurs
 				return req, ctx, cancel
@@ -133,7 +140,7 @@ func TestHeaderAuth(t *testing.T) {
 			auth := tt.factory()
 			require.Equal(t, "Header", auth.Name())
 
-			req, ctx, cancel := tt.setup()
+			req, ctx, cancel := tt.setup(t)
 			if cancel != nil {
 				defer cancel()
 			}
@@ -175,10 +182,11 @@ func TestHeaderAuthCloning(t *testing.T) {
 	originalHeaders["X-New"] = "added"
 
 	// Create a request
-	req, _ := http.NewRequest(http.MethodGet, "https://example.com", nil)
+	req, err := http.NewRequest(http.MethodGet, "https://example.com", nil)
+	require.NoError(t, err)
 
 	// Apply auth
-	err := auth.Authenticate(req)
+	err = auth.Authenticate(req)
 	require.NoError(t, err)
 
 	// The authenticator should have used its own internal copy, not the modified one

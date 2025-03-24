@@ -16,7 +16,7 @@ func TestBasicAuth(t *testing.T) {
 		name        string
 		username    string
 		password    string
-		setup       func() (*http.Request, context.Context, context.CancelFunc)
+		setup       func(t *testing.T) (*http.Request, context.Context, context.CancelFunc)
 		expectError bool
 		verifyReq   func(t *testing.T, req *http.Request)
 	}{
@@ -24,8 +24,9 @@ func TestBasicAuth(t *testing.T) {
 			name:     "Valid credentials",
 			username: "testuser",
 			password: "testpass",
-			setup: func() (*http.Request, context.Context, context.CancelFunc) {
-				req, _ := http.NewRequest(http.MethodGet, "https://example.com", nil)
+			setup: func(t *testing.T) (*http.Request, context.Context, context.CancelFunc) {
+				req, err := http.NewRequest(http.MethodGet, "https://example.com", nil)
+				require.NoError(t, err)
 				return req, nil, nil
 			},
 			verifyReq: func(t *testing.T, req *http.Request) {
@@ -39,8 +40,9 @@ func TestBasicAuth(t *testing.T) {
 			name:     "Empty username (no auth applied)",
 			username: "",
 			password: "testpass",
-			setup: func() (*http.Request, context.Context, context.CancelFunc) {
-				req, _ := http.NewRequest(http.MethodGet, "https://example.com", nil)
+			setup: func(t *testing.T) (*http.Request, context.Context, context.CancelFunc) {
+				req, err := http.NewRequest(http.MethodGet, "https://example.com", nil)
+				require.NoError(t, err)
 				return req, nil, nil
 			},
 			verifyReq: func(t *testing.T, req *http.Request) {
@@ -53,8 +55,9 @@ func TestBasicAuth(t *testing.T) {
 			name:     "With context",
 			username: "testuser",
 			password: "testpass",
-			setup: func() (*http.Request, context.Context, context.CancelFunc) {
-				req, _ := http.NewRequest(http.MethodGet, "https://example.com", nil)
+			setup: func(t *testing.T) (*http.Request, context.Context, context.CancelFunc) {
+				req, err := http.NewRequest(http.MethodGet, "https://example.com", nil)
+				require.NoError(t, err)
 				ctx := context.Background()
 				return req, ctx, nil
 			},
@@ -69,8 +72,9 @@ func TestBasicAuth(t *testing.T) {
 			name:     "With cancelled context",
 			username: "testuser",
 			password: "testpass",
-			setup: func() (*http.Request, context.Context, context.CancelFunc) {
-				req, _ := http.NewRequest(http.MethodGet, "https://example.com", nil)
+			setup: func(t *testing.T) (*http.Request, context.Context, context.CancelFunc) {
+				req, err := http.NewRequest(http.MethodGet, "https://example.com", nil)
+				require.NoError(t, err)
 				ctx, cancel := context.WithCancel(context.Background())
 				cancel() // Cancel immediately
 				return req, ctx, nil
@@ -81,8 +85,9 @@ func TestBasicAuth(t *testing.T) {
 			name:     "With timeout context",
 			username: "testuser",
 			password: "testpass",
-			setup: func() (*http.Request, context.Context, context.CancelFunc) {
-				req, _ := http.NewRequest(http.MethodGet, "https://example.com", nil)
+			setup: func(t *testing.T) (*http.Request, context.Context, context.CancelFunc) {
+				req, err := http.NewRequest(http.MethodGet, "https://example.com", nil)
+				require.NoError(t, err)
 				ctx, cancel := context.WithTimeout(context.Background(), 1*time.Nanosecond)
 				time.Sleep(5 * time.Millisecond) // Ensure the timeout occurs
 				return req, ctx, cancel
@@ -99,7 +104,7 @@ func TestBasicAuth(t *testing.T) {
 			auth := NewBasicAuth(tt.username, tt.password)
 			require.Equal(t, "Basic", auth.Name())
 
-			req, ctx, cancel := tt.setup()
+			req, ctx, cancel := tt.setup(t)
 			if cancel != nil {
 				defer cancel()
 			}

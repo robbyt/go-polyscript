@@ -58,12 +58,15 @@ func (p *ContextProvider) AddDataToContext(ctx context.Context, data ...any) (co
 		return ctx, fmt.Errorf("context key is empty")
 	}
 
+	// Collect errors during processing
+	var errz []error
+
 	// Initialize the data storage map
 	toStore := make(map[string]any)
 
 	// Get existing data from context if any
-	existingData, _ := p.GetData(ctx)
-	if existingData != nil {
+	existingData, err := p.GetData(ctx)
+	if err == nil && existingData != nil && len(existingData) > 0 {
 		maps.Copy(toStore, existingData)
 	}
 
@@ -75,9 +78,6 @@ func (p *ContextProvider) AddDataToContext(ctx context.Context, data ...any) (co
 	if _, exists := toStore[constants.ScriptData]; !exists {
 		toStore[constants.ScriptData] = make(map[string]any)
 	}
-
-	// Collect errors during processing
-	var errz []error
 
 	// Process each data item based on its type
 	for _, item := range data {

@@ -9,19 +9,41 @@ import (
 
 	"github.com/robbyt/go-polyscript/execution/data"
 	"github.com/robbyt/go-polyscript/machines/types"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
-// mockLoader is a simple implementation of loader.Loader for testing
-type mockLoader struct{}
-
-func (m *mockLoader) GetReader() (io.ReadCloser, error) {
-	return nil, nil
+// MockLoader is a testify mock implementation of loader.Loader for testing
+type MockLoader struct {
+	mock.Mock
 }
 
-func (m *mockLoader) GetSourceURL() *url.URL {
-	u, _ := url.Parse("file:///mock")
+func (m *MockLoader) GetReader() (io.ReadCloser, error) {
+	args := m.Called()
+	reader, _ := args.Get(0).(io.ReadCloser)
+	return reader, args.Error(1)
+}
+
+func (m *MockLoader) GetSourceURL() *url.URL {
+	args := m.Called()
+	u, _ := args.Get(0).(*url.URL)
 	return u
+}
+
+// NewMockLoader creates a pre-configured MockLoader with default expectations
+func NewMockLoader() *MockLoader {
+	mockLoader := new(MockLoader)
+
+	// Set up default expectations
+	mockLoader.On("GetReader").Return(nil, nil)
+
+	u, err := url.Parse("file:///mock")
+	if err != nil {
+		panic(err) // This should never happen with a valid URL string
+	}
+	mockLoader.On("GetSourceURL").Return(u)
+
+	return mockLoader
 }
 
 func TestWithOptions(t *testing.T) {
@@ -33,7 +55,7 @@ func TestWithOptions(t *testing.T) {
 	// Create test options
 	testHandler := slog.NewTextHandler(os.Stdout, nil)
 	testDataProvider := data.NewStaticProvider(map[string]any{"test": "value"})
-	testLoader := &mockLoader{}
+	testLoader := NewMockLoader()
 
 	// Create and apply options
 	loggerOpt := WithLogger(testHandler)
@@ -65,7 +87,7 @@ func TestConfigValidation(t *testing.T) {
 
 	// Test with missing machine type
 	cfg2 := &Config{
-		loader: &mockLoader{},
+		loader: NewMockLoader(),
 	}
 	err = cfg2.Validate()
 	require.Error(t, err)
@@ -74,7 +96,7 @@ func TestConfigValidation(t *testing.T) {
 	// Test with valid config
 	cfg3 := &Config{
 		machineType: types.Starlark,
-		loader:      &mockLoader{},
+		loader:      NewMockLoader(),
 	}
 	err = cfg3.Validate()
 	require.NoError(t, err)
@@ -83,7 +105,7 @@ func TestConfigValidation(t *testing.T) {
 func TestConfigGetters(t *testing.T) {
 	testHandler := slog.NewTextHandler(os.Stdout, nil)
 	testDataProvider := data.NewStaticProvider(map[string]any{"test": "value"})
-	testLoader := &mockLoader{}
+	testLoader := NewMockLoader()
 	testCompilerOpts := "test-options"
 
 	cfg := &Config{

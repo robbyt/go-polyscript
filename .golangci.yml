@@ -1,0 +1,81 @@
+version: "2"
+run:
+  go: "1.24"
+linters:
+  default: none
+  enable:
+    - bodyclose
+    - contextcheck
+    - errcheck
+    - errorlint
+    - govet
+    - ineffassign
+    - misspell
+    - staticcheck
+    - unused
+    - whitespace
+  settings:
+    errcheck:
+      check-blank: true
+      exclude-functions:
+        - (*github.com/stretchr/testify/mock.Mock).Get
+        - (net.Listener).Addr
+        - (sync/atomic.Value).Load
+    errorlint:
+      errorf: true
+      asserts: true
+      comparison: true
+    govet:
+      enable:
+        - assign
+        - atomic
+        - bools
+        - buildtag
+        - copylocks
+        - httpresponse
+        - loopclosure
+        - lostcancel
+        - nilfunc
+        - stdmethods
+        - structtag
+        - tests
+        - unmarshal
+        - unreachable
+        - unusedresult
+      enable-all: false
+    staticcheck:
+      checks:
+        - all
+    wrapcheck:
+      ignore-sigs:
+        - .Errorf(
+        - errors.New(
+        - errors.Unwrap
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+issues:
+  max-issues-per-linter: 20
+  max-same-issues: 5
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/robbyt/go-supervisor
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$

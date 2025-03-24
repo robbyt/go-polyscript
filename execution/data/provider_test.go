@@ -5,20 +5,35 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/robbyt/go-polyscript/execution/constants"
 )
 
-// Mock provider that always returns an error
-type mockErrorProvider struct{}
-
-func (m *mockErrorProvider) GetData(ctx context.Context) (map[string]any, error) {
-	return nil, assert.AnError
+// MockProvider is a testify mock implementation of Provider
+type MockProvider struct {
+	mock.Mock
 }
 
-func (m *mockErrorProvider) AddDataToContext(ctx context.Context, data ...any) (context.Context, error) {
-	return ctx, assert.AnError
+func (m *MockProvider) GetData(ctx context.Context) (map[string]any, error) {
+	args := m.Called(ctx)
+	data, _ := args.Get(0).(map[string]any)
+	return data, args.Error(1)
+}
+
+func (m *MockProvider) AddDataToContext(ctx context.Context, data ...any) (context.Context, error) {
+	args := m.Called(append([]any{ctx}, data...))
+	newCtx, _ := args.Get(0).(context.Context)
+	return newCtx, args.Error(1)
+}
+
+// For backward compatibility with existing tests
+func newMockErrorProvider() *MockProvider {
+	provider := new(MockProvider)
+	provider.On("GetData", mock.Anything).Return(nil, assert.AnError)
+	provider.On("AddDataToContext", mock.Anything, mock.Anything).Return(mock.Anything, assert.AnError)
+	return provider
 }
 
 func TestContextProvider(t *testing.T) {
@@ -176,7 +191,8 @@ func TestStaticProvider(t *testing.T) {
 				originalLength := len(result)
 				result["newKey"] = "newValue"
 
-				newResult, _ := provider.GetData(ctx)
+				newResult, err := provider.GetData(ctx)
+				assert.NoError(t, err)
 				assert.Len(t, newResult, originalLength)
 				assert.NotContains(t, newResult, "newKey")
 			}
@@ -259,7 +275,7 @@ func TestCompositeProvider(t *testing.T) {
 					"key1": "value1",
 				}),
 				// Create a mock provider that returns an error
-				&mockErrorProvider{},
+				newMockErrorProvider(),
 				NewStaticProvider(map[string]any{
 					"key3": "value3", // This should not be merged
 				}),

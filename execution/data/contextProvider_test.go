@@ -146,7 +146,7 @@ func TestCompositeProvider_AddDataToContext(t *testing.T) {
 			providers: []Provider{
 				NewStaticProvider(nil), // This one will error
 				NewStaticProvider(nil), // This one will error
-				&mockErrorProvider{},   // This one will error
+				newMockErrorProvider(), // This one will error
 			},
 			data:           []any{map[string]any{"key": "value"}},
 			shouldError:    true, // Should error when all providers fail
