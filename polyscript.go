@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/robbyt/go-polyscript/engine"
-	"github.com/robbyt/go-polyscript/execution/data"
 	"github.com/robbyt/go-polyscript/execution/script"
 	"github.com/robbyt/go-polyscript/execution/script/loader"
 	"github.com/robbyt/go-polyscript/machines"
@@ -144,12 +143,6 @@ func NewExtismEvaluator(opts ...options.Option) (engine.EvaluatorWithPrep, error
 
 // createEvaluator is a helper function to create an evaluator from a config
 func createEvaluator(cfg *options.Config) (engine.EvaluatorWithPrep, error) {
-	// Create compiler
-	compiler, err := machines.NewCompiler(cfg.GetHandler(), cfg.GetMachineType(), cfg.GetCompilerOptions())
-	if err != nil {
-		return nil, err
-	}
-
 	// Create executable unit ID from source URL
 	execUnitID := ""
 	sourceURL := cfg.GetLoader().GetSourceURL()
@@ -157,17 +150,20 @@ func createEvaluator(cfg *options.Config) (engine.EvaluatorWithPrep, error) {
 		execUnitID = sourceURL.String()
 	}
 
-	// Create executable unit (this will compile the script internally)
-	// Use the Provider directly
-	var dataProvider data.Provider = cfg.GetDataProvider()
+	// Create compiler
+	compiler, err := machines.NewCompiler(cfg.GetHandler(), cfg.GetMachineType(), cfg.GetCompilerOptions())
+	if err != nil {
+		return nil, err
+	}
 
+	// Create executable unit (to compile and prepare the script)
 	execUnit, err := script.NewExecutableUnit(
 		cfg.GetHandler(),
 		execUnitID,
 		cfg.GetLoader(),
 		compiler,
-		dataProvider,
-		nil, // No script data for now
+		cfg.GetDataProvider(),
+		nil, // No compile-time supplemental script_data
 	)
 	if err != nil {
 		return nil, err
