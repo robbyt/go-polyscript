@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"os"
 	"sync/atomic"
 
 	extismSDK "github.com/extism/go-sdk"
 
 	"github.com/robbyt/go-polyscript/execution/script"
+	"github.com/robbyt/go-polyscript/internal/helpers"
 )
 
 const defaultEntryPoint = "main"
@@ -31,13 +31,7 @@ type CompilerOptions interface {
 // NewCompiler creates a new Extism WASM Compiler instance. External config of the compiler not
 // currently supported.
 func NewCompiler(handler slog.Handler, compilerOptions CompilerOptions) *Compiler {
-	if handler == nil {
-		defaultHandler := slog.NewTextHandler(os.Stdout, nil)
-		handler = defaultHandler.WithGroup("extism")
-		// Create a logger from the handler rather than using slog directly
-		defaultLogger := slog.New(handler)
-		defaultLogger.Warn("Handler is nil, using the default logger configuration.")
-	}
+	handler, logger := helpers.SetupLogger(handler, "extism", "Compiler")
 
 	entryPointName := compilerOptions.GetEntryPointName()
 	if entryPointName == "" {
@@ -52,7 +46,7 @@ func NewCompiler(handler slog.Handler, compilerOptions CompilerOptions) *Compile
 		ctx:            context.Background(),
 		options:        withDefaultCompileOptions(),
 		logHandler:     handler,
-		logger:         slog.New(handler.WithGroup("Compiler")),
+		logger:         logger,
 	}
 }
 
