@@ -23,8 +23,13 @@ func GetRisorScript() string {
 		timestamp := ctx["timestamp"]
 		
 		// Format the timestamp nicely
-		formatted_time := time.Parse(timestamp, "2006-01-02 15:04:05")
-		
+		parsedTime, err := time.Parse("2006-01-02 15:04:05", timestamp)
+		if err != nil {
+			return map[string]any{
+				"error": "Invalid timestamp format",
+			}
+		}
+		formatted_time := parsedTime.Format("2006-01-02 15:04:05")
 		// Return a map with our result
 		{
 			"greeting": "Hello, " + name + "!",
