@@ -1,50 +1,49 @@
 # Machine Implementations
 
-This package contains virtual machine implementations for executing scripts in various languages through a consistent interface.
+This package contains virtual machine implementations for executing scripts in various languages through a consistent interface. While each supported VM has its own unique characteristics, they all follow a standardized flow pattern.
 
-## Data Flow
+## Design Philosophy
 
-All machine implementations follow a uniform data flow pattern:
+1. **Common Interface**: All VMs present the same interface (`engine.EvaluatorWithPrep`) regardless of underlying implementation
+2. **Separation of Concerns**: Compilation, data preparation, and execution are distinct phases
+3. **Thread-safe Evaluation**: Each VM is designed to allow concurrent execution of scripts
+3. **Context-Based Data Flow**:  Runtime data is accessed with a `context.Context` object (saved/loaded with a `data.Provider`) 
+4. **Execution Results**: All VMs return the same `engine.EvaluatorResponse` object, which contains the execution result and metadata
 
-1. **Compilation Stage**
-   - Source code is parsed and compiled to bytecode
-   - Compile-time errors are captured and returned
-   - Machine-specific optimizations are applied
+## Dataflow & Architecture
 
-2. **Data Preparation**
-   - `PrepareContext` enriches context with runtime data
-   - Data providers handle accessing and storing execution data
-   - Context is the primary vehicle for data transfer between components
+1. **Compilation Instantiation**
+   - Each VM has a `NewCompiler` function that returns a compiler instance that implements the `script.Compiler` interface
+   - The `NewCompiler` function may have some VM-specific options
+   - The `Compiler` object includes a `Compile` method that takes a `loader.Loader` implementation
+   - `loader.Loader` is a generic way to load script content from various sources
+   - Compile-time errors are captured and returned to the caller
+   - A `script.ExecutableContent` is returned by `Compile`
 
-3. **Execution Stage**
-   - Bytecode is executed with data from context
-   - A consistent global variable (`ctx`) provides access to input data
-   - Context cancellation signals terminate execution
+2. **Executable Creation Stage**
+   - The `script.ExecutableUnit` is a wrapper around the `script.ExecutableContent`
+   - `NewExecutableUnit` receives a `Compiler` and several other objects
+   - Calls the `script.Compiler` to compile the script, storing the result in the `ExecutableContent`
+   - The `ExecutableUnit` is responsible for managing the lifecycle of the script execution
 
-4. **Result Processing**
-   - VM-specific results are converted to Go types
-   - Type conversions maintain semantic equivalence
-   - Execution metrics (timing, etc.) are captured consistently
+3. **Evaluator Creation**
+   - `NewEvaluator` takes a `script.ExecutableUnit` and returns an object that implements `engine.EvaluatorWithPrep`
+   - At this point it can be called with `.Eval(ctx)`, however input data is required it must be prepared
 
-## Implementation Requirements
+4. **Data Preparation Stage**
+   - This phase is optional, and must happen prior to evaluation when runtime input data is used
+   - The `BytecodeEvaluator` implements the `engine.EvaluatorWithPrep` interface, which has a `PrepareContext` method
+   - The `PrepareContext` method takes a `context.Context` and a variadic list of `any`
+   - `PrepareContext` calls the `data.Provider` to convert and store the data, somewhere accessible to the Evaluator
+   - The conversion is fairly opinionated, and handled by the `data.Provider`
+   - For example, it converts an `http.Request` into a `map[string]any` using the schema in `helper.RequestToMap`
+   - The `PrepareContext` method returns a new context with the data stored or linked in it
 
-Each machine implementation must:
+5. **Execution Stage**
+   - When `Eval(ctx)` is called, the `data.Provider` first loads the input data into the VM
+   - The VM executes the script and returns an `engine.EvaluatorResponse`
 
-1. Implement the `engine.EvaluatorWithPrep` interface
-2. Handle context cancellation properly
-3. Use the executable unit's data provider for input/output
-4. Maintain consistent error wrapping patterns
-5. Track execution timing in a uniform way
-6. Pass data to scripts through a consistent interface
-
-## Testing Guidelines
-
-Virtual machine implementations should include tests that verify:
-
-1. Proper handling of various input data types
-2. Context cancellation behavior
-3. Error conditions and edge cases
-4. Type conversion correctness
-5. Integration with the executable unit lifecycle
-
-By following these guidelines, we ensure consistent behavior across all machine implementations while allowing for VM-specific optimizations.
+6. **Result Processing**
+   - The process for building the `engine.EvaluatorResponse` is different for each VM
+   - There are several type conversions, and the result is accessible with the `Interface()` method
+   - The `engine.EvaluatorResponse` also contains metadata about the execution
