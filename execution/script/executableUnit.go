@@ -1,12 +1,9 @@
 package script
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"log/slog"
-	"net/http"
-	"os"
 	"time"
 
 	"github.com/robbyt/go-polyscript/execution/data"
@@ -26,22 +23,21 @@ type ExecutableUnit struct {
 	// CreatedAt records when this executable unit was instantiated.
 	CreatedAt time.Time
 
-	// Loader is responsible for loading the script content from its source (file, string, etc.).
-	Loader loader.Loader
-
-	// Content holds the compiled bytecode and source representation of the script.
-	Content ExecutableContent
+	// ScriptLoader loads the script content to local memory from various places (file, string, etc.).
+	ScriptLoader loader.Loader
 
 	// Compiler is the script language-specific compiler that was used to compile this unit.
 	Compiler Compiler
+
+	// Content holds the compiled bytecode and source representation of the script.
+	Content ExecutableContent
 
 	// ScriptData contains key-value pairs that can be accessed by the script at runtime.
 	// This data is made available to the script during evaluation.
 	ScriptData map[string]any
 
-	// DataProvider provides runtime data for script evaluation.
-	// When using the "compile once, run many times" pattern, a ContextProvider
-	// is recommended to pass different data for each evaluation.
+	// DataProvider provides access to variable runtime data during script evaluation.
+	// Enabling the "compile once, run many times" design.
 	DataProvider data.Provider
 
 	// Logging components
@@ -54,18 +50,12 @@ type ExecutableUnit struct {
 func NewExecutableUnit(
 	handler slog.Handler,
 	versionID string,
-	loader loader.Loader,
+	scriptLoader loader.Loader,
 	compiler Compiler,
 	dataProvider data.Provider,
 	sData map[string]any,
 ) (*ExecutableUnit, error) {
-	if handler == nil {
-		defaultHandler := slog.NewTextHandler(os.Stdout, nil)
-		handler = defaultHandler.WithGroup("script")
-		// Create a logger from the handler rather than using slog directly
-		defaultLogger := slog.New(handler)
-		defaultLogger.Warn("Handler is nil, using the default logger configuration.")
-	}
+	handler, logger := helpers.SetupLogger(handler, "script", "ExecutableUnit")
 
 	if compiler == nil {
 		return nil, errors.New("compiler is nil")
@@ -75,7 +65,7 @@ func NewExecutableUnit(
 		sData = make(map[string]any)
 	}
 
-	reader, err := loader.GetReader()
+	reader, err := scriptLoader.GetReader()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get reader from loader: %w", err)
 	}
@@ -92,122 +82,60 @@ func NewExecutableUnit(
 		}
 	}
 
-	logger := slog.New(handler.WithGroup("ExecutableUnit"))
-	logger = logger.With("ID", versionID)
-
 	return &ExecutableUnit{
 		ID:           versionID,
 		CreatedAt:    time.Now(),
-		Loader:       loader,
+		ScriptLoader: scriptLoader,
 		Content:      exe,
 		Compiler:     compiler,
 		ScriptData:   sData,
 		DataProvider: dataProvider,
 		logHandler:   handler,
-		logger:       logger,
+		logger:       logger.With("ID", versionID),
 	}, nil
 }
 
-func (ver *ExecutableUnit) String() string {
+func (exe *ExecutableUnit) String() string {
 	return fmt.Sprintf("ExecutableUnit{ID: %s, CreatedAt: %s, Compiler: %s, Loader: %s}",
-		ver.ID, ver.CreatedAt, ver.Compiler, ver.Loader)
+		exe.ID, exe.CreatedAt, exe.Compiler, exe.ScriptLoader)
 }
 
 // GetID returns the unique identifier (version number, or name) for this script version.
-func (ver *ExecutableUnit) GetID() string {
-	return ver.ID
+func (exe *ExecutableUnit) GetID() string {
+	return exe.ID
 }
 
 // GetContent returns the validated & compiled script content as ExecutableContent
-func (ver *ExecutableUnit) GetContent() ExecutableContent {
-	return ver.Content
+func (exe *ExecutableUnit) GetContent() ExecutableContent {
+	return exe.Content
 }
 
 // CreatedAt returns the timestamp when the version was created.
-func (ver *ExecutableUnit) GetCreatedAt() time.Time {
-	return ver.CreatedAt
+func (exe *ExecutableUnit) GetCreatedAt() time.Time {
+	return exe.CreatedAt
 }
 
 // GetMachineType returns the machine type this script is intended to run on.
-func (ver *ExecutableUnit) GetMachineType() machineTypes.Type {
-	return ver.Content.GetMachineType()
+func (exe *ExecutableUnit) GetMachineType() machineTypes.Type {
+	return exe.Content.GetMachineType()
 }
 
 // GetCompiler returns the compiler used to validate the script and convert it into runnable bytecode.
-func (ver *ExecutableUnit) GetCompiler() Compiler {
-	return ver.Compiler
+func (exe *ExecutableUnit) GetCompiler() Compiler {
+	return exe.Compiler
 }
 
 // GetLoader returns the loader used to load the script.
-func (ver *ExecutableUnit) GetLoader() loader.Loader {
-	return ver.Loader
+func (exe *ExecutableUnit) GetLoader() loader.Loader {
+	return exe.ScriptLoader
 }
 
 // GetScriptData returns the script data associated with this version.
-func (ver *ExecutableUnit) GetScriptData() map[string]any {
-	return ver.ScriptData
+func (exe *ExecutableUnit) GetScriptData() map[string]any {
+	return exe.ScriptData
 }
 
 // GetDataProvider returns the data provider for this executable unit.
-func (ver *ExecutableUnit) GetDataProvider() data.Provider {
-	return ver.DataProvider
-}
-
-// WithDataProvider returns a copy of this executable unit with the specified data provider.
-// This is useful for the "compile once, run many times" pattern.
-func (ver *ExecutableUnit) WithDataProvider(provider data.Provider) *ExecutableUnit {
-	clone := *ver
-	clone.DataProvider = provider
-	return &clone
-}
-
-// StoreDataInContext enriches the provided context with script and request data
-// using the ExecutableUnit's configured DataProvider.
-//
-// This method is a replacement for the legacy BuildEvalContext method and provides
-// a more flexible approach to storing data for script execution. It supports the
-// "compile once, run many times with different data" pattern by using a Provider
-// to manage the data.
-//
-// Key behaviors:
-// 1. Delegates data storage to the DataProvider's AddDataToContext method
-// 2. Different provider types handle data in context-appropriate ways:
-//   - ContextProvider: Stores in the context under a specific key
-//   - StaticProvider: Already has predefined data, doesn't support adding more
-//   - CompositeProvider: Distributes data to multiple providers in a chain
-//
-// 3. Sends both the HTTP request and the ExecutableUnit's script data to the provider
-// 4. Returns the original context if no provider is configured or if there's an error
-// 5. Logs errors using the ExecutableUnit's logger
-//
-// Even if the provider encounters errors (e.g., can't convert a request to a map),
-// all providers are designed to store whatever data they can process successfully.
-// This ensures scripts always have a predictable data structure to work with.
-func (ver *ExecutableUnit) StoreDataInContext(ctx context.Context, r *http.Request) context.Context {
-	// If no DataProvider is configured, log an error and return original context
-	if ver.DataProvider == nil {
-		if ver.logger != nil {
-			ver.logger.Error("Cannot store data in context: no DataProvider configured")
-		}
-		return ctx
-	}
-
-	// Use the DataProvider to store data
-	// Note: We send both the request and script data to be handled by the provider
-	// The provider will handle converting the request to a map and merging script data
-	newCtx, err := ver.DataProvider.AddDataToContext(ctx, r, ver.GetScriptData())
-
-	// If there's an error, log it but still return the context that was created
-	// This allows for partial success - some data may have been stored successfully
-	if err != nil {
-		if ver.logger != nil {
-			ver.logger.Error("Failed to add data to context using provider", "error", err)
-		} else {
-			defaultLogger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-			defaultLogger.Error("Failed to add data to context using provider - logger was nil", "error", err)
-		}
-	}
-
-	// Return the updated context, which may have partial data even if there was an error
-	return newCtx
+func (exe *ExecutableUnit) GetDataProvider() data.Provider {
+	return exe.DataProvider
 }
