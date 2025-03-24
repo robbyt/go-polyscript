@@ -22,14 +22,18 @@ type httpRequestWrapper struct {
 	QueryParams   map[string][]string
 }
 
-// newHttpRequestWrapper converts an http.Request to an httpRequest struct.
-func newHttpRequestWrapper(r *http.Request) (*httpRequestWrapper, error) {
+// newHTTPRequestWrapper converts an http.Request to an httpRequest struct.
+func newHTTPRequestWrapper(r *http.Request) (*httpRequestWrapper, error) {
 	if r == nil {
 		return nil, errors.New("request is nil")
 	}
 
-	// Validate URL if present
-	if r.URL != nil {
+	// Ensure and validate the URL
+	if r.URL == nil {
+		// If URL is nil, provide a default one
+		r.URL = &url.URL{Path: "/"}
+	} else {
+		// If URL is not nil, validate it
 		if _, err := url.Parse(r.URL.String()); err != nil {
 			return nil, fmt.Errorf("invalid URL: %w", err)
 		}
@@ -98,7 +102,7 @@ func (h *httpRequestWrapper) toMap() map[string]any {
 // RequestToMap converts an http.Request to a map[string]any using the httpRequest struct as an intermediary.
 func RequestToMap(r *http.Request) (map[string]any, error) {
 	// Transform http.Request to httpRequest struct
-	reqStruct, err := newHttpRequestWrapper(r)
+	reqStruct, err := newHTTPRequestWrapper(r)
 	if err != nil {
 		return nil, fmt.Errorf("failed to transform http.Request to httpRequest struct: %w", err)
 	}

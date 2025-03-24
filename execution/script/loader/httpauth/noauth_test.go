@@ -21,14 +21,15 @@ func TestNoAuth(t *testing.T) {
 	// Run various authentication scenarios
 	tests := []struct {
 		name        string
-		setup       func() (*http.Request, context.Context, context.CancelFunc)
+		setup       func(t *testing.T) (*http.Request, context.Context, context.CancelFunc)
 		expectError bool
 		verifyReq   func(t *testing.T, req *http.Request)
 	}{
 		{
 			name: "Basic authentication",
-			setup: func() (*http.Request, context.Context, context.CancelFunc) {
-				req, _ := http.NewRequest(http.MethodGet, "https://example.com", nil)
+			setup: func(t *testing.T) (*http.Request, context.Context, context.CancelFunc) {
+				req, err := http.NewRequest(http.MethodGet, "https://example.com", nil)
+				require.NoError(t, err)
 				return req, nil, nil
 			},
 			verifyReq: func(t *testing.T, req *http.Request) {
@@ -38,8 +39,9 @@ func TestNoAuth(t *testing.T) {
 		},
 		{
 			name: "With context authentication",
-			setup: func() (*http.Request, context.Context, context.CancelFunc) {
-				req, _ := http.NewRequest(http.MethodGet, "https://example.com", nil)
+			setup: func(t *testing.T) (*http.Request, context.Context, context.CancelFunc) {
+				req, err := http.NewRequest(http.MethodGet, "https://example.com", nil)
+				require.NoError(t, err)
 				ctx := context.Background()
 				return req, ctx, nil
 			},
@@ -49,8 +51,9 @@ func TestNoAuth(t *testing.T) {
 		},
 		{
 			name: "With cancelled context",
-			setup: func() (*http.Request, context.Context, context.CancelFunc) {
-				req, _ := http.NewRequest(http.MethodGet, "https://example.com", nil)
+			setup: func(t *testing.T) (*http.Request, context.Context, context.CancelFunc) {
+				req, err := http.NewRequest(http.MethodGet, "https://example.com", nil)
+				require.NoError(t, err)
 				ctx, cancel := context.WithCancel(context.Background())
 				cancel() // Cancel immediately
 				return req, ctx, nil
@@ -59,8 +62,9 @@ func TestNoAuth(t *testing.T) {
 		},
 		{
 			name: "With timeout context",
-			setup: func() (*http.Request, context.Context, context.CancelFunc) {
-				req, _ := http.NewRequest(http.MethodGet, "https://example.com", nil)
+			setup: func(t *testing.T) (*http.Request, context.Context, context.CancelFunc) {
+				req, err := http.NewRequest(http.MethodGet, "https://example.com", nil)
+				require.NoError(t, err)
 				ctx, cancel := context.WithTimeout(context.Background(), 1*time.Nanosecond)
 				time.Sleep(5 * time.Millisecond) // Ensure the timeout occurs
 				return req, ctx, cancel
@@ -74,7 +78,7 @@ func TestNoAuth(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			req, ctx, cancel := tt.setup()
+			req, ctx, cancel := tt.setup(t)
 			if cancel != nil {
 				defer cancel()
 			}

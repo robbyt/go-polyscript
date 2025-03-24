@@ -1,13 +1,10 @@
 package script
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"io"
 	"log/slog"
-	"net/http"
-	"net/http/httptest"
 	"net/url"
 	"os"
 	"testing"
@@ -16,7 +13,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/robbyt/go-polyscript/execution/constants"
+	"github.com/robbyt/go-polyscript/execution/data"
 	"github.com/robbyt/go-polyscript/execution/script/loader"
 	machineTypes "github.com/robbyt/go-polyscript/machines/types"
 )
@@ -24,6 +21,7 @@ import (
 var emptyScriptData = make(map[string]any)
 
 // Mock implementations
+
 type mockLoader struct {
 	mock.Mock
 }
@@ -123,7 +121,7 @@ func TestNewVersion(t *testing.T) {
 		comp.On("Compile", reader).Return(&MockExecutableContent{}, nil)
 
 		// Create executable unit
-		exe, err := NewExecutableUnit(logHandler, t.Name(), mockLoader, comp, emptyScriptData)
+		exe, err := NewExecutableUnit(logHandler, t.Name(), mockLoader, comp, data.NewStaticProvider(emptyScriptData), emptyScriptData)
 		require.NoError(t, err, "Expected no error when creating executable unit")
 		require.NotNil(t, exe, "Expected executable unit to be non-nil")
 		require.Equal(t, t.Name(), exe.GetID(), "Expected ID to match")
@@ -145,12 +143,12 @@ func TestNewVersion(t *testing.T) {
 		mockContent := new(MockExecutableContent)
 		comp.On("Compile", reader).Return(mockContent, nil).Once()
 
-		exe, err := NewExecutableUnit(logHandler, t.Name(), lod, comp, emptyScriptData)
+		exe, err := NewExecutableUnit(logHandler, t.Name(), lod, comp, data.NewStaticProvider(emptyScriptData), emptyScriptData)
 		require.NoError(t, err, "Expected no error when creating a new version with valid content")
 		require.NotNil(t, exe, "Expected version to be non-nil")
 		require.Equal(t, mockContent, exe.GetContent(), "Expected content to match the mock content")
 		require.NotNil(t, exe.GetLoader().GetSourceURL(), "Expected SourceURI to be non-nil")
-		require.Equal(t, "string:", exe.GetLoader().GetSourceURL().String())
+		require.Contains(t, exe.GetLoader().GetSourceURL().String(), "string://inline/")
 		require.WithinDuration(t, time.Now(), exe.GetCreatedAt(), time.Second, "Expected CreatedAt to be within the last second")
 
 		comp.AssertExpectations(t)
@@ -169,7 +167,7 @@ func TestNewVersion(t *testing.T) {
 		validationError := errors.New("validation failed")
 		comp.On("Compile", reader).Return(nil, validationError).Once()
 
-		exe, err := NewExecutableUnit(logHandler, t.Name(), lod, comp, emptyScriptData)
+		exe, err := NewExecutableUnit(logHandler, t.Name(), lod, comp, data.NewStaticProvider(emptyScriptData), emptyScriptData)
 		require.Error(t, err)
 		require.Nil(t, exe)
 		require.ErrorIs(t, err, validationError)
@@ -200,7 +198,7 @@ func TestNewVersion(t *testing.T) {
 		mockCompiler.On("Compile", reader).Return(mockContent, nil)
 
 		// Create executable unit with empty ID
-		exe, err := NewExecutableUnit(logHandler, "", mockLoader, mockCompiler, emptyScriptData)
+		exe, err := NewExecutableUnit(logHandler, "", mockLoader, mockCompiler, data.NewStaticProvider(emptyScriptData), emptyScriptData)
 		require.NoError(t, err)
 		require.NotNil(t, exe)
 
@@ -216,7 +214,7 @@ func TestNewVersion(t *testing.T) {
 	})
 
 	t.Run("NilCompiler", func(t *testing.T) {
-		exe, err := NewExecutableUnit(logHandler, "test", &mockLoader{}, nil, emptyScriptData)
+		exe, err := NewExecutableUnit(logHandler, "test", &mockLoader{}, nil, data.NewStaticProvider(emptyScriptData), emptyScriptData)
 		require.Error(t, err)
 		require.Nil(t, exe)
 		require.Contains(t, err.Error(), "compiler is nil")
@@ -241,7 +239,7 @@ func TestNewVersion(t *testing.T) {
 		mockCompiler := new(MockCompiler)
 		mockCompiler.On("Compile", mockReader).Return(nil, errors.New("empty content"))
 		// Create executable unit
-		exe, err := NewExecutableUnit(logHandler, "test", mockLoader, mockCompiler, emptyScriptData)
+		exe, err := NewExecutableUnit(logHandler, "test", mockLoader, mockCompiler, data.NewStaticProvider(emptyScriptData), emptyScriptData)
 		require.Error(t, err)
 		require.Nil(t, exe)
 
@@ -257,7 +255,7 @@ func TestNewVersion(t *testing.T) {
 		mockLoader := new(mockLoader)
 		mockLoader.On("GetReader").Return(mockReader, errors.New("get reader error")).Once()
 
-		exe, err := NewExecutableUnit(logHandler, "test", mockLoader, new(MockCompiler), emptyScriptData)
+		exe, err := NewExecutableUnit(logHandler, "test", mockLoader, new(MockCompiler), data.NewStaticProvider(emptyScriptData), emptyScriptData)
 		require.Error(t, err)
 		require.Nil(t, exe)
 
@@ -278,7 +276,7 @@ func TestNewVersion(t *testing.T) {
 		mockCompiler.On("Compile", mockReader).Return(nil, errors.New("compile failed")).Once()
 
 		// Create executable unit
-		exe, err := NewExecutableUnit(logHandler, "test", mockLoader, mockCompiler, emptyScriptData)
+		exe, err := NewExecutableUnit(logHandler, "test", mockLoader, mockCompiler, data.NewStaticProvider(emptyScriptData), emptyScriptData)
 		require.Error(t, err)
 		require.Nil(t, exe)
 
@@ -298,15 +296,15 @@ func TestExecutableUnit_String(t *testing.T) {
 		mockContent := new(MockExecutableContent)
 
 		exe := &ExecutableUnit{
-			ID:        "testID",
-			CreatedAt: time.Now(),
-			Loader:    mockLoader,
-			Content:   mockContent,
-			Compiler:  mockCompiler,
+			ID:           "testID",
+			CreatedAt:    time.Now(),
+			ScriptLoader: mockLoader,
+			Content:      mockContent,
+			Compiler:     mockCompiler,
 		}
 
 		expectedString := fmt.Sprintf("ExecutableUnit{ID: %s, CreatedAt: %s, Compiler: %s, Loader: %s}",
-			exe.ID, exe.CreatedAt, exe.Compiler, exe.Loader)
+			exe.ID, exe.CreatedAt, exe.Compiler, exe.ScriptLoader)
 
 		require.Equal(t, expectedString, exe.String(), "Expected string representation to match")
 	})
@@ -345,7 +343,7 @@ func TestNewVersionWithScriptData(t *testing.T) {
 		}
 
 		// Create executable unit
-		exe, err := NewExecutableUnit(logHandler, t.Name(), loader, mockCompiler, scriptData)
+		exe, err := NewExecutableUnit(logHandler, t.Name(), loader, mockCompiler, data.NewStaticProvider(scriptData), scriptData)
 		require.NoError(t, err, "Expected no error creating executable unit")
 		require.NotNil(t, exe, "Expected executable unit to be non-nil")
 		require.Equal(t, scriptData, exe.GetScriptData(), "Expected script data to match")
@@ -369,147 +367,12 @@ func TestNewVersionWithScriptData(t *testing.T) {
 
 		comp.On("Compile", reader).Return(mockContent, nil).Once()
 
-		exe, err := NewExecutableUnit(logHandler, t.Name(), lod, comp, nil)
+		exe, err := NewExecutableUnit(logHandler, t.Name(), lod, comp, data.NewStaticProvider(nil), nil)
 		require.NoError(t, err, "Expected no error when creating a new version with nil script data")
 		require.NotNil(t, exe, "Expected version to be non-nil")
 		require.Empty(t, exe.GetScriptData(), "Expected script data to be empty")
 
 		comp.AssertExpectations(t)
 		mockContent.AssertExpectations(t)
-	})
-}
-
-func TestExecutableUnit_BuildEvalContext(t *testing.T) {
-	t.Run("request data handling", func(t *testing.T) {
-		tests := []struct {
-			name       string
-			request    *http.Request
-			scriptData map[string]any
-			wantData   map[string]any
-		}{
-			{
-				name: "valid request with headers",
-				request: func() *http.Request {
-					req := httptest.NewRequest("GET", "/test", nil)
-					req.Header.Add("Content-Type", "application/json")
-					req.RemoteAddr = "192.0.2.1:1234"
-					return req
-				}(),
-				scriptData: map[string]any{"config": "value"},
-				wantData: map[string]any{
-					constants.Request: map[string]any{
-						"Method":        "GET",
-						"URL":           &url.URL{Path: "/test"},
-						"URL_String":    "/test",
-						"URL_Host":      "",
-						"URL_Scheme":    "",
-						"URL_Path":      "/test",
-						"Proto":         "HTTP/1.1",
-						"Headers":       map[string][]string{"Content-Type": {"application/json"}},
-						"Body":          "",
-						"ContentLength": int64(0),
-						"Host":          "example.com",
-						"RemoteAddr":    "192.0.2.1:1234",
-						"QueryParams":   map[string][]string{},
-					},
-					constants.ScriptData: map[string]any{
-						"config": "value",
-					},
-				},
-			},
-			{
-				name:       "nil script data",
-				request:    httptest.NewRequest("POST", "/api", nil),
-				scriptData: nil,
-				wantData: map[string]any{
-					constants.Request: map[string]any{
-						"Method":        "POST",
-						"URL":           &url.URL{Path: "/api"},
-						"URL_String":    "/api",
-						"URL_Host":      "",
-						"URL_Scheme":    "",
-						"URL_Path":      "/api",
-						"Proto":         "HTTP/1.1",
-						"Headers":       map[string][]string{},
-						"Body":          "",
-						"ContentLength": int64(0),
-						"Host":          "example.com",
-						"RemoteAddr":    "192.0.2.1:1234",
-						"QueryParams":   map[string][]string{},
-					},
-					constants.ScriptData: map[string]any{},
-				},
-			},
-		}
-
-		for _, tt := range tests {
-			t.Run(tt.name, func(t *testing.T) {
-				unit := &ExecutableUnit{
-					ID:         "test-unit",
-					ScriptData: tt.scriptData,
-				}
-
-				ctx := context.Background()
-				resultCtx := unit.BuildEvalContext(ctx, tt.request)
-
-				// Get the eval data from context
-				evalData, ok := resultCtx.Value(constants.EvalData).(map[string]any)
-				require.True(t, ok, "Expected eval data in context")
-
-				// Check request data
-				reqData, ok := evalData[constants.Request].(map[string]any)
-				require.True(t, ok, "Expected request data in eval data")
-				require.Equal(t, tt.wantData[constants.Request], reqData)
-
-				// Check script data
-				scriptData, ok := evalData[constants.ScriptData].(map[string]any)
-				require.True(t, ok, "Expected script data in eval data")
-				require.Equal(t, tt.wantData[constants.ScriptData], scriptData)
-			})
-		}
-	})
-
-	t.Run("request conversion error", func(t *testing.T) {
-		// Create a test logger
-		logHandler := slog.NewTextHandler(os.Stdout, nil)
-		logger := slog.New(logHandler.WithGroup("test"))
-
-		unit := &ExecutableUnit{
-			ID:         "test-unit",
-			logHandler: logHandler,
-			logger:     logger,
-		}
-
-		// Create invalid request that won't panic but will cause conversion error
-		req := &http.Request{
-			Method: "GET",
-			URL: &url.URL{
-				// Invalid URL schema that will cause conversion error but not panic
-				Scheme: "%%%",
-				Path:   "/test",
-			},
-			Proto:         "HTTP/1.1",
-			ProtoMajor:    1,
-			ProtoMinor:    1,
-			Header:        make(http.Header),
-			ContentLength: 0,
-		}
-
-		ctx := context.Background()
-		resultCtx := unit.BuildEvalContext(ctx, req)
-
-		// Get the eval data from context
-		evalData, ok := resultCtx.Value(constants.EvalData).(map[string]any)
-		require.True(t, ok, "Expected eval data in context")
-
-		// Check that request data is an empty map on error
-		reqData, ok := evalData[constants.Request].(map[string]any)
-		require.True(t, ok, "Expected request data in eval data")
-		require.Empty(t, reqData, "Expected empty request data on error")
-
-		// Verify script data is still present even with request error
-		scriptData, ok := evalData[constants.ScriptData].(map[string]any)
-		require.True(t, ok, "Expected script data in eval data")
-		require.Empty(t, scriptData, "Expected empty script data")
 	})
 }

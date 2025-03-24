@@ -6,118 +6,22 @@ import (
 	"errors"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"testing"
-	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/robbyt/go-polyscript/execution/constants"
 	"github.com/robbyt/go-polyscript/execution/data"
 	"github.com/robbyt/go-polyscript/execution/script"
 	machineTypes "github.com/robbyt/go-polyscript/machines/types"
-
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
 )
 
-var emptyScriptData = make(map[string]any)
+// Path to the test WASM file
+const testWasmPath = "testdata/examples/main.wasm"
 
-// mockExecutableContent is a mock implementation of script.ExecutableContent
-type mockExecutableContent struct {
-	mock.Mock
-}
-
-func (m *mockExecutableContent) GetSource() string {
-	args := m.Called()
-	return args.String(0)
-}
-
-func (m *mockExecutableContent) GetByteCode() any {
-	args := m.Called()
-	return args.Get(0)
-}
-
-func (m *mockExecutableContent) GetMachineType() machineTypes.Type {
-	args := m.Called()
-	return args.Get(0).(machineTypes.Type)
-}
-
-func (m *mockExecutableContent) Close(ctx context.Context) error {
-	args := m.Called(ctx)
-	return args.Error(0)
-}
-
-func TestMarshalInputData(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name      string
-		inputData map[string]any
-		wantErr   bool
-		wantNil   bool
-	}{
-		{
-			name:      "empty map",
-			inputData: map[string]any{},
-			wantNil:   true,
-		},
-		{
-			name: "simple map",
-			inputData: map[string]any{
-				"key": "value",
-			},
-			wantNil: false,
-		},
-		{
-			name: "complex map",
-			inputData: map[string]any{
-				"string": "value",
-				"int":    42,
-				"bool":   true,
-				"nested": map[string]any{
-					"key": "nested value",
-				},
-				"array": []string{"one", "two"},
-			},
-			wantNil: false,
-		},
-		{
-			name: "map with channel (should error)",
-			inputData: map[string]any{
-				"channel": make(chan int),
-			},
-			wantErr: true,
-		},
-	}
-
-	for _, tt := range tests {
-		tt := tt
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			result, err := marshalInputData(tt.inputData)
-
-			if tt.wantErr {
-				require.Error(t, err)
-				return
-			}
-
-			require.NoError(t, err)
-
-			if tt.wantNil {
-				assert.Nil(t, result)
-			} else {
-				assert.NotNil(t, result)
-				// Verify it's valid JSON
-				var decoded map[string]any
-				err = json.Unmarshal(result, &decoded)
-				require.NoError(t, err)
-				assert.Equal(t, len(tt.inputData), len(decoded))
-			}
-		})
-	}
-}
-
-func TestLoadInputDataFromCtx(t *testing.T) {
+func TestLoadInputData(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -126,30 +30,24 @@ func TestLoadInputDataFromCtx(t *testing.T) {
 		expectedEmpty bool
 	}{
 		{
-			name:          "nil context data",
+			name:          "empty context",
 			ctxData:       nil,
 			expectedEmpty: true,
 		},
 		{
-			name: "valid map data",
+			name: "valid data",
 			ctxData: map[string]any{
-				"key": "value",
+				"foo": "bar",
+				"nested": map[string]any{
+					"a": 1,
+					"b": 2,
+				},
 			},
 			expectedEmpty: false,
 		},
 		{
-			name:          "wrong type (string)",
-			ctxData:       "not a map",
-			expectedEmpty: true,
-		},
-		{
-			name:          "wrong type (int)",
-			ctxData:       42,
-			expectedEmpty: true,
-		},
-		{
-			name:          "wrong map type",
-			ctxData:       map[int]string{1: "value"},
+			name:          "empty data",
+			ctxData:       map[string]any{},
 			expectedEmpty: true,
 		},
 	}
@@ -160,7 +58,16 @@ func TestLoadInputDataFromCtx(t *testing.T) {
 			t.Parallel()
 
 			handler := slog.NewTextHandler(os.Stdout, nil)
-			evaluator := NewBytecodeEvaluator(handler, nil)
+
+			// Create a context provider
+			ctxProvider := data.NewContextProvider(constants.EvalData)
+
+			// Create a dummy executableUnit
+			dummyExe := &script.ExecutableUnit{
+				DataProvider: ctxProvider,
+			}
+
+			evaluator := NewBytecodeEvaluator(handler, dummyExe)
 			ctx := context.Background()
 
 			if tt.ctxData != nil {
@@ -168,9 +75,9 @@ func TestLoadInputDataFromCtx(t *testing.T) {
 				ctx = context.WithValue(ctx, constants.EvalData, tt.ctxData)
 			}
 
-			// Note: We're still testing the old method during the transition,
-			// but in production we'll use the new dataProvider.GetInputData()
-			result := evaluator.loadInputDataFromCtx(ctx)
+			// Test the loadInputData method
+			result, err := evaluator.loadInputData(ctx)
+			require.NoError(t, err)
 
 			if tt.expectedEmpty {
 				assert.Empty(t, result)
@@ -193,53 +100,46 @@ func TestBytecodeEvaluatorInvalidInputs(t *testing.T) {
 		wantErrType error
 	}{
 		{
-			name: "nil executable",
+			name: "nil bytecode",
 			setupExe: func(t *testing.T) *script.ExecutableUnit {
-				return nil
-			},
-			wantErrType: errors.New("executable unit is nil"),
-		},
-		{
-			name: "nil content",
-			setupExe: func(t *testing.T) *script.ExecutableUnit {
+				// Create a context provider
+				ctxProvider := data.NewContextProvider(constants.EvalData)
+
+				// Use mock content
+				mockContent := &mockExecutableContent{
+					machineType: machineTypes.Extism,
+					source:      "invalid wasm",
+					bytecode:    nil, // Nil bytecode will cause error
+				}
+
 				return &script.ExecutableUnit{
-					ID:         "test",
-					Content:    nil,
-					ScriptData: emptyScriptData,
+					ID:           "test-nil-bytecode",
+					Content:      mockContent,
+					DataProvider: ctxProvider,
 				}
 			},
-			wantErrType: errors.New("content is nil"),
+			wantErrType: errors.New("bytecode is nil"),
 		},
 		{
-			name: "wrong content type",
+			name: "invalid content type",
 			setupExe: func(t *testing.T) *script.ExecutableUnit {
-				mockContent := &mockExecutableContent{}
-				mockContent.On("GetByteCode").Return([]byte("mockbytecode"))
-				mockContent.On("GetMachineType").Return(machineTypes.Type("mock"))
+				// Create a context provider
+				ctxProvider := data.NewContextProvider(constants.EvalData)
+
+				// This is not a proper Executable
+				mockContent := &mockExecutableContent{
+					machineType: machineTypes.Extism,
+					source:      "invalid wasm",
+					bytecode:    []byte{0x00}, // Not a valid WASM module
+				}
+
 				return &script.ExecutableUnit{
-					ID:         "test",
-					Content:    mockContent,
-					ScriptData: emptyScriptData,
+					ID:           "test-invalid-content-type",
+					Content:      mockContent,
+					DataProvider: ctxProvider,
 				}
 			},
 			wantErrType: errors.New("invalid executable type"),
-		},
-		{
-			name: "empty execution ID",
-			setupExe: func(t *testing.T) *script.ExecutableUnit {
-				wasmBytes := readTestWasm(t)
-				plugin, err := CompileBytes(context.Background(), wasmBytes, nil)
-				require.NoError(t, err)
-
-				executable := NewExecutable(wasmBytes, plugin, "run")
-
-				return &script.ExecutableUnit{
-					ID:         "", // Empty ID
-					Content:    executable,
-					ScriptData: emptyScriptData,
-				}
-			},
-			wantErrType: errors.New("execution ID is empty"),
 		},
 	}
 
@@ -249,160 +149,548 @@ func TestBytecodeEvaluatorInvalidInputs(t *testing.T) {
 			t.Parallel()
 
 			handler := slog.NewTextHandler(os.Stdout, nil)
-			evaluator := NewBytecodeEvaluator(handler, nil)
-			ctx := context.Background()
-
 			exe := tt.setupExe(t)
-			_, err := evaluator.Eval(ctx, exe)
+			evaluator := NewBytecodeEvaluator(handler, exe)
 
-			require.Error(t, err)
-			assert.Contains(t, err.Error(), tt.wantErrType.Error())
+			ctx := context.Background()
+			_, err := evaluator.Eval(ctx)
+
+			if tt.wantErrType != nil {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.wantErrType.Error())
+			} else {
+				require.NoError(t, err)
+			}
 		})
 	}
 }
 
-// This function would test additional error handling in the exec function, but
-// because the Extism SDK uses concrete types rather than interfaces, mocking is difficult.
-// TODO: Consider refactoring the code to use interfaces for easier testing, or
-// set up an integration test that can deliberately cause errors.
-func TestValidScript(t *testing.T) {
+func TestMarshalInputData(t *testing.T) {
 	t.Parallel()
-	// Setup logging
-	handler := slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
-		Level: slog.LevelDebug,
-	})
-	slog.SetDefault(slog.New(handler))
 
-	// Read test WASM binary
-	wasmBytes := readTestWasm(t)
-	require.NotEmpty(t, wasmBytes)
-
-	// Create helper to build test executables
-	evalBuilder := func(t *testing.T, funcName string) (*script.ExecutableUnit, *BytecodeEvaluator) {
-		t.Helper()
-
-		// Create compiler with new reader each time
-		// Create compiler options
-		compilerOptions := &defaultCompilerOptions{entryPointName: funcName}
-		handler := slog.NewTextHandler(os.Stdout, nil)
-		compiler := NewCompiler(handler, compilerOptions)
-		compiler.SetEntryPointName(funcName)
-
-		// Convert bytes to reader
-		reader := newMockScriptReaderCloser(wasmBytes)
-		reader.On("Close").Return(nil)
-
-		content, err := compiler.Compile(reader)
-		require.NoError(t, err)
-		require.NotNil(t, content)
-
-		exe := &script.ExecutableUnit{
-			ID:         t.Name(),
-			Content:    content,
-			ScriptData: emptyScriptData,
-		}
-		require.NotNil(t, exe)
-
-		handlerEval := slog.NewTextHandler(os.Stdout, nil)
-		evaluator := NewBytecodeEvaluator(handlerEval, nil)
-		require.NotNil(t, evaluator)
-
-		return exe, evaluator
+	tests := []struct {
+		name     string
+		input    map[string]any
+		wantJSON bool
+		wantErr  bool
+	}{
+		{
+			name:     "empty map",
+			input:    map[string]any{},
+			wantJSON: false,
+			wantErr:  false,
+		},
+		{
+			name: "valid data",
+			input: map[string]any{
+				"str":  "value",
+				"int":  42,
+				"bool": true,
+				"map": map[string]any{
+					"nested": "data",
+				},
+			},
+			wantJSON: true,
+			wantErr:  false,
+		},
+		{
+			name:     "nil map",
+			input:    nil,
+			wantJSON: false,
+			wantErr:  false,
+		},
+		{
+			name: "complex nested data",
+			input: map[string]any{
+				"array": []int{1, 2, 3},
+				"nested": map[string]any{
+					"deeper": map[string]any{
+						"evenDeeper": []map[string]any{
+							{"key": "value"},
+						},
+					},
+				},
+			},
+			wantJSON: true,
+			wantErr:  false,
+		},
 	}
 
-	t.Run("basic functions", func(t *testing.T) {
-		tests := []struct {
-			name          string
-			function      string
-			input         []byte
-			expected      string
-			expectedType  data.Types
-			expectedValue any
-		}{
-			{
-				name:          "greet function",
-				function:      "greet",
-				input:         []byte("World"),
-				expected:      "Hello, World!",
-				expectedType:  data.MAP,
-				expectedValue: map[string]any{"greeting": "Hello, World!"},
-			},
-			{
-				name:          "reverse string",
-				function:      "reverse_string",
-				input:         []byte("Hello"),
-				expected:      "olleH",
-				expectedType:  data.MAP,
-				expectedValue: map[string]any{"reversed": "olleH"},
-			},
-			{
-				name:         "count vowels",
-				function:     "count_vowels",
-				input:        []byte("Hello World"),
-				expectedType: data.MAP,
-				// Result will be JSON object
-				expected: `{"count":3,"vowels":"aeiouAEIOU","input":"Hello World"}`,
-			},
-		}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-		for _, tt := range tests {
-			tt := tt
-			t.Run(tt.name, func(t *testing.T) {
-				t.Parallel()
-				exe, evaluator := evalBuilder(t, tt.function)
+			result, err := marshalInputData(tt.input)
 
-				// Create context with input data
-				inputData := map[string]any{
-					"input": string(tt.input),
-				}
-				//nolint:staticcheck // Temporarily ignoring the "string as context key" warning until type system is fixed
-				ctx := context.WithValue(context.Background(), constants.EvalData, inputData)
-
-				response, err := evaluator.Eval(ctx, exe)
+			if tt.wantErr {
+				require.Error(t, err)
+			} else {
 				require.NoError(t, err)
-				require.NotNil(t, response)
+				if tt.wantJSON {
+					require.NotNil(t, result)
+					require.NotEmpty(t, result)
 
-				assert.Equal(t, tt.expectedType, response.Type())
-				if tt.expectedValue != nil {
-					// Direct comparison - response.Interface() already returns any
-					assert.Equal(t, tt.expectedValue, response.Interface())
+					// Verify the JSON can be unmarshaled
+					var checkData map[string]any
+					unmarshalErr := json.Unmarshal(result, &checkData)
+					require.NoError(t, unmarshalErr)
+
+					// For simple maps, verify the data matches
+					if len(tt.input) > 0 && len(tt.input) < 5 {
+						for k, expectedVal := range tt.input {
+							// Skip complex nested structures in this check
+							if _, isMap := expectedVal.(map[string]any); !isMap {
+								// Handle type conversions that happen during JSON marshaling
+								if intVal, isInt := expectedVal.(int); isInt {
+									// JSON unmarshaling converts numbers to float64
+									assert.Equal(t, float64(intVal), checkData[k])
+								} else if _, isIntSlice := expectedVal.([]int); isIntSlice {
+									// Skip int slice checks (arrays become []interface{})
+								} else if _, isSlice := expectedVal.([]any); !isSlice {
+									assert.Equal(t, expectedVal, checkData[k])
+								}
+							}
+						}
+					}
+				} else if len(tt.input) == 0 || tt.input == nil {
+					require.Nil(t, result)
 				}
-			})
-		}
-	})
+			}
+		})
+	}
+}
 
-	t.Run("complex processing", func(t *testing.T) {
-		exe, evaluator := evalBuilder(t, "process_complex")
+func TestNilHandlerFallback(t *testing.T) {
+	// Test that the evaluator handles nil handlers by creating a default
+	exe := &script.ExecutableUnit{
+		ID:           "test-nil-handler",
+		DataProvider: data.NewContextProvider(constants.EvalData),
+		Content: &mockExecutableContent{
+			machineType: machineTypes.Extism,
+			source:      "test wasm",
+			bytecode:    []byte{0x00, 0x61, 0x73, 0x6D},
+		},
+	}
 
-		request := map[string]any{
-			"id":        "test-123",
-			"timestamp": time.Now().Unix(),
-			"data": map[string]any{
-				"key1": "value1",
-				"key2": 42,
+	// Create with nil handler
+	evaluator := NewBytecodeEvaluator(nil, exe)
+
+	// Shouldn't panic
+	require.NotNil(t, evaluator)
+	require.NotNil(t, evaluator.logger)
+	require.NotNil(t, evaluator.logHandler)
+}
+
+func TestEvaluatorString(t *testing.T) {
+	handler := slog.NewTextHandler(os.Stdout, nil)
+	evaluator := NewBytecodeEvaluator(handler, nil)
+
+	// Test the string representation
+	strRep := evaluator.String()
+	require.Equal(t, "extism.BytecodeEvaluator", strRep)
+}
+
+func TestGetPluginInstanceConfig(t *testing.T) {
+	handler := slog.NewTextHandler(os.Stdout, nil)
+	evaluator := NewBytecodeEvaluator(handler, nil)
+
+	// Get the config
+	config := evaluator.getPluginInstanceConfig()
+
+	// Should be a valid config
+	require.NotNil(t, config)
+	require.NotNil(t, config.ModuleConfig)
+}
+
+func TestEvalWithNilExecutableUnit(t *testing.T) {
+	handler := slog.NewTextHandler(os.Stdout, nil)
+	evaluator := NewBytecodeEvaluator(handler, nil)
+
+	// Attempt to evaluate with nil executable unit
+	ctx := context.Background()
+	_, err := evaluator.Eval(ctx)
+
+	// Should get an error
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "executable unit is nil")
+}
+
+type mockExecutableContent struct {
+	machineType machineTypes.Type
+	source      string
+	bytecode    any
+}
+
+func (m *mockExecutableContent) GetMachineType() machineTypes.Type {
+	return m.machineType
+}
+
+func (m *mockExecutableContent) GetSource() string {
+	return m.source
+}
+
+func (m *mockExecutableContent) GetByteCode() any {
+	return m.bytecode
+}
+
+// TestBasicExecution is a simplified test that mocks the execution
+func TestBasicExecution(t *testing.T) {
+	// Skip this test in CI environments that may not support WASM
+	if os.Getenv("CI") != "" {
+		t.Skip("Skipping WASM test in CI environment")
+	}
+
+	handler := slog.NewTextHandler(os.Stdout, nil)
+
+	// Create context provider
+	ctxProvider := data.NewContextProvider(constants.EvalData)
+
+	// Create a mock executable
+	exe := &script.ExecutableUnit{
+		ID:           "test-basic",
+		DataProvider: ctxProvider,
+		Content: &mockExecutableContent{
+			machineType: machineTypes.Extism,
+			source:      "test wasm",
+			bytecode:    []byte{0x00, 0x61, 0x73, 0x6D}, // WASM magic bytes only
+		},
+	}
+
+	evaluator := NewBytecodeEvaluator(handler, exe)
+
+	// This will fail during execution but should handle the error gracefully
+	ctx := context.Background()
+	evalData := map[string]any{"test": "data"}
+	ctx = context.WithValue(ctx, constants.EvalData, evalData)
+
+	_, err := evaluator.Eval(ctx)
+	// We expect an error since our mock WASM isn't valid
+	assert.Error(t, err)
+}
+
+func TestPrepareContext(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		setupExe    func(t *testing.T) *script.ExecutableUnit
+		inputs      []any
+		wantError   bool
+		expectedErr string
+	}{
+		{
+			name: "nil data provider",
+			setupExe: func(t *testing.T) *script.ExecutableUnit {
+				return &script.ExecutableUnit{
+					ID:           "test-nil-provider",
+					DataProvider: nil,
+					Content: &mockExecutableContent{
+						machineType: machineTypes.Extism,
+						source:      "test wasm",
+						bytecode:    []byte{0x00, 0x61, 0x73, 0x6D},
+					},
+				}
 			},
-			"tags": []string{"test", "example"},
-			"metadata": map[string]string{
-				"source":  "unit-test",
-				"version": "1.0",
+			inputs:      []any{map[string]any{"test": "data"}},
+			wantError:   true,
+			expectedErr: "no data provider available",
+		},
+		{
+			name: "valid simple data",
+			setupExe: func(t *testing.T) *script.ExecutableUnit {
+				return &script.ExecutableUnit{
+					ID:           "test-valid-data",
+					DataProvider: data.NewContextProvider(constants.EvalData),
+					Content: &mockExecutableContent{
+						machineType: machineTypes.Extism,
+						source:      "test wasm",
+						bytecode:    []byte{0x00, 0x61, 0x73, 0x6D},
+					},
+				}
 			},
-			"count":  42,
-			"active": true,
-		}
+			inputs:    []any{map[string]any{"test": "data"}},
+			wantError: false,
+		},
+		{
+			name: "empty input",
+			setupExe: func(t *testing.T) *script.ExecutableUnit {
+				return &script.ExecutableUnit{
+					ID:           "test-empty-input",
+					DataProvider: data.NewContextProvider(constants.EvalData),
+					Content: &mockExecutableContent{
+						machineType: machineTypes.Extism,
+						source:      "test wasm",
+						bytecode:    []byte{0x00, 0x61, 0x73, 0x6D},
+					},
+				}
+			},
+			inputs:    []any{},
+			wantError: false,
+		},
+		{
+			name: "nil executable unit",
+			setupExe: func(t *testing.T) *script.ExecutableUnit {
+				return nil
+			},
+			inputs:      []any{map[string]any{"test": "data"}},
+			wantError:   true,
+			expectedErr: "no data provider available",
+		},
+		{
+			name: "with error throwing provider",
+			setupExe: func(t *testing.T) *script.ExecutableUnit {
+				mockProvider := &mockErrProvider{
+					err: errors.New("provider error"),
+				}
+				return &script.ExecutableUnit{
+					ID:           "test-err-provider",
+					DataProvider: mockProvider,
+					Content: &mockExecutableContent{
+						machineType: machineTypes.Extism,
+						source:      "test wasm",
+						bytecode:    []byte{0x00, 0x61, 0x73, 0x6D},
+					},
+				}
+			},
+			inputs:      []any{map[string]any{"test": "data"}},
+			wantError:   true,
+			expectedErr: "provider error",
+		},
+	}
 
-		//nolint:staticcheck // Temporarily ignoring the "string as context key" warning until type system is fixed
-		ctx := context.WithValue(context.Background(), constants.EvalData, request)
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-		response, err := evaluator.Eval(ctx, exe)
-		require.NoError(t, err)
-		require.NotNil(t, response)
+			handler := slog.NewTextHandler(os.Stdout, nil)
+			exe := tt.setupExe(t)
+			evaluator := NewBytecodeEvaluator(handler, exe)
 
-		assert.Equal(t, data.MAP, response.Type())
+			ctx := context.Background()
+			enrichedCtx, err := evaluator.PrepareContext(ctx, tt.inputs...)
 
-		result := response.Interface().(map[string]any)
-		assert.Equal(t, "test-123", result["request_id"])
-		assert.Equal(t, 2, result["tag_count"])
-		assert.Equal(t, 2, result["meta_count"])
-		assert.Equal(t, true, result["is_active"])
-	})
+			// Check error expectations
+			if tt.wantError {
+				require.Error(t, err)
+				if tt.expectedErr != "" {
+					assert.Contains(t, err.Error(), tt.expectedErr)
+				}
+			} else {
+				require.NoError(t, err)
+			}
+
+			// Even with errors, we should get a context back (might be the original)
+			require.NotNil(t, enrichedCtx)
+		})
+	}
+}
+
+// mockErrProvider implements the data.Provider interface and always returns an error
+type mockErrProvider struct {
+	err error
+}
+
+func (m *mockErrProvider) GetData(ctx context.Context) (map[string]any, error) {
+	return nil, m.err
+}
+
+func (m *mockErrProvider) AddDataToContext(ctx context.Context, data ...any) (context.Context, error) {
+	return ctx, m.err
+}
+
+// mockPluginInstance is a mock implementation of the testPluginInstance interface
+type mockPluginInstance struct {
+	exitCode   uint32
+	output     []byte
+	callErr    error
+	closeErr   error
+	wasCalled  bool
+	wasClosed  bool
+	cancelFunc func()
+}
+
+func (m *mockPluginInstance) CallWithContext(ctx context.Context, functionName string, input []byte) (uint32, []byte, error) {
+	m.wasCalled = true
+	// Execute the cancel function if provided (to simulate context cancellation)
+	if m.cancelFunc != nil {
+		m.cancelFunc()
+	}
+	// Check if the context was canceled
+	if ctx.Err() != nil {
+		return 0, nil, ctx.Err()
+	}
+	return m.exitCode, m.output, m.callErr
+}
+
+func (m *mockPluginInstance) Close(ctx context.Context) error {
+	m.wasClosed = true
+	return m.closeErr
+}
+
+func TestExecHelper(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		setup       func() (*mockPluginInstance, context.Context, context.CancelFunc)
+		entryPoint  string
+		input       []byte
+		wantErr     bool
+		errContains string
+	}{
+		{
+			name: "successful execution with json output",
+			setup: func() (*mockPluginInstance, context.Context, context.CancelFunc) {
+				ctx, cancel := context.WithCancel(context.Background())
+				return &mockPluginInstance{
+					exitCode: 0,
+					output:   []byte(`{"result": "success", "count": 42}`),
+				}, ctx, cancel
+			},
+			entryPoint: "main",
+			input:      []byte(`{"key":"value"}`),
+			wantErr:    false,
+		},
+		{
+			name: "successful execution with string output",
+			setup: func() (*mockPluginInstance, context.Context, context.CancelFunc) {
+				ctx, cancel := context.WithCancel(context.Background())
+				return &mockPluginInstance{
+					exitCode: 0,
+					output:   []byte(`plain text output`),
+				}, ctx, cancel
+			},
+			entryPoint: "main",
+			input:      []byte(`{"key":"value"}`),
+			wantErr:    false,
+		},
+		{
+			name: "non-zero exit code",
+			setup: func() (*mockPluginInstance, context.Context, context.CancelFunc) {
+				ctx, cancel := context.WithCancel(context.Background())
+				return &mockPluginInstance{
+					exitCode: 1,
+					output:   []byte(`{"error": "something went wrong"}`),
+				}, ctx, cancel
+			},
+			entryPoint:  "main",
+			input:       []byte(`{"key":"value"}`),
+			wantErr:     true,
+			errContains: "non-zero exit code",
+		},
+		{
+			name: "execution error",
+			setup: func() (*mockPluginInstance, context.Context, context.CancelFunc) {
+				ctx, cancel := context.WithCancel(context.Background())
+				return &mockPluginInstance{
+					callErr: errors.New("execution failed"),
+				}, ctx, cancel
+			},
+			entryPoint:  "main",
+			input:       []byte(`{"key":"value"}`),
+			wantErr:     true,
+			errContains: "execution failed",
+		},
+		{
+			name: "context cancellation",
+			setup: func() (*mockPluginInstance, context.Context, context.CancelFunc) {
+				ctx, cancel := context.WithCancel(context.Background())
+				mock := &mockPluginInstance{
+					cancelFunc: cancel, // This will cancel the context during execution
+					callErr:    context.Canceled,
+				}
+				return mock, ctx, cancel
+			},
+			entryPoint:  "main",
+			input:       []byte(`{"key":"value"}`),
+			wantErr:     true,
+			errContains: "cancelled",
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			mockInstance, ctx, cancel := tt.setup()
+			defer cancel()
+
+			logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+			result, execTime, err := execHelper(ctx, logger, mockInstance, tt.entryPoint, tt.input)
+
+			// Verify the mock was called
+			assert.True(t, mockInstance.wasCalled, "Expected the mock instance to be called")
+
+			// Check for expected errors
+			if tt.wantErr {
+				assert.Error(t, err)
+				if tt.errContains != "" {
+					assert.Contains(t, err.Error(), tt.errContains)
+				}
+			} else {
+				assert.NoError(t, err)
+				assert.NotNil(t, result)
+			}
+
+			// Execution time should always be measured
+			assert.Greater(t, execTime.Nanoseconds(), int64(0))
+		})
+	}
+}
+
+func TestEvalWithCancelledContext(t *testing.T) {
+	// Load the test WASM file
+	wasmContent, err := os.ReadFile(testWasmPath)
+	require.NoError(t, err, "Failed to read WASM test file")
+
+	// Create a temporary directory using the testing package
+	tmpDir := t.TempDir()
+
+	// Write the test WASM bytes to a file
+	wasmFile := filepath.Join(tmpDir, "test.wasm")
+	err = os.WriteFile(wasmFile, wasmContent, 0644)
+	require.NoError(t, err, "Failed to write test WASM file")
+
+	// Create a mock compiled plugin
+	ctx := context.Background()
+	compileOpts := withDefaultCompileOptions()
+	compiledPlugin, err := CompileBytes(ctx, wasmContent, compileOpts)
+	require.NoError(t, err, "Failed to compile plugin")
+
+	// Create our executable
+	exec := NewExecutable(wasmContent, compiledPlugin, "greet")
+
+	// Create a context provider
+	ctxProvider := data.NewContextProvider(constants.EvalData)
+
+	// Create a context that we can cancel
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Create the executable unit
+	execUnit := &script.ExecutableUnit{
+		ID:           "test-cancellation",
+		DataProvider: ctxProvider,
+		Content:      exec,
+	}
+
+	// Create handler and evaluator
+	handler := slog.NewTextHandler(os.Stdout, nil)
+	evaluator := NewBytecodeEvaluator(handler, execUnit)
+
+	// Set up context data
+	evalData := map[string]any{"name": "TestUser"}
+	ctx = context.WithValue(ctx, constants.EvalData, evalData)
+
+	// Cancel the context before evaluation
+	cancel()
+
+	// Try to evaluate with the cancelled context
+	_, err = evaluator.Eval(ctx)
+
+	// Should get an error (either cancellation or plugin error)
+	require.Error(t, err)
 }

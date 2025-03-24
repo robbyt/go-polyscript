@@ -8,8 +8,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestNewHttpRequestWrapper tests the newHttpRequestWrapper function.
-func TestNewHttpRequestWrapper(t *testing.T) {
+// TestNewHTTPRequestWrapper tests the newHTTPRequestWrapper function.
+func TestNewHTTPRequestWrapper(t *testing.T) {
 	t.Run("with body", func(t *testing.T) {
 		body := "test body"
 		req, err := http.NewRequest(http.MethodPost, "http://localhost:8080/test?query=1", bytes.NewBufferString(body))
@@ -20,7 +20,7 @@ func TestNewHttpRequestWrapper(t *testing.T) {
 		req.Host = "localhost:8080"
 		req.RemoteAddr = "127.0.0.1:12345"
 
-		reqStruct, err := newHttpRequestWrapper(req)
+		reqStruct, err := newHTTPRequestWrapper(req)
 		require.NoError(t, err)
 		require.NotNil(t, reqStruct)
 
@@ -42,7 +42,7 @@ func TestNewHttpRequestWrapper(t *testing.T) {
 		req, err := http.NewRequest(http.MethodGet, "http://localhost:8080/test", nil)
 		require.NoError(t, err)
 
-		reqStruct, err := newHttpRequestWrapper(req)
+		reqStruct, err := newHTTPRequestWrapper(req)
 		require.NoError(t, err)
 		require.NotNil(t, reqStruct)
 
@@ -61,7 +61,7 @@ func TestNewHttpRequestWrapper(t *testing.T) {
 		req, err := http.NewRequest(http.MethodGet, "http://localhost:8080/test?param1=value1&param2=value2", nil)
 		require.NoError(t, err)
 
-		reqStruct, err := newHttpRequestWrapper(req)
+		reqStruct, err := newHTTPRequestWrapper(req)
 		require.NoError(t, err)
 		require.NotNil(t, reqStruct)
 
@@ -80,7 +80,7 @@ func TestNewHttpRequestWrapper(t *testing.T) {
 	})
 
 	t.Run("nil request", func(t *testing.T) {
-		reqStruct, err := newHttpRequestWrapper(nil)
+		reqStruct, err := newHTTPRequestWrapper(nil)
 		require.Error(t, err)
 		require.Nil(t, reqStruct)
 		require.Equal(t, "request is nil", err.Error())

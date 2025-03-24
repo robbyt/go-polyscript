@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"os"
 	"sync/atomic"
 
 	extismSDK "github.com/extism/go-sdk"
 
 	"github.com/robbyt/go-polyscript/execution/script"
+	"github.com/robbyt/go-polyscript/internal/helpers"
 )
 
 const defaultEntryPoint = "main"
@@ -31,13 +31,7 @@ type CompilerOptions interface {
 // NewCompiler creates a new Extism WASM Compiler instance. External config of the compiler not
 // currently supported.
 func NewCompiler(handler slog.Handler, compilerOptions CompilerOptions) *Compiler {
-	if handler == nil {
-		defaultHandler := slog.NewTextHandler(os.Stdout, nil)
-		handler = defaultHandler.WithGroup("extism")
-		// Create a logger from the handler rather than using slog directly
-		defaultLogger := slog.New(handler)
-		defaultLogger.Warn("Handler is nil, using the default logger configuration.")
-	}
+	handler, logger := helpers.SetupLogger(handler, "extism", "Compiler")
 
 	entryPointName := compilerOptions.GetEntryPointName()
 	if entryPointName == "" {
@@ -52,12 +46,8 @@ func NewCompiler(handler slog.Handler, compilerOptions CompilerOptions) *Compile
 		ctx:            context.Background(),
 		options:        withDefaultCompileOptions(),
 		logHandler:     handler,
-		logger:         slog.New(handler.WithGroup("Compiler")),
+		logger:         logger,
 	}
-}
-
-func (c *Compiler) getLogger() *slog.Logger {
-	return c.logger
 }
 
 func (c *Compiler) String() string {
@@ -68,6 +58,8 @@ func (c *Compiler) String() string {
 // TODO: Some error paths are difficult to test with the current design
 // Consider adding integration tests for hard-to-reach error cases.
 func (c *Compiler) Compile(scriptReader io.ReadCloser) (script.ExecutableContent, error) {
+	logger := c.logger.WithGroup("compile")
+
 	if scriptReader == nil {
 		return nil, ErrContentNil
 	}
@@ -81,8 +73,6 @@ func (c *Compiler) Compile(scriptReader io.ReadCloser) (script.ExecutableContent
 	if err != nil {
 		return nil, fmt.Errorf("failed to close reader: %w", err)
 	}
-
-	logger := c.getLogger()
 
 	if len(scriptBytes) == 0 {
 		logger.Error("Compile called with empty script")

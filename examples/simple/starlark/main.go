@@ -1,4 +1,4 @@
-package starlark
+package main
 
 import (
 	"context"
@@ -6,11 +6,11 @@ import (
 	"log/slog"
 	"os"
 
+	"github.com/robbyt/go-polyscript"
 	"github.com/robbyt/go-polyscript/execution/constants"
 	"github.com/robbyt/go-polyscript/execution/data"
-	"github.com/robbyt/go-polyscript/execution/script"
-	"github.com/robbyt/go-polyscript/execution/script/loader"
 	"github.com/robbyt/go-polyscript/machines/starlark"
+	"github.com/robbyt/go-polyscript/options"
 )
 
 // GetStarlarkScript returns the script content for the Starlark example
@@ -20,15 +20,17 @@ func GetStarlarkScript() string {
 name = ctx["name"]
 message = "Hello, " + name + "!"
 
-# Return a dictionary with our result
-{
+# Return a dictionary with our result - must explicitly return to get a value
+result = {
     "greeting": message,
     "length": len(message)
 }
+# In Starlark, the last expression's value becomes the script's return value
+result
 `
 }
 
-// RunStarlarkExample executes a Starlark script and returns the result
+// RunStarlarkExample executes a Starlark script once and returns the result
 func RunStarlarkExample(handler slog.Handler) (map[string]any, error) {
 	if handler == nil {
 		handler = slog.NewTextHandler(os.Stdout, nil)
@@ -38,40 +40,38 @@ func RunStarlarkExample(handler slog.Handler) (map[string]any, error) {
 	// Define globals that will be available to the script
 	globals := []string{constants.Ctx}
 
-	// Create a compiler for Starlark scripts
-	compilerOptions := &starlark.BasicCompilerOptions{Globals: globals}
-	compiler := starlark.NewCompiler(handler, compilerOptions)
-
-	// Load script from a string
+	// Create a script string
 	scriptContent := GetStarlarkScript()
-	fromString, err := loader.NewFromString(scriptContent)
-	if err != nil {
-		logger.Error("Failed to create string loader", "error", err)
-		return nil, err
-	}
 
-	// Create an executable unit
-	unit, err := script.NewExecutableUnit(handler, "", fromString, compiler, nil)
-	if err != nil {
-		logger.Error("Failed to create executable unit", "error", err)
-		return nil, err
-	}
-
-	// Create an evaluator for Starlark scripts with a context data provider
-	dataProvider := data.NewContextProvider(constants.EvalData)
-	evaluator := starlark.NewBytecodeEvaluator(handler, dataProvider)
-
-	// Create context with input data
-	ctx := context.Background()
+	// Create input data - this is different from the context data
+	// It will be provided via the data provider during evaluation
 	input := map[string]any{
 		"name": "World",
 	}
-	ctx = context.WithValue(ctx, constants.EvalData, input)
+	dataProvider := data.NewStaticProvider(input)
+
+	// Create evaluator using the functional options pattern
+	evaluator, err := polyscript.FromStarlarkString(
+		scriptContent,
+		options.WithDefaults(), // Add defaults option to ensure all required fields are set
+		options.WithLogger(handler),
+		options.WithDataProvider(dataProvider),
+		starlark.WithGlobals(globals),
+	)
+	if err != nil {
+		logger.Error("Failed to create evaluator", "error", err)
+		return nil, err
+	}
 
 	// Execute the script
-	result, err := evaluator.Eval(ctx, unit)
+	ctx := context.Background()
+	if evaluator == nil {
+		logger.Error("Evaluator is nil")
+		return nil, fmt.Errorf("evaluator is nil")
+	}
+	result, err := evaluator.Eval(ctx)
 	if err != nil {
-		logger.Error("Script evaluation failed", "error", err)
+		logger.Error("Script evaluation failed", "error", err, "evaluator", fmt.Sprintf("%T", evaluator))
 		return nil, err
 	}
 

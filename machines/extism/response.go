@@ -37,10 +37,6 @@ func newEvalResult(handler slog.Handler, value any, execTime time.Duration, scri
 	}
 }
 
-func (r *execResult) getLogger() *slog.Logger {
-	return r.logger
-}
-
 func (r *execResult) String() string {
 	return fmt.Sprintf(
 		"execResult{Type: %s, Value: %v, ExecTime: %s, ScriptExeID: %s}",
@@ -66,7 +62,7 @@ func (r *execResult) Type() data.Types {
 	case map[string]any:
 		return data.MAP
 	default:
-		r.getLogger().Error("Unknown type", "type", fmt.Sprintf("%T", v))
+		r.logger.Error("Unknown type", "type", fmt.Sprintf("%T", v))
 		return data.ERROR
 	}
 }
@@ -88,7 +84,7 @@ func (r *execResult) Inspect() string {
 			return string(jsonBytes)
 		}
 		// If JSON marshaling fails, log and fallback to default
-		r.getLogger().Error("Failed to marshal map to JSON", "error", err)
+		r.logger.Error("Failed to marshal map to JSON", "error", err)
 	}
 
 	// Default string representation for other types

@@ -30,9 +30,15 @@ func (m *mockHTTPClient) Do(req *http.Request) (*http.Response, error) {
 type mockResponseBody struct {
 	io.Reader
 	closeFunc func() error
+	closed    bool
 }
 
-func (m mockResponseBody) Close() error {
+func (m *mockResponseBody) Close() error {
+	if m.closed {
+		return nil
+	}
+	m.closed = true
+
 	if m.closeFunc != nil {
 		return m.closeFunc()
 	}
@@ -43,7 +49,7 @@ func (m mockResponseBody) Close() error {
 func newMockResponse(statusCode int, body string) *http.Response {
 	return &http.Response{
 		StatusCode: statusCode,
-		Body:       mockResponseBody{Reader: bytes.NewBufferString(body)},
+		Body:       &mockResponseBody{Reader: bytes.NewBufferString(body)},
 		Status:     http.StatusText(statusCode),
 		Header:     make(http.Header),
 	}
@@ -212,7 +218,7 @@ func TestFromHTTPGetReader(t *testing.T) {
 		name             string
 		url              string
 		optionsModifier  func(options *HTTPOptions) *HTTPOptions
-		mockResponse     *http.Response
+		customResp       func() *http.Response
 		mockError        error
 		requestValidator func(t *testing.T, req *http.Request)
 		expectError      bool
@@ -220,9 +226,11 @@ func TestFromHTTPGetReader(t *testing.T) {
 		validateBody     bool
 	}{
 		{
-			name:         "Success - Default",
-			url:          "https://example.com/script.js",
-			mockResponse: newMockResponse(http.StatusOK, testScript),
+			name: "Success - Default",
+			url:  "https://example.com/script.js",
+			customResp: func() *http.Response {
+				return newMockResponse(http.StatusOK, testScript)
+			},
 			requestValidator: func(t *testing.T, req *http.Request) {
 				require.Equal(t, "https://example.com/script.js", req.URL.String())
 				require.Equal(t, http.MethodGet, req.Method)
@@ -236,7 +244,9 @@ func TestFromHTTPGetReader(t *testing.T) {
 			optionsModifier: func(options *HTTPOptions) *HTTPOptions {
 				return options.WithBasicAuth("user", "pass").WithTimeout(5 * time.Second)
 			},
-			mockResponse: newMockResponse(http.StatusOK, testScript),
+			customResp: func() *http.Response {
+				return newMockResponse(http.StatusOK, testScript)
+			},
 			requestValidator: func(t *testing.T, req *http.Request) {
 				require.Equal(t, "https://example.com/auth", req.URL.String())
 				username, password, ok := req.BasicAuth()
@@ -252,7 +262,9 @@ func TestFromHTTPGetReader(t *testing.T) {
 			optionsModifier: func(options *HTTPOptions) *HTTPOptions {
 				return options.WithBearerAuth("test-token").WithTimeout(5 * time.Second)
 			},
-			mockResponse: newMockResponse(http.StatusOK, testScript),
+			customResp: func() *http.Response {
+				return newMockResponse(http.StatusOK, testScript)
+			},
 			requestValidator: func(t *testing.T, req *http.Request) {
 				require.Equal(t, "https://example.com/header-auth", req.URL.String())
 				require.Equal(t, "Bearer test-token", req.Header.Get("Authorization"))
@@ -267,7 +279,9 @@ func TestFromHTTPGetReader(t *testing.T) {
 				options.Headers["X-Custom"] = "value"
 				return options
 			},
-			mockResponse: newMockResponse(http.StatusOK, testScript),
+			customResp: func() *http.Response {
+				return newMockResponse(http.StatusOK, testScript)
+			},
 			requestValidator: func(t *testing.T, req *http.Request) {
 				require.Equal(t, "Custom-Agent", req.Header.Get("User-Agent"))
 				require.Equal(t, "value", req.Header.Get("X-Custom"))
@@ -275,16 +289,20 @@ func TestFromHTTPGetReader(t *testing.T) {
 			validateBody: true,
 		},
 		{
-			name:          "Failure - Unauthorized",
-			url:           "https://example.com/auth",
-			mockResponse:  newMockResponse(http.StatusUnauthorized, "Unauthorized"),
+			name: "Failure - Unauthorized",
+			url:  "https://example.com/auth",
+			customResp: func() *http.Response {
+				return newMockResponse(http.StatusUnauthorized, "Unauthorized")
+			},
 			expectError:   true,
 			errorContains: "HTTP 401",
 		},
 		{
-			name:          "Failure - Not Found",
-			url:           "https://example.com/error",
-			mockResponse:  newMockResponse(http.StatusNotFound, "Not Found"),
+			name: "Failure - Not Found",
+			url:  "https://example.com/error",
+			customResp: func() *http.Response {
+				return newMockResponse(http.StatusNotFound, "Not Found")
+			},
 			expectError:   true,
 			errorContains: "HTTP 404",
 		},
@@ -313,7 +331,8 @@ func TestFromHTTPGetReader(t *testing.T) {
 						return nil, tt.mockError
 					}
 
-					return tt.mockResponse, nil
+					resp := tt.customResp()
+					return resp, nil
 				},
 			}
 
@@ -364,15 +383,13 @@ func TestFromHTTPGetReaderWithContext(t *testing.T) {
 		url           string
 		ctx           context.Context
 		cancelFunc    func()
-		mockResponse  *http.Response
 		expectError   bool
 		errorContains string
 	}{
 		{
-			name:         "Success - Background Context",
-			url:          "https://example.com/script.js",
-			ctx:          context.Background(),
-			mockResponse: newMockResponse(http.StatusOK, testScript),
+			name: "Success - Background Context",
+			url:  "https://example.com/script.js",
+			ctx:  context.Background(),
 		},
 		{
 			name:          "Failure - Cancelled Context",
@@ -409,7 +426,9 @@ func TestFromHTTPGetReaderWithContext(t *testing.T) {
 					if err := req.Context().Err(); err != nil {
 						return nil, err
 					}
-					return tt.mockResponse, nil
+					// Create a new response each time to ensure it can be properly closed
+					resp := newMockResponse(http.StatusOK, testScript)
+					return resp, nil
 				},
 			}
 			loader.client = mockClient

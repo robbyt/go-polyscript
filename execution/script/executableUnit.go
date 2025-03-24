@@ -1,15 +1,12 @@
 package script
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"log/slog"
-	"net/http"
-	"os"
 	"time"
 
-	"github.com/robbyt/go-polyscript/execution/constants"
+	"github.com/robbyt/go-polyscript/execution/data"
 	"github.com/robbyt/go-polyscript/execution/script/loader"
 	"github.com/robbyt/go-polyscript/internal/helpers"
 	machineTypes "github.com/robbyt/go-polyscript/machines/types"
@@ -26,18 +23,22 @@ type ExecutableUnit struct {
 	// CreatedAt records when this executable unit was instantiated.
 	CreatedAt time.Time
 
-	// Loader is responsible for loading the script content from its source (file, string, etc.).
-	Loader loader.Loader
-
-	// Content holds the compiled bytecode and source representation of the script.
-	Content ExecutableContent
+	// ScriptLoader loads the script content to local memory from various places (file, string, etc.).
+	ScriptLoader loader.Loader
 
 	// Compiler is the script language-specific compiler that was used to compile this unit.
 	Compiler Compiler
 
+	// Content holds the compiled bytecode and source representation of the script.
+	Content ExecutableContent
+
 	// ScriptData contains key-value pairs that can be accessed by the script at runtime.
 	// This data is made available to the script during evaluation.
 	ScriptData map[string]any
+
+	// DataProvider provides access to variable runtime data during script evaluation.
+	// Enabling the "compile once, run many times" design.
+	DataProvider data.Provider
 
 	// Logging components
 	logHandler slog.Handler
@@ -45,21 +46,26 @@ type ExecutableUnit struct {
 }
 
 // NewExecutableUnit creates a new ExecutableUnit from the provided loader and compiler.
-// The EvalContext parameter allows passing variables from Go into the VM at evaluation time.
-func NewExecutableUnit(handler slog.Handler, versionID string, loader loader.Loader, compiler Compiler, sData map[string]any) (*ExecutableUnit, error) {
-	if handler == nil {
-		defaultHandler := slog.NewTextHandler(os.Stdout, nil)
-		handler = defaultHandler.WithGroup("script")
-		// Create a logger from the handler rather than using slog directly
-		defaultLogger := slog.New(handler)
-		defaultLogger.Warn("Handler is nil, using the default logger configuration.")
-	}
+// The dataProvider parameter provides runtime data for script evaluation.
+func NewExecutableUnit(
+	handler slog.Handler,
+	versionID string,
+	scriptLoader loader.Loader,
+	compiler Compiler,
+	dataProvider data.Provider,
+	sData map[string]any,
+) (*ExecutableUnit, error) {
+	handler, logger := helpers.SetupLogger(handler, "script", "ExecutableUnit")
 
 	if compiler == nil {
 		return nil, errors.New("compiler is nil")
 	}
 
-	reader, err := loader.GetReader()
+	if sData == nil {
+		sData = make(map[string]any)
+	}
+
+	reader, err := scriptLoader.GetReader()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get reader from loader: %w", err)
 	}
@@ -76,84 +82,60 @@ func NewExecutableUnit(handler slog.Handler, versionID string, loader loader.Loa
 		}
 	}
 
-	logger := slog.New(handler.WithGroup("ExecutableUnit"))
-	logger = logger.With("ID", versionID)
-
 	return &ExecutableUnit{
-		ID:         versionID,
-		CreatedAt:  time.Now(),
-		Loader:     loader,
-		Content:    exe,
-		Compiler:   compiler,
-		ScriptData: sData,
-		logHandler: handler,
-		logger:     logger,
+		ID:           versionID,
+		CreatedAt:    time.Now(),
+		ScriptLoader: scriptLoader,
+		Content:      exe,
+		Compiler:     compiler,
+		ScriptData:   sData,
+		DataProvider: dataProvider,
+		logHandler:   handler,
+		logger:       logger.With("ID", versionID),
 	}, nil
 }
 
-func (ver *ExecutableUnit) String() string {
+func (exe *ExecutableUnit) String() string {
 	return fmt.Sprintf("ExecutableUnit{ID: %s, CreatedAt: %s, Compiler: %s, Loader: %s}",
-		ver.ID, ver.CreatedAt, ver.Compiler, ver.Loader)
+		exe.ID, exe.CreatedAt, exe.Compiler, exe.ScriptLoader)
 }
 
 // GetID returns the unique identifier (version number, or name) for this script version.
-func (ver *ExecutableUnit) GetID() string {
-	return ver.ID
+func (exe *ExecutableUnit) GetID() string {
+	return exe.ID
 }
 
 // GetContent returns the validated & compiled script content as ExecutableContent
-func (ver *ExecutableUnit) GetContent() ExecutableContent {
-	return ver.Content
+func (exe *ExecutableUnit) GetContent() ExecutableContent {
+	return exe.Content
 }
 
 // CreatedAt returns the timestamp when the version was created.
-func (ver *ExecutableUnit) GetCreatedAt() time.Time {
-	return ver.CreatedAt
+func (exe *ExecutableUnit) GetCreatedAt() time.Time {
+	return exe.CreatedAt
 }
 
 // GetMachineType returns the machine type this script is intended to run on.
-func (ver *ExecutableUnit) GetMachineType() machineTypes.Type {
-	return ver.Content.GetMachineType()
+func (exe *ExecutableUnit) GetMachineType() machineTypes.Type {
+	return exe.Content.GetMachineType()
 }
 
 // GetCompiler returns the compiler used to validate the script and convert it into runnable bytecode.
-func (ver *ExecutableUnit) GetCompiler() Compiler {
-	return ver.Compiler
+func (exe *ExecutableUnit) GetCompiler() Compiler {
+	return exe.Compiler
 }
 
 // GetLoader returns the loader used to load the script.
-func (ver *ExecutableUnit) GetLoader() loader.Loader {
-	return ver.Loader
+func (exe *ExecutableUnit) GetLoader() loader.Loader {
+	return exe.ScriptLoader
 }
 
 // GetScriptData returns the script data associated with this version.
-func (ver *ExecutableUnit) GetScriptData() map[string]any {
-	if ver.ScriptData != nil {
-		return ver.ScriptData
-	}
-	return make(map[string]any)
+func (exe *ExecutableUnit) GetScriptData() map[string]any {
+	return exe.ScriptData
 }
 
-// BuildEvalContext builds and returns the a context object associated with this version. It packs
-// the script data and request data into the context, accessible with a call to ctx.Value(constants.EvalDataKey).
-func (ver *ExecutableUnit) BuildEvalContext(ctx context.Context, r *http.Request) context.Context {
-	evalData := make(map[string]any)
-	evalData[constants.ScriptData] = ver.GetScriptData()
-
-	rMap, err := helpers.RequestToMap(r)
-	if err != nil {
-		// Use the configured logger to log the error
-		if ver.logger != nil {
-			ver.logger.Error("Failed to convert request to map", "error", err)
-		} else {
-			// Fallback to default logger as a last resort
-			defaultLogger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-			defaultLogger.Error("Failed to convert request to map - logger was nil", "error", err)
-		}
-		rMap = make(map[string]any)
-	}
-	evalData[constants.Request] = rMap
-
-	//nolint:staticcheck // Temporarily ignoring the "string as context key" warning until type system is fixed
-	return context.WithValue(ctx, constants.EvalData, evalData)
+// GetDataProvider returns the data provider for this executable unit.
+func (exe *ExecutableUnit) GetDataProvider() data.Provider {
+	return exe.DataProvider
 }

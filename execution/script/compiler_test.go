@@ -33,7 +33,7 @@ func (m *mockScriptReaderCloser) Read(p []byte) (n int, err error) {
 }
 
 func (m *mockScriptReaderCloser) Close() error {
-	args := m.Mock.Called()
+	args := m.Called()
 	return args.Error(0)
 }
 

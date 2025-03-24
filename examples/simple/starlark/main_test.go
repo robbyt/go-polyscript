@@ -1,4 +1,4 @@
-package starlark
+package main
 
 import (
 	"log/slog"
