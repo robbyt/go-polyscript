@@ -51,6 +51,41 @@ func (be *BytecodeEvaluator) String() string {
 	return "starlark.BytecodeEvaluator"
 }
 
+// convertToStarlarkFormat converts a Go map into Starlark StringDict format.
+// It wraps the input data in a "ctx" object that will be accessible within the script.
+func (be *BytecodeEvaluator) convertToStarlarkFormat(inputData map[string]any) (starlarkLib.StringDict, error) {
+	// Start with the ctx dict
+	sDict := make(starlarkLib.StringDict, 1)
+
+	// Create a Starlark dict for the ctx global variable
+	ctxDict := starlarkLib.NewDict(len(inputData))
+
+	// Convert each input data key-value pair and add to the ctxDict
+	errz := make([]error, 0, len(inputData))
+	for k, v := range inputData {
+		starlarkVal, err := convertToStarlarkValue(v)
+		if err != nil {
+			// Collect errors but continue processing
+			errz = append(errz, fmt.Errorf("failed to convert input value for key %q: %w", k, err))
+			continue
+		}
+		if err := ctxDict.SetKey(starlarkLib.String(k), starlarkVal); err != nil {
+			// Collect errors but continue processing
+			errz = append(errz, fmt.Errorf("failed to set ctx dict key %q: %w", k, err))
+			continue
+		}
+	}
+
+	// If we had errors, return the first one
+	if len(errz) > 0 {
+		return nil, errz[0]
+	}
+
+	// Set the ctx global variable to the dictionary
+	sDict[constants.Ctx] = ctxDict
+	return sDict, nil
+}
+
 // loadInputData retrieves input data using the data provider in the executable unit.
 // Returns a map that will be used as input for the Starlark VM.
 func (be *BytecodeEvaluator) loadInputData(ctx context.Context) (map[string]any, error) {
@@ -176,7 +211,7 @@ func (be *BytecodeEvaluator) Eval(ctx context.Context) (engine.EvaluatorResponse
 	}
 
 	// 2. Convert input data to Starlark values
-	globals, err := convertToStringDict(inputData)
+	globals, err := be.convertToStarlarkFormat(inputData)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert input data: %w", err)
 	}

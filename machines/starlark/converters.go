@@ -1,13 +1,10 @@
 package starlark
 
 import (
-	"errors"
 	"fmt"
 	"net/url"
 
 	starlarkLib "go.starlark.net/starlark"
-
-	"github.com/robbyt/go-polyscript/execution/constants"
 )
 
 // convertStarlarkValueToInterface converts a Starlark value to a Go any value
@@ -66,41 +63,6 @@ func convertStarlarkValueToInterface(v starlarkLib.Value) (any, error) {
 	default:
 		return nil, fmt.Errorf("unsupported Starlark type %T", v)
 	}
-}
-
-// convertToStringDict handles conversion of Go values to the Starlark StringDict format.
-func convertToStringDict(inputData map[string]any) (starlarkLib.StringDict, error) {
-	// Start with the outter container, the ctx dict
-	sDict := make(starlarkLib.StringDict, 1)
-
-	// Create an inner container, containing all the values from inputData
-	ctxDict := starlarkLib.NewDict(len(inputData))
-
-	// Convert each input data key-value pair and add to the ctxDict
-	errz := make([]error, 0, len(inputData))
-	for k, v := range inputData {
-		starlarkVal, err := convertToStarlarkValue(v)
-		if err != nil {
-			// Collect errors but continue processing
-			errz = append(errz, fmt.Errorf("failed to convert input value for key %q: %w", k, err))
-			continue
-		}
-		if err := ctxDict.SetKey(starlarkLib.String(k), starlarkVal); err != nil {
-			// Collect errors but continue processing
-			errz = append(errz, fmt.Errorf("failed to set ctx dict key %q: %w", k, err))
-			continue
-		}
-	}
-
-	// If there were any errors, return them
-	if len(errz) > 0 {
-		err := errors.Join(errz...)
-		return nil, fmt.Errorf("failed to convert input data: %w", err)
-	}
-
-	// add that inner container to the outer container, and return
-	sDict[constants.Ctx] = ctxDict
-	return sDict, nil
 }
 
 func convertToStarlarkValue(v any) (starlarkLib.Value, error) {

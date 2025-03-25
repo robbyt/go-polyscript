@@ -39,6 +39,14 @@ func (be *BytecodeEvaluator) String() string {
 	return "extism.BytecodeEvaluator"
 }
 
+// convertToExtismFormat converts a Go map into JSON format for the Extism VM.
+func (be *BytecodeEvaluator) convertToExtismFormat(inputData map[string]any) ([]byte, error) {
+	if len(inputData) == 0 {
+		return nil, nil
+	}
+	return json.Marshal(inputData)
+}
+
 func (be *BytecodeEvaluator) getPluginInstanceConfig() extismSDK.PluginInstanceConfig {
 	// Create base config if none provided
 	moduleConfig := wazero.NewModuleConfig()
@@ -194,7 +202,7 @@ func (be *BytecodeEvaluator) Eval(ctx context.Context) (engine.EvaluatorResponse
 	}
 
 	// 2. Convert input data to JSON for passing into the WASM VM
-	inputJSON, err := marshalInputData(inputData)
+	inputJSON, err := be.convertToExtismFormat(inputData)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal input data: %w", err)
 	}

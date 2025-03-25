@@ -378,8 +378,8 @@ func TestEval(t *testing.T) {
 	})
 }
 
-// TestConvertInputData tests the convertInputData method
-func TestConvertInputData(t *testing.T) {
+// TestLoadInputData tests the loadInputData method
+func TestLoadInputData(t *testing.T) {
 	t.Parallel()
 	handler := slog.NewTextHandler(os.Stderr, nil)
 
@@ -392,10 +392,11 @@ func TestConvertInputData(t *testing.T) {
 		}
 
 		ctx := context.Background()
-		options, err := evaluator.convertInputData(ctx)
+		data, err := evaluator.loadInputData(ctx)
 
 		require.NoError(t, err)
-		require.Len(t, options, 1)
+		require.NotNil(t, data)
+		require.Empty(t, data)
 	})
 
 	t.Run("with provider error", func(t *testing.T) {
@@ -417,11 +418,11 @@ func TestConvertInputData(t *testing.T) {
 		}
 
 		ctx := context.Background()
-		options, err := evaluator.convertInputData(ctx)
+		data, err := evaluator.loadInputData(ctx)
 
 		require.Error(t, err)
 		require.Equal(t, expectedErr, err)
-		require.Empty(t, options)
+		require.Nil(t, data)
 		mockProvider.AssertExpectations(t)
 	})
 
@@ -444,12 +445,33 @@ func TestConvertInputData(t *testing.T) {
 		}
 
 		ctx := context.Background()
-		options, err := evaluator.convertInputData(ctx)
+		data, err := evaluator.loadInputData(ctx)
 
 		require.NoError(t, err)
-		require.Len(t, options, 1)
+		require.Empty(t, data)
 		mockProvider.AssertExpectations(t)
 	})
+}
+
+// TestConvertToRisorOptions tests the convertToRisorOptions method
+func TestConvertToRisorOptions(t *testing.T) {
+	t.Parallel()
+	handler := slog.NewTextHandler(os.Stderr, nil)
+
+	evaluator := &BytecodeEvaluator{
+		ctxKey:     constants.Ctx,
+		logHandler: handler,
+		logger:     slog.New(handler),
+	}
+
+	// Test with empty data
+	options := evaluator.convertToRisorOptions(map[string]any{})
+	require.Len(t, options, 1)
+
+	// Test with actual data
+	testData := map[string]any{"foo": "bar"}
+	options = evaluator.convertToRisorOptions(testData)
+	require.Len(t, options, 1)
 }
 
 // TestGetMachineType tests the GetMachineType method

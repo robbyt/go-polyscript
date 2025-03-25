@@ -165,7 +165,7 @@ func TestBytecodeEvaluatorInvalidInputs(t *testing.T) {
 	}
 }
 
-func TestMarshalInputData(t *testing.T) {
+func TestConvertToExtismFormat(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -221,7 +221,12 @@ func TestMarshalInputData(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			result, err := marshalInputData(tt.input)
+			// Create a BytecodeEvaluator
+			evaluator := &BytecodeEvaluator{
+				logger: slog.New(slog.NewTextHandler(os.Stderr, nil)),
+			}
+
+			result, err := evaluator.convertToExtismFormat(tt.input)
 
 			if tt.wantErr {
 				require.Error(t, err)

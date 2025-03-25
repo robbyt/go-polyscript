@@ -1,6 +1,8 @@
 package starlark
 
 import (
+	"io"
+	"log/slog"
 	"net/url"
 	"testing"
 
@@ -179,7 +181,7 @@ func TestConvertStarlarkValueToInterface(t *testing.T) {
 	})
 }
 
-func TestConvertInputData(t *testing.T) {
+func TestConvertToStarlarkFormat(t *testing.T) {
 	t.Run("basic types", func(t *testing.T) {
 		tests := []struct {
 			name     string
@@ -228,7 +230,10 @@ func TestConvertInputData(t *testing.T) {
 
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
-				result, err := convertToStringDict(tt.input)
+				evaluator := &BytecodeEvaluator{
+					logger: slog.New(slog.NewJSONHandler(io.Discard, nil)),
+				}
+				result, err := evaluator.convertToStarlarkFormat(tt.input)
 				if tt.wantErr {
 					require.Error(t, err)
 					return
@@ -323,7 +328,10 @@ func TestConvertInputData(t *testing.T) {
 
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
-				result, err := convertToStringDict(tt.input)
+				evaluator := &BytecodeEvaluator{
+					logger: slog.New(slog.NewJSONHandler(io.Discard, nil)),
+				}
+				result, err := evaluator.convertToStarlarkFormat(tt.input)
 				if tt.wantErr {
 					require.Error(t, err)
 					return
@@ -379,7 +387,10 @@ func TestConvertInputData(t *testing.T) {
 
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
-				_, err := convertToStringDict(tt.input)
+				evaluator := &BytecodeEvaluator{
+					logger: slog.New(slog.NewJSONHandler(io.Discard, nil)),
+				}
+				_, err := evaluator.convertToStarlarkFormat(tt.input)
 				require.Error(t, err)
 				require.Contains(t, err.Error(), "failed to convert input value")
 			})

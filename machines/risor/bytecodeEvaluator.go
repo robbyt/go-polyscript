@@ -101,22 +101,6 @@ func (be *BytecodeEvaluator) convertToRisorOptions(inputData map[string]any) []r
 	}
 }
 
-// convertInputData creates a slice of risorLib.Option objects from the input data.
-//
-// Note: This method will be refactored as part of the context harmonization plan.
-// The data retrieval will be moved to a loadInputData method, and this method
-// will focus solely on converting data to Risor VM format.
-func (be *BytecodeEvaluator) convertInputData(ctx context.Context) ([]risorLib.Option, error) {
-	// Use the standardized loadInputData method
-	inputData, err := be.loadInputData(ctx)
-	if err != nil {
-		return []risorLib.Option{}, err
-	}
-
-	// Convert to Risor options
-	return be.convertToRisorOptions(inputData), nil
-}
-
 // Eval evaluates the loaded bytecode and uses the provided EvalData to pass data in to the Risor VM execution
 func (be *BytecodeEvaluator) Eval(ctx context.Context) (engine.EvaluatorResponse, error) {
 	logger := be.logger.WithGroup("Eval")
