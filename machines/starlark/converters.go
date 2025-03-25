@@ -1,6 +1,7 @@
 package starlark
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
 
@@ -67,25 +68,37 @@ func convertStarlarkValueToInterface(v starlarkLib.Value) (any, error) {
 	}
 }
 
-func convertInputData(inputData map[string]any) (starlarkLib.StringDict, error) {
-	// Start with the ctx dict
+// convertToStringDict handles conversion of Go values to the Starlark StringDict format.
+func convertToStringDict(inputData map[string]any) (starlarkLib.StringDict, error) {
+	// Start with the outter container, the ctx dict
 	sDict := make(starlarkLib.StringDict, 1)
 
-	// Create a Starlark dict for the ctx global variable
+	// Create an inner container, containing all the values from inputData
 	ctxDict := starlarkLib.NewDict(len(inputData))
 
-	// Convert each input data key-value pair and add to the ctx dict
+	// Convert each input data key-value pair and add to the ctxDict
+	errz := make([]error, 0, len(inputData))
 	for k, v := range inputData {
 		starlarkVal, err := convertToStarlarkValue(v)
 		if err != nil {
-			return nil, fmt.Errorf("failed to convert input value for key %q: %w", k, err)
+			// Collect errors but continue processing
+			errz = append(errz, fmt.Errorf("failed to convert input value for key %q: %w", k, err))
+			continue
 		}
 		if err := ctxDict.SetKey(starlarkLib.String(k), starlarkVal); err != nil {
-			return nil, fmt.Errorf("failed to set ctx dict key %q: %w", k, err)
+			// Collect errors but continue processing
+			errz = append(errz, fmt.Errorf("failed to set ctx dict key %q: %w", k, err))
+			continue
 		}
 	}
 
-	// Set the ctx global variable to the dictionary
+	// If there were any errors, return them
+	if len(errz) > 0 {
+		err := errors.Join(errz...)
+		return nil, fmt.Errorf("failed to convert input data: %w", err)
+	}
+
+	// add that inner container to the outer container, and return
 	sDict[constants.Ctx] = ctxDict
 	return sDict, nil
 }

@@ -51,6 +51,33 @@ func (be *BytecodeEvaluator) String() string {
 	return "starlark.BytecodeEvaluator"
 }
 
+// loadInputData retrieves input data using the data provider in the executable unit.
+// Returns a map that will be used as input for the Starlark VM.
+func (be *BytecodeEvaluator) loadInputData(ctx context.Context) (map[string]any, error) {
+	logger := be.logger.WithGroup("loadInputData")
+
+	// If no executable unit or data provider, return empty map
+	if be.execUnit == nil || be.execUnit.GetDataProvider() == nil {
+		logger.WarnContext(ctx, "no data provider available, using empty data")
+		return make(map[string]any), nil
+	}
+
+	// Get input data from provider
+	inputData, err := be.execUnit.GetDataProvider().GetData(ctx)
+	if err != nil {
+		logger.ErrorContext(ctx, "failed to get input data from provider", "error", err)
+		return nil, err
+	}
+
+	if len(inputData) == 0 {
+		logger.WarnContext(ctx, "empty input data returned from provider")
+	} else {
+		logger.DebugContext(ctx, "input data loaded from provider", "inputData", inputData)
+	}
+
+	return inputData, nil
+}
+
 // prepareGlobals merges the universe and input globals into a single Starlark dictionary
 func (be *BytecodeEvaluator) prepareGlobals(ctx context.Context, inputGlobals starlarkLib.StringDict) starlarkLib.StringDict {
 	// Pre-allocate with exact capacity needed
@@ -119,11 +146,22 @@ func (be *BytecodeEvaluator) Eval(ctx context.Context) (engine.EvaluatorResponse
 		return nil, fmt.Errorf("executable unit is nil")
 	}
 
+	if be.execUnit.GetContent() == nil {
+		return nil, fmt.Errorf("content is nil")
+	}
+
 	// Get bytecode from executable unit
 	bytecode := be.execUnit.GetContent().GetByteCode()
 	if bytecode == nil {
 		return nil, fmt.Errorf("bytecode is nil")
 	}
+
+	// Get execution ID
+	exeID := be.execUnit.GetID()
+	if exeID == "" {
+		return nil, fmt.Errorf("execution ID is empty")
+	}
+	logger = logger.With("exeID", exeID)
 
 	// Type assert to Starlark program
 	prog, ok := bytecode.(*starlarkLib.Program)
@@ -131,36 +169,22 @@ func (be *BytecodeEvaluator) Eval(ctx context.Context) (engine.EvaluatorResponse
 		return nil, fmt.Errorf("invalid bytecode type: expected *starlark.Program, got %T", bytecode)
 	}
 
-	exeID := be.execUnit.GetID()
-	if exeID == "" {
-		return nil, fmt.Errorf("execution ID is empty")
-	}
-	logger = logger.With("exeID", exeID)
-
-	// Get input data from the provider in the executable unit
-	var inputData map[string]any
-	var err error
-
-	if be.execUnit.GetDataProvider() != nil {
-		inputData, err = be.execUnit.GetDataProvider().GetData(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get input data from provider: %w", err)
-		}
-	} else {
-		// If no provider is specified, use an empty map
-		inputData = make(map[string]any)
+	// 1. Get the raw input data
+	inputData, err := be.loadInputData(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get input data: %w", err)
 	}
 
-	// Convert input data to Starlark values
-	globals, err := convertInputData(inputData)
+	// 2. Convert input data to Starlark values
+	globals, err := convertToStringDict(inputData)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert input data: %w", err)
 	}
 
-	// Prepare globals by merging with universe
+	// 3. Prepare globals by merging with universe
 	mergedGlobals := be.prepareGlobals(ctx, globals)
 
-	// Execute the program
+	// 4. Execute the program
 	result, err := be.exec(ctx, prog, mergedGlobals)
 	if err != nil {
 		return nil, fmt.Errorf("execution error: %w", err)

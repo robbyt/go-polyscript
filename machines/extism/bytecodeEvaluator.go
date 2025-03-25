@@ -125,6 +125,10 @@ func (be *BytecodeEvaluator) exec(
 
 // loadInputData retrieves input data using the data provider in the executable unit.
 // Returns a map that will be used as input for the WASM module.
+//
+// Note: This method handles data retrieval using the GetData method of the provider.
+// It's part of the standard pattern used across all VMs as defined in the
+// context harmonization plan.
 func (be *BytecodeEvaluator) loadInputData(ctx context.Context) (map[string]any, error) {
 	logger := be.logger.WithGroup("loadInputData")
 
@@ -150,8 +154,6 @@ func (be *BytecodeEvaluator) loadInputData(ctx context.Context) (map[string]any,
 // Consider adding more integration tests to cover these paths.
 func (be *BytecodeEvaluator) Eval(ctx context.Context) (engine.EvaluatorResponse, error) {
 	logger := be.logger.WithGroup("Eval")
-
-	// Validate executable unit
 	if be.execUnit == nil {
 		return nil, fmt.Errorf("executable unit is nil")
 	}
@@ -166,6 +168,13 @@ func (be *BytecodeEvaluator) Eval(ctx context.Context) (engine.EvaluatorResponse
 		return nil, fmt.Errorf("bytecode is nil")
 	}
 
+	// Get execution ID
+	exeID := be.execUnit.GetID()
+	if exeID == "" {
+		return nil, fmt.Errorf("execution ID is empty")
+	}
+	logger = logger.With("exeID", exeID)
+
 	// Type assert to WASM module
 	wasmExe, ok := be.execUnit.GetContent().(*Executable)
 	if !ok {
@@ -178,26 +187,19 @@ func (be *BytecodeEvaluator) Eval(ctx context.Context) (engine.EvaluatorResponse
 		return nil, fmt.Errorf("compiled plugin is nil")
 	}
 
-	// Get execution ID
-	exeID := be.execUnit.GetID()
-	if exeID == "" {
-		return nil, fmt.Errorf("execution ID is empty")
-	}
-	logger = logger.With("exeID", exeID)
-
-	// Get input data from the provider
+	// 1. Get the raw input data
 	inputData, err := be.loadInputData(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get input data: %w", err)
 	}
 
-	// Marshal input data to JSON
+	// 2. Convert input data to JSON for passing into the WASM VM
 	inputJSON, err := marshalInputData(inputData)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal input data: %w", err)
 	}
 
-	// Execute WASM module
+	// 3. Execute in the VM
 	result, err := be.exec(
 		ctx, plugin,
 		wasmExe.GetEntryPoint(),
