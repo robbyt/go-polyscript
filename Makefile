@@ -18,9 +18,14 @@ help: Makefile
 test: go-generate
 	go test -race -cover $(PACKAGES)
 
-## bench: Run performance benchmarks
+## bench: Run performance benchmarks and create reports
 .PHONY: bench
 bench: go-generate
+	benchmarks/run.sh
+
+## bench-quick: Run benchmarks without creating reports
+.PHONY: bench-quick
+bench-quick: go-generate
 	go test -run=^$$ -bench=. -benchmem $(PACKAGES)
 
 ## lint: Run golangci-lint code quality checks
