@@ -1,0 +1,13 @@
+goos: darwin
+goarch: amd64
+pkg: github.com/robbyt/go-polyscript/engine
+cpu: Intel(R) Xeon(R) W-3275M CPU @ 2.50GHz
+BenchmarkEvaluationPatterns/SingleExecution-56         	    4023	    306759 ns/op	  460826 B/op	    1166 allocs/op
+BenchmarkEvaluationPatterns/CompileOnceRunMany-56      	    6962	    183575 ns/op	  373087 B/op	     432 allocs/op
+BenchmarkDataProviders/StaticProvider-56               	    6068	    185814 ns/op	  373121 B/op	     432 allocs/op
+BenchmarkDataProviders/ContextProvider-56              	    6506	    186396 ns/op	  372799 B/op	     431 allocs/op
+BenchmarkDataProviders/CompositeProvider-56            	    6135	    185636 ns/op	  373591 B/op	     438 allocs/op
+BenchmarkVMComparison/RisorVM-56                       	    6291	    183765 ns/op	  373152 B/op	     432 allocs/op
+BenchmarkVMComparison/StarlarkVM-56                    	  107295	     11719 ns/op	    7040 B/op	      65 allocs/op
+PASS
+ok  	github.com/robbyt/go-polyscript/engine	8.725s
