@@ -68,7 +68,13 @@ func RunRisorExample(handler slog.Handler) (map[string]any, error) {
 	}
 	result, err := evaluator.Eval(ctx)
 	if err != nil {
-		logger.Error("Script evaluation failed", "error", err, "evaluator", fmt.Sprintf("%T", evaluator))
+		logger.Error(
+			"Script evaluation failed",
+			"error",
+			err,
+			"evaluator",
+			fmt.Sprintf("%T", evaluator),
+		)
 		return nil, err
 	}
 

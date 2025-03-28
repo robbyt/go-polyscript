@@ -21,7 +21,10 @@ type EvaluatorWrapper struct {
 }
 
 // NewEvaluatorWrapper creates a new evaluator wrapper
-func NewEvaluatorWrapper(delegate engine.Evaluator, execUnit *script.ExecutableUnit) engine.EvaluatorWithPrep {
+func NewEvaluatorWrapper(
+	delegate engine.Evaluator,
+	execUnit *script.ExecutableUnit,
+) engine.EvaluatorWithPrep {
 	return &EvaluatorWrapper{
 		delegate: delegate,
 		execUnit: execUnit,
@@ -37,7 +40,10 @@ func (e *EvaluatorWrapper) Eval(ctx context.Context) (engine.EvaluatorResponse, 
 // PrepareContext implements the engine.EvalDataPreparer interface by enriching
 // the context with data for script evaluation. It delegates to the wrapped evaluator
 // if it implements EvalDataPreparer, otherwise uses the ExecutableUnit's DataProvider directly.
-func (e *EvaluatorWrapper) PrepareContext(ctx context.Context, data ...any) (context.Context, error) {
+func (e *EvaluatorWrapper) PrepareContext(
+	ctx context.Context,
+	data ...any,
+) (context.Context, error) {
 	// If the delegate implements EvalDataPreparer, use it
 	if preparer, ok := e.delegate.(engine.EvalDataPreparer); ok {
 		return preparer.PrepareContext(ctx, data...)
@@ -59,7 +65,9 @@ func (e *EvaluatorWrapper) GetExecutableUnit() *script.ExecutableUnit {
 
 // WithExecutableUnit returns a new evaluator wrapper with the specified ExecutableUnit
 // This is useful for creating evaluator variants with different data providers
-func (e *EvaluatorWrapper) WithExecutableUnit(execUnit *script.ExecutableUnit) engine.EvaluatorWithPrep {
+func (e *EvaluatorWrapper) WithExecutableUnit(
+	execUnit *script.ExecutableUnit,
+) engine.EvaluatorWithPrep {
 	return &EvaluatorWrapper{
 		delegate: e.delegate,
 		execUnit: execUnit,
@@ -151,7 +159,11 @@ func createEvaluator(cfg *options.Config) (engine.EvaluatorWithPrep, error) {
 	}
 
 	// Create compiler
-	compiler, err := machines.NewCompiler(cfg.GetHandler(), cfg.GetMachineType(), cfg.GetCompilerOptions())
+	compiler, err := machines.NewCompiler(
+		cfg.GetHandler(),
+		cfg.GetMachineType(),
+		cfg.GetCompilerOptions(),
+	)
 	if err != nil {
 		return nil, err
 	}

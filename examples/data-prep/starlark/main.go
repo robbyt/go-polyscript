@@ -67,7 +67,10 @@ func simulateUserData() map[string]any {
 
 // PrepareAndEvaluateInSteps demonstrates the complete workflow with separate
 // preparation steps, showing how different systems might handle different parts.
-func PrepareAndEvaluateInSteps(evaluator engine.EvaluatorWithPrep, logger *slog.Logger) (map[string]any, error) {
+func PrepareAndEvaluateInSteps(
+	evaluator engine.EvaluatorWithPrep,
+	logger *slog.Logger,
+) (map[string]any, error) {
 	// Create a base context
 	ctx := context.Background()
 

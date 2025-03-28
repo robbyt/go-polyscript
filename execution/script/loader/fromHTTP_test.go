@@ -131,6 +131,7 @@ func TestNewFromHTTPWithOptions(t *testing.T) {
 				return options.WithTimeout(60 * time.Second)
 			},
 			validateOption: func(t *testing.T, loader *FromHTTP) {
+				t.Helper()
 				require.Equal(t, 60*time.Second, loader.options.Timeout)
 			},
 		},
@@ -141,6 +142,7 @@ func TestNewFromHTTPWithOptions(t *testing.T) {
 				return options.WithBasicAuth("user", "pass")
 			},
 			validateOption: func(t *testing.T, loader *FromHTTP) {
+				t.Helper()
 				auth, ok := loader.options.Authenticator.(*httpauth.BasicAuth)
 				require.True(t, ok, "Expected BasicAuth authenticator")
 				require.Equal(t, "user", auth.Username)
@@ -154,6 +156,7 @@ func TestNewFromHTTPWithOptions(t *testing.T) {
 				return options.WithBearerAuth("token123")
 			},
 			validateOption: func(t *testing.T, loader *FromHTTP) {
+				t.Helper()
 				auth, ok := loader.options.Authenticator.(*httpauth.HeaderAuth)
 				require.True(t, ok, "Expected HeaderAuth authenticator")
 				require.Equal(t, "Bearer token123", auth.Headers["Authorization"])
@@ -168,6 +171,7 @@ func TestNewFromHTTPWithOptions(t *testing.T) {
 				return options
 			},
 			validateOption: func(t *testing.T, loader *FromHTTP) {
+				t.Helper()
 				require.Equal(t, "TestValue", loader.options.Headers["X-Custom"])
 				require.Equal(t, "Test-Agent", loader.options.Headers["User-Agent"])
 			},
@@ -232,6 +236,7 @@ func TestFromHTTPGetReader(t *testing.T) {
 				return newMockResponse(http.StatusOK, testScript)
 			},
 			requestValidator: func(t *testing.T, req *http.Request) {
+				t.Helper()
 				require.Equal(t, "https://example.com/script.js", req.URL.String())
 				require.Equal(t, http.MethodGet, req.Method)
 				require.Equal(t, "go-polyscript/http-loader", req.Header.Get("User-Agent"))
@@ -248,6 +253,7 @@ func TestFromHTTPGetReader(t *testing.T) {
 				return newMockResponse(http.StatusOK, testScript)
 			},
 			requestValidator: func(t *testing.T, req *http.Request) {
+				t.Helper()
 				require.Equal(t, "https://example.com/auth", req.URL.String())
 				username, password, ok := req.BasicAuth()
 				require.True(t, ok, "Expected Basic Auth to be set")
@@ -266,6 +272,7 @@ func TestFromHTTPGetReader(t *testing.T) {
 				return newMockResponse(http.StatusOK, testScript)
 			},
 			requestValidator: func(t *testing.T, req *http.Request) {
+				t.Helper()
 				require.Equal(t, "https://example.com/header-auth", req.URL.String())
 				require.Equal(t, "Bearer test-token", req.Header.Get("Authorization"))
 			},
@@ -283,6 +290,7 @@ func TestFromHTTPGetReader(t *testing.T) {
 				return newMockResponse(http.StatusOK, testScript)
 			},
 			requestValidator: func(t *testing.T, req *http.Request) {
+				t.Helper()
 				require.Equal(t, "Custom-Agent", req.Header.Get("User-Agent"))
 				require.Equal(t, "value", req.Header.Get("X-Custom"))
 			},
@@ -362,7 +370,7 @@ func TestFromHTTPGetReader(t *testing.T) {
 
 			require.NoError(t, err)
 			require.NotNil(t, reader)
-			defer reader.Close()
+			defer func() { require.NoError(t, reader.Close(), "Failed to close reader") }()
 
 			if tt.validateBody {
 				content, err := io.ReadAll(reader)
@@ -445,7 +453,7 @@ func TestFromHTTPGetReaderWithContext(t *testing.T) {
 
 			require.NoError(t, err)
 			require.NotNil(t, reader)
-			defer reader.Close()
+			defer func() { require.NoError(t, reader.Close(), "Failed to close reader") }()
 		})
 	}
 }

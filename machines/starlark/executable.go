@@ -1,9 +1,8 @@
 package starlark
 
 import (
-	starlarkLib "go.starlark.net/starlark"
-
 	machineTypes "github.com/robbyt/go-polyscript/machines/types"
+	starlarkLib "go.starlark.net/starlark"
 )
 
 // Executable represents a compiled Starlark script

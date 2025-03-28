@@ -5,11 +5,10 @@ import (
 	"testing"
 
 	extismSDK "github.com/extism/go-sdk"
+	machineTypes "github.com/robbyt/go-polyscript/machines/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-
-	machineTypes "github.com/robbyt/go-polyscript/machines/types"
 )
 
 // MockCompiledPlugin is a mock implementation of the compiledPlugin interface
@@ -17,7 +16,10 @@ type MockCompiledPlugin struct {
 	mock.Mock
 }
 
-func (m *MockCompiledPlugin) Instance(ctx context.Context, config extismSDK.PluginInstanceConfig) (pluginInstance, error) {
+func (m *MockCompiledPlugin) Instance(
+	ctx context.Context,
+	config extismSDK.PluginInstanceConfig,
+) (pluginInstance, error) {
 	args := m.Called(ctx, config)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -40,7 +42,11 @@ func (m *MockPluginInstance) Call(name string, data []byte) (uint32, []byte, err
 	return uint32(args.Int(0)), args.Get(1).([]byte), args.Error(2)
 }
 
-func (m *MockPluginInstance) CallWithContext(ctx context.Context, name string, data []byte) (uint32, []byte, error) {
+func (m *MockPluginInstance) CallWithContext(
+	ctx context.Context,
+	name string,
+	data []byte,
+) (uint32, []byte, error) {
 	args := m.Called(ctx, name, data)
 	return uint32(args.Int(0)), args.Get(1).([]byte), args.Error(2)
 }

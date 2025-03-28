@@ -2,7 +2,6 @@ package risor
 
 import (
 	risorCompiler "github.com/risor-io/risor/compiler"
-
 	machineTypes "github.com/robbyt/go-polyscript/machines/types"
 )
 

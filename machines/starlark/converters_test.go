@@ -4,10 +4,9 @@ import (
 	"net/url"
 	"testing"
 
+	"github.com/robbyt/go-polyscript/execution/constants"
 	"github.com/stretchr/testify/require"
 	starlarkLib "go.starlark.net/starlark"
-
-	"github.com/robbyt/go-polyscript/execution/constants"
 )
 
 func TestConvertStarlarkValueToInterface(t *testing.T) {
@@ -128,7 +127,10 @@ func TestConvertStarlarkValueToInterface(t *testing.T) {
 				name: "nested dict",
 				input: func() *starlarkLib.Dict {
 					inner := starlarkLib.NewDict(1)
-					require.NoError(t, inner.SetKey(starlarkLib.String("inner"), starlarkLib.MakeInt(1)))
+					require.NoError(
+						t,
+						inner.SetKey(starlarkLib.String("inner"), starlarkLib.MakeInt(1)),
+					)
 
 					outer := starlarkLib.NewDict(1)
 					require.NoError(t, outer.SetKey(starlarkLib.String("outer"), inner))
@@ -206,8 +208,14 @@ func TestConvertToStarlarkFormat(t *testing.T) {
 					d := starlarkLib.NewDict(4)
 					require.NoError(t, d.SetKey(starlarkLib.String("bool"), starlarkLib.Bool(true)))
 					require.NoError(t, d.SetKey(starlarkLib.String("int"), starlarkLib.MakeInt(42)))
-					require.NoError(t, d.SetKey(starlarkLib.String("float"), starlarkLib.Float(3.14)))
-					require.NoError(t, d.SetKey(starlarkLib.String("string"), starlarkLib.String("hello")))
+					require.NoError(
+						t,
+						d.SetKey(starlarkLib.String("float"), starlarkLib.Float(3.14)),
+					)
+					require.NoError(
+						t,
+						d.SetKey(starlarkLib.String("string"), starlarkLib.String("hello")),
+					)
 					return starlarkLib.StringDict{constants.Ctx: d}
 				}(),
 			},
@@ -272,7 +280,10 @@ func TestConvertToStarlarkFormat(t *testing.T) {
 				expected: func() starlarkLib.StringDict {
 					d := starlarkLib.NewDict(1)
 					u := &url.URL{Scheme: "https", Host: "example.com"}
-					require.NoError(t, d.SetKey(starlarkLib.String("url"), starlarkLib.String(u.String())))
+					require.NoError(
+						t,
+						d.SetKey(starlarkLib.String("url"), starlarkLib.String(u.String())),
+					)
 					return starlarkLib.StringDict{constants.Ctx: d}
 				}(),
 			},

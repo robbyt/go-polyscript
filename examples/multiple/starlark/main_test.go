@@ -29,7 +29,13 @@ func TestRunStarlarkExampleMultipleTimes(t *testing.T) {
 		expectedGreeting := "Hello, " + name + "!"
 
 		// Verify greeting
-		assert.Equal(t, expectedGreeting, result["greeting"], "Should have the correct greeting for %s", name)
+		assert.Equal(
+			t,
+			expectedGreeting,
+			result["greeting"],
+			"Should have the correct greeting for %s",
+			name,
+		)
 
 		// Verify length
 		length := result["length"]
@@ -43,7 +49,13 @@ func TestRunStarlarkExampleMultipleTimes(t *testing.T) {
 		if !ok {
 			lengthValueFloat, ok := length.(float64)
 			if ok {
-				assert.Equal(t, float64(expectedLength), lengthValueFloat, "Should have the correct length for %s", name)
+				assert.Equal(
+					t,
+					float64(expectedLength),
+					lengthValueFloat,
+					"Should have the correct length for %s",
+					name,
+				)
 			} else {
 				assert.Fail(t, "Length is neither int64 nor float64")
 			}

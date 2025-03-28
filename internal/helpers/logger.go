@@ -16,7 +16,11 @@ import (
 // Returns:
 //   - The configured handler
 //   - A logger created from the handler
-func SetupLogger(handler slog.Handler, vmName string, groupName string) (slog.Handler, *slog.Logger) {
+func SetupLogger(
+	handler slog.Handler,
+	vmName string,
+	groupName string,
+) (slog.Handler, *slog.Logger) {
 	if handler == nil {
 		defaultHandler := slog.NewTextHandler(os.Stdout, nil)
 		handler = defaultHandler.WithGroup(vmName)

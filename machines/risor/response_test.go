@@ -8,12 +8,11 @@ import (
 
 	rObj "github.com/risor-io/risor/object"
 	"github.com/risor-io/risor/op"
+	"github.com/robbyt/go-polyscript/engine"
+	"github.com/robbyt/go-polyscript/execution/data"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-
-	"github.com/robbyt/go-polyscript/engine"
-	"github.com/robbyt/go-polyscript/execution/data"
 )
 
 // RisorObjectMock is a mock implementation of the rObj.Object interface.

@@ -34,7 +34,11 @@ type Authenticator interface {
 //   - authFn: The function that performs the actual authentication
 //
 // Returns an error if the context is already canceled or if the authentication fails.
-func applyAuthWithContext(ctx context.Context, req *http.Request, authFn func(*http.Request) error) error {
+func applyAuthWithContext(
+	ctx context.Context,
+	req *http.Request,
+	authFn func(*http.Request) error,
+) error {
 	// Check if context is already cancelled
 	select {
 	case <-ctx.Done():

@@ -53,7 +53,10 @@ func (p *CompositeProvider) GetData(ctx context.Context) (map[string]any, error)
 //	contextProvider := NewContextProvider(constants.EvalData)
 //	composite := NewCompositeProvider(staticProvider, contextProvider)
 //	ctx, err := composite.AddDataToContext(ctx, req, userData)
-func (p *CompositeProvider) AddDataToContext(ctx context.Context, data ...any) (context.Context, error) {
+func (p *CompositeProvider) AddDataToContext(
+	ctx context.Context,
+	data ...any,
+) (context.Context, error) {
 	// Make a copy of the initial context
 	currentCtx := ctx
 
@@ -73,7 +76,6 @@ func (p *CompositeProvider) AddDataToContext(ctx context.Context, data ...any) (
 
 		// Pass data to this provider
 		newCtx, err := provider.AddDataToContext(currentCtx, data...)
-
 		if err != nil {
 			// If a StaticProvider or other provider that doesn't support adding data
 			// is in the chain, it will return an error. We'll collect these errors

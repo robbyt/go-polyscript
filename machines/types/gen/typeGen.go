@@ -92,7 +92,7 @@ func main() {
 			log.Fatal(err)
 		}
 
-		if err := os.WriteFile(target.OutputFile, formatted, 0644); err != nil {
+		if err := os.WriteFile(target.OutputFile, formatted, 0o644); err != nil {
 			log.Fatal(err)
 		}
 		fmt.Printf("Generated: %s\n", target.OutputFile)

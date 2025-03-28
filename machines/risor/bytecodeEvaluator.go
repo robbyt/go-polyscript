@@ -8,7 +8,6 @@ import (
 
 	risorLib "github.com/risor-io/risor"
 	risorCompiler "github.com/risor-io/risor/compiler"
-
 	"github.com/robbyt/go-polyscript/engine"
 	"github.com/robbyt/go-polyscript/execution/constants"
 	"github.com/robbyt/go-polyscript/execution/data"
@@ -29,7 +28,10 @@ type BytecodeEvaluator struct {
 }
 
 // NewBytecodeEvaluator creates a new BytecodeEvaluator object
-func NewBytecodeEvaluator(handler slog.Handler, execUnit *script.ExecutableUnit) *BytecodeEvaluator {
+func NewBytecodeEvaluator(
+	handler slog.Handler,
+	execUnit *script.ExecutableUnit,
+) *BytecodeEvaluator {
 	handler, logger := helpers.SetupLogger(handler, "risor", "BytecodeEvaluator")
 
 	return &BytecodeEvaluator{
@@ -115,7 +117,10 @@ func (be *BytecodeEvaluator) Eval(ctx context.Context) (engine.EvaluatorResponse
 	// 1. Type assert the bytecode into *risorCompiler.Code
 	risorByteCode, ok := bytecode.(*risorCompiler.Code)
 	if !ok {
-		return nil, fmt.Errorf("unable to type assert bytecode into *risorCompiler.Code for ID: %s", exeID)
+		return nil, fmt.Errorf(
+			"unable to type assert bytecode into *risorCompiler.Code for ID: %s",
+			exeID,
+		)
 	}
 
 	// 2. Get the raw input data
@@ -156,7 +161,10 @@ func (be *BytecodeEvaluator) Eval(ctx context.Context) (engine.EvaluatorResponse
 // PrepareContext implements the EvalDataPreparer interface for Risor scripts.
 // It enriches the provided context with data for script evaluation, using the
 // ExecutableUnit's DataProvider to store the data.
-func (be *BytecodeEvaluator) PrepareContext(ctx context.Context, d ...any) (context.Context, error) {
+func (be *BytecodeEvaluator) PrepareContext(
+	ctx context.Context,
+	d ...any,
+) (context.Context, error) {
 	logger := be.logger.WithGroup("PrepareContext")
 
 	// Use the shared helper function for context preparation

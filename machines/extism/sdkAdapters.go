@@ -30,7 +30,10 @@ func newCompiledPluginAdapter(plugin *extismSDK.CompiledPlugin) compiledPlugin {
 }
 
 // Instance creates a new instance of the plugin
-func (a *sdkCompiledPluginAdapter) Instance(ctx context.Context, config extismSDK.PluginInstanceConfig) (pluginInstance, error) {
+func (a *sdkCompiledPluginAdapter) Instance(
+	ctx context.Context,
+	config extismSDK.PluginInstanceConfig,
+) (pluginInstance, error) {
 	instance, err := a.plugin.Instance(ctx, config)
 	if err != nil {
 		return nil, err
@@ -49,7 +52,11 @@ type sdkPluginAdapter struct {
 }
 
 // CallWithContext calls a function in the plugin
-func (a *sdkPluginAdapter) CallWithContext(ctx context.Context, name string, data []byte) (uint32, []byte, error) {
+func (a *sdkPluginAdapter) CallWithContext(
+	ctx context.Context,
+	name string,
+	data []byte,
+) (uint32, []byte, error) {
 	return a.instance.CallWithContext(ctx, name, data)
 }
 

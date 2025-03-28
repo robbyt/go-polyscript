@@ -12,7 +12,6 @@ import (
 	"github.com/robbyt/go-polyscript/execution/data"
 	"github.com/robbyt/go-polyscript/execution/script"
 	"github.com/robbyt/go-polyscript/internal/helpers"
-
 	starlarkLib "go.starlark.net/starlark"
 )
 
@@ -29,7 +28,10 @@ type BytecodeEvaluator struct {
 }
 
 // NewBytecodeEvaluator creates a new BytecodeEvaluator object
-func NewBytecodeEvaluator(handler slog.Handler, execUnit *script.ExecutableUnit) *BytecodeEvaluator {
+func NewBytecodeEvaluator(
+	handler slog.Handler,
+	execUnit *script.ExecutableUnit,
+) *BytecodeEvaluator {
 	handler, logger := helpers.SetupLogger(handler, "starlark", "BytecodeEvaluator")
 
 	// Get universe with standard modules
@@ -77,7 +79,9 @@ func (be *BytecodeEvaluator) loadInputData(ctx context.Context) (map[string]any,
 }
 
 // prepareGlobals merges the universe and input globals into a single Starlark dictionary
-func (be *BytecodeEvaluator) prepareGlobals(inputGlobals starlarkLib.StringDict) starlarkLib.StringDict {
+func (be *BytecodeEvaluator) prepareGlobals(
+	inputGlobals starlarkLib.StringDict,
+) starlarkLib.StringDict {
 	// Pre-allocate with exact capacity needed
 	mergedGlobals := make(starlarkLib.StringDict, len(be.universe)+len(inputGlobals))
 
@@ -168,7 +172,10 @@ func (be *BytecodeEvaluator) Eval(ctx context.Context) (engine.EvaluatorResponse
 	// 1. Type assert to Starlark program
 	prog, ok := bytecode.(*starlarkLib.Program)
 	if !ok {
-		return nil, fmt.Errorf("invalid bytecode type: expected *starlark.Program, got %T", bytecode)
+		return nil, fmt.Errorf(
+			"invalid bytecode type: expected *starlark.Program, got %T",
+			bytecode,
+		)
 	}
 
 	// 2. Get the raw input data
@@ -220,7 +227,10 @@ func (be *BytecodeEvaluator) Eval(ctx context.Context) (engine.EvaluatorResponse
 // PrepareContext implements the EvalDataPreparer interface for Starlark scripts.
 // It enriches the provided context with data for script evaluation, using the
 // ExecutableUnit's DataProvider to store the data.
-func (be *BytecodeEvaluator) PrepareContext(ctx context.Context, d ...any) (context.Context, error) {
+func (be *BytecodeEvaluator) PrepareContext(
+	ctx context.Context,
+	d ...any,
+) (context.Context, error) {
 	logger := be.logger.WithGroup("PrepareContext")
 
 	// Use the shared helper function for context preparation

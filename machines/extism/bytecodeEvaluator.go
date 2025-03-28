@@ -8,12 +8,11 @@ import (
 	"log/slog"
 	"time"
 
+	extismSDK "github.com/extism/go-sdk"
 	"github.com/robbyt/go-polyscript/engine"
 	"github.com/robbyt/go-polyscript/execution/data"
 	"github.com/robbyt/go-polyscript/execution/script"
 	"github.com/robbyt/go-polyscript/internal/helpers"
-
-	extismSDK "github.com/extism/go-sdk"
 )
 
 // BytecodeEvaluator executes compiled WASM modules with provided runtime data
@@ -23,7 +22,10 @@ type BytecodeEvaluator struct {
 	logger     *slog.Logger
 }
 
-func NewBytecodeEvaluator(handler slog.Handler, execUnit *script.ExecutableUnit) *BytecodeEvaluator {
+func NewBytecodeEvaluator(
+	handler slog.Handler,
+	execUnit *script.ExecutableUnit,
+) *BytecodeEvaluator {
 	handler, logger := helpers.SetupLogger(handler, "extism", "BytecodeEvaluator")
 
 	return &BytecodeEvaluator{
@@ -120,7 +122,11 @@ func (be *BytecodeEvaluator) exec(
 	if err != nil {
 		return nil, fmt.Errorf("failed to create plugin instance: %w", err)
 	}
-	defer instance.Close(ctx)
+	defer func() {
+		if err := instance.Close(ctx); err != nil {
+			logger.Warn("Failed to close Extism plugin instance", "error", err)
+		}
+	}()
 
 	// Use the helper function for execution
 	result, execTime, err := execHelper(ctx, logger, instance, entryPoint, inputJSON)
@@ -161,7 +167,10 @@ func (be *BytecodeEvaluator) Eval(ctx context.Context) (engine.EvaluatorResponse
 	// 1. Type assert to WASM module, and get the compiled plugin object
 	wasmExe, ok := be.execUnit.GetContent().(*Executable)
 	if !ok {
-		return nil, fmt.Errorf("invalid executable type: expected *Executable, got %T", be.execUnit.GetContent())
+		return nil, fmt.Errorf(
+			"invalid executable type: expected *Executable, got %T",
+			be.execUnit.GetContent(),
+		)
 	}
 	plugin := wasmExe.GetExtismByteCode()
 	if plugin == nil {
@@ -200,7 +209,10 @@ func (be *BytecodeEvaluator) Eval(ctx context.Context) (engine.EvaluatorResponse
 // PrepareContext implements the EvalDataPreparer interface for Extism WebAssembly modules.
 // It enriches the provided context with data for script evaluation, using the
 // ExecutableUnit's DataProvider to store the data.
-func (be *BytecodeEvaluator) PrepareContext(ctx context.Context, d ...any) (context.Context, error) {
+func (be *BytecodeEvaluator) PrepareContext(
+	ctx context.Context,
+	d ...any,
+) (context.Context, error) {
 	logger := be.logger.WithGroup("PrepareContext")
 
 	// Use the shared helper function for context preparation

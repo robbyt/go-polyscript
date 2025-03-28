@@ -1,19 +1,34 @@
-version: "2"
+version: '2'
+
 run:
-  go: "1.24"
+  timeout: 5m
+  go: '1.24'
+
 linters:
-  default: none
+  default: standard
+  disable:
+    - godox         # Detects usage of FIXME, TODO and other keywords inside comments
+    - nilnil        # Checks that there is no simultaneous return of `nil` error and an invalid value
+    - noctx         # Finds sending http request without context.Context
+    - prealloc      # Temporarily disable until slice allocation issues are fixed
   enable:
-    - bodyclose
-    - contextcheck
+    - bodyclose     # Checks HTTP response body is closed
+    - contextcheck  # Check whether the function uses a non-inherited context
+    - dupl          # Find duplicate code
+    - dupword       # Find duplicate words in comments and strings
     - errcheck
-    - errorlint
-    - govet
-    - ineffassign
-    - misspell
-    - staticcheck
-    - unused
-    - whitespace
+    - errorlint     # Check error handling
+    - whitespace    # Check for unnecessary whitespace
+    - misspell      # Find commonly misspelled English words
+    - unconvert     # Remove unnecessary type conversions
+    - reassign      # Checks that package variables are not reassigned
+    - tagalign      # Check that struct tags are well aligned
+    - nilerr        # Finds code that returns nil even if it checks that the error is not nil
+    - thelper       # Detects test helpers which should start with t.Helper()
+    - govet         # Examines Go source code and reports suspicious constructs
+    - ineffassign   # Detects when assignments to existing variables are not used
+    - staticcheck   # Staticcheck is a go linter
+    - unused        # Checks for unused code
   settings:
     errcheck:
       check-blank: true
@@ -25,57 +40,15 @@ linters:
       errorf: true
       asserts: true
       comparison: true
-    govet:
-      enable:
-        - assign
-        - atomic
-        - bools
-        - buildtag
-        - copylocks
-        - httpresponse
-        - loopclosure
-        - lostcancel
-        - nilfunc
-        - stdmethods
-        - structtag
-        - tests
-        - unmarshal
-        - unreachable
-        - unusedresult
-      enable-all: false
-    staticcheck:
-      checks:
-        - all
-    wrapcheck:
-      ignore-sigs:
-        - .Errorf(
-        - errors.New(
-        - errors.Unwrap
-  exclusions:
-    generated: lax
-    presets:
-      - comments
-      - common-false-positives
-      - legacy
-      - std-error-handling
-    paths:
-      - third_party$
-      - builtin$
-      - examples$
+      
+formatters:
+  enable:
+    - gci           # Control Go package import order
+    - gofmt         # Format Go source code
+    - gofumpt       # Stricter Go formatting
+    - goimports     # Check and format imports
+    - golines       # Formats long lines
+
 issues:
   max-issues-per-linter: 20
   max-same-issues: 5
-formatters:
-  enable:
-    - gofmt
-    - goimports
-  settings:
-    goimports:
-      local-prefixes:
-        - github.com/robbyt/go-supervisor
-  exclusions:
-    generated: lax
-    paths:
-      - third_party$
-      - builtin$
-      - examples$

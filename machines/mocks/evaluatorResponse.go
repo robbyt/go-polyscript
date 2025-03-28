@@ -1,9 +1,8 @@
 package mocks
 
 import (
-	"github.com/stretchr/testify/mock"
-
 	"github.com/robbyt/go-polyscript/execution/data"
+	"github.com/stretchr/testify/mock"
 )
 
 // EvaluatorResponse is a mock implementation of the cpu.EvaluatorResponse interface.

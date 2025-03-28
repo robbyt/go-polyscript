@@ -12,7 +12,11 @@ import (
 func TestNewHTTPRequestWrapper(t *testing.T) {
 	t.Run("with body", func(t *testing.T) {
 		body := "test body"
-		req, err := http.NewRequest(http.MethodPost, "http://localhost:8080/test?query=1", bytes.NewBufferString(body))
+		req, err := http.NewRequest(
+			http.MethodPost,
+			"http://localhost:8080/test?query=1",
+			bytes.NewBufferString(body),
+		)
 		require.NoError(t, err)
 
 		req.Header.Set("Content-Type", "application/json")
@@ -58,7 +62,11 @@ func TestNewHTTPRequestWrapper(t *testing.T) {
 	})
 
 	t.Run("with query parameters", func(t *testing.T) {
-		req, err := http.NewRequest(http.MethodGet, "http://localhost:8080/test?param1=value1&param2=value2", nil)
+		req, err := http.NewRequest(
+			http.MethodGet,
+			"http://localhost:8080/test?param1=value1&param2=value2",
+			nil,
+		)
 		require.NoError(t, err)
 
 		reqStruct, err := newHTTPRequestWrapper(req)
@@ -66,7 +74,11 @@ func TestNewHTTPRequestWrapper(t *testing.T) {
 		require.NotNil(t, reqStruct)
 
 		require.Equal(t, http.MethodGet, reqStruct.Method)
-		require.Equal(t, "http://localhost:8080/test?param1=value1&param2=value2", reqStruct.URL.String())
+		require.Equal(
+			t,
+			"http://localhost:8080/test?param1=value1&param2=value2",
+			reqStruct.URL.String(),
+		)
 		require.Equal(t, "HTTP/1.1", reqStruct.Proto)
 		require.Equal(t, int64(0), reqStruct.ContentLength)
 		require.Equal(t, "localhost:8080", reqStruct.Host)
@@ -91,7 +103,11 @@ func TestNewHTTPRequestWrapper(t *testing.T) {
 func TestRequestToMap(t *testing.T) {
 	t.Run("with body", func(t *testing.T) {
 		body := "test body"
-		req, err := http.NewRequest(http.MethodPost, "http://localhost:8080/test?query=1", bytes.NewBufferString(body))
+		req, err := http.NewRequest(
+			http.MethodPost,
+			"http://localhost:8080/test?query=1",
+			bytes.NewBufferString(body),
+		)
 		require.NoError(t, err)
 
 		req.Header.Set("Content-Type", "application/json")
@@ -137,7 +153,11 @@ func TestRequestToMap(t *testing.T) {
 	})
 
 	t.Run("with query parameters", func(t *testing.T) {
-		req, err := http.NewRequest(http.MethodGet, "http://localhost:8080/test?param1=value1&param2=value2", nil)
+		req, err := http.NewRequest(
+			http.MethodGet,
+			"http://localhost:8080/test?param1=value1&param2=value2",
+			nil,
+		)
 		require.NoError(t, err)
 
 		result, err := RequestToMap(req)
@@ -145,7 +165,11 @@ func TestRequestToMap(t *testing.T) {
 		require.NotNil(t, result)
 
 		require.Equal(t, http.MethodGet, result["Method"])
-		require.Equal(t, "http://localhost:8080/test?param1=value1&param2=value2", result["URL_String"])
+		require.Equal(
+			t,
+			"http://localhost:8080/test?param1=value1&param2=value2",
+			result["URL_String"],
+		)
 		require.Equal(t, "HTTP/1.1", result["Proto"])
 		require.Equal(t, int64(0), result["ContentLength"])
 		require.Equal(t, "localhost:8080", result["Host"])

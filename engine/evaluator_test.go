@@ -8,14 +8,13 @@ import (
 	"os"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-
 	"github.com/robbyt/go-polyscript"
 	"github.com/robbyt/go-polyscript/execution/constants"
 	"github.com/robbyt/go-polyscript/execution/data"
 	"github.com/robbyt/go-polyscript/machines/risor"
 	"github.com/robbyt/go-polyscript/options"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestEvalDataPreparerInterface(t *testing.T) {
@@ -70,7 +69,12 @@ method + " " + greeting
 	require.NotNil(t, result)
 
 	// Verify result
-	assert.Equal(t, "GET Hello, World!", fmt.Sprintf("%v", result.Interface()), "Script result should match expected")
+	assert.Equal(
+		t,
+		"GET Hello, World!",
+		fmt.Sprintf("%v", result.Interface()),
+		"Script result should match expected",
+	)
 }
 
 func TestEvaluatorWithPrepErrors(t *testing.T) {
@@ -92,7 +96,12 @@ func TestEvaluatorWithPrepErrors(t *testing.T) {
 
 	// Should return error about StaticProvider not supporting runtime data changes
 	assert.Error(t, err, "Should return error for static provider")
-	assert.Contains(t, err.Error(), "StaticProvider doesn't support adding data", "Error should mention static provider limitation")
+	assert.Contains(
+		t,
+		err.Error(),
+		"StaticProvider doesn't support adding data",
+		"Error should mention static provider limitation",
+	)
 
 	// Test with evaluator that has a ContextProvider
 	contextProvider := data.NewContextProvider(constants.EvalData)
@@ -108,7 +117,12 @@ func TestEvaluatorWithPrepErrors(t *testing.T) {
 
 	// Should return error about unsupported data type, but still return the context
 	assert.Error(t, err, "Should return error for unsupported data type")
-	assert.Contains(t, err.Error(), "unsupported data type", "Error should mention unsupported data type")
+	assert.Contains(
+		t,
+		err.Error(),
+		"unsupported data type",
+		"Error should mention unsupported data type",
+	)
 
 	// The context should still be usable
 	assert.NotNil(t, enrichedCtx, "Should still return a context even with error")

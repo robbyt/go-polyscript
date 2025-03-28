@@ -109,7 +109,7 @@ func TestFromExtismFile(t *testing.T) {
 	// wasmPath := "/absolute/path/to/examples/extism/main.wasm"
 
 	// // Create a logger handler
-	// handler := slog.NewTextHandler(os.Stdout, nil)
+	// := slog.NewTextHandler(os.Stdout, nil)
 
 	// // Create an evaluator with file loader
 	// evaluator, err := polyscript.FromExtismFile(wasmPath,

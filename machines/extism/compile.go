@@ -44,7 +44,11 @@ func compile(ctx context.Context, wasmBytes []byte, opts *compileOptions) (compi
 }
 
 // CompileBase64 creates a compiled Extism plugin from base64-encoded WASM content
-func CompileBase64(ctx context.Context, scriptContent string, opts *compileOptions) (compiledPlugin, error) {
+func CompileBase64(
+	ctx context.Context,
+	scriptContent string,
+	opts *compileOptions,
+) (compiledPlugin, error) {
 	// Decode base64 WASM bytes
 	wasmBytes, err := base64.StdEncoding.DecodeString(scriptContent)
 	if err != nil {
@@ -55,6 +59,10 @@ func CompileBase64(ctx context.Context, scriptContent string, opts *compileOptio
 }
 
 // CompileBytes creates a compiled Extism plugin from raw WASM bytes
-func CompileBytes(ctx context.Context, wasmBytes []byte, opts *compileOptions) (compiledPlugin, error) {
+func CompileBytes(
+	ctx context.Context,
+	wasmBytes []byte,
+	opts *compileOptions,
+) (compiledPlugin, error) {
 	return compile(ctx, wasmBytes, opts)
 }
