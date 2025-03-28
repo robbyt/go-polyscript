@@ -77,7 +77,7 @@ func TestFromString_GetReader(t *testing.T) {
 		require.NoError(t, err)
 
 		t.Cleanup(func() {
-			reader.Close()
+			require.NoError(t, reader.Close(), "Failed to close reader")
 		})
 
 		got, err := io.ReadAll(reader)

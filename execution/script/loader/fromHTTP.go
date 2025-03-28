@@ -15,6 +15,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"time"
@@ -228,7 +229,9 @@ func (l *FromHTTP) GetReaderWithContext(ctx context.Context) (io.ReadCloser, err
 	}
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		resp.Body.Close()
+		if err := resp.Body.Close(); err != nil {
+			slog.Default().Debug("Failed to close response body", "error", err)
+		}
 		return nil, fmt.Errorf(
 			"%w: HTTP %d - %s",
 			ErrScriptNotAvailable,
@@ -257,7 +260,11 @@ func (l *FromHTTP) String() string {
 		if err != nil {
 			return noChkSum
 		}
-		defer reader.Close()
+		defer func() {
+			if err := reader.Close(); err != nil {
+				slog.Default().Debug("Failed to close reader in String() method", "error", err)
+			}
+		}()
 
 		chksum, err = helpers.SHA256Reader(reader)
 		if err != nil {

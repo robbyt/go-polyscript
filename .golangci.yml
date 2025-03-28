@@ -7,7 +7,6 @@ run:
 linters:
   default: standard
   disable:
-    - errcheck      # Temporarily disable until specific error checks are fixed
     - godox         # Detects usage of FIXME, TODO and other keywords inside comments
     - nilnil        # Checks that there is no simultaneous return of `nil` error and an invalid value
     - noctx         # Finds sending http request without context.Context
@@ -17,6 +16,7 @@ linters:
     - contextcheck  # Check whether the function uses a non-inherited context
     - dupl          # Find duplicate code
     - dupword       # Find duplicate words in comments and strings
+    - errcheck
     - errorlint     # Check error handling
     - whitespace    # Check for unnecessary whitespace
     - misspell      # Find commonly misspelled English words
@@ -29,7 +29,18 @@ linters:
     - ineffassign   # Detects when assignments to existing variables are not used
     - staticcheck   # Staticcheck is a go linter
     - unused        # Checks for unused code
-
+  settings:
+    errcheck:
+      check-blank: true
+      exclude-functions:
+        - (*github.com/stretchr/testify/mock.Mock).Get
+        - (net.Listener).Addr
+        - (sync/atomic.Value).Load
+    errorlint:
+      errorf: true
+      asserts: true
+      comparison: true
+      
 formatters:
   enable:
     - gci           # Control Go package import order

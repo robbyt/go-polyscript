@@ -94,7 +94,7 @@ func TestCompiler(t *testing.T) {
 			extismSDK.PluginInstanceConfig{},
 		)
 		require.NoError(t, err)
-		defer instance.Close(context.Background())
+		defer func() { require.NoError(t, instance.Close(context.Background()), "Failed to close instance") }()
 
 		assert.True(t, instance.FunctionExists("greet"), "Function 'greet' should exist")
 
@@ -155,7 +155,7 @@ func TestCompiler(t *testing.T) {
 			extismSDK.PluginInstanceConfig{},
 		)
 		require.NoError(t, err)
-		defer instance.Close(context.Background())
+		defer func() { require.NoError(t, instance.Close(context.Background()), "Failed to close instance") }()
 
 		assert.True(t, instance.FunctionExists("process_complex"),
 			"Function 'process_complex' should exist")

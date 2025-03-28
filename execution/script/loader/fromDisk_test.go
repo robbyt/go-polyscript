@@ -152,7 +152,7 @@ func TestFromDisk_GetReader(t *testing.T) {
 		// Ensure reader is closed after test
 		t.Cleanup(func() {
 			if reader != nil {
-				reader.Close()
+				require.NoError(t, reader.Close(), "Failed to close reader")
 			}
 		})
 

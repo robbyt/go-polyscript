@@ -41,14 +41,14 @@ func TestCompileSuccess(t *testing.T) {
 		plugin, err := CompileBytes(ctx, wasmBytes, nil)
 		require.NoError(t, err)
 		require.NotNil(t, plugin)
-		defer plugin.Close(ctx)
+		defer func() { require.NoError(t, plugin.Close(ctx), "Failed to close plugin") }()
 
 		// Create an instance to verify the plugin works
 		pluginInstance, err := plugin.Instance(ctx, extismSDK.PluginInstanceConfig{
 			ModuleConfig: wazero.NewModuleConfig(),
 		})
 		require.NoError(t, err)
-		defer pluginInstance.Close(ctx)
+		defer func() { require.NoError(t, pluginInstance.Close(ctx), "Failed to close plugin instance") }()
 
 		testFunctions(t, pluginInstance)
 	})
@@ -64,14 +64,14 @@ func TestCompileSuccess(t *testing.T) {
 		plugin, err := CompileBytes(ctx, wasmBytes, opts)
 		require.NoError(t, err)
 		require.NotNil(t, plugin)
-		defer plugin.Close(ctx)
+		defer func() { require.NoError(t, plugin.Close(ctx), "Failed to close plugin") }()
 
 		// Create an instance to verify the plugin works
 		pluginInstance, err := plugin.Instance(ctx, extismSDK.PluginInstanceConfig{
 			ModuleConfig: wazero.NewModuleConfig(),
 		})
 		require.NoError(t, err)
-		defer pluginInstance.Close(ctx)
+		defer func() { require.NoError(t, pluginInstance.Close(ctx), "Failed to close plugin instance") }()
 
 		testFunctions(t, pluginInstance)
 	})
@@ -82,14 +82,14 @@ func TestCompileSuccess(t *testing.T) {
 		plugin, err := CompileBase64(ctx, wasmBase64, nil)
 		require.NoError(t, err)
 		require.NotNil(t, plugin)
-		defer plugin.Close(ctx)
+		defer func() { require.NoError(t, plugin.Close(ctx), "Failed to close plugin") }()
 
 		// Create an instance to verify the plugin works
 		pluginInstance, err := plugin.Instance(ctx, extismSDK.PluginInstanceConfig{
 			ModuleConfig: wazero.NewModuleConfig(),
 		})
 		require.NoError(t, err)
-		defer pluginInstance.Close(ctx)
+		defer func() { require.NoError(t, pluginInstance.Close(ctx), "Failed to close plugin instance") }()
 
 		testFunctions(t, pluginInstance)
 	})
@@ -105,14 +105,14 @@ func TestCompileSuccess(t *testing.T) {
 		plugin, err := CompileBase64(ctx, wasmBase64, opts)
 		require.NoError(t, err)
 		require.NotNil(t, plugin)
-		defer plugin.Close(ctx)
+		defer func() { require.NoError(t, plugin.Close(ctx), "Failed to close plugin") }()
 
 		// Create an instance to verify the plugin works
 		pluginInstance, err := plugin.Instance(ctx, extismSDK.PluginInstanceConfig{
 			ModuleConfig: wazero.NewModuleConfig(),
 		})
 		require.NoError(t, err)
-		defer pluginInstance.Close(ctx)
+		defer func() { require.NoError(t, pluginInstance.Close(ctx), "Failed to close plugin instance") }()
 
 		testFunctions(t, pluginInstance)
 	})
@@ -285,14 +285,14 @@ func TestCompileWithHostFunctions(t *testing.T) {
 	plugin, err := CompileBytes(ctx, wasmBytes, opts)
 	require.NoError(t, err)
 	require.NotNil(t, plugin)
-	defer plugin.Close(ctx)
+	defer func() { require.NoError(t, plugin.Close(ctx), "Failed to close plugin") }()
 
 	// Create an instance
 	instance, err := plugin.Instance(ctx, extismSDK.PluginInstanceConfig{
 		ModuleConfig: wazero.NewModuleConfig(),
 	})
 	require.NoError(t, err)
-	defer instance.Close(ctx)
+	defer func() { require.NoError(t, instance.Close(ctx), "Failed to close instance") }()
 
 	assert.NotNil(t, instance)
 }

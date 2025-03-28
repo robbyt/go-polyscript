@@ -3,6 +3,7 @@ package loader
 import (
 	"fmt"
 	"io"
+	"log/slog"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -64,7 +65,11 @@ func (l *FromDisk) String() string {
 		if err != nil {
 			return noChkSum
 		}
-		defer reader.Close()
+		defer func() {
+			if err := reader.Close(); err != nil {
+				slog.Default().Debug("Failed to close reader in String() method", "error", err)
+			}
+		}()
 
 		chksum, err = helpers.SHA256Reader(reader)
 		if err != nil {

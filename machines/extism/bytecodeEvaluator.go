@@ -122,7 +122,11 @@ func (be *BytecodeEvaluator) exec(
 	if err != nil {
 		return nil, fmt.Errorf("failed to create plugin instance: %w", err)
 	}
-	defer instance.Close(ctx)
+	defer func() {
+		if err := instance.Close(ctx); err != nil {
+			logger.Warn("Failed to close Extism plugin instance", "error", err)
+		}
+	}()
 
 	// Use the helper function for execution
 	result, execTime, err := execHelper(ctx, logger, instance, entryPoint, inputJSON)

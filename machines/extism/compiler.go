@@ -98,7 +98,11 @@ func (c *Compiler) Compile(scriptReader io.ReadCloser) (script.ExecutableContent
 		logger.Error("Failed to create test instance", "error", err)
 		return nil, fmt.Errorf("%w: failed to create test instance: %w", ErrValidationFailed, err)
 	}
-	defer instance.Close(c.ctx)
+	defer func() {
+		if err := instance.Close(c.ctx); err != nil {
+			c.logger.Warn("Failed to close Extism plugin instance in compiler", "error", err)
+		}
+	}()
 
 	// Verify the entry point function exists
 	funcName := c.GetEntryPointName()

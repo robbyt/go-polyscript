@@ -370,7 +370,7 @@ func TestFromHTTPGetReader(t *testing.T) {
 
 			require.NoError(t, err)
 			require.NotNil(t, reader)
-			defer reader.Close()
+			defer func() { require.NoError(t, reader.Close(), "Failed to close reader") }()
 
 			if tt.validateBody {
 				content, err := io.ReadAll(reader)
@@ -453,7 +453,7 @@ func TestFromHTTPGetReaderWithContext(t *testing.T) {
 
 			require.NoError(t, err)
 			require.NotNil(t, reader)
-			defer reader.Close()
+			defer func() { require.NoError(t, reader.Close(), "Failed to close reader") }()
 		})
 	}
 }
