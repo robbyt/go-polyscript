@@ -36,7 +36,7 @@ lint: go-generate
 ## lint-fix: Run golangci-lint with auto-fix for common issues
 .PHONY: lint-fix
 lint-fix: go-generate
-	go fmt ./...
+	golangci-lint fmt
 	golangci-lint run --fix ./...
 
 ## go-generate: Run code generation for type wrappers
