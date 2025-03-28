@@ -12,157 +12,127 @@ import (
 func TestHeaderAuth(t *testing.T) {
 	t.Parallel()
 
-	tests := []struct {
-		name        string
-		factory     func() Authenticator
-		setup       func(t *testing.T) (*http.Request, context.Context, context.CancelFunc)
-		expectError bool
-		verifyReq   func(t *testing.T, req *http.Request)
-	}{
-		{
-			name: "Multiple custom headers",
-			factory: func() Authenticator {
-				return NewHeaderAuth(map[string]string{
-					"Authorization": "Bearer token123",
-					"X-API-Key":     "secret-key",
-					"X-Custom":      "value",
-				})
-			},
-			setup: func(t *testing.T) (*http.Request, context.Context, context.CancelFunc) {
-				req, err := http.NewRequest(http.MethodGet, "https://example.com", nil)
-				require.NoError(t, err)
-				return req, nil, nil
-			},
-			verifyReq: func(t *testing.T, req *http.Request) {
-				require.Equal(t, "Bearer token123", req.Header.Get("Authorization"))
-				require.Equal(t, "secret-key", req.Header.Get("X-API-Key"))
-				require.Equal(t, "value", req.Header.Get("X-Custom"))
-			},
-		},
-		{
-			name: "Empty headers map",
-			factory: func() Authenticator {
-				return NewHeaderAuth(map[string]string{})
-			},
-			setup: func(t *testing.T) (*http.Request, context.Context, context.CancelFunc) {
-				req, err := http.NewRequest(http.MethodGet, "https://example.com", nil)
-				require.NoError(t, err)
-				return req, nil, nil
-			},
-			verifyReq: func(t *testing.T, req *http.Request) {
-				require.Empty(t, req.Header.Get("Authorization"))
-			},
-		},
-		{
-			name: "Nil headers map",
-			factory: func() Authenticator {
-				return NewHeaderAuth(nil)
-			},
-			setup: func(t *testing.T) (*http.Request, context.Context, context.CancelFunc) {
-				req, err := http.NewRequest(http.MethodGet, "https://example.com", nil)
-				require.NoError(t, err)
-				return req, nil, nil
-			},
-			verifyReq: func(t *testing.T, req *http.Request) {
-				require.Empty(t, req.Header.Get("Authorization"))
-			},
-		},
-		{
-			name: "Bearer token helper",
-			factory: func() Authenticator {
-				return NewBearerAuth("my-test-token")
-			},
-			setup: func(t *testing.T) (*http.Request, context.Context, context.CancelFunc) {
-				req, err := http.NewRequest(http.MethodGet, "https://example.com", nil)
-				require.NoError(t, err)
-				return req, nil, nil
-			},
-			verifyReq: func(t *testing.T, req *http.Request) {
-				require.Equal(t, "Bearer my-test-token", req.Header.Get("Authorization"))
-			},
-		},
-		{
-			name: "With context",
-			factory: func() Authenticator {
-				return NewHeaderAuth(map[string]string{
-					"Authorization": "Bearer token123",
-				})
-			},
-			setup: func(t *testing.T) (*http.Request, context.Context, context.CancelFunc) {
-				req, err := http.NewRequest(http.MethodGet, "https://example.com", nil)
-				require.NoError(t, err)
-				ctx := context.Background()
-				return req, ctx, nil
-			},
-			verifyReq: func(t *testing.T, req *http.Request) {
-				require.Equal(t, "Bearer token123", req.Header.Get("Authorization"))
-			},
-		},
-		{
-			name: "With cancelled context",
-			factory: func() Authenticator {
-				return NewHeaderAuth(map[string]string{
-					"Authorization": "Bearer token123",
-				})
-			},
-			setup: func(t *testing.T) (*http.Request, context.Context, context.CancelFunc) {
-				req, err := http.NewRequest(http.MethodGet, "https://example.com", nil)
-				require.NoError(t, err)
-				ctx, cancel := context.WithCancel(context.Background())
-				cancel() // Cancel immediately
-				return req, ctx, nil
-			},
-			expectError: true,
-		},
-		{
-			name: "With timeout context",
-			factory: func() Authenticator {
-				return NewHeaderAuth(map[string]string{
-					"Authorization": "Bearer token123",
-				})
-			},
-			setup: func(t *testing.T) (*http.Request, context.Context, context.CancelFunc) {
-				req, err := http.NewRequest(http.MethodGet, "https://example.com", nil)
-				require.NoError(t, err)
-				ctx, cancel := context.WithTimeout(context.Background(), 1*time.Nanosecond)
-				time.Sleep(5 * time.Millisecond) // Ensure the timeout occurs
-				return req, ctx, cancel
-			},
-			expectError: true,
-		},
-	}
+	t.Run("Multiple custom headers", func(t *testing.T) {
+		t.Parallel()
 
-	for _, tt := range tests {
-		tt := tt // Capture range variable
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			auth := tt.factory()
-			require.Equal(t, "Header", auth.Name())
-
-			req, ctx, cancel := tt.setup(t)
-			if cancel != nil {
-				defer cancel()
-			}
-
-			var err error
-			if ctx != nil {
-				err = auth.AuthenticateWithContext(ctx, req)
-			} else {
-				err = auth.Authenticate(req)
-			}
-
-			if tt.expectError {
-				require.Error(t, err)
-				return
-			}
-
-			require.NoError(t, err)
-			if tt.verifyReq != nil {
-				tt.verifyReq(t, req)
-			}
+		auth := NewHeaderAuth(map[string]string{
+			"Authorization": "Bearer token123",
+			"X-API-Key":     "secret-key",
+			"X-Custom":      "value",
 		})
-	}
+		require.Equal(t, "Header", auth.Name())
+
+		req, err := http.NewRequest(http.MethodGet, "https://example.com", nil)
+		require.NoError(t, err)
+
+		err = auth.Authenticate(req)
+		require.NoError(t, err)
+
+		require.Equal(t, "Bearer token123", req.Header.Get("Authorization"))
+		require.Equal(t, "secret-key", req.Header.Get("X-API-Key"))
+		require.Equal(t, "value", req.Header.Get("X-Custom"))
+	})
+
+	t.Run("Empty headers map", func(t *testing.T) {
+		t.Parallel()
+
+		auth := NewHeaderAuth(map[string]string{})
+		require.Equal(t, "Header", auth.Name())
+
+		req, err := http.NewRequest(http.MethodGet, "https://example.com", nil)
+		require.NoError(t, err)
+
+		err = auth.Authenticate(req)
+		require.NoError(t, err)
+
+		require.Empty(t, req.Header.Get("Authorization"))
+	})
+
+	t.Run("Nil headers map", func(t *testing.T) {
+		t.Parallel()
+
+		auth := NewHeaderAuth(nil)
+		require.Equal(t, "Header", auth.Name())
+
+		req, err := http.NewRequest(http.MethodGet, "https://example.com", nil)
+		require.NoError(t, err)
+
+		err = auth.Authenticate(req)
+		require.NoError(t, err)
+
+		require.Empty(t, req.Header.Get("Authorization"))
+	})
+
+	t.Run("Bearer token helper", func(t *testing.T) {
+		t.Parallel()
+
+		auth := NewBearerAuth("my-test-token")
+		require.Equal(t, "Header", auth.Name())
+
+		req, err := http.NewRequest(http.MethodGet, "https://example.com", nil)
+		require.NoError(t, err)
+
+		err = auth.Authenticate(req)
+		require.NoError(t, err)
+
+		require.Equal(t, "Bearer my-test-token", req.Header.Get("Authorization"))
+	})
+
+	t.Run("With context", func(t *testing.T) {
+		t.Parallel()
+
+		auth := NewHeaderAuth(map[string]string{
+			"Authorization": "Bearer token123",
+		})
+		require.Equal(t, "Header", auth.Name())
+
+		req, err := http.NewRequest(http.MethodGet, "https://example.com", nil)
+		require.NoError(t, err)
+		ctx := context.Background()
+
+		err = auth.AuthenticateWithContext(ctx, req)
+		require.NoError(t, err)
+
+		require.Equal(t, "Bearer token123", req.Header.Get("Authorization"))
+	})
+
+	t.Run("With cancelled context", func(t *testing.T) {
+		t.Parallel()
+
+		auth := NewHeaderAuth(map[string]string{
+			"Authorization": "Bearer token123",
+		})
+		require.Equal(t, "Header", auth.Name())
+
+		req, err := http.NewRequest(http.MethodGet, "https://example.com", nil)
+		require.NoError(t, err)
+
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel() // Cancel immediately
+		defer cancel()
+
+		err = auth.AuthenticateWithContext(ctx, req)
+		require.Error(t, err)
+	})
+
+	t.Run("With timeout context", func(t *testing.T) {
+		t.Parallel()
+
+		auth := NewHeaderAuth(map[string]string{
+			"Authorization": "Bearer token123",
+		})
+		require.Equal(t, "Header", auth.Name())
+
+		req, err := http.NewRequest(http.MethodGet, "https://example.com", nil)
+		require.NoError(t, err)
+
+		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Nanosecond)
+		time.Sleep(5 * time.Millisecond) // Ensure the timeout occurs
+		defer cancel()
+
+		err = auth.AuthenticateWithContext(ctx, req)
+		require.Error(t, err)
+	})
 }
 
 // Test that maps.Clone is properly cloning the headers map

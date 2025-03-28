@@ -229,7 +229,12 @@ func (l *FromHTTP) GetReaderWithContext(ctx context.Context) (io.ReadCloser, err
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		resp.Body.Close()
-		return nil, fmt.Errorf("%w: HTTP %d - %s", ErrScriptNotAvailable, resp.StatusCode, resp.Status)
+		return nil, fmt.Errorf(
+			"%w: HTTP %d - %s",
+			ErrScriptNotAvailable,
+			resp.StatusCode,
+			resp.Status,
+		)
 	}
 
 	return resp.Body, nil

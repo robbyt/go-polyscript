@@ -12,119 +12,101 @@ import (
 func TestBasicAuth(t *testing.T) {
 	t.Parallel()
 
-	tests := []struct {
-		name        string
-		username    string
-		password    string
-		setup       func(t *testing.T) (*http.Request, context.Context, context.CancelFunc)
-		expectError bool
-		verifyReq   func(t *testing.T, req *http.Request)
-	}{
-		{
-			name:     "Valid credentials",
-			username: "testuser",
-			password: "testpass",
-			setup: func(t *testing.T) (*http.Request, context.Context, context.CancelFunc) {
-				req, err := http.NewRequest(http.MethodGet, "https://example.com", nil)
-				require.NoError(t, err)
-				return req, nil, nil
-			},
-			verifyReq: func(t *testing.T, req *http.Request) {
-				username, password, ok := req.BasicAuth()
-				require.True(t, ok, "Basic auth header should be present")
-				require.Equal(t, "testuser", username)
-				require.Equal(t, "testpass", password)
-			},
-		},
-		{
-			name:     "Empty username (no auth applied)",
-			username: "",
-			password: "testpass",
-			setup: func(t *testing.T) (*http.Request, context.Context, context.CancelFunc) {
-				req, err := http.NewRequest(http.MethodGet, "https://example.com", nil)
-				require.NoError(t, err)
-				return req, nil, nil
-			},
-			verifyReq: func(t *testing.T, req *http.Request) {
-				_, _, ok := req.BasicAuth()
-				require.False(t, ok, "Basic auth header should not be present")
-				require.Empty(t, req.Header.Get("Authorization"))
-			},
-		},
-		{
-			name:     "With context",
-			username: "testuser",
-			password: "testpass",
-			setup: func(t *testing.T) (*http.Request, context.Context, context.CancelFunc) {
-				req, err := http.NewRequest(http.MethodGet, "https://example.com", nil)
-				require.NoError(t, err)
-				ctx := context.Background()
-				return req, ctx, nil
-			},
-			verifyReq: func(t *testing.T, req *http.Request) {
-				username, password, ok := req.BasicAuth()
-				require.True(t, ok, "Basic auth header should be present")
-				require.Equal(t, "testuser", username)
-				require.Equal(t, "testpass", password)
-			},
-		},
-		{
-			name:     "With cancelled context",
-			username: "testuser",
-			password: "testpass",
-			setup: func(t *testing.T) (*http.Request, context.Context, context.CancelFunc) {
-				req, err := http.NewRequest(http.MethodGet, "https://example.com", nil)
-				require.NoError(t, err)
-				ctx, cancel := context.WithCancel(context.Background())
-				cancel() // Cancel immediately
-				return req, ctx, nil
-			},
-			expectError: true,
-		},
-		{
-			name:     "With timeout context",
-			username: "testuser",
-			password: "testpass",
-			setup: func(t *testing.T) (*http.Request, context.Context, context.CancelFunc) {
-				req, err := http.NewRequest(http.MethodGet, "https://example.com", nil)
-				require.NoError(t, err)
-				ctx, cancel := context.WithTimeout(context.Background(), 1*time.Nanosecond)
-				time.Sleep(5 * time.Millisecond) // Ensure the timeout occurs
-				return req, ctx, cancel
-			},
-			expectError: true,
-		},
-	}
+	t.Run("Valid credentials", func(t *testing.T) {
+		t.Parallel()
+		username := "testuser"
+		password := "testpass"
 
-	for _, tt := range tests {
-		tt := tt // Capture range variable
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
+		req, err := http.NewRequest(http.MethodGet, "https://example.com", nil)
+		require.NoError(t, err)
 
-			auth := NewBasicAuth(tt.username, tt.password)
-			require.Equal(t, "Basic", auth.Name())
+		auth := NewBasicAuth(username, password)
+		require.Equal(t, "Basic", auth.Name())
 
-			req, ctx, cancel := tt.setup(t)
-			if cancel != nil {
-				defer cancel()
-			}
+		err = auth.Authenticate(req)
+		require.NoError(t, err)
 
-			var err error
-			if ctx != nil {
-				err = auth.AuthenticateWithContext(ctx, req)
-			} else {
-				err = auth.Authenticate(req)
-			}
+		actualUsername, actualPassword, ok := req.BasicAuth()
+		require.True(t, ok, "Basic auth header should be present")
+		require.Equal(t, username, actualUsername)
+		require.Equal(t, password, actualPassword)
+	})
 
-			if tt.expectError {
-				require.Error(t, err)
-				return
-			}
+	t.Run("Empty username (no auth applied)", func(t *testing.T) {
+		t.Parallel()
+		username := ""
+		password := "testpass"
 
-			require.NoError(t, err)
-			if tt.verifyReq != nil {
-				tt.verifyReq(t, req)
-			}
-		})
-	}
+		req, err := http.NewRequest(http.MethodGet, "https://example.com", nil)
+		require.NoError(t, err)
+
+		auth := NewBasicAuth(username, password)
+		require.Equal(t, "Basic", auth.Name())
+
+		err = auth.Authenticate(req)
+		require.NoError(t, err)
+
+		_, _, ok := req.BasicAuth()
+		require.False(t, ok, "Basic auth header should not be present")
+		require.Empty(t, req.Header.Get("Authorization"))
+	})
+
+	t.Run("With context", func(t *testing.T) {
+		t.Parallel()
+		username := "testuser"
+		password := "testpass"
+
+		req, err := http.NewRequest(http.MethodGet, "https://example.com", nil)
+		require.NoError(t, err)
+		ctx := context.Background()
+
+		auth := NewBasicAuth(username, password)
+		require.Equal(t, "Basic", auth.Name())
+
+		err = auth.AuthenticateWithContext(ctx, req)
+		require.NoError(t, err)
+
+		actualUsername, actualPassword, ok := req.BasicAuth()
+		require.True(t, ok, "Basic auth header should be present")
+		require.Equal(t, username, actualUsername)
+		require.Equal(t, password, actualPassword)
+	})
+
+	t.Run("With cancelled context", func(t *testing.T) {
+		t.Parallel()
+		username := "testuser"
+		password := "testpass"
+
+		req, err := http.NewRequest(http.MethodGet, "https://example.com", nil)
+		require.NoError(t, err)
+
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel() // Cancel immediately
+		defer cancel()
+
+		auth := NewBasicAuth(username, password)
+		require.Equal(t, "Basic", auth.Name())
+
+		err = auth.AuthenticateWithContext(ctx, req)
+		require.Error(t, err)
+	})
+
+	t.Run("With timeout context", func(t *testing.T) {
+		t.Parallel()
+		username := "testuser"
+		password := "testpass"
+
+		req, err := http.NewRequest(http.MethodGet, "https://example.com", nil)
+		require.NoError(t, err)
+
+		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Nanosecond)
+		time.Sleep(5 * time.Millisecond) // Ensure the timeout occurs
+		defer cancel()
+
+		auth := NewBasicAuth(username, password)
+		require.Equal(t, "Basic", auth.Name())
+
+		err = auth.AuthenticateWithContext(ctx, req)
+		require.Error(t, err)
+	})
 }

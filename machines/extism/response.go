@@ -19,7 +19,12 @@ type execResult struct {
 	logger      *slog.Logger
 }
 
-func newEvalResult(handler slog.Handler, value any, execTime time.Duration, scriptExeID string) *execResult {
+func newEvalResult(
+	handler slog.Handler,
+	value any,
+	execTime time.Duration,
+	scriptExeID string,
+) *execResult {
 	if handler == nil {
 		defaultHandler := slog.NewTextHandler(os.Stdout, nil)
 		handler = defaultHandler.WithGroup("extism")

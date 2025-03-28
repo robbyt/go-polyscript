@@ -6,13 +6,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/robbyt/go-polyscript/engine"
+	"github.com/robbyt/go-polyscript/execution/data"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.starlark.net/starlark"
-
-	"github.com/robbyt/go-polyscript/engine"
-	"github.com/robbyt/go-polyscript/execution/data"
 )
 
 // StarlarkValueMock is a mock implementation of the starlark.Value interface

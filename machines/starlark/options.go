@@ -22,7 +22,10 @@ func WithGlobals(globals []string) options.Option {
 	return func(c *options.Config) error {
 		// Validate this is being used with the correct machine type
 		if c.GetMachineType() != types.Starlark && c.GetMachineType() != "" {
-			return fmt.Errorf("WithGlobals for Starlark can only be used with Starlark machine, got %s", c.GetMachineType())
+			return fmt.Errorf(
+				"WithGlobals for Starlark can only be used with Starlark machine, got %s",
+				c.GetMachineType(),
+			)
 		}
 
 		// Set the machine-specific options

@@ -48,6 +48,7 @@ type testCase struct {
 
 // execute a single unit test
 func runTestCase(t *testing.T, tt testCase) {
+	t.Helper()
 	t.Parallel()
 
 	// Create mock compiler and reader
@@ -237,7 +238,12 @@ func TestCompileIOError(t *testing.T) {
 	execContent, err := comp.Compile(reader)
 	require.Error(t, err, "Expected an error but got none")
 	require.Nil(t, execContent, "Expected execContent to be nil")
-	require.Contains(t, err.Error(), "failed to read script", "Expected error to contain 'failed to read script'")
+	require.Contains(
+		t,
+		err.Error(),
+		"failed to read script",
+		"Expected error to contain 'failed to read script'",
+	)
 }
 
 func TestCompileCloseError(t *testing.T) {
@@ -255,7 +261,12 @@ func TestCompileCloseError(t *testing.T) {
 	execContent, err := comp.Compile(reader)
 	require.Error(t, err, "Expected an error but got none")
 	require.Nil(t, execContent, "Expected execContent to be nil")
-	require.Contains(t, err.Error(), "failed to close reader", "Expected error to contain 'failed to close reader'")
+	require.Contains(
+		t,
+		err.Error(),
+		"failed to close reader",
+		"Expected error to contain 'failed to close reader'",
+	)
 }
 
 // mockErrorReader implements io.ReadCloser for testing read errors

@@ -32,166 +32,175 @@ func readTestWasm(t *testing.T) []byte {
 }
 
 func TestCompileSuccess(t *testing.T) {
+	t.Parallel()
 	wasmBytes := readTestWasm(t)
+	ctx := context.Background()
 
-	tests := []struct {
-		name      string
-		opts      *compileOptions
-		useBase64 bool
-	}{
-		{
-			name:      "default options",
-			opts:      nil,
-			useBase64: false,
-		},
-		{
-			name: "custom options",
-			opts: &compileOptions{
-				EnableWASI:    true,
-				RuntimeConfig: wazero.NewRuntimeConfig().WithCompilationCache(wazero.NewCompilationCache()),
-			},
-			useBase64: false,
-		},
-		{
-			name:      "base64 input default options",
-			opts:      nil,
-			useBase64: true,
-		},
-		{
-			name: "base64 input custom options",
-			opts: &compileOptions{
-				EnableWASI:    true,
-				RuntimeConfig: wazero.NewRuntimeConfig(),
-			},
-			useBase64: true,
-		},
-	}
+	t.Run("default options", func(t *testing.T) {
+		t.Parallel()
+		plugin, err := CompileBytes(ctx, wasmBytes, nil)
+		require.NoError(t, err)
+		require.NotNil(t, plugin)
+		defer plugin.Close(ctx)
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			ctx := context.Background()
-			var plugin compiledPlugin
-			var err error
-
-			if tt.useBase64 {
-				wasmBase64 := base64.StdEncoding.EncodeToString(wasmBytes)
-				plugin, err = CompileBase64(ctx, wasmBase64, tt.opts)
-			} else {
-				plugin, err = CompileBytes(ctx, wasmBytes, tt.opts)
-			}
-
-			require.NoError(t, err)
-			require.NotNil(t, plugin)
-			defer plugin.Close(ctx)
-
-			// Create an instance to verify the plugin works
-			pluginInstance, err := plugin.Instance(ctx, extismSDK.PluginInstanceConfig{
-				ModuleConfig: wazero.NewModuleConfig(),
-			})
-			require.NoError(t, err)
-			defer pluginInstance.Close(ctx)
-
-			testCases := []struct {
-				name     string
-				input    []byte
-				wantErr  bool
-				validate func(t *testing.T, output []byte)
-			}{
-				{
-					name:  "greet",
-					input: []byte(`{"input":"World"}`),
-					validate: func(t *testing.T, output []byte) {
-						var result struct {
-							Greeting string `json:"greeting"`
-						}
-						require.NoError(t, json.Unmarshal(output, &result))
-						assert.Equal(t, "Hello, World!", result.Greeting)
-					},
-				},
-				{
-					name:  "reverse_string",
-					input: []byte(`{"input":"Hello"}`),
-					validate: func(t *testing.T, output []byte) {
-						var result struct {
-							Reversed string `json:"reversed"`
-						}
-						require.NoError(t, json.Unmarshal(output, &result))
-						assert.Equal(t, "olleH", result.Reversed)
-					},
-				},
-				{
-					name:  "count_vowels",
-					input: []byte(`{"input":"Hello World"}`),
-					validate: func(t *testing.T, output []byte) {
-						var result struct {
-							Count  int    `json:"count"`
-							Vowels string `json:"vowels"`
-							Input  string `json:"input"`
-						}
-						require.NoError(t, json.Unmarshal(output, &result))
-						assert.Equal(t, 3, result.Count) // "e", "o", "o" in "Hello World"
-						assert.Equal(t, "Hello World", result.Input)
-					},
-				},
-				{
-					name: "process_complex",
-					input: func() []byte {
-						req := TestRequest{
-							ID:        "test-123",
-							Timestamp: time.Now().Unix(),
-							Data: map[string]any{
-								"key1": "value1",
-								"key2": 42,
-							},
-							Tags: []string{"test", "example"},
-							Metadata: map[string]string{
-								"source":  "unit-test",
-								"version": "1.0",
-							},
-							Count:  42,
-							Active: true,
-						}
-						b, err := json.Marshal(req)
-						require.NoError(t, err)
-						return b
-					}(),
-					validate: func(t *testing.T, output []byte) {
-						var result struct {
-							RequestID   string         `json:"request_id"`
-							ProcessedAt string         `json:"processed_at"`
-							Results     map[string]any `json:"results"`
-							TagCount    int            `json:"tag_count"`
-							MetaCount   int            `json:"meta_count"`
-							IsActive    bool           `json:"is_active"`
-							Summary     string         `json:"summary"`
-						}
-						require.NoError(t, json.Unmarshal(output, &result))
-						assert.Equal(t, "test-123", result.RequestID)
-						assert.Equal(t, 2, result.TagCount)
-						assert.Equal(t, 2, result.MetaCount)
-						assert.True(t, result.IsActive)
-						assert.Contains(t, result.Summary, "test-123")
-					},
-				},
-			}
-
-			for _, tc := range testCases {
-				t.Run(tc.name, func(t *testing.T) {
-					exit, output, err := pluginInstance.Call(tc.name, tc.input)
-					if tc.wantErr {
-						assert.Error(t, err)
-						return
-					}
-					require.NoError(t, err)
-					assert.Equal(t, uint32(0), exit, "Function %s should execute successfully", tc.name)
-
-					if tc.validate != nil {
-						tc.validate(t, output)
-					}
-				})
-			}
+		// Create an instance to verify the plugin works
+		pluginInstance, err := plugin.Instance(ctx, extismSDK.PluginInstanceConfig{
+			ModuleConfig: wazero.NewModuleConfig(),
 		})
-	}
+		require.NoError(t, err)
+		defer pluginInstance.Close(ctx)
+
+		testFunctions(t, pluginInstance)
+	})
+
+	t.Run("custom options", func(t *testing.T) {
+		t.Parallel()
+		opts := &compileOptions{
+			EnableWASI: true,
+			RuntimeConfig: wazero.NewRuntimeConfig().
+				WithCompilationCache(wazero.NewCompilationCache()),
+		}
+
+		plugin, err := CompileBytes(ctx, wasmBytes, opts)
+		require.NoError(t, err)
+		require.NotNil(t, plugin)
+		defer plugin.Close(ctx)
+
+		// Create an instance to verify the plugin works
+		pluginInstance, err := plugin.Instance(ctx, extismSDK.PluginInstanceConfig{
+			ModuleConfig: wazero.NewModuleConfig(),
+		})
+		require.NoError(t, err)
+		defer pluginInstance.Close(ctx)
+
+		testFunctions(t, pluginInstance)
+	})
+
+	t.Run("base64 input default options", func(t *testing.T) {
+		t.Parallel()
+		wasmBase64 := base64.StdEncoding.EncodeToString(wasmBytes)
+		plugin, err := CompileBase64(ctx, wasmBase64, nil)
+		require.NoError(t, err)
+		require.NotNil(t, plugin)
+		defer plugin.Close(ctx)
+
+		// Create an instance to verify the plugin works
+		pluginInstance, err := plugin.Instance(ctx, extismSDK.PluginInstanceConfig{
+			ModuleConfig: wazero.NewModuleConfig(),
+		})
+		require.NoError(t, err)
+		defer pluginInstance.Close(ctx)
+
+		testFunctions(t, pluginInstance)
+	})
+
+	t.Run("base64 input custom options", func(t *testing.T) {
+		t.Parallel()
+		opts := &compileOptions{
+			EnableWASI:    true,
+			RuntimeConfig: wazero.NewRuntimeConfig(),
+		}
+
+		wasmBase64 := base64.StdEncoding.EncodeToString(wasmBytes)
+		plugin, err := CompileBase64(ctx, wasmBase64, opts)
+		require.NoError(t, err)
+		require.NotNil(t, plugin)
+		defer plugin.Close(ctx)
+
+		// Create an instance to verify the plugin works
+		pluginInstance, err := plugin.Instance(ctx, extismSDK.PluginInstanceConfig{
+			ModuleConfig: wazero.NewModuleConfig(),
+		})
+		require.NoError(t, err)
+		defer pluginInstance.Close(ctx)
+
+		testFunctions(t, pluginInstance)
+	})
+}
+
+func testFunctions(t *testing.T, instance pluginInstance) {
+	t.Helper()
+	t.Run("greet function", func(t *testing.T) {
+		input := []byte(`{"input":"World"}`)
+		exit, output, err := instance.Call("greet", input)
+		require.NoError(t, err)
+		assert.Equal(t, uint32(0), exit, "Function should execute successfully")
+
+		var result struct {
+			Greeting string `json:"greeting"`
+		}
+		require.NoError(t, json.Unmarshal(output, &result))
+		assert.Equal(t, "Hello, World!", result.Greeting)
+	})
+
+	t.Run("reverse_string function", func(t *testing.T) {
+		input := []byte(`{"input":"Hello"}`)
+		exit, output, err := instance.Call("reverse_string", input)
+		require.NoError(t, err)
+		assert.Equal(t, uint32(0), exit, "Function should execute successfully")
+
+		var result struct {
+			Reversed string `json:"reversed"`
+		}
+		require.NoError(t, json.Unmarshal(output, &result))
+		assert.Equal(t, "olleH", result.Reversed)
+	})
+
+	t.Run("count_vowels function", func(t *testing.T) {
+		input := []byte(`{"input":"Hello World"}`)
+		exit, output, err := instance.Call("count_vowels", input)
+		require.NoError(t, err)
+		assert.Equal(t, uint32(0), exit, "Function should execute successfully")
+
+		var result struct {
+			Count  int    `json:"count"`
+			Vowels string `json:"vowels"`
+			Input  string `json:"input"`
+		}
+		require.NoError(t, json.Unmarshal(output, &result))
+		assert.Equal(t, 3, result.Count) // "e", "o", "o" in "Hello World"
+		assert.Equal(t, "Hello World", result.Input)
+	})
+
+	t.Run("process_complex function", func(t *testing.T) {
+		req := TestRequest{
+			ID:        "test-123",
+			Timestamp: time.Now().Unix(),
+			Data: map[string]any{
+				"key1": "value1",
+				"key2": 42,
+			},
+			Tags: []string{"test", "example"},
+			Metadata: map[string]string{
+				"source":  "unit-test",
+				"version": "1.0",
+			},
+			Count:  42,
+			Active: true,
+		}
+		input, err := json.Marshal(req)
+		require.NoError(t, err)
+
+		exit, output, err := instance.Call("process_complex", input)
+		require.NoError(t, err)
+		assert.Equal(t, uint32(0), exit, "Function should execute successfully")
+
+		var result struct {
+			RequestID   string         `json:"request_id"`
+			ProcessedAt string         `json:"processed_at"`
+			Results     map[string]any `json:"results"`
+			TagCount    int            `json:"tag_count"`
+			MetaCount   int            `json:"meta_count"`
+			IsActive    bool           `json:"is_active"`
+			Summary     string         `json:"summary"`
+		}
+		require.NoError(t, json.Unmarshal(output, &result))
+		assert.Equal(t, "test-123", result.RequestID)
+		assert.Equal(t, 2, result.TagCount)
+		assert.Equal(t, 2, result.MetaCount)
+		assert.True(t, result.IsActive)
+		assert.Contains(t, result.Summary, "test-123")
+	})
 }
 
 func TestCompileErrors(t *testing.T) {
@@ -223,8 +232,10 @@ func TestCompileErrors(t *testing.T) {
 			wantErr:   "failed to compile plugin",
 		},
 		{
-			name:    "corrupted wasm",
-			input:   append([]byte{0x00, 0x61, 0x73, 0x6D, 0x01, 0x00, 0x00, 0x00}, []byte("corrupted")...),
+			name: "corrupted wasm",
+			input: append(
+				[]byte{0x00, 0x61, 0x73, 0x6D, 0x01, 0x00, 0x00, 0x00},
+				[]byte("corrupted")...),
 			wantErr: "failed to compile plugin",
 		},
 	}

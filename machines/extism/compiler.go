@@ -8,7 +8,6 @@ import (
 	"sync/atomic"
 
 	extismSDK "github.com/extism/go-sdk"
-
 	"github.com/robbyt/go-polyscript/execution/script"
 	"github.com/robbyt/go-polyscript/internal/helpers"
 )
@@ -105,7 +104,11 @@ func (c *Compiler) Compile(scriptReader io.ReadCloser) (script.ExecutableContent
 	funcName := c.GetEntryPointName()
 	if !instance.FunctionExists(funcName) {
 		logger.Error("Entry point function not found", "function", funcName)
-		return nil, fmt.Errorf("%w: entry point function '%s' not found", ErrValidationFailed, funcName)
+		return nil, fmt.Errorf(
+			"%w: entry point function '%s' not found",
+			ErrValidationFailed,
+			funcName,
+		)
 	}
 
 	// Create executable with the compiled plugin

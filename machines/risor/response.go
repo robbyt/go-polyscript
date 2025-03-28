@@ -7,7 +7,6 @@ import (
 	"time"
 
 	risorObject "github.com/risor-io/risor/object"
-
 	"github.com/robbyt/go-polyscript/execution/data"
 )
 
@@ -21,7 +20,12 @@ type execResult struct {
 	logger      *slog.Logger
 }
 
-func newEvalResult(handler slog.Handler, obj risorObject.Object, execTime time.Duration, versionID string) *execResult {
+func newEvalResult(
+	handler slog.Handler,
+	obj risorObject.Object,
+	execTime time.Duration,
+	versionID string,
+) *execResult {
 	if handler == nil {
 		defaultHandler := slog.NewTextHandler(os.Stdout, nil)
 		handler = defaultHandler.WithGroup("risor")

@@ -52,7 +52,12 @@ func TestRunRisorExampleMultipleTimes(t *testing.T) {
 		if !ok {
 			lengthValueFloat, ok := length.(float64)
 			if ok {
-				assert.Equal(t, float64(expectedLengths[i]), lengthValueFloat, "Should have the correct length")
+				assert.Equal(
+					t,
+					float64(expectedLengths[i]),
+					lengthValueFloat,
+					"Should have the correct length",
+				)
 			} else {
 				assert.Fail(t, "Length is neither int64 nor float64")
 			}

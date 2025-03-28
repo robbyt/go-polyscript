@@ -72,7 +72,8 @@ func (c *Compiler) compile(scriptBodyBytes []byte) (*Executable, error) {
 	// Check for comment-only script
 	isCommentOnly := true
 	for line := range strings.SplitSeq(trimmedScript, "\n") {
-		if trimmedLine := strings.TrimSpace(line); trimmedLine != "" && !strings.HasPrefix(trimmedLine, "#") {
+		if trimmedLine := strings.TrimSpace(line); trimmedLine != "" &&
+			!strings.HasPrefix(trimmedLine, "#") {
 			// Found a non-comment line, so we can stop checking lines because there's some real code here!
 			isCommentOnly = false
 			break

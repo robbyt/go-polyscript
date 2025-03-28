@@ -8,13 +8,12 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-
 	"github.com/robbyt/go-polyscript/execution/constants"
 	"github.com/robbyt/go-polyscript/execution/data"
 	"github.com/robbyt/go-polyscript/execution/script"
 	machineTypes "github.com/robbyt/go-polyscript/machines/types"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // Path to the test WASM file
@@ -101,6 +100,7 @@ func TestBytecodeEvaluatorInvalidInputs(t *testing.T) {
 		{
 			name: "nil bytecode",
 			setupExe: func(t *testing.T) *script.ExecutableUnit {
+				t.Helper()
 				// Create a context provider
 				ctxProvider := data.NewContextProvider(constants.EvalData)
 
@@ -122,6 +122,7 @@ func TestBytecodeEvaluatorInvalidInputs(t *testing.T) {
 		{
 			name: "invalid content type",
 			setupExe: func(t *testing.T) *script.ExecutableUnit {
+				t.Helper()
 				// Create a context provider
 				ctxProvider := data.NewContextProvider(constants.EvalData)
 
@@ -285,6 +286,7 @@ func TestPrepareContext(t *testing.T) {
 		{
 			name: "nil data provider",
 			setupExe: func(t *testing.T) *script.ExecutableUnit {
+				t.Helper()
 				return &script.ExecutableUnit{
 					ID:           "test-nil-provider",
 					DataProvider: nil,
@@ -302,6 +304,7 @@ func TestPrepareContext(t *testing.T) {
 		{
 			name: "valid simple data",
 			setupExe: func(t *testing.T) *script.ExecutableUnit {
+				t.Helper()
 				return &script.ExecutableUnit{
 					ID:           "test-valid-data",
 					DataProvider: data.NewContextProvider(constants.EvalData),
@@ -318,6 +321,7 @@ func TestPrepareContext(t *testing.T) {
 		{
 			name: "empty input",
 			setupExe: func(t *testing.T) *script.ExecutableUnit {
+				t.Helper()
 				return &script.ExecutableUnit{
 					ID:           "test-empty-input",
 					DataProvider: data.NewContextProvider(constants.EvalData),
@@ -334,6 +338,7 @@ func TestPrepareContext(t *testing.T) {
 		{
 			name: "nil executable unit",
 			setupExe: func(t *testing.T) *script.ExecutableUnit {
+				t.Helper()
 				return nil
 			},
 			inputs:      []any{map[string]any{"test": "data"}},
@@ -343,6 +348,7 @@ func TestPrepareContext(t *testing.T) {
 		{
 			name: "with error throwing provider",
 			setupExe: func(t *testing.T) *script.ExecutableUnit {
+				t.Helper()
 				mockProvider := &mockErrProvider{
 					err: errors.New("provider error"),
 				}
@@ -399,7 +405,10 @@ func (m *mockErrProvider) GetData(ctx context.Context) (map[string]any, error) {
 	return nil, m.err
 }
 
-func (m *mockErrProvider) AddDataToContext(ctx context.Context, data ...any) (context.Context, error) {
+func (m *mockErrProvider) AddDataToContext(
+	ctx context.Context,
+	data ...any,
+) (context.Context, error) {
 	return ctx, m.err
 }
 
@@ -414,7 +423,11 @@ type mockPluginInstance struct {
 	cancelFunc func()
 }
 
-func (m *mockPluginInstance) CallWithContext(ctx context.Context, functionName string, input []byte) (uint32, []byte, error) {
+func (m *mockPluginInstance) CallWithContext(
+	ctx context.Context,
+	functionName string,
+	input []byte,
+) (uint32, []byte, error) {
 	m.wasCalled = true
 	// Execute the cancel function if provided (to simulate context cancellation)
 	if m.cancelFunc != nil {
@@ -554,7 +567,7 @@ func TestEvalWithCancelledContext(t *testing.T) {
 
 	// Write the test WASM bytes to a file
 	wasmFile := filepath.Join(tmpDir, "test.wasm")
-	err = os.WriteFile(wasmFile, wasmContent, 0644)
+	err = os.WriteFile(wasmFile, wasmContent, 0o644)
 	require.NoError(t, err, "Failed to write test WASM file")
 
 	// Create a mock compiled plugin

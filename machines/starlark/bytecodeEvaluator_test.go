@@ -7,13 +7,12 @@ import (
 	"os"
 	"testing"
 
-	"github.com/stretchr/testify/require"
-
 	"github.com/robbyt/go-polyscript/execution/constants"
 	"github.com/robbyt/go-polyscript/execution/data"
 	"github.com/robbyt/go-polyscript/execution/script"
 	"github.com/robbyt/go-polyscript/execution/script/loader"
 	"github.com/robbyt/go-polyscript/internal/helpers"
+	"github.com/stretchr/testify/require"
 )
 
 var emptyScriptData = make(map[string]any)
@@ -38,6 +37,7 @@ _ = request_handler(ctx.get("request"))
 `
 
 	evalBuilder := func(t *testing.T, scriptContent string) (*script.ExecutableUnit, *BytecodeEvaluator) {
+		t.Helper()
 		loader, err := loader.NewFromString(scriptContent)
 		require.NoError(t, err, "Failed to create new loader")
 

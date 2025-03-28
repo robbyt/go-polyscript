@@ -53,7 +53,10 @@ func (p *ContextProvider) GetData(ctx context.Context) (map[string]any, error) {
 //	req := &http.Request{...}
 //	scriptData := map[string]any{"user": "admin"}
 //	ctx, err := provider.AddDataToContext(ctx, req, scriptData)
-func (p *ContextProvider) AddDataToContext(ctx context.Context, data ...any) (context.Context, error) {
+func (p *ContextProvider) AddDataToContext(
+	ctx context.Context,
+	data ...any,
+) (context.Context, error) {
 	if p.contextKey == "" {
 		return ctx, fmt.Errorf("context key is empty")
 	}

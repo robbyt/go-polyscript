@@ -30,6 +30,9 @@ func (p *StaticProvider) GetData(ctx context.Context) (map[string]any, error) {
 
 // AddDataToContext returns an error as StaticProvider doesn't support dynamic data.
 // Use a ContextProvider or CompositeProvider when runtime data updates are needed.
-func (p *StaticProvider) AddDataToContext(ctx context.Context, data ...any) (context.Context, error) {
+func (p *StaticProvider) AddDataToContext(
+	ctx context.Context,
+	data ...any,
+) (context.Context, error) {
 	return ctx, fmt.Errorf("StaticProvider doesn't support adding data at runtime")
 }

@@ -138,7 +138,7 @@ func TestFromDisk_GetReader(t *testing.T) {
 		testContent := "test content\nwith multiple lines"
 		testFile := filepath.Join(tempDir, "test.risor")
 
-		err := os.WriteFile(testFile, []byte(testContent), 0644)
+		err := os.WriteFile(testFile, []byte(testContent), 0o644)
 		require.NoError(t, err, "Failed to write test file")
 
 		// Create loader

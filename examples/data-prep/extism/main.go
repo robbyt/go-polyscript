@@ -63,7 +63,10 @@ func simulateConfigData() map[string]any {
 
 // demonstrateAsyncPreparation shows how data preparation can be done asynchronously
 // before evaluation, which is useful in high-throughput systems
-func demonstrateAsyncPreparation(evaluator engine.EvaluatorWithPrep, logger *slog.Logger) (map[string]any, error) {
+func demonstrateAsyncPreparation(
+	evaluator engine.EvaluatorWithPrep,
+	logger *slog.Logger,
+) (map[string]any, error) {
 	// Base context
 	ctx := context.Background()
 

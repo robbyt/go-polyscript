@@ -3,11 +3,10 @@ package starlark
 import (
 	"testing"
 
+	machineTypes "github.com/robbyt/go-polyscript/machines/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	starlarkLib "go.starlark.net/starlark"
-
-	machineTypes "github.com/robbyt/go-polyscript/machines/types"
 )
 
 func TestNewExecutableValid(t *testing.T) {
@@ -16,7 +15,7 @@ func TestNewExecutableValid(t *testing.T) {
 
 	executable := NewExecutable([]byte(content), bytecode)
 	require.NotNil(t, executable)
-	assert.Equal(t, content, string(executable.GetSource()))
+	assert.Equal(t, content, executable.GetSource())
 	assert.Equal(t, bytecode, executable.GetByteCode())
 	assert.Equal(t, bytecode, executable.GetStarlarkByteCode())
 	assert.Equal(t, machineTypes.Starlark, executable.GetMachineType())
@@ -46,7 +45,7 @@ func TestExecutable_GetSource(t *testing.T) {
 	require.NotNil(t, executable)
 
 	source := executable.GetSource()
-	assert.Equal(t, content, string(source))
+	assert.Equal(t, content, source)
 }
 
 func TestExecutable_GetByteCode(t *testing.T) {
@@ -80,7 +79,7 @@ func TestNewExecutable(t *testing.T) {
 
 		exe := NewExecutable([]byte(content), bytecode)
 		require.NotNil(t, exe)
-		assert.Equal(t, content, string(exe.GetSource()))
+		assert.Equal(t, content, exe.GetSource())
 		assert.Equal(t, bytecode, exe.ByteCode)
 	})
 

@@ -3,9 +3,8 @@ package script
 import (
 	"io"
 
-	"github.com/stretchr/testify/mock"
-
 	machineTypes "github.com/robbyt/go-polyscript/machines/types"
+	"github.com/stretchr/testify/mock"
 )
 
 // MockCompiler is a mock implementation of the Compiler interface.

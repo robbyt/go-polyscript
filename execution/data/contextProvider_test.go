@@ -6,10 +6,9 @@ import (
 	"net/url"
 	"testing"
 
+	"github.com/robbyt/go-polyscript/execution/constants"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/robbyt/go-polyscript/execution/constants"
 )
 
 func TestStaticProvider_AddDataToContext(t *testing.T) {
@@ -21,7 +20,12 @@ func TestStaticProvider_AddDataToContext(t *testing.T) {
 	// Static provider should reject all attempts to add data
 	_, err := provider.AddDataToContext(ctx, "some data")
 	assert.Error(t, err, "StaticProvider should reject all attempts to add data")
-	assert.Contains(t, err.Error(), "doesn't support adding data", "Error message should explain limitation")
+	assert.Contains(
+		t,
+		err.Error(),
+		"doesn't support adding data",
+		"Error message should explain limitation",
+	)
 }
 
 func TestContextProvider_AddDataToContext(t *testing.T) {
@@ -168,7 +172,12 @@ func TestCompositeProvider_AddDataToContext(t *testing.T) {
 			if tt.shouldError {
 				assert.Error(t, err)
 				if tt.allShouldError {
-					assert.Equal(t, ctx, newCtx, "Context should remain unchanged when all providers error")
+					assert.Equal(
+						t,
+						ctx,
+						newCtx,
+						"Context should remain unchanged when all providers error",
+					)
 				}
 			} else {
 				if len(tt.providers) > 0 {

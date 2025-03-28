@@ -54,7 +54,10 @@ func simulateWebRequest() map[string]any {
 // 1. Data preparation and evaluation need to happen on different systems
 // 2. Context enrichment is complex and should be separated from evaluation
 // 3. You want to prepare data once and evaluate multiple times
-func simulateDistributedArchitecture(evaluator engine.EvaluatorWithPrep, logger *slog.Logger) (map[string]any, error) {
+func simulateDistributedArchitecture(
+	evaluator engine.EvaluatorWithPrep,
+	logger *slog.Logger,
+) (map[string]any, error) {
 	// Create a base context
 	ctx := context.Background()
 

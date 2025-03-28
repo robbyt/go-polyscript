@@ -6,9 +6,8 @@ import (
 	"os"
 	"time"
 
-	starlarkLib "go.starlark.net/starlark"
-
 	"github.com/robbyt/go-polyscript/execution/data"
+	starlarkLib "go.starlark.net/starlark"
 )
 
 // execResult is a wrapper around the starlark.Value interface
@@ -20,7 +19,12 @@ type execResult struct {
 	logger      *slog.Logger
 }
 
-func newEvalResult(handler slog.Handler, obj starlarkLib.Value, execTime time.Duration, versionID string) *execResult {
+func newEvalResult(
+	handler slog.Handler,
+	obj starlarkLib.Value,
+	execTime time.Duration,
+	versionID string,
+) *execResult {
 	if handler == nil {
 		defaultHandler := slog.NewTextHandler(os.Stdout, nil)
 		handler = defaultHandler.WithGroup("starlark")

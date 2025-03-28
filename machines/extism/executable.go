@@ -9,9 +9,7 @@ import (
 	machineTypes "github.com/robbyt/go-polyscript/machines/types"
 )
 
-var (
-	ErrExecutableClosed = errors.New("executable is closed")
-)
+var ErrExecutableClosed = errors.New("executable is closed")
 
 // Executable implements script.ExecutableContent for Extism WASM modules
 type Executable struct {

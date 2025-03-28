@@ -3,13 +3,16 @@ package starlark
 import (
 	"fmt"
 
-	"go.starlark.net/syntax"
-
 	starlarkLib "go.starlark.net/starlark"
+	"go.starlark.net/syntax"
 )
 
 // compile parses and compiles the script content into a Starlark program
-func compile(scriptBodyBytes []byte, opts *syntax.FileOptions, globals starlarkLib.StringDict) (*starlarkLib.Program, error) {
+func compile(
+	scriptBodyBytes []byte,
+	opts *syntax.FileOptions,
+	globals starlarkLib.StringDict,
+) (*starlarkLib.Program, error) {
 	if scriptBodyBytes == nil {
 		return nil, fmt.Errorf("script content is nil")
 	}
@@ -49,7 +52,10 @@ func compile(scriptBodyBytes []byte, opts *syntax.FileOptions, globals starlarkL
 // which are needed when parsing a script that will eventually have globals injected at eval time.
 // For example, if a script uses a request or response object, it needs to be compiled with those
 // global names, even though they won't be available until eval time.
-func compileWithEmptyGlobals(scriptBodyBytes []byte, globals []string) (*starlarkLib.Program, error) {
+func compileWithEmptyGlobals(
+	scriptBodyBytes []byte,
+	globals []string,
+) (*starlarkLib.Program, error) {
 	// Set up FileOptions with globals reassignment enabled
 	opts := &syntax.FileOptions{
 		GlobalReassign: true, // Allow later reassignment of the globals we're injecting right now

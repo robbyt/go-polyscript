@@ -108,7 +108,9 @@ func RequestToMap(r *http.Request) (map[string]any, error) {
 	}
 
 	if reqStruct == nil {
-		return nil, errors.New("failed to transform http.Request to httpRequest struct: result is nil")
+		return nil, errors.New(
+			"failed to transform http.Request to httpRequest struct: result is nil",
+		)
 	}
 
 	// Convert httpRequest struct to map[string]any

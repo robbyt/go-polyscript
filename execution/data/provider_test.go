@@ -4,11 +4,10 @@ import (
 	"context"
 	"testing"
 
+	"github.com/robbyt/go-polyscript/execution/constants"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-
-	"github.com/robbyt/go-polyscript/execution/constants"
 )
 
 // MockProvider is a testify mock implementation of Provider
@@ -32,7 +31,8 @@ func (m *MockProvider) AddDataToContext(ctx context.Context, data ...any) (conte
 func newMockErrorProvider() *MockProvider {
 	provider := new(MockProvider)
 	provider.On("GetData", mock.Anything).Return(nil, assert.AnError)
-	provider.On("AddDataToContext", mock.Anything, mock.Anything).Return(mock.Anything, assert.AnError)
+	provider.On("AddDataToContext", mock.Anything, mock.Anything).
+		Return(mock.Anything, assert.AnError)
 	return provider
 }
 

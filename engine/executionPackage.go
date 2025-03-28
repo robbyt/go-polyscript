@@ -26,7 +26,11 @@ type executionPackage struct {
 }
 
 // NewScriptContext creates a new ScriptContext
-func NewExecutionPackage(evaluator Evaluator, unit *script.ExecutableUnit, evalTimeout time.Duration) *executionPackage {
+func NewExecutionPackage(
+	evaluator Evaluator,
+	unit *script.ExecutableUnit,
+	evalTimeout time.Duration,
+) *executionPackage {
 	return &executionPackage{
 		evaluator:   evaluator,
 		unit:        unit,
@@ -35,7 +39,11 @@ func NewExecutionPackage(evaluator Evaluator, unit *script.ExecutableUnit, evalT
 }
 
 func (sc *executionPackage) String() string {
-	return fmt.Sprintf("engine.ExecutionPackage{Evaluator: %s, ExecutableUnit: %s}", sc.evaluator, sc.unit)
+	return fmt.Sprintf(
+		"engine.ExecutionPackage{Evaluator: %s, ExecutableUnit: %s}",
+		sc.evaluator,
+		sc.unit,
+	)
 }
 
 // GetEvaluator returns a evaluator that can run the associated executable unit
