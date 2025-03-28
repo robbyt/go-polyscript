@@ -30,32 +30,6 @@ linters:
     - staticcheck   # Staticcheck is a go linter
     - unused        # Checks for unused code
 
-linters-settings:
-  errorlint:
-    errorf: true
-    asserts: true
-    comparison: true
-  govet:
-    enable:
-      - assign
-      - atomic
-      - bools
-      - buildtag
-      - copylocks
-      - httpresponse
-      - loopclosure
-      - lostcancel
-      - nilfunc
-      - stdmethods
-      - structtag
-      - tests
-      - unmarshal
-      - unreachable
-      - unusedresult
-  staticcheck:
-    checks:
-      - all
-
 formatters:
   enable:
     - gci           # Control Go package import order
@@ -67,12 +41,3 @@ formatters:
 issues:
   max-issues-per-linter: 20
   max-same-issues: 5
-  
-  # Exclude paths from linting
-  exclude-rules:
-    - path: third_party$
-      linters: [all]
-    - path: builtin$
-      linters: [all]
-    - path: examples$
-      linters: [all]
