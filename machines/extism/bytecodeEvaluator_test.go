@@ -92,77 +92,59 @@ func TestLoadInputData(t *testing.T) {
 func TestBytecodeEvaluatorInvalidInputs(t *testing.T) {
 	t.Parallel()
 
-	tests := []struct {
-		name        string
-		setupExe    func(t *testing.T) *script.ExecutableUnit
-		wantErrType error
-	}{
-		{
-			name: "nil bytecode",
-			setupExe: func(t *testing.T) *script.ExecutableUnit {
-				t.Helper()
-				// Create a context provider
-				ctxProvider := data.NewContextProvider(constants.EvalData)
+	// Common test setup helper
+	setupTest := func(content *mockExecutableContent) (slog.Handler, *script.ExecutableUnit) {
+		handler := slog.NewTextHandler(os.Stdout, nil)
+		ctxProvider := data.NewContextProvider(constants.EvalData)
 
-				// Use mock content
-				mockContent := &mockExecutableContent{
-					machineType: machineTypes.Extism,
-					source:      "invalid wasm",
-					bytecode:    nil, // Nil bytecode will cause error
-				}
+		exe := &script.ExecutableUnit{
+			ID:           "test-case",
+			Content:      content,
+			DataProvider: ctxProvider,
+		}
 
-				return &script.ExecutableUnit{
-					ID:           "test-nil-bytecode",
-					Content:      mockContent,
-					DataProvider: ctxProvider,
-				}
-			},
-			wantErrType: errors.New("bytecode is nil"),
-		},
-		{
-			name: "invalid content type",
-			setupExe: func(t *testing.T) *script.ExecutableUnit {
-				t.Helper()
-				// Create a context provider
-				ctxProvider := data.NewContextProvider(constants.EvalData)
-
-				// This is not a proper Executable
-				mockContent := &mockExecutableContent{
-					machineType: machineTypes.Extism,
-					source:      "invalid wasm",
-					bytecode:    []byte{0x00}, // Not a valid WASM module
-				}
-
-				return &script.ExecutableUnit{
-					ID:           "test-invalid-content-type",
-					Content:      mockContent,
-					DataProvider: ctxProvider,
-				}
-			},
-			wantErrType: errors.New("invalid executable type"),
-		},
+		return handler, exe
 	}
 
-	for _, tt := range tests {
-		tt := tt
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
+	// Test case: nil bytecode
+	t.Run("nil bytecode", func(t *testing.T) {
+		t.Parallel()
 
-			handler := slog.NewTextHandler(os.Stdout, nil)
-			exe := tt.setupExe(t)
-			evaluator := NewBytecodeEvaluator(handler, exe)
+		mockContent := &mockExecutableContent{
+			machineType: machineTypes.Extism,
+			source:      "invalid wasm",
+			bytecode:    nil, // Nil bytecode will cause error
+		}
 
-			ctx := context.Background()
-			_, err := evaluator.Eval(ctx)
+		handler, exe := setupTest(mockContent)
+		evaluator := NewBytecodeEvaluator(handler, exe)
 
-			if tt.wantErrType != nil {
-				require.Error(t, err)
-				assert.Contains(t, err.Error(), tt.wantErrType.Error())
-			} else {
-				require.NoError(t, err)
-			}
-		})
-	}
+		ctx := context.Background()
+		_, err := evaluator.Eval(ctx)
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "bytecode is nil")
+	})
+
+	// Test case: invalid content type
+	t.Run("invalid content type", func(t *testing.T) {
+		t.Parallel()
+
+		mockContent := &mockExecutableContent{
+			machineType: machineTypes.Extism,
+			source:      "invalid wasm",
+			bytecode:    []byte{0x00}, // Not a valid WASM module
+		}
+
+		handler, exe := setupTest(mockContent)
+		evaluator := NewBytecodeEvaluator(handler, exe)
+
+		ctx := context.Background()
+		_, err := evaluator.Eval(ctx)
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid executable type")
+	})
 }
 
 func TestNilHandlerFallback(t *testing.T) {
