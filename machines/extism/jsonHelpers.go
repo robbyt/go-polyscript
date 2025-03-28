@@ -52,10 +52,3 @@ func fixJSONNumberTypes(data any) any {
 		return data
 	}
 }
-
-func marshalInputData(inputData map[string]any) ([]byte, error) {
-	if len(inputData) == 0 {
-		return nil, nil
-	}
-	return json.Marshal(inputData)
-}

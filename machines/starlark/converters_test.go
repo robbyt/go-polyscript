@@ -179,7 +179,7 @@ func TestConvertStarlarkValueToInterface(t *testing.T) {
 	})
 }
 
-func TestConvertInputData(t *testing.T) {
+func TestConvertToStarlarkFormat(t *testing.T) {
 	t.Run("basic types", func(t *testing.T) {
 		tests := []struct {
 			name     string
@@ -228,7 +228,7 @@ func TestConvertInputData(t *testing.T) {
 
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
-				result, err := convertInputData(tt.input)
+				result, err := convertToStarlarkFormat(tt.input)
 				if tt.wantErr {
 					require.Error(t, err)
 					return
@@ -323,7 +323,7 @@ func TestConvertInputData(t *testing.T) {
 
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
-				result, err := convertInputData(tt.input)
+				result, err := convertToStarlarkFormat(tt.input)
 				if tt.wantErr {
 					require.Error(t, err)
 					return
@@ -379,7 +379,7 @@ func TestConvertInputData(t *testing.T) {
 
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
-				_, err := convertInputData(tt.input)
+				_, err := convertToStarlarkFormat(tt.input)
 				require.Error(t, err)
 				require.Contains(t, err.Error(), "failed to convert input value")
 			})
