@@ -3,7 +3,6 @@ package extism
 import (
 	"bytes"
 	"context"
-	"crypto/rand"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -15,7 +14,6 @@ import (
 	"github.com/robbyt/go-polyscript/internal/helpers"
 
 	extismSDK "github.com/extism/go-sdk"
-	"github.com/tetratelabs/wazero"
 )
 
 // BytecodeEvaluator executes compiled WASM modules with provided runtime data
@@ -39,27 +37,29 @@ func (be *BytecodeEvaluator) String() string {
 	return "extism.BytecodeEvaluator"
 }
 
-// convertToExtismFormat converts a Go map into JSON format for the Extism VM.
-func (be *BytecodeEvaluator) convertToExtismFormat(inputData map[string]any) ([]byte, error) {
+// loadInputData retrieves input data using the data provider in the executable unit.
+// Returns a map that will be used as input for the WASM module.
+func (be *BytecodeEvaluator) loadInputData(ctx context.Context) (map[string]any, error) {
+	logger := be.logger.WithGroup("loadInputData")
+
+	// If no executable unit or data provider, return empty map
+	if be.execUnit == nil || be.execUnit.GetDataProvider() == nil {
+		logger.WarnContext(ctx, "no data provider available, using empty data")
+		return make(map[string]any), nil
+	}
+
+	// Get input data from provider
+	inputData, err := be.execUnit.GetDataProvider().GetData(ctx)
+	if err != nil {
+		logger.ErrorContext(ctx, "failed to get input data from provider", "error", err)
+		return nil, err
+	}
+
 	if len(inputData) == 0 {
-		return nil, nil
+		logger.WarnContext(ctx, "empty input data returned from provider")
 	}
-	return json.Marshal(inputData)
-}
-
-func (be *BytecodeEvaluator) getPluginInstanceConfig() extismSDK.PluginInstanceConfig {
-	// Create base config if none provided
-	moduleConfig := wazero.NewModuleConfig()
-
-	// Configure with recommended options
-	moduleConfig = moduleConfig.
-		WithSysWalltime().          // For consistent time functions
-		WithSysNanotime().          // For high-precision timing
-		WithRandSource(rand.Reader) // For secure randomness
-
-	return extismSDK.PluginInstanceConfig{
-		ModuleConfig: moduleConfig,
-	}
+	logger.DebugContext(ctx, "input data loaded from provider", "inputData", inputData)
+	return inputData, nil
 }
 
 // execHelper is a utility function to handle common execution logic
@@ -125,36 +125,11 @@ func (be *BytecodeEvaluator) exec(
 	// Use the helper function for execution
 	result, execTime, err := execHelper(ctx, logger, instance, entryPoint, inputJSON)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("extism execution error: %w", err)
 	}
 
+	logger.InfoContext(ctx, "execution complete", "result", result)
 	return newEvalResult(be.logHandler, result, execTime, ""), nil
-}
-
-// loadInputData retrieves input data using the data provider in the executable unit.
-// Returns a map that will be used as input for the WASM module.
-//
-// Note: This method handles data retrieval using the GetData method of the provider.
-// It's part of the standard pattern used across all VMs as defined in the
-// context harmonization plan.
-func (be *BytecodeEvaluator) loadInputData(ctx context.Context) (map[string]any, error) {
-	logger := be.logger.WithGroup("loadInputData")
-
-	// If no executable unit or data provider, return empty map
-	if be.execUnit == nil || be.execUnit.GetDataProvider() == nil {
-		logger.WarnContext(ctx, "no data provider available, using empty data")
-		return make(map[string]any), nil
-	}
-
-	// Get input data from provider
-	inputData, err := be.execUnit.GetDataProvider().GetData(ctx)
-	if err != nil {
-		logger.ErrorContext(ctx, "failed to get input data from provider", "error", err)
-		return nil, err
-	}
-
-	logger.DebugContext(ctx, "input data loaded from provider", "inputData", inputData)
-	return inputData, nil
 }
 
 // Eval implements engine.Evaluator
@@ -170,7 +145,7 @@ func (be *BytecodeEvaluator) Eval(ctx context.Context) (engine.EvaluatorResponse
 		return nil, fmt.Errorf("content is nil")
 	}
 
-	// Get and validate bytecode
+	// Get bytecode from executable unit
 	bytecode := be.execUnit.GetContent().GetByteCode()
 	if bytecode == nil {
 		return nil, fmt.Errorf("bytecode is nil")
@@ -179,48 +154,46 @@ func (be *BytecodeEvaluator) Eval(ctx context.Context) (engine.EvaluatorResponse
 	// Get execution ID
 	exeID := be.execUnit.GetID()
 	if exeID == "" {
-		return nil, fmt.Errorf("execution ID is empty")
+		return nil, fmt.Errorf("exeID is empty")
 	}
 	logger = logger.With("exeID", exeID)
 
-	// Type assert to WASM module
+	// 1. Type assert to WASM module, and get the compiled plugin object
 	wasmExe, ok := be.execUnit.GetContent().(*Executable)
 	if !ok {
 		return nil, fmt.Errorf("invalid executable type: expected *Executable, got %T", be.execUnit.GetContent())
 	}
-
-	// Get compiled plugin
 	plugin := wasmExe.GetExtismByteCode()
 	if plugin == nil {
 		return nil, fmt.Errorf("compiled plugin is nil")
 	}
 
-	// 1. Get the raw input data
-	inputData, err := be.loadInputData(ctx)
+	// 2. Get the raw input data
+	rawInputData, err := be.loadInputData(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get input data: %w", err)
 	}
 
-	// 2. Convert input data to JSON for passing into the WASM VM
-	inputJSON, err := be.convertToExtismFormat(inputData)
+	// 3. Convert input data to JSON for passing into the WASM VM
+	runtimeData, err := convertToExtismFormat(rawInputData)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal input data: %w", err)
 	}
 
-	// 3. Execute in the VM
+	// 4. Execute the program
 	result, err := be.exec(
 		ctx, plugin,
 		wasmExe.GetEntryPoint(),
 		be.getPluginInstanceConfig(),
-		inputJSON,
+		runtimeData,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("execution error: %w", err)
 	}
 
-	// Set execution ID and return
+	// 5. Collect results
 	result.scriptExeID = exeID
-	logger.Debug("execution complete")
+	logger.DebugContext(ctx, "execution complete")
 	return result, nil
 }
 

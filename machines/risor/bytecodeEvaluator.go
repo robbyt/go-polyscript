@@ -64,41 +64,28 @@ func (be *BytecodeEvaluator) loadInputData(ctx context.Context) (map[string]any,
 
 	if len(inputData) == 0 {
 		logger.WarnContext(ctx, "empty input data returned from provider")
-	} else {
-		logger.DebugContext(ctx, "input data loaded from provider", "inputData", inputData)
 	}
-
+	logger.DebugContext(ctx, "input data loaded from provider", "inputData", inputData)
 	return inputData, nil
 }
 
 // exec pulls the latest bytecode, and runs it with some input from options
-func (be *BytecodeEvaluator) exec(ctx context.Context, bytecode *risorCompiler.Code, options ...risorLib.Option) (*execResult, error) {
+func (be *BytecodeEvaluator) exec(
+	ctx context.Context,
+	bytecode *risorCompiler.Code,
+	options ...risorLib.Option,
+) (*execResult, error) {
+	logger := be.logger.WithGroup("exec")
 	startTime := time.Now()
 	result, err := risorLib.EvalCode(ctx, bytecode, options...)
 	execTime := time.Since(startTime)
 
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("risor execution error: %w", err)
 	}
 
+	logger.InfoContext(ctx, "execution complete", "result", result)
 	return newEvalResult(be.logHandler, result, execTime, ""), nil
-}
-
-// convertToRisorOptions converts a Go map into Risor VM options.
-// The input data will be wrapped in a single "ctx" object passed to the VM.
-//
-// For example, if the inputData is {"foo": "bar", "baz": 123}, the output will be:
-//
-//	[]risorLib.Option{
-//	  risorLib.WithGlobal("ctx", map[string]any{
-//	    "foo": "bar",
-//	    "baz": 123,
-//	  }),
-//	}
-func (be *BytecodeEvaluator) convertToRisorOptions(inputData map[string]any) []risorLib.Option {
-	return []risorLib.Option{
-		risorLib.WithGlobal(be.ctxKey, inputData),
-	}
 }
 
 // Eval evaluates the loaded bytecode and uses the provided EvalData to pass data in to the Risor VM execution
@@ -125,29 +112,29 @@ func (be *BytecodeEvaluator) Eval(ctx context.Context) (engine.EvaluatorResponse
 	}
 	logger = logger.With("exeID", exeID)
 
-	// 1. Get the raw input data
-	inputData, err := be.loadInputData(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get input data: %w", err)
-	}
-
-	// 2. Convert to Risor VM format
-	inputDataOptions := be.convertToRisorOptions(inputData)
-
-	// 3. Type assert the bytecode into *risorCompiler.Code
+	// 1. Type assert the bytecode into *risorCompiler.Code
 	risorByteCode, ok := bytecode.(*risorCompiler.Code)
 	if !ok {
 		return nil, fmt.Errorf("unable to type assert bytecode into *risorCompiler.Code for ID: %s", exeID)
 	}
 
-	// 4. Execute in the VM
-	result, err := be.exec(ctx, risorByteCode, inputDataOptions...)
+	// 2. Get the raw input data
+	rawInputData, err := be.loadInputData(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get input data: %w", err)
+	}
+
+	// 3. Convert to Risor VM format
+	runtimeData := convertToRisorOptions(be.ctxKey, rawInputData)
+
+	// 4. Execute the program
+	result, err := be.exec(ctx, risorByteCode, runtimeData...)
 	if err != nil {
 		return nil, fmt.Errorf("error returned from script: %w", err)
 	}
 	logger.Debug("script execution complete", "result", result)
 
-	// Set the script version on the result
+	// 5. Collect results
 	result.scriptExeID = exeID
 
 	if result.Object == nil {
@@ -162,6 +149,7 @@ func (be *BytecodeEvaluator) Eval(ctx context.Context) (engine.EvaluatorResponse
 		return result, fmt.Errorf("function object returned from script: %s", result.Inspect())
 	}
 
+	logger.DebugContext(ctx, "execution complete")
 	return result, nil
 }
 

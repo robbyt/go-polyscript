@@ -51,41 +51,6 @@ func (be *BytecodeEvaluator) String() string {
 	return "starlark.BytecodeEvaluator"
 }
 
-// convertToStarlarkFormat converts a Go map into Starlark StringDict format.
-// It wraps the input data in a "ctx" object that will be accessible within the script.
-func (be *BytecodeEvaluator) convertToStarlarkFormat(inputData map[string]any) (starlarkLib.StringDict, error) {
-	// Start with the ctx dict
-	sDict := make(starlarkLib.StringDict, 1)
-
-	// Create a Starlark dict for the ctx global variable
-	ctxDict := starlarkLib.NewDict(len(inputData))
-
-	// Convert each input data key-value pair and add to the ctxDict
-	errz := make([]error, 0, len(inputData))
-	for k, v := range inputData {
-		starlarkVal, err := convertToStarlarkValue(v)
-		if err != nil {
-			// Collect errors but continue processing
-			errz = append(errz, fmt.Errorf("failed to convert input value for key %q: %w", k, err))
-			continue
-		}
-		if err := ctxDict.SetKey(starlarkLib.String(k), starlarkVal); err != nil {
-			// Collect errors but continue processing
-			errz = append(errz, fmt.Errorf("failed to set ctx dict key %q: %w", k, err))
-			continue
-		}
-	}
-
-	// If we had errors, return the first one
-	if len(errz) > 0 {
-		return nil, errz[0]
-	}
-
-	// Set the ctx global variable to the dictionary
-	sDict[constants.Ctx] = ctxDict
-	return sDict, nil
-}
-
 // loadInputData retrieves input data using the data provider in the executable unit.
 // Returns a map that will be used as input for the Starlark VM.
 func (be *BytecodeEvaluator) loadInputData(ctx context.Context) (map[string]any, error) {
@@ -106,15 +71,13 @@ func (be *BytecodeEvaluator) loadInputData(ctx context.Context) (map[string]any,
 
 	if len(inputData) == 0 {
 		logger.WarnContext(ctx, "empty input data returned from provider")
-	} else {
-		logger.DebugContext(ctx, "input data loaded from provider", "inputData", inputData)
 	}
-
+	logger.DebugContext(ctx, "input data loaded from provider", "inputData", inputData)
 	return inputData, nil
 }
 
 // prepareGlobals merges the universe and input globals into a single Starlark dictionary
-func (be *BytecodeEvaluator) prepareGlobals(ctx context.Context, inputGlobals starlarkLib.StringDict) starlarkLib.StringDict {
+func (be *BytecodeEvaluator) prepareGlobals(inputGlobals starlarkLib.StringDict) starlarkLib.StringDict {
 	// Pre-allocate with exact capacity needed
 	mergedGlobals := make(starlarkLib.StringDict, len(be.universe)+len(inputGlobals))
 
@@ -128,7 +91,11 @@ func (be *BytecodeEvaluator) prepareGlobals(ctx context.Context, inputGlobals st
 }
 
 // exec executes the bytecode with the provided globals
-func (be *BytecodeEvaluator) exec(ctx context.Context, prog *starlarkLib.Program, globals starlarkLib.StringDict) (*execResult, error) {
+func (be *BytecodeEvaluator) exec(
+	ctx context.Context,
+	prog *starlarkLib.Program,
+	globals starlarkLib.StringDict,
+) (*execResult, error) {
 	logger := be.logger.WithGroup("exec")
 	startTime := time.Now()
 
@@ -160,7 +127,6 @@ func (be *BytecodeEvaluator) exec(ctx context.Context, prog *starlarkLib.Program
 	if mainVal == nil {
 		mainVal = starlarkLib.None
 	}
-	logger.InfoContext(ctx, "execution complete", "mainVal", mainVal)
 
 	// Check if the value is None and try to find a valid result variable
 	if mainVal == starlarkLib.None {
@@ -171,6 +137,7 @@ func (be *BytecodeEvaluator) exec(ctx context.Context, prog *starlarkLib.Program
 		}
 	}
 
+	logger.InfoContext(ctx, "execution complete", "result", mainVal)
 	return newEvalResult(be.logHandler, mainVal, execTime, ""), nil
 }
 
@@ -194,39 +161,38 @@ func (be *BytecodeEvaluator) Eval(ctx context.Context) (engine.EvaluatorResponse
 	// Get execution ID
 	exeID := be.execUnit.GetID()
 	if exeID == "" {
-		return nil, fmt.Errorf("execution ID is empty")
+		return nil, fmt.Errorf("exeID is empty")
 	}
 	logger = logger.With("exeID", exeID)
 
-	// Type assert to Starlark program
+	// 1. Type assert to Starlark program
 	prog, ok := bytecode.(*starlarkLib.Program)
 	if !ok {
 		return nil, fmt.Errorf("invalid bytecode type: expected *starlark.Program, got %T", bytecode)
 	}
 
-	// 1. Get the raw input data
-	inputData, err := be.loadInputData(ctx)
+	// 2. Get the raw input data
+	rawInputData, err := be.loadInputData(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get input data: %w", err)
 	}
 
-	// 2. Convert input data to Starlark values
-	globals, err := be.convertToStarlarkFormat(inputData)
+	// 3. Convert input data to Starlark values
+	input, err := convertToStarlarkFormat(rawInputData)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert input data: %w", err)
 	}
-
-	// 3. Prepare globals by merging with universe
-	mergedGlobals := be.prepareGlobals(ctx, globals)
+	// Prepare globals by merging input with "universe"
+	runtimeData := be.prepareGlobals(input)
 
 	// 4. Execute the program
-	result, err := be.exec(ctx, prog, mergedGlobals)
+	result, err := be.exec(ctx, prog, runtimeData)
 	if err != nil {
 		return nil, fmt.Errorf("execution error: %w", err)
 	}
 	logger.Debug("script execution complete", "result", result)
 
-	// Set the execution ID
+	// 5. Collect results
 	result.scriptExeID = exeID
 
 	// Handle specific return types
@@ -244,6 +210,7 @@ func (be *BytecodeEvaluator) Eval(ctx context.Context) (engine.EvaluatorResponse
 		}
 		// "Freeze" the value to prevent any further modifications
 		val.Freeze()
+		logger.DebugContext(ctx, "execution complete")
 		return newEvalResult(be.logHandler, val, result.execTime, exeID), nil
 	}
 

@@ -1,8 +1,6 @@
 package starlark
 
 import (
-	"io"
-	"log/slog"
 	"net/url"
 	"testing"
 
@@ -230,10 +228,7 @@ func TestConvertToStarlarkFormat(t *testing.T) {
 
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
-				evaluator := &BytecodeEvaluator{
-					logger: slog.New(slog.NewJSONHandler(io.Discard, nil)),
-				}
-				result, err := evaluator.convertToStarlarkFormat(tt.input)
+				result, err := convertToStarlarkFormat(tt.input)
 				if tt.wantErr {
 					require.Error(t, err)
 					return
@@ -328,10 +323,7 @@ func TestConvertToStarlarkFormat(t *testing.T) {
 
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
-				evaluator := &BytecodeEvaluator{
-					logger: slog.New(slog.NewJSONHandler(io.Discard, nil)),
-				}
-				result, err := evaluator.convertToStarlarkFormat(tt.input)
+				result, err := convertToStarlarkFormat(tt.input)
 				if tt.wantErr {
 					require.Error(t, err)
 					return
@@ -387,10 +379,7 @@ func TestConvertToStarlarkFormat(t *testing.T) {
 
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
-				evaluator := &BytecodeEvaluator{
-					logger: slog.New(slog.NewJSONHandler(io.Discard, nil)),
-				}
-				_, err := evaluator.convertToStarlarkFormat(tt.input)
+				_, err := convertToStarlarkFormat(tt.input)
 				require.Error(t, err)
 				require.Contains(t, err.Error(), "failed to convert input value")
 			})

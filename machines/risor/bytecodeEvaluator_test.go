@@ -453,27 +453,6 @@ func TestLoadInputData(t *testing.T) {
 	})
 }
 
-// TestConvertToRisorOptions tests the convertToRisorOptions method
-func TestConvertToRisorOptions(t *testing.T) {
-	t.Parallel()
-	handler := slog.NewTextHandler(os.Stderr, nil)
-
-	evaluator := &BytecodeEvaluator{
-		ctxKey:     constants.Ctx,
-		logHandler: handler,
-		logger:     slog.New(handler),
-	}
-
-	// Test with empty data
-	options := evaluator.convertToRisorOptions(map[string]any{})
-	require.Len(t, options, 1)
-
-	// Test with actual data
-	testData := map[string]any{"foo": "bar"}
-	options = evaluator.convertToRisorOptions(testData)
-	require.Len(t, options, 1)
-}
-
 // TestGetMachineType tests the GetMachineType method
 func TestGetMachineType(t *testing.T) {
 	t.Parallel()
