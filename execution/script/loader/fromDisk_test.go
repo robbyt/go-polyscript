@@ -7,10 +7,13 @@ import (
 	"runtime"
 	"testing"
 
+	"github.com/robbyt/go-polyscript/internal/helpers"
 	"github.com/stretchr/testify/require"
 )
 
 func TestNewFromDisk(t *testing.T) {
+	t.Parallel()
+
 	t.Run("valid paths", func(t *testing.T) {
 		tempDir := t.TempDir()
 		absPath := filepath.Join(tempDir, "test.js")
@@ -132,6 +135,7 @@ func TestNewFromDisk(t *testing.T) {
 
 func TestFromDisk_GetReader(t *testing.T) {
 	t.Parallel()
+
 	t.Run("read file contents", func(t *testing.T) {
 		// Setup test file
 		tempDir := t.TempDir()
@@ -161,10 +165,58 @@ func TestFromDisk_GetReader(t *testing.T) {
 		require.NoError(t, err, "Failed to read content")
 		require.Equal(t, testContent, string(content), "Content mismatch")
 	})
+
+	t.Run("multiple reads from same loader", func(t *testing.T) {
+		// Setup test file
+		tempDir := t.TempDir()
+		testContent := "function calculate() { return 42; }"
+		testFile := filepath.Join(tempDir, "test.js")
+
+		err := os.WriteFile(testFile, []byte(testContent), 0o644)
+		require.NoError(t, err, "Failed to write test file")
+
+		// Create loader
+		loader, err := NewFromDisk(testFile)
+		require.NoError(t, err, "Failed to create loader")
+
+		// First read
+		reader1, err := loader.GetReader()
+		require.NoError(t, err)
+		t.Cleanup(func() {
+			require.NoError(t, reader1.Close(), "Failed to close first reader")
+		})
+		got1, err := io.ReadAll(reader1)
+		require.NoError(t, err)
+		require.Equal(t, testContent, string(got1))
+
+		// Second read should return a new reader with the same content
+		reader2, err := loader.GetReader()
+		require.NoError(t, err)
+		t.Cleanup(func() {
+			require.NoError(t, reader2.Close(), "Failed to close second reader")
+		})
+		got2, err := io.ReadAll(reader2)
+		require.NoError(t, err)
+		require.Equal(t, testContent, string(got2))
+	})
+
+	t.Run("file not found", func(t *testing.T) {
+		tempDir := t.TempDir()
+		nonExistingFile := filepath.Join(tempDir, "nonexisting.js")
+
+		loader, err := NewFromDisk(nonExistingFile)
+		require.NoError(t, err)
+
+		reader, err := loader.GetReader()
+		require.Error(t, err)
+		require.Nil(t, reader)
+		require.Contains(t, err.Error(), "no such file or directory")
+	})
 }
 
 func TestFromDisk_GetSourceURL(t *testing.T) {
 	t.Parallel()
+
 	t.Run("valid source URL", func(t *testing.T) {
 		// Setup test file
 		tempDir := t.TempDir()
@@ -174,7 +226,51 @@ func TestFromDisk_GetSourceURL(t *testing.T) {
 		loader, err := NewFromDisk(testFile)
 		require.NoError(t, err, "Failed to create loader")
 
-		// Ensure source URL is set
-		require.Equal(t, "file://"+testFile, loader.GetSourceURL().String())
+		// Get and validate source URL
+		url := loader.GetSourceURL()
+		require.NotNil(t, url)
+		require.Equal(t, "file", url.Scheme)
+		require.Equal(t, "file://"+testFile, url.String())
+	})
+}
+
+func TestFromDisk_String(t *testing.T) {
+	t.Parallel()
+
+	t.Run("string representation with content", func(t *testing.T) {
+		// Setup test file
+		tempDir := t.TempDir()
+		testContent := "test content for string method"
+		testFile := filepath.Join(tempDir, "test.js")
+
+		err := os.WriteFile(testFile, []byte(testContent), 0o644)
+		require.NoError(t, err, "Failed to write test file")
+
+		// Create loader
+		loader, err := NewFromDisk(testFile)
+		require.NoError(t, err, "Failed to create loader")
+
+		// Get string representation
+		str := loader.String()
+		require.Contains(t, str, "loader.FromDisk{Path:")
+		require.Contains(t, str, testFile)
+		require.Contains(t, str, "SHA256:")
+
+		// Verify SHA256 hash is correct
+		contentHash := helpers.SHA256(testContent)[:8]
+		require.Contains(t, str, contentHash)
+	})
+
+	t.Run("string representation with non-existent file", func(t *testing.T) {
+		tempDir := t.TempDir()
+		nonExistingFile := filepath.Join(tempDir, "nonexisting.js")
+
+		loader, err := NewFromDisk(nonExistingFile)
+		require.NoError(t, err)
+
+		str := loader.String()
+		require.Contains(t, str, "loader.FromDisk{Path:")
+		require.Contains(t, str, nonExistingFile)
+		require.NotContains(t, str, "SHA256:")
 	})
 }

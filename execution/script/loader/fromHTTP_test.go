@@ -89,10 +89,7 @@ func TestNewFromHTTP(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt // Capture range variable
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
 			loader, err := NewFromHTTP(tt.url)
 			if tt.expectError {
 				require.Error(t, err)
@@ -179,10 +176,7 @@ func TestNewFromHTTPWithOptions(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt // Capture range variable
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
 			// Start with default options and apply modifier if provided
 			options := DefaultHTTPOptions()
 			if tt.optionsModifier != nil {
@@ -213,7 +207,7 @@ func TestNewFromHTTPWithOptions(t *testing.T) {
 	}
 }
 
-func TestFromHTTPGetReader(t *testing.T) {
+func TestFromHTTP_GetReader(t *testing.T) {
 	t.Parallel()
 
 	const testScript = `function test() { return "Hello, World!"; }`
@@ -324,10 +318,7 @@ func TestFromHTTPGetReader(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt // Capture range variable
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
 			// Create a mock client for this test
 			mockClient := &mockHTTPClient{
 				doFunc: func(req *http.Request) (*http.Response, error) {
@@ -381,7 +372,7 @@ func TestFromHTTPGetReader(t *testing.T) {
 	}
 }
 
-func TestFromHTTPGetReaderWithContext(t *testing.T) {
+func TestFromHTTP_GetReaderWithContext(t *testing.T) {
 	t.Parallel()
 
 	const testScript = `function test() { return "Hello, World!"; }`
@@ -421,10 +412,7 @@ func TestFromHTTPGetReaderWithContext(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt // Capture range variable
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
 			loader, err := NewFromHTTP(tt.url)
 			require.NoError(t, err)
 
@@ -458,60 +446,66 @@ func TestFromHTTPGetReaderWithContext(t *testing.T) {
 	}
 }
 
-func TestFromHTTPString(t *testing.T) {
+func TestFromHTTP_String(t *testing.T) {
 	t.Parallel()
 
-	// Test successful String() result with mock client
-	testURL := "https://example.com/script.js"
-	loader, err := NewFromHTTP(testURL)
-	require.NoError(t, err)
+	t.Run("successful string representation", func(t *testing.T) {
+		// Test successful String() result with mock client
+		testURL := "https://example.com/script.js"
+		loader, err := NewFromHTTP(testURL)
+		require.NoError(t, err)
 
-	// Mock client that returns content for SHA256 calculation
-	mockClient := &mockHTTPClient{
-		doFunc: func(req *http.Request) (*http.Response, error) {
-			return newMockResponse(http.StatusOK, "test script content"), nil
-		},
-	}
-	loader.client = mockClient
+		// Mock client that returns content for SHA256 calculation
+		mockClient := &mockHTTPClient{
+			doFunc: func(req *http.Request) (*http.Response, error) {
+				return newMockResponse(http.StatusOK, "test script content"), nil
+			},
+		}
+		loader.client = mockClient
 
-	str := loader.String()
-	require.Contains(t, str, "loader.FromHTTP{URL:")
-	require.Contains(t, str, testURL)
-	require.Contains(t, str, "SHA256:")
+		str := loader.String()
+		require.Contains(t, str, "loader.FromHTTP{URL:")
+		require.Contains(t, str, testURL)
+		require.Contains(t, str, "SHA256:")
+	})
 
-	// Test error case for String method
-	failingLoader, err := NewFromHTTP(testURL)
-	require.NoError(t, err)
+	t.Run("string representation with network error", func(t *testing.T) {
+		testURL := "https://example.com/script.js"
+		loader, err := NewFromHTTP(testURL)
+		require.NoError(t, err)
 
-	// Mock client that simulates an error
-	failingMockClient := &mockHTTPClient{
-		doFunc: func(req *http.Request) (*http.Response, error) {
-			return nil, errors.New("network error")
-		},
-	}
-	failingLoader.client = failingMockClient
+		// Mock client that simulates an error
+		failingMockClient := &mockHTTPClient{
+			doFunc: func(req *http.Request) (*http.Response, error) {
+				return nil, errors.New("network error")
+			},
+		}
+		loader.client = failingMockClient
 
-	str = failingLoader.String()
-	require.Contains(t, str, "loader.FromHTTP{URL:")
-	require.Contains(t, str, testURL)
-	require.NotContains(t, str, "SHA256")
+		str := loader.String()
+		require.Contains(t, str, "loader.FromHTTP{URL:")
+		require.Contains(t, str, testURL)
+		require.NotContains(t, str, "SHA256")
+	})
 
-	// Test when HTTP response is an error code
-	errorLoader, err := NewFromHTTP(testURL)
-	require.NoError(t, err)
+	t.Run("string representation with HTTP error", func(t *testing.T) {
+		testURL := "https://example.com/script.js"
+		loader, err := NewFromHTTP(testURL)
+		require.NoError(t, err)
 
-	// Mock client that returns an error status code
-	errorMockClient := &mockHTTPClient{
-		doFunc: func(req *http.Request) (*http.Response, error) {
-			return newMockResponse(http.StatusNotFound, "Not Found"), nil
-		},
-	}
-	errorLoader.client = errorMockClient
+		// Mock client that returns an error status code
+		errorMockClient := &mockHTTPClient{
+			doFunc: func(req *http.Request) (*http.Response, error) {
+				return newMockResponse(http.StatusNotFound, "Not Found"), nil
+			},
+		}
+		loader.client = errorMockClient
 
-	str = errorLoader.String()
-	require.Contains(t, str, "loader.FromHTTP{URL:")
-	require.Contains(t, str, testURL)
-	require.NotContains(t, str, "SHA256")
+		str := loader.String()
+		require.Contains(t, str, "loader.FromHTTP{URL:")
+		require.Contains(t, str, testURL)
+		require.NotContains(t, str, "SHA256")
+	})
 }
 
 func TestDefaultHTTPOptions(t *testing.T) {
@@ -530,34 +524,63 @@ func TestDefaultHTTPOptions(t *testing.T) {
 func TestHTTPOptionsWithMethods(t *testing.T) {
 	t.Parallel()
 
-	// Test chaining of option methods
-	options := DefaultHTTPOptions().
-		WithTimeout(60*time.Second).
-		WithBasicAuth("user", "pass")
+	t.Run("option method chaining", func(t *testing.T) {
+		// Test chaining of option methods
+		options := DefaultHTTPOptions().
+			WithTimeout(60*time.Second).
+			WithBasicAuth("user", "pass")
 
-	require.Equal(t, 60*time.Second, options.Timeout)
+		require.Equal(t, 60*time.Second, options.Timeout)
 
-	// Check authenticator
-	auth, ok := options.Authenticator.(*httpauth.BasicAuth)
-	require.True(t, ok, "Expected BasicAuth authenticator")
-	require.Equal(t, "user", auth.Username)
-	require.Equal(t, "pass", auth.Password)
+		// Check authenticator
+		auth, ok := options.Authenticator.(*httpauth.BasicAuth)
+		require.True(t, ok, "Expected BasicAuth authenticator")
+		require.Equal(t, "user", auth.Username)
+		require.Equal(t, "pass", auth.Password)
+	})
+
+	t.Run("with header auth", func(t *testing.T) {
+		headers := map[string]string{
+			"X-API-Key":    "api-key-123",
+			"X-Custom-Key": "custom-value",
+		}
+
+		options := DefaultHTTPOptions().WithHeaderAuth(headers)
+
+		auth, ok := options.Authenticator.(*httpauth.HeaderAuth)
+		require.True(t, ok, "Expected HeaderAuth authenticator")
+		require.Equal(t, "api-key-123", auth.Headers["X-API-Key"])
+		require.Equal(t, "custom-value", auth.Headers["X-Custom-Key"])
+	})
+
+	t.Run("with no auth", func(t *testing.T) {
+		// Start with basic auth
+		options := DefaultHTTPOptions().WithBasicAuth("user", "pass")
+
+		// Then switch to no auth
+		noAuthOptions := options.WithNoAuth()
+
+		// Check that authenticator is NoAuth
+		require.Equal(t, "None", noAuthOptions.Authenticator.Name())
+		require.NotEqual(t, options.Authenticator, noAuthOptions.Authenticator)
+	})
 }
 
-// Test the GetSourceURL method
-func TestFromHTTPGetSourceURL(t *testing.T) {
+func TestFromHTTP_GetSourceURL(t *testing.T) {
 	t.Parallel()
 
-	testURL := "https://example.com/script.js"
-	loader, err := NewFromHTTP(testURL)
-	require.NoError(t, err)
+	t.Run("source URL", func(t *testing.T) {
+		testURL := "https://example.com/script.js"
+		loader, err := NewFromHTTP(testURL)
+		require.NoError(t, err)
 
-	sourceURL := loader.GetSourceURL()
-	require.NotNil(t, sourceURL)
-	require.Equal(t, testURL, sourceURL.String())
+		sourceURL := loader.GetSourceURL()
+		require.NotNil(t, sourceURL)
+		require.Equal(t, testURL, sourceURL.String())
 
-	// Test that the returned URL is a copy that can't modify the internal state
-	parsedURL, err := url.Parse(testURL)
-	require.NoError(t, err)
-	require.Equal(t, parsedURL, sourceURL)
+		// Test that the returned URL is a copy that can't modify the internal state
+		parsedURL, err := url.Parse(testURL)
+		require.NoError(t, err)
+		require.Equal(t, parsedURL, sourceURL)
+	})
 }
