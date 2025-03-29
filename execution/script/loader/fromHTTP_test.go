@@ -3,6 +3,7 @@ package loader
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"errors"
 	"io"
 	"net/http"
@@ -205,6 +206,88 @@ func TestNewFromHTTPWithOptions(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestFromHTTP_TLSConfig(t *testing.T) {
+	t.Parallel()
+
+	t.Run("with insecure skip verify", func(t *testing.T) {
+		options := DefaultHTTPOptions()
+		options.InsecureSkipVerify = true
+
+		loader, err := NewFromHTTPWithOptions("https://example.com/script.js", options)
+		require.NoError(t, err)
+		require.NotNil(t, loader)
+
+		// Extract the transport to verify TLS settings
+		transport, ok := loader.client.(*http.Client).Transport.(*http.Transport)
+		require.True(t, ok, "Expected *http.Transport")
+		require.NotNil(t, transport.TLSClientConfig)
+		require.True(t, transport.TLSClientConfig.InsecureSkipVerify,
+			"InsecureSkipVerify should be true")
+	})
+
+	t.Run("with custom TLS config", func(t *testing.T) {
+		options := DefaultHTTPOptions()
+		customTLS := &tls.Config{
+			MinVersion: tls.VersionTLS12,
+			// Add custom ciphers
+			CipherSuites: []uint16{tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384},
+		}
+		options.TLSConfig = customTLS
+
+		loader, err := NewFromHTTPWithOptions("https://example.com/script.js", options)
+		require.NoError(t, err)
+		require.NotNil(t, loader)
+
+		// Extract the transport to verify TLS settings
+		transport, ok := loader.client.(*http.Client).Transport.(*http.Transport)
+		require.True(t, ok, "Expected *http.Transport")
+		require.NotNil(t, transport.TLSClientConfig)
+		require.Equal(t, uint16(tls.VersionTLS12), transport.TLSClientConfig.MinVersion)
+		require.Contains(t, transport.TLSClientConfig.CipherSuites,
+			tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384)
+	})
+
+	t.Run("TLSConfig takes precedence over InsecureSkipVerify", func(t *testing.T) {
+		options := DefaultHTTPOptions()
+		options.InsecureSkipVerify = true
+		customTLS := &tls.Config{
+			InsecureSkipVerify: false,
+			MinVersion:         tls.VersionTLS13,
+		}
+		options.TLSConfig = customTLS
+
+		loader, err := NewFromHTTPWithOptions("https://example.com/script.js", options)
+		require.NoError(t, err)
+		require.NotNil(t, loader)
+
+		// Extract the transport to verify TLS settings
+		transport, ok := loader.client.(*http.Client).Transport.(*http.Transport)
+		require.True(t, ok, "Expected *http.Transport")
+		require.NotNil(t, transport.TLSClientConfig)
+
+		// Should use the TLSConfig value (false) rather than the InsecureSkipVerify field (true)
+		require.False(t, transport.TLSClientConfig.InsecureSkipVerify,
+			"TLSConfig should override InsecureSkipVerify")
+		require.Equal(t, uint16(tls.VersionTLS13), transport.TLSClientConfig.MinVersion)
+	})
+
+	t.Run("no TLS modifications when neither option is set", func(t *testing.T) {
+		options := DefaultHTTPOptions()
+
+		loader, err := NewFromHTTPWithOptions("https://example.com/script.js", options)
+		require.NoError(t, err)
+		require.NotNil(t, loader)
+
+		// When no TLS options are set, the client uses the default transport without modifications
+		client, ok := loader.client.(*http.Client)
+		require.True(t, ok, "Expected http.Client")
+
+		// The http.Client only initializes Transport when needed, so it might be nil at this point
+		// We should check that it's nil when neither TLS option is set
+		require.Nil(t, client.Transport, "Expected Transport to be nil when no TLS options are set")
+	})
 }
 
 func TestFromHTTP_GetReader(t *testing.T) {

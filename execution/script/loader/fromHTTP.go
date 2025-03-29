@@ -166,14 +166,23 @@ func NewFromHTTPWithOptions(rawURL string, options *HTTPOptions) (*FromHTTP, err
 
 	// Configure TLS if needed
 	if options.InsecureSkipVerify || options.TLSConfig != nil {
+		// Start with default transport
 		transport := http.DefaultTransport.(*http.Transport).Clone()
-		if options.TLSConfig != nil {
-			transport.TLSClientConfig = options.TLSConfig
-		} else if options.InsecureSkipVerify {
-			transport.TLSClientConfig = &tls.Config{
-				InsecureSkipVerify: true,
-			}
+
+		// Configure TLS
+		tlsConfig := transport.TLSClientConfig
+		if tlsConfig == nil {
+			tlsConfig = &tls.Config{}
 		}
+
+		// Apply custom config or skip verify flag
+		if options.TLSConfig != nil {
+			tlsConfig = options.TLSConfig
+		} else if options.InsecureSkipVerify {
+			tlsConfig.InsecureSkipVerify = true
+		}
+
+		transport.TLSClientConfig = tlsConfig
 		client.Transport = transport
 	}
 
