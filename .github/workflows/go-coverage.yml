@@ -27,7 +27,9 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
-          cache-dependency-path: go.sum
+          cache-dependency-path: |
+             go.sum
+             machines/extism/testdata/go.sum
 
       - name: Display Go version
         run: go version
