@@ -38,8 +38,7 @@ jobs:
         run: |
           go test -coverprofile=unit.coverage.out -cover ./...
           cd machines/extism/testdata && \
-            go test -coverprofile=extism.coverage.out -cover ./... && \
-            mv extism.coverage.out ../../../
+            go test -coverprofile=../../../extism.coverage.out -cover .
 
       - name: SonarQube Scan
         uses: SonarSource/sonarqube-scan-action@v5
