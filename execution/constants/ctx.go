@@ -9,7 +9,10 @@ const (
 	EvalData ContextKey = "eval_data" // object added to ctx objects sent to the evaluator, load with ctx.Value()
 
 	// These are string keys used within the EvalData map, not context keys
-	Ctx        = "ctx"         // top-scope variable name for accessing input data from scripts
-	Request    = "request"     // key for accessing the request object from the EvalData map
-	ScriptData = "script_data" // key for accessing the "script_data" object set in the config file
+	Ctx = "ctx" // top-scope variable name for accessing input data from scripts
+
+	// These sub-keys will be nested under the ctx key, in the input data provided to the evaluator at runtime
+	Request   = "request"
+	Response  = "response"
+	InputData = "input_data"
 )

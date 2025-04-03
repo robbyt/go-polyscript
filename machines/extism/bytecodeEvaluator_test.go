@@ -592,3 +592,103 @@ func TestEvalWithCancelledContext(t *testing.T) {
 	// Should get an error (either cancellation or plugin error)
 	require.Error(t, err)
 }
+
+/*
+// TestScriptDataAndDataProvider tests that ScriptData from ExecutableUnit is properly combined
+// with data from the DataProvider
+func TestScriptDataAndDataProvider(t *testing.T) {
+	t.Skip("Need to confirm behavior of the script_data in ctx")
+	// Load the test WASM file
+	wasmContent, err := os.ReadFile(testWasmPath)
+	require.NoError(t, err, "Failed to read WASM test file")
+
+	// Create a mock compiled plugin
+	ctx := context.Background()
+	compileOpts := withDefaultCompileOptions()
+	compiledPlugin, err := CompileBytes(ctx, wasmContent, compileOpts)
+	require.NoError(t, err, "Failed to compile plugin")
+
+	// Create our executable
+	exec := NewExecutable(wasmContent, compiledPlugin, "greet")
+
+	// Create a context provider for runtime data
+	ctxProvider := data.NewContextProvider(constants.EvalData)
+
+	// Create static data for compile-time configuration
+	staticData := map[string]any{"initial": "value"}
+
+	// Create a static provider
+	staticProvider := data.NewStaticProvider(staticData)
+
+	// Create a composite provider that combines static and context data
+	compositeProvider := data.NewCompositeProvider(staticProvider, ctxProvider)
+
+	// Create the executable unit with the composite provider
+	execUnit := &script.ExecutableUnit{
+		ID:           "test-script-data",
+		DataProvider: compositeProvider,
+		Content:      exec,
+	}
+
+	// Create handler and evaluator
+	handler := slog.NewTextHandler(os.Stdout, nil)
+	evaluator := NewBytecodeEvaluator(handler, execUnit)
+
+	// Create a context
+	ctx = context.Background()
+
+	// First test: load data with empty context
+	result1, err := evaluator.loadInputData(ctx)
+	require.NoError(t, err)
+	assert.Contains(t, result1, "initial")
+	assert.Equal(t, "value", result1["initial"])
+
+	// Second test: add data to context and verify it's merged with script data
+	inputData := map[string]any{"input": "test input"}
+	enrichedCtx, err := evaluator.PrepareContext(ctx, inputData)
+	require.NoError(t, err)
+
+	result2, err := evaluator.loadInputData(enrichedCtx)
+	require.NoError(t, err)
+	// Static data should still be there
+	assert.Contains(t, result2, "initial")
+	assert.Equal(t, "value", result2["initial"])
+	// Runtime data from the ContextProvider is stored under the 'script_data' key
+	assert.Contains(t, result2, constants.ScriptData)
+
+	// Extract the script_data map and verify it's the correct type
+	scriptData, ok := result2[constants.ScriptData].(map[string]any)
+	require.True(t, ok, "script_data should be a map")
+
+	// Verify our input data was correctly stored in the script_data map
+	assert.Contains(t, scriptData, "input")
+	assert.Equal(t, "test input", scriptData["input"])
+}
+*/
+
+// TestExtismDirectInputFormat tests how input data is formatted for Extism
+func TestExtismDirectInputFormat(t *testing.T) {
+	// Create a test map that simulates data from our providers
+	inputData := map[string]any{
+		"initial": "top-level-value",
+		"request": map[string]any{},
+		"script_data": map[string]any{
+			"input": "API User",
+		},
+	}
+
+	// First, log the structure to understand what we're dealing with
+	t.Logf("Input data structure: %#v", inputData)
+
+	// Convert the input data for Extism
+	jsonBytes, err := convertToExtismFormat(inputData)
+	require.NoError(t, err)
+	require.NotNil(t, jsonBytes)
+
+	// Log the JSON output
+	t.Logf("JSON for Extism: %s", string(jsonBytes))
+
+	// Verify current behavior (we'll modify this later based on our design decision)
+	expected := `{"initial":"top-level-value","request":{},"script_data":{"input":"API User"}}`
+	assert.JSONEq(t, expected, string(jsonBytes))
+}

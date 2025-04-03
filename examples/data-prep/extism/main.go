@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/robbyt/go-polyscript"
@@ -15,151 +14,150 @@ import (
 	"github.com/robbyt/go-polyscript/options"
 )
 
-// FindWasmFile searches for the Extism WASM file in various likely locations
-func FindWasmFile(logger *slog.Logger) (string, error) {
-	paths := []string{
-		"main.wasm",                                            // Current directory
-		"extism/main.wasm",                                     // extism subdirectory
-		"data-prep/extism/main.wasm",                           // data-prep/extism subdirectory
-		"examples/extism/main.wasm",                            // examples/extism
-		"examples/data-prep/extism/main.wasm",                  // examples/data-prep/extism
-		"../../../machines/extism/testdata/examples/main.wasm", // From machines testdata
+// ExtismEvaluator is a type alias to make testing cleaner
+type ExtismEvaluator = engine.EvaluatorWithPrep
+
+// CreateExtismEvaluator creates a new Extism evaluator with the given WASM file and logger
+func CreateExtismEvaluator(wasmFilePath string, handler slog.Handler) (*ExtismEvaluator, error) {
+	// Create a StaticProvider with compile-time data
+	staticData := map[string]any{
+		// Put the input field directly at the top level for Extism
+		"input": "API User",
+	}
+	staticProvider := data.NewStaticProvider(staticData)
+
+	// Also create a ContextProvider for any runtime data
+	// Using the eval_data key where data will be stored in the context
+	ctxProvider := data.NewContextProvider("eval_data")
+
+	// Create a CompositeProvider that combines both static and runtime data
+	// The ordering is important: runtime data (ctxProvider) will override static data
+	compositeProvider := data.NewCompositeProvider(staticProvider, ctxProvider)
+
+	// Create evaluator using the functional options pattern
+	evaluator, err := polyscript.FromExtismFile(
+		wasmFilePath,
+		options.WithLogger(handler),
+		options.WithDataProvider(compositeProvider), // Use the composite provider
+		extism.WithEntryPoint("greet"),
+	)
+	if err != nil {
+		return nil, err
 	}
 
-	for _, path := range paths {
-		if _, err := os.Stat(path); err == nil {
-			absPath, err := filepath.Abs(path)
-			if err == nil {
-				if logger != nil {
-					logger.Info("Found WASM file", "path", absPath)
-				}
-				return absPath, nil
-			}
-		}
-	}
-
-	return "", fmt.Errorf("WASM file not found in any of the expected locations")
+	return &evaluator, nil
 }
 
-// simulateAPIRequest creates fake data to simulate an incoming API request
-func simulateAPIRequest() map[string]any {
-	return map[string]any{
-		"input":     "World",
-		"timestamp": time.Now().Format(time.RFC3339),
-		"requestId": fmt.Sprintf("req-%d", time.Now().UnixNano()),
+// PrepareRequestData prepares the context with request data
+func PrepareRequestData(
+	ctx context.Context,
+	evaluator ExtismEvaluator,
+	logger *slog.Logger,
+) (context.Context, error) {
+	// Simulate gathering data from an API request
+	logger.Info("Preparing request data")
+
+	// For Extism, we need to structure our data so that the "input" field
+	// will be directly accessible to the WASM module. The ContextProvider wraps
+	// map[string]any data in script_data, so we need to add our data there.
+	scriptData := map[string]any{
+		"input": "API User", // This is what the Extism WASM module needs
 	}
+
+	// Enrich context with request data
+	enrichedCtx, err := evaluator.PrepareContext(ctx, scriptData)
+	if err != nil {
+		logger.Error("Failed to prepare context with request data", "error", err)
+		return nil, err
+	}
+
+	logger.Info("Request data prepared successfully")
+	return enrichedCtx, nil
 }
 
-// simulateConfigData creates configuration data that might be loaded from a database
-func simulateConfigData() map[string]any {
-	return map[string]any{
-		"mode": "production",
-		"features": map[string]bool{
-			"advanced_greeting": true,
-			"timestamps":        true,
-		},
-	}
+// PrepareConfigData prepares the context with configuration data
+func PrepareConfigData(
+	ctx context.Context,
+	evaluator ExtismEvaluator,
+	logger *slog.Logger,
+) (context.Context, error) {
+	// For Extism, we'll keep using the simple structure since the WASM module
+	// only expects {"input": "..."} format
+	// This function is kept for consistency with other examples and to demonstrate
+	// the multi-step preparation pattern
+	logger.Info("Preparing configuration data")
+
+	// We don't need to add any additional data for this example
+	enrichedCtx := ctx
+
+	logger.Info("Configuration data prepared successfully")
+	return enrichedCtx, nil
 }
 
-// demonstrateAsyncPreparation shows how data preparation can be done asynchronously
-// before evaluation, which is useful in high-throughput systems
-func demonstrateAsyncPreparation(
-	evaluator engine.EvaluatorWithPrep,
+// EvaluateScript evaluates the script with the prepared context
+func EvaluateScript(
+	ctx context.Context,
+	evaluator ExtismEvaluator,
 	logger *slog.Logger,
 ) (map[string]any, error) {
-	// Base context
-	ctx := context.Background()
-
-	// Channel to send prepared contexts between goroutines
-	ctxChan := make(chan struct {
-		ctx context.Context
-		err error
-	}, 1)
-
-	// Step 1: Asynchronously prepare the context in a separate goroutine
-	// -----------------------------------------------------------------
-	logger.Info("Starting async context preparation")
-
-	go func() {
-		// Create a local context with timeout for the preparation process
-		prepCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
-		defer cancel()
-
-		logger.Info("Async routine: Gathering data")
-		// Simulate gathering data from different sources
-		apiData := simulateAPIRequest()
-		configData := simulateConfigData()
-
-		// First preparation step with API data
-		enrichedCtx, err := evaluator.PrepareContext(prepCtx, apiData)
-		if err != nil {
-			logger.Error("Async routine: Failed to prepare context with API data", "error", err)
-			ctxChan <- struct {
-				ctx context.Context
-				err error
-			}{ctx: nil, err: err}
-			return
-		}
-
-		// Second preparation step with config data
-		finalCtx, err := evaluator.PrepareContext(enrichedCtx, configData)
-		if err != nil {
-			logger.Error("Async routine: Failed to prepare context with config data", "error", err)
-			ctxChan <- struct {
-				ctx context.Context
-				err error
-			}{ctx: nil, err: err}
-			return
-		}
-
-		logger.Info("Async routine: Context preparation complete")
-		// Send the fully prepared context through the channel
-		ctxChan <- struct {
-			ctx context.Context
-			err error
-		}{ctx: finalCtx, err: nil}
-	}()
-
-	// Step 2: Wait for the preparation to complete and evaluate
-	// --------------------------------------------------------
-	logger.Info("Main routine: Waiting for context preparation")
-
-	// Receive the prepared context or error
-	result := <-ctxChan
-	if result.err != nil {
-		return nil, fmt.Errorf("context preparation failed: %w", result.err)
-	}
+	logger.Info("Evaluating script")
 
 	// Set a timeout for the evaluation
-	evalCtx, cancel := context.WithTimeout(result.ctx, 5*time.Second)
+	evalCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-
-	// Step 3: Evaluate the script with the prepared context
-	// ----------------------------------------------------
-	logger.Info("Main routine: Evaluating script with prepared context")
 
 	// Evaluate the script
 	response, err := evaluator.Eval(evalCtx)
 	if err != nil {
-		logger.Error("Main routine: Failed to evaluate script", "error", err)
-		return nil, fmt.Errorf("script evaluation failed: %w", err)
+		logger.Error("Failed to evaluate script", "error", err)
+		return nil, err
 	}
 
 	// Process the result
 	val := response.Interface()
 	if val == nil {
-		logger.Warn("Main routine: Result is nil")
+		logger.Warn("Result is nil")
 		return map[string]any{}, nil
 	}
 
 	// Return the result
 	resultMap, ok := val.(map[string]any)
 	if !ok {
-		logger.Error("Main routine: Unexpected response type", "type", fmt.Sprintf("%T", val))
+		logger.Error("Unexpected response type", "type", fmt.Sprintf("%T", val))
 		return nil, fmt.Errorf("unexpected response type: %T", val)
 	}
 
+	logger.Info("Script evaluated successfully")
 	return resultMap, nil
+}
+
+// DemonstrateDataPrepAndEval shows the complete data preparation and evaluation workflow
+func DemonstrateDataPrepAndEval(
+	evaluator ExtismEvaluator,
+	logger *slog.Logger,
+) (map[string]any, error) {
+	// Create a base context
+	ctx := context.Background()
+
+	// Step 1: Prepare context with request data
+	ctx, err := PrepareRequestData(ctx, evaluator, logger)
+	if err != nil {
+		return nil, fmt.Errorf("request data preparation failed: %w", err)
+	}
+
+	// Step 2: Prepare context with config data
+	ctx, err = PrepareConfigData(ctx, evaluator, logger)
+	if err != nil {
+		return nil, fmt.Errorf("config data preparation failed: %w", err)
+	}
+
+	// Step 3: Evaluate the script with the prepared context
+	result, err := EvaluateScript(ctx, evaluator, logger)
+	if err != nil {
+		return nil, fmt.Errorf("script evaluation failed: %w", err)
+	}
+
+	return result, nil
 }
 
 func main() {
@@ -176,31 +174,17 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Create data provider - we'll use a context provider for this example
-	dataProvider := data.NewContextProvider("eval_data")
-
-	// Create evaluator using the functional options pattern
-	evaluator, err := polyscript.FromExtismFile(
-		wasmFilePath,
-		options.WithLogger(handler),
-		options.WithDataProvider(dataProvider),
-		extism.WithEntryPoint("greet"),
-	)
+	// Create evaluator
+	evaluator, err := CreateExtismEvaluator(wasmFilePath, handler)
 	if err != nil {
 		logger.Error("Failed to create evaluator", "error", err)
 		os.Exit(1)
 	}
 
-	// Verify the evaluator is properly initialized
-	if evaluator == nil {
-		logger.Error("Evaluator is nil")
-		os.Exit(1)
-	}
-
-	// Run the asynchronous preparation example
-	result, err := demonstrateAsyncPreparation(evaluator, logger)
+	// Run the data preparation and evaluation example
+	result, err := DemonstrateDataPrepAndEval(*evaluator, logger)
 	if err != nil {
-		logger.Error("Failed to run async preparation example", "error", err)
+		logger.Error("Failed to run data prep and eval example", "error", err)
 		os.Exit(1)
 	}
 

@@ -67,21 +67,6 @@ func (p *ContextProvider) AddDataToContext(
 	// Initialize the data storage map
 	toStore := make(map[string]any)
 
-	// Get existing data from context if any
-	existingData, err := p.GetData(ctx)
-	if err == nil && existingData != nil && len(existingData) > 0 {
-		maps.Copy(toStore, existingData)
-	}
-
-	// Initialize standard keys with empty maps if they don't exist
-	// This ensures scripts always have a consistent data structure to work with
-	if _, exists := toStore[constants.Request]; !exists {
-		toStore[constants.Request] = make(map[string]any)
-	}
-	if _, exists := toStore[constants.ScriptData]; !exists {
-		toStore[constants.ScriptData] = make(map[string]any)
-	}
-
 	// Process each data item based on its type
 	for _, item := range data {
 		if item == nil {
@@ -90,41 +75,83 @@ func (p *ContextProvider) AddDataToContext(
 
 		switch v := item.(type) {
 		case *http.Request:
-			// Handle HTTP request - convert to map and store under request key
+			if v == nil {
+				continue
+			}
+
+			if existingValue, exists := toStore[constants.Request]; exists {
+				errz = append(errz, fmt.Errorf("request data already set: %v", existingValue))
+				continue
+			}
+
 			reqMap, err := helpers.RequestToMap(v)
 			if err != nil {
 				errz = append(errz, fmt.Errorf("failed to convert HTTP request to map: %w", err))
-				// Keep the empty request map - don't skip storing data
-				// The empty map was already initialized above
-			} else {
-				toStore[constants.Request] = reqMap
+				continue
 			}
+			toStore[constants.Request] = reqMap
 
 		case http.Request:
-			// Handle HTTP request value (not pointer)
+			if existingValue, exists := toStore[constants.Request]; exists {
+				errz = append(errz, fmt.Errorf("request data already set: %v", existingValue))
+				continue
+			}
+
 			reqMap, err := helpers.RequestToMap(&v)
 			if err != nil {
 				errz = append(errz, fmt.Errorf("failed to convert HTTP request to map: %w", err))
-				// Keep the empty request map - don't skip storing data
-				// The empty map was already initialized above
-			} else {
-				toStore[constants.Request] = reqMap
+				continue
 			}
+			toStore[constants.Request] = reqMap
+		/*
+			TODO: add helpers.ResponseToMap
+			case *http.Response:
+				if v == nil {
+					continue
+				}
 
+				if existingValue, exists := toStore[constants.Response]; exists {
+					errz = append(errz, fmt.Errorf("response data already set: %v", existingValue))
+					continue
+				}
+
+				respMap, err := helpers.ResponseToMap(v)
+				if err != nil {
+					errz = append(errz, fmt.Errorf("failed to convert HTTP response to map: %w", err))
+					continue
+				}
+				toStore[constants.Response] = respMap
+
+			case http.Response:
+				if existingValue, exists := toStore[constants.Response]; exists {
+					errz = append(errz, fmt.Errorf("response data already set: %v", existingValue))
+					continue
+				}
+
+				respMap, err := helpers.ResponseToMap(&v)
+				if err != nil {
+					errz = append(errz, fmt.Errorf("failed to convert HTTP response to map: %w", err))
+					continue
+				}
+				toStore[constants.Response] = respMap
+
+		*/
 		case map[string]any:
-			// Handle script data map - store under script_data key
-			// We merge with existing script data rather than replacing it
+			// Handle general data - store the object under the input_data key
 			scriptData := make(map[string]any)
-			if existingScriptData, ok := toStore[constants.ScriptData].(map[string]any); ok {
-				maps.Copy(scriptData, existingScriptData)
-			}
-			maps.Copy(scriptData, v)
-			toStore[constants.ScriptData] = scriptData
 
+			// Reuse existing map if available
+			if existingScriptData, ok := toStore[constants.InputData].(map[string]any); ok {
+				scriptData = existingScriptData
+			}
+
+			// Copy new data into the map (overwriting any existing keys)
+			maps.Copy(scriptData, v)
+			toStore[constants.InputData] = scriptData
 		default:
-			// For unrecognized types, log warning or return error
+			// For unhandled types, log an error and continue
 			errz = append(errz, fmt.Errorf("unsupported data type for ContextProvider: %T", item))
-			// We continue processing other items even if this one failed
+			continue
 		}
 	}
 

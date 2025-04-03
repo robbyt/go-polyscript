@@ -1,6 +1,7 @@
 package script
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -32,12 +33,10 @@ type ExecutableUnit struct {
 	// Content holds the compiled bytecode and source representation of the script.
 	Content ExecutableContent
 
-	// ScriptData contains key-value pairs that can be accessed by the script at runtime.
-	// This data is made available to the script during evaluation.
-	ScriptData map[string]any
-
-	// DataProvider provides access to variable runtime data during script evaluation.
-	// Enabling the "compile once, run many times" design.
+	// DataProvider provides access to both static compile-time data and variable runtime data
+	// during script evaluation. Enabling the "compile once, run many times" design.
+	// When created with NewExecutableUnit, this is typically a CompositeProvider containing
+	// a StaticProvider (for compile-time data) and another provider (for runtime data).
 	DataProvider data.Provider
 
 	// Logging components
@@ -47,6 +46,7 @@ type ExecutableUnit struct {
 
 // NewExecutableUnit creates a new ExecutableUnit from the provided loader and compiler.
 // The dataProvider parameter provides runtime data for script evaluation.
+// Static script data (sData) is automatically combined with the runtime data provider using a CompositeProvider.
 func NewExecutableUnit(
 	handler slog.Handler,
 	versionID string,
@@ -82,14 +82,27 @@ func NewExecutableUnit(
 		}
 	}
 
+	// Create a StaticProvider for the compile-time script data
+	staticProvider := data.NewStaticProvider(sData)
+
+	// Create a CompositeProvider that combines the static compile-time data with
+	// the runtime data from the passed-in provider. The ordering is important:
+	// runtime data should override compile-time data for any duplicate keys.
+	var combinedProvider data.Provider
+	if dataProvider != nil {
+		combinedProvider = data.NewCompositeProvider(staticProvider, dataProvider)
+	} else {
+		// If no runtime data provider is specified, just use the static provider
+		combinedProvider = staticProvider
+	}
+
 	return &ExecutableUnit{
 		ID:           versionID,
 		CreatedAt:    time.Now(),
 		ScriptLoader: scriptLoader,
 		Content:      exe,
 		Compiler:     compiler,
-		ScriptData:   sData,
-		DataProvider: dataProvider,
+		DataProvider: combinedProvider,
 		logHandler:   handler,
 		logger:       logger.With("ID", versionID),
 	}, nil
@@ -131,8 +144,24 @@ func (exe *ExecutableUnit) GetLoader() loader.Loader {
 }
 
 // GetScriptData returns the script data associated with this version.
+//
+// Deprecated: This method is maintained for backwards compatibility but now retrieves
+// data from the DataProvider. It may be removed in a future version.
+// Prefer using GetDataProvider() directly to access script data.
 func (exe *ExecutableUnit) GetScriptData() map[string]any {
-	return exe.ScriptData
+	// For backwards compatibility, attempt to extract static data if it's a composite provider
+	if exe.DataProvider == nil {
+		return nil
+	}
+
+	// If we can get the data synchronously from the provider, return it
+	// This will work for StaticProvider and return the full merged data for CompositeProvider
+	data, err := exe.DataProvider.GetData(context.Background())
+	if err != nil {
+		// If there's an error, just return an empty map
+		return make(map[string]any)
+	}
+	return data
 }
 
 // GetDataProvider returns the data provider for this executable unit.

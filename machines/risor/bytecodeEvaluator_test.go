@@ -21,8 +21,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var emptyScriptData = make(map[string]any)
-
 // Mock the data.Provider interface
 type MockProvider struct {
 	mock.Mock
@@ -108,7 +106,7 @@ handle(ctx["request"])
 	// Create a context provider to use with our test context
 	ctxProvider := data.NewContextProvider(constants.EvalData)
 
-	exe, err := createTestExecutable(handler, ld, opt, ctxProvider, emptyScriptData)
+	exe, err := createTestExecutable(handler, ld, opt, ctxProvider)
 	require.NoError(t, err)
 
 	evaluator := NewBytecodeEvaluator(handler, exe)
@@ -493,7 +491,6 @@ func createTestExecutable(
 	ld loader.Loader,
 	opt *RisorOptions,
 	provider data.Provider,
-	scriptData map[string]any,
 ) (*script.ExecutableUnit, error) {
 	compiler := NewCompiler(handler, opt)
 	reader, err := ld.GetReader()
@@ -510,6 +507,5 @@ func createTestExecutable(
 		ID:           "test-id",
 		Content:      content,
 		DataProvider: provider,
-		ScriptData:   scriptData,
 	}, nil
 }
