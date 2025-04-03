@@ -59,13 +59,13 @@ func PrepareRequestData(
 
 	// For Extism, we need to structure our data so that the "input" field
 	// will be directly accessible to the WASM module. The ContextProvider wraps
-	// map[string]any data in script_data, so we need to add our data there.
-	scriptData := map[string]any{
+	// map[string]any data in input_data, so we need to add our data there.
+	inputData := map[string]any{
 		"input": "API User", // This is what the Extism WASM module needs
 	}
 
 	// Enrich context with request data
-	enrichedCtx, err := evaluator.PrepareContext(ctx, scriptData)
+	enrichedCtx, err := evaluator.PrepareContext(ctx, inputData)
 	if err != nil {
 		logger.Error("Failed to prepare context with request data", "error", err)
 		return nil, err

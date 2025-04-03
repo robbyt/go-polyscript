@@ -360,7 +360,51 @@ func TestWithCompositeProvider(t *testing.T) {
 	})
 
 	// This script tries to access data in both top-level and nested formats
-	hybridAccessScript := "\nfunc process() {\n\tprint(\"DEBUG: Starting script execution\")\n\tprint(\"DEBUG: Context data =\", ctx)\n\t\n\t// Try to get data from both locations\n\tvar name = \"\"\n\tvar timestamp = \"\"\n\t\n\t// First try direct access at top level\n\tif ctx[\"name\"] != nil {\n\t\tprint(\"DEBUG: Found name at top level:\", ctx[\"name\"])\n\t\tname = ctx[\"name\"]\n\t} else if ctx[\"input_data\"] != nil && ctx[\"input_data\"][\"name\"] != nil {\n\t\tprint(\"DEBUG: Found name in input_data:\", ctx[\"input_data\"][\"name\"])\n\t\tname = ctx[\"input_data\"][\"name\"]\n\t} else {\n\t\tprint(\"DEBUG: Using default name\")\n\t\tname = \"Unknown\"\n\t}\n\t\n\t// Same for timestamp - access from input_data since that's where it is\n\tif ctx[\"input_data\"] != nil && ctx[\"input_data\"][\"timestamp\"] != nil {\n\t\tprint(\"DEBUG: Found timestamp in input_data:\", ctx[\"input_data\"][\"timestamp\"])\n\t\ttimestamp = ctx[\"input_data\"][\"timestamp\"]\n\t} else if ctx[\"timestamp\"] != nil {\n\t\t// This branch won't execute in our test case but kept for completeness\n\t\tprint(\"DEBUG: Found timestamp at top level:\", ctx[\"timestamp\"])\n\t\ttimestamp = ctx[\"timestamp\"]\n\t} else {\n\t\tprint(\"DEBUG: Using default timestamp\")\n\t\ttimestamp = \"Unknown time\"\n\t}\n\t\n\t// Build result\n\t:= {}\n\tresult[\"greeting\"] = \"Hello, \" + name + \"!\"\n\tresult[\"timestamp\"] = timestamp\n\t\n\tprint(\"DEBUG: Returning result:\", result)\n\treturn result\n}\n\n// Make sure to actually call the function\nprocess()"
+	hybridAccessScript := `
+func process() {
+	print("DEBUG: Starting script execution")
+	print("DEBUG: Context data =", ctx)
+	
+	// Try to get data from both locations
+	var name = ""
+	var timestamp = ""
+	
+	// First try direct access at top level
+	if ctx["name"] != nil {
+		print("DEBUG: Found name at top level:", ctx["name"])
+		name = ctx["name"]
+	} else if ctx["input_data"] != nil && ctx["input_data"]["name"] != nil {
+		print("DEBUG: Found name in input_data:", ctx["input_data"]["name"])
+		name = ctx["input_data"]["name"]
+	} else {
+		print("DEBUG: Using default name")
+		name = "Unknown"
+	}
+	
+	// Same for timestamp - access from input_data since that's where it is
+	if ctx["input_data"] != nil && ctx["input_data"]["timestamp"] != nil {
+		print("DEBUG: Found timestamp in input_data:", ctx["input_data"]["timestamp"])
+		timestamp = ctx["input_data"]["timestamp"]
+	} else if ctx["timestamp"] != nil {
+		// This branch won't execute in our test case but kept for completeness
+		print("DEBUG: Found timestamp at top level:", ctx["timestamp"])
+		timestamp = ctx["timestamp"]
+	} else {
+		print("DEBUG: Using default timestamp")
+		timestamp = "Unknown time"
+	}
+	
+	// Build result
+	result := {}
+	result["greeting"] = "Hello, " + name + "!"
+	result["timestamp"] = timestamp
+	
+	print("DEBUG: Returning result:", result)
+	return result
+}
+
+// Make sure to actually call the function
+process()`
 
 	// Define static compile-time data
 	staticData := map[string]any{

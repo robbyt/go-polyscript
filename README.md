@@ -186,7 +186,7 @@ For maximum script compatibility, use a hybrid data access pattern that checks b
 ```go
 // Risor script with hybrid data access
 func process() {
-    // Try both locations for accessing data
+    // Try both locations for accessing user data
     var name = ""
     if ctx["name"] != nil {
         name = ctx["name"]  // Try direct access first (StaticProvider)
@@ -194,7 +194,16 @@ func process() {
         name = ctx["input_data"]["name"]  // Fall back to nested (ContextProvider)
     }
     
-    return {"greeting": "Hello, " + name}
+    // Access HTTP request data (always under input_data)
+    var method = "GET"  // Default
+    if ctx["input_data"] != nil && ctx["input_data"]["request"] != nil {
+        method = ctx["input_data"]["request"]["method"]
+    }
+    
+    return {
+        "greeting": "Hello, " + name,
+        "method": method
+    }
 }
 ```
 
@@ -218,6 +227,7 @@ go-polyscript uses a unified `Provider` interface to supply data to scripts. The
 
 1. Top-level access for static data: `ctx["config_value"]`
 2. Nested access for dynamic data: `ctx["input_data"]["user_data"]`
+3. HTTP request data access: `ctx["input_data"]["request"]["method"]` (request objects are always stored under input_data)
 
 See the [Data Providers](#working-with-data-providers) section for more details.
 

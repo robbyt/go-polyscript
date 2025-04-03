@@ -57,13 +57,17 @@ func (p *ContextProvider) GetData(ctx context.Context) (map[string]any, error) {
 // Prioritizes consistent data structure for scripts over error propagation,
 // ensuring scripts always have required data structures available.
 //
+// Data is organized as follows:
+// - HTTP request/response objects are placed under input_data.request and input_data.response
+// - General map[string]any data is placed under input_data
+//
 // Example:
 //
 //	ctx := context.Background()
 //	provider := NewContextProvider(constants.EvalData)
 //	req := &http.Request{...}
-//	scriptData := map[string]any{"user": "admin"}
-//	ctx, err := provider.AddDataToContext(ctx, req, scriptData)
+//	inputData := map[string]any{"user": "admin"}
+//	ctx, err := provider.AddDataToContext(ctx, req, inputData)
 func (p *ContextProvider) AddDataToContext(
 	ctx context.Context,
 	data ...any,
@@ -90,16 +94,16 @@ func (p *ContextProvider) AddDataToContext(
 			errz = append(errz, fmt.Errorf("unsupported data type for ContextProvider: %T", item))
 			continue
 		case map[string]any:
-			scriptData := make(map[string]any)
+			inputData := make(map[string]any)
 
 			// Reuse existing data map if available, because we're iterating multiple data
-			if existingScriptData, ok := toStore[p.storageKey].(map[string]any); ok {
-				scriptData = existingScriptData
+			if existingInputData, ok := toStore[p.storageKey].(map[string]any); ok {
+				inputData = existingInputData
 			}
 
 			// Copy new data into the map (overwriting any existing keys)
-			maps.Copy(scriptData, v)
-			toStore[p.storageKey] = scriptData
+			maps.Copy(inputData, v)
+			toStore[p.storageKey] = inputData
 		case *http.Request:
 			if v == nil {
 				continue

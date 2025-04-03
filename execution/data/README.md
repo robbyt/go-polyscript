@@ -46,8 +46,10 @@ Both types of data are made available to scripts as part of the top-level `ctx` 
 │    "config_value2": ...,                                            │
 │                                                                     │
 │    // Dynamic data (from ContextProvider) is nested                 │
-│    "input_data": { ... },  // Dynamic data added at runtime         │
-│    "request": { ... },     // HTTP request data (if available)      │
+│    "input_data": {                                                  │
+│      ...                   // User-provided dynamic data            │
+│      "request": { ... },   // HTTP request data (if available)      │
+│    },                                                               │
 │  }                                                                  │
 └─────────────────────────────────────┬───────────────────────────────┘
                                       │
@@ -61,7 +63,7 @@ Both types of data are made available to scripts as part of the top-level `ctx` 
 │  Script accesses via top-level `ctx` variable:                      │
 │    ctx["config_value1"]                 // Static data (direct)     │
 │    ctx["input_data"]["user_input"]      // Dynamic data (nested)    │
-│    ctx["request"]["params"]             // HTTP request data        │
+│    ctx["input_data"]["request"]["params"] // HTTP request data      │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -81,11 +83,18 @@ Scripts must handle different data access patterns based on the Provider:
 
 3. **Hybrid approach** for maximum compatibility:
    ```
+   // Example for accessing user data
    var name = ""
    if ctx["name"] != nil {
        name = ctx["name"]  // Try direct access first
    } else if ctx["input_data"] != nil && ctx["input_data"]["name"] != nil {
        name = ctx["input_data"]["name"]  // Fall back to nested access
+   }
+   
+   // Example for accessing request data (almost always under input_data)
+   var requestMethod = ""
+   if ctx["input_data"] != nil && ctx["input_data"]["request"] != nil {
+       requestMethod = ctx["input_data"]["request"]["method"]
    }
    ```
 

@@ -594,10 +594,10 @@ func TestEvalWithCancelledContext(t *testing.T) {
 }
 
 /*
-// TestScriptDataAndDataProvider tests that ScriptData from ExecutableUnit is properly combined
-// with data from the DataProvider
-func TestScriptDataAndDataProvider(t *testing.T) {
-	t.Skip("Need to confirm behavior of the script_data in ctx")
+// TestStaticAndDynamicDataCombination tests how static data and dynamic data are combined
+// with the CompositeProvider
+func TestStaticAndDynamicDataCombination(t *testing.T) {
+	t.Skip("Need to confirm behavior of the input_data in ctx")
 	// Load the test WASM file
 	wasmContent, err := os.ReadFile(testWasmPath)
 	require.NoError(t, err, "Failed to read WASM test file")
@@ -625,7 +625,7 @@ func TestScriptDataAndDataProvider(t *testing.T) {
 
 	// Create the executable unit with the composite provider
 	execUnit := &script.ExecutableUnit{
-		ID:           "test-script-data",
+		ID:           "test-data-provider",
 		DataProvider: compositeProvider,
 		Content:      exec,
 	}
@@ -643,26 +643,28 @@ func TestScriptDataAndDataProvider(t *testing.T) {
 	assert.Contains(t, result1, "initial")
 	assert.Equal(t, "value", result1["initial"])
 
-	// Second test: add data to context and verify it's merged with script data
+	// Second test: add data to context and verify it's merged with static data
 	inputData := map[string]any{"input": "test input"}
 	enrichedCtx, err := evaluator.PrepareContext(ctx, inputData)
 	require.NoError(t, err)
 
 	result2, err := evaluator.loadInputData(enrichedCtx)
 	require.NoError(t, err)
-	// Static data should still be there
+	
+	// Static data should still be there at top level
 	assert.Contains(t, result2, "initial")
 	assert.Equal(t, "value", result2["initial"])
-	// Runtime data from the ContextProvider is stored under the 'script_data' key
-	assert.Contains(t, result2, constants.ScriptData)
+	
+	// Runtime data from the ContextProvider is stored under the 'input_data' key
+	assert.Contains(t, result2, constants.InputData)
 
-	// Extract the script_data map and verify it's the correct type
-	scriptData, ok := result2[constants.ScriptData].(map[string]any)
-	require.True(t, ok, "script_data should be a map")
+	// Extract the input_data map and verify it's the correct type
+	dynamicData, ok := result2[constants.InputData].(map[string]any)
+	require.True(t, ok, "input_data should be a map")
 
-	// Verify our input data was correctly stored in the script_data map
-	assert.Contains(t, scriptData, "input")
-	assert.Equal(t, "test input", scriptData["input"])
+	// Verify our input data was correctly stored in the input_data map
+	assert.Contains(t, dynamicData, "input")
+	assert.Equal(t, "test input", dynamicData["input"])
 }
 */
 
@@ -670,10 +672,10 @@ func TestScriptDataAndDataProvider(t *testing.T) {
 func TestExtismDirectInputFormat(t *testing.T) {
 	// Create a test map that simulates data from our providers
 	inputData := map[string]any{
-		"initial": "top-level-value",
-		"request": map[string]any{},
-		"script_data": map[string]any{
+		"initial": "top-level-value",  // Static data at top level
+		"input_data": map[string]any{  // Dynamic data nested under input_data
 			"input": "API User",
+			"request": map[string]any{},  // HTTP request data nested under input_data
 		},
 	}
 
@@ -688,7 +690,7 @@ func TestExtismDirectInputFormat(t *testing.T) {
 	// Log the JSON output
 	t.Logf("JSON for Extism: %s", string(jsonBytes))
 
-	// Verify current behavior (we'll modify this later based on our design decision)
-	expected := `{"initial":"top-level-value","request":{},"script_data":{"input":"API User"}}`
+	// Verify current behavior
+	expected := `{"initial":"top-level-value","input_data":{"input":"API User","request":{}}}`
 	assert.JSONEq(t, expected, string(jsonBytes))
 }
