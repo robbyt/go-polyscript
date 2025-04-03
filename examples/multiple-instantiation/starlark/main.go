@@ -2,43 +2,27 @@ package main
 
 import (
 	"context"
+	_ "embed"
 	"fmt"
 	"log/slog"
 	"os"
 
 	"github.com/robbyt/go-polyscript"
+	"github.com/robbyt/go-polyscript/engine"
 	"github.com/robbyt/go-polyscript/execution/constants"
 	"github.com/robbyt/go-polyscript/execution/data"
 	"github.com/robbyt/go-polyscript/machines/starlark"
 	"github.com/robbyt/go-polyscript/options"
 )
 
-// GetStarlarkScript returns the script content for the Starlark example
-func GetStarlarkScript() string {
-	return `
-# Script has access to ctx variable passed from Go
-name = ctx["name"]
-message = "Hello, " + name + "!"
+// StarlarkEvaluator is a type alias to make testing cleaner
+type StarlarkEvaluator = engine.EvaluatorWithPrep
 
-# Return a dictionary with our result - must explicitly return to get a value
-result = {
-    "greeting": message,
-    "length": len(message)
-}
-# In Starlark, the last expression's value becomes the script's return value
-result
-`
-}
+//go:embed testdata/script.star
+var starlarkScript string
 
-// RunStarlarkExampleMultipleTimes demonstrates the "compile once, run many times" pattern
-// It compiles the script once and then executes it multiple times with different inputs.
-//
-// This pattern is more efficient than compiling the script for each execution:
-// 1. It creates a script evaluator with a ContextProvider to get data from context
-// 2. For each execution, it passes different data via the context
-// 3. The ContextProvider retrieves this data during execution
-// 4. The script accesses data through the "ctx" global variable
-func RunStarlarkExampleMultipleTimes(handler slog.Handler) ([]map[string]any, error) {
+// createEvaluator initializes a Starlark evaluator with context provider for runtime data
+func createEvaluator(handler slog.Handler) (StarlarkEvaluator, error) {
 	if handler == nil {
 		handler = slog.NewTextHandler(os.Stdout, nil)
 	}
@@ -47,23 +31,35 @@ func RunStarlarkExampleMultipleTimes(handler slog.Handler) ([]map[string]any, er
 	// Define globals that will be available to the script
 	globals := []string{constants.Ctx}
 
-	// Create a script string
-	scriptContent := GetStarlarkScript()
-
-	// Create a context provider that will be used for runtime data
-	// This allows us to pass different data on each evaluation
+	// Create a context provider for runtime data
 	ctxProvider := data.NewContextProvider(constants.EvalData)
 
 	// Create evaluator using the functional options pattern
 	evaluator, err := polyscript.FromStarlarkString(
-		scriptContent,
+		starlarkScript,
 		options.WithDefaults(),
 		options.WithLogger(handler),
-		options.WithDataProvider(ctxProvider), // Use context provider
+		options.WithDataProvider(ctxProvider),
 		starlark.WithGlobals(globals),
 	)
 	if err != nil {
 		logger.Error("Failed to create evaluator", "error", err)
+		return nil, err
+	}
+
+	return evaluator, nil
+}
+
+// runMultipleTimes demonstrates the "compile once, run many times" pattern
+func runMultipleTimes(handler slog.Handler) ([]map[string]any, error) {
+	if handler == nil {
+		handler = slog.NewTextHandler(os.Stdout, nil)
+	}
+	logger := slog.New(handler)
+
+	// Create the evaluator once
+	evaluator, err := createEvaluator(handler)
+	if err != nil {
 		return nil, err
 	}
 
@@ -73,16 +69,13 @@ func RunStarlarkExampleMultipleTimes(handler slog.Handler) ([]map[string]any, er
 
 	// Execute the script multiple times with different input data
 	for _, name := range names {
-		// Create the data structure expected by the script
-		// This is a simple map that will be made available to the script via the "ctx" global
-		// The script can access values like: ctx["name"]
+		// Create context data for this execution
 		contextData := map[string]any{
 			"name": name,
 		}
 
 		// Create a context with the specific data for this run
 		ctx := context.Background()
-		// Important: Use the EvalData constant for context value key to match the ContextProvider
 		ctx = context.WithValue(ctx, constants.EvalData, contextData)
 
 		logger.Debug("Running script with name", "name", name)
@@ -114,19 +107,29 @@ func RunStarlarkExampleMultipleTimes(handler slog.Handler) ([]map[string]any, er
 	return results, nil
 }
 
-func main() {
+func run() error {
 	// Create a logger
 	handler := slog.NewTextHandler(os.Stdout, nil)
+	logger := slog.New(handler.WithGroup("starlark-multiple-example"))
 
 	// Run the example
-	results, err := RunStarlarkExampleMultipleTimes(handler)
+	results, err := runMultipleTimes(handler)
 	if err != nil {
-		fmt.Printf("Error: %v\n", err)
-		return
+		logger.Error("Failed to run example", "error", err)
+		return err
 	}
 
 	// Print the results
 	for i, result := range results {
-		fmt.Printf("Result %d: %v\n", i+1, result)
+		logger.Info("Result", "index", i+1, "data", result)
+	}
+
+	return nil
+}
+
+func main() {
+	if err := run(); err != nil {
+		fmt.Printf("Error: %v\n", err)
+		os.Exit(1)
 	}
 }

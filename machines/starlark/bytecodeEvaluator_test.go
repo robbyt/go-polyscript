@@ -102,7 +102,6 @@ _ = request_handler(ctx.get("request"))
 					constants.Request: rMap,
 				}
 
-				//nolint:staticcheck // Temporarily ignoring the "string as context key" warning until type system is fixed
 				ctx := context.WithValue(context.Background(), constants.EvalData, evalData)
 
 				// Evaluate the script with the provided HttpRequest
@@ -133,7 +132,6 @@ _ = request_handler(ctx.get("request"))
 			constants.Request: rMap,
 		}
 
-		//nolint:staticcheck // Temporarily ignoring the "string as context key" warning until type system is fixed
 		ctx := context.WithValue(context.Background(), constants.EvalData, evalData)
 
 		// Evaluate the script with the provided HttpRequest

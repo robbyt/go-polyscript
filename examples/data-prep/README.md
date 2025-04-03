@@ -1,65 +1,39 @@
 # Data Preparation Examples
 
-This directory contains examples demonstrating the `EvalDataPreparer` interface for separating data preparation from script evaluation in go-polyscript.
+This directory contains examples demonstrating how to separate data preparation from script evaluation in go-polyscript.
 
 ## Overview
 
-The data preparation pattern enables a more flexible architecture by allowing data preparation to occur independently from script evaluation. This pattern introduces:
-
-- The `EvalDataPreparer` interface with the `PrepareContext` method
-- The `EvaluatorWithPrep` combined interface
+The data preparation pattern separates static configuration data from dynamic runtime data, making code more modular and flexible. This pattern uses a composite data provider combining static and dynamic data sources, with a clear separation between configuration, preparation, and evaluation phases.
 
 ## When to Use This Pattern
 
 This pattern is valuable for:
 
-1. **Distributed Architecture**: Prepare data on one system (e.g., web server) and evaluate on another (e.g., worker)
-2. **Separation of Concerns**: Clearly separate data processing from script execution
-3. **Multi-step Preparation**: Enrich a context across multiple services or systems
-4. **Performance Optimization**: Prepare data asynchronously while other operations are happening
+- **Distributed Architecture**: Prepare data on one system (e.g., web server) and evaluate on another (e.g., worker)
+- **Separation of Concerns**: Clearly separate data processing from script execution
+- **Layered Data Access**: Combine static configuration with dynamic runtime data
+- **Performance Optimization**: Prepare data asynchronously while other operations are happening
 
-## Implementation Details
+## Implementation Pattern
 
-### Interface Overview
+These examples follow a consistent three-phase pattern:
 
-```go
-// EvalDataPreparer is an interface for preparing data before evaluation
-type EvalDataPreparer interface {
-    // PrepareContext takes a context and variadic data arguments and returns an enriched context
-    PrepareContext(ctx context.Context, data ...any) (context.Context, error)
-}
-
-// EvaluatorWithPrep combines Evaluator and EvalDataPreparer interfaces
-type EvaluatorWithPrep interface {
-    Evaluator
-    EvalDataPreparer
-}
-```
-
-All factory functions now return implementations of the `EvaluatorWithPrep` interface.
-
-### Example Patterns
-
-Each subdirectory demonstrates a different usage pattern:
-
-- **risor/**: Simple distributed architecture pattern
-- **starlark/**: Multi-step data preparation
-- **extism/**: Asynchronous data preparation
-
-### Key Concepts
-
-The `PrepareContext` method handles:
-- Converting raw Go types to machine-specific formats
-- Storing data in the context using the data provider
-- Error handling and validation
+1. **Create evaluator with static data**: Set up an evaluator with configuration data that remains constant across executions
+2. **Prepare runtime data**: Add dynamic data to the context using the `PrepareContext` method
+3. **Evaluate script**: Execute the script with the enriched context
 
 ## Running the Examples
 
-To run any example:
+Each example follows the same pattern but demonstrates it with a different script engine:
 
 ```bash
-cd examples/data-prep/<engine>
-go run main.go
+go run examples/data-prep/<engine>/main.go
 ```
 
 Note: The Extism example requires a WASM file. If not found automatically, you may need to compile it using the `Makefile` in `/machines/extism/testdata/`.
+
+## Related Patterns
+
+- [Simple Examples](/examples/simple): Basic one-time execution pattern
+- [Multiple Examples](/examples/multiple-instantiation): Compile-once-run-many pattern

@@ -1,48 +1,49 @@
 # Simple Execution Examples
 
-This directory contains examples of the basic "compile and run once" pattern for script execution with go-polyscript.
+This directory contains examples demonstrating the basic "compile and execute once" pattern for script execution in go-polyscript.
 
 ## Overview
 
-The simple execution pattern is the most straightforward way to run embedded scripts. It follows these steps:
-
-1. Prepare script data
-2. Configure script options
-3. Compile and immediately execute the script in a single operation
-4. Process the results
+The simple execution pattern is the most straightforward way to run embedded scripts with go-polyscript. It creates an evaluator and immediately executes the script in a single operation, providing a clean, concise approach for one-off script executions.
 
 ## When to Use This Pattern
 
 This pattern is ideal for:
 
-- One-off script executions
-- Simple automation tasks
-- Configuration processing
-- Situations where script reuse is not needed
-- When performance is not critical
+- **Single-Use Scripts**: Scripts that will only be executed once
+- **Configuration Processing**: Loading and validating configuration files
+- **Simple Automation Tasks**: One-time data transformations or validations
+- **Prototype Development**: Quick implementations for testing concepts
+- **Isolated Operations**: When script execution is independent of other operations
 
-## Implementation Details
+## Implementation Pattern
 
-These examples use the following components:
+These examples follow a consistent pattern:
 
-- `StaticProvider`: Provides predefined data to the script at compile time
-- Script data is accessed via the `ctx` global variable within scripts
-- Each subdirectory contains examples for different script engines
+1. **Create the input data**: Build a map with values the script needs
+2. **Configure the data provider**: Use `data.NewStaticProvider(input)` to make data available to the script
+3. **Configure the evaluator**: Set up with options like `WithGlobals` to expose the `ctx` variable
+4. **Execute immediately**: Call `evaluator.Eval(ctx)` to run the script
+5. **Process results**: Convert the response to the expected type with `result.Interface()`
+
+## Script Access Pattern
+
+In all examples, scripts access data using a `ctx` global variable:
+- Starlark: `name = ctx["name"]`
+- Risor: `name := ctx["name"]`
+- Extism: Input data is available directly to the WASM module
 
 ## Running the Examples
 
-To run any example:
+Each example follows the same pattern but demonstrates it with a different script engine:
 
 ```bash
-cd examples/simple/<engine>
-go run main.go
+go run examples/simple/<engine>/main.go
 ```
 
-Note: The Extism example requires a WebAssembly module (provided as `main.wasm` in the `extism` directory).
+Note: The Extism example requires a WebAssembly module. It uses the `FindWasmFile` function to locate the module in various directories.
 
-## Next Steps
+## Related Patterns
 
-For more advanced usage patterns, see:
-
-- [Multiple Execution Examples](/examples/multiple): The "compile once, run many times" pattern for better performance
-- [Data Preparation Examples](/examples/data-prep): Separating data preparation from script evaluation
+- [Multiple Instantiation Examples](/examples/multiple-instantiation): Compile once, run many times pattern
+- [Data Preparation Examples](/examples/data-prep): Separating static configuration from dynamic runtime data

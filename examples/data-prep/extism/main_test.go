@@ -10,6 +10,24 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// getTestStaticData returns static data for tests
+func getTestStaticData() map[string]any {
+	return map[string]any{
+		"app_version": "1.0.0-test",
+		"environment": "test",
+		"config": map[string]any{
+			"timeout":     10,
+			"max_retries": 1,
+			"feature_flags": map[string]any{
+				"advanced_features": true,
+				"beta_features":     true,
+			},
+		},
+		// Put the input field directly at the top level for Extism
+		"input": "Test User",
+	}
+}
+
 func TestDemonstrateDataPrepAndEval(t *testing.T) {
 	// Create a test logger
 	handler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
@@ -18,18 +36,19 @@ func TestDemonstrateDataPrepAndEval(t *testing.T) {
 	logger := slog.New(handler)
 
 	// Find the WASM file
-	wasmFilePath, err := FindWasmFile(logger)
+	wasmFilePath, err := findWasmFile(logger)
 	if err != nil {
-		t.Logf("Extism example failed: %v - this may be due to missing WASM file", err)
-		t.Skip("Skipping Extism test as it requires a WASM file")
+		t.Errorf("Extism example failed: %v - this may be due to missing WASM file", err)
 		return
 	}
 
+	// Get static test data
+	staticData := getTestStaticData()
+
 	// Create evaluator
-	evaluator, err := CreateExtismEvaluator(wasmFilePath, handler)
+	evaluator, err := createExtismEvaluator(logger, wasmFilePath, staticData)
 	if err != nil {
-		t.Logf("Failed to create evaluator: %v", err)
-		t.Skip("Skipping Extism test as it failed to create evaluator")
+		t.Errorf("Failed to create evaluator: %v", err)
 		return
 	}
 	require.NotNil(t, evaluator, "Evaluator should not be nil")
@@ -40,7 +59,7 @@ func TestDemonstrateDataPrepAndEval(t *testing.T) {
 	t.Log("Extism evaluator created successfully")
 }
 
-func TestPrepareRequestData(t *testing.T) {
+func TestPrepareRuntimeData(t *testing.T) {
 	// Create a test logger
 	handler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
 		Level: slog.LevelInfo,
@@ -48,26 +67,28 @@ func TestPrepareRequestData(t *testing.T) {
 	logger := slog.New(handler)
 
 	// Find the WASM file
-	wasmFilePath, err := FindWasmFile(logger)
+	wasmFilePath, err := findWasmFile(logger)
 	if err != nil {
-		t.Logf("Skipping test due to missing WASM file: %v", err)
-		t.Skip("WASM file required for this test")
+		t.Errorf("Failed to find WASM file: %v", err)
 		return
 	}
 
+	// Get static test data
+	staticData := getTestStaticData()
+
 	// Create evaluator
-	evaluator, err := CreateExtismEvaluator(wasmFilePath, handler)
+	evaluator, err := createExtismEvaluator(logger, wasmFilePath, staticData)
 	require.NoError(t, err, "Failed to create evaluator")
 	require.NotNil(t, evaluator, "Evaluator should not be nil")
 
-	// Test PrepareRequestData function
+	// Test prepareRuntimeData function
 	ctx := context.Background()
-	enrichedCtx, err := PrepareRequestData(ctx, *evaluator, logger)
-	assert.NoError(t, err, "PrepareRequestData should not return an error")
+	enrichedCtx, err := prepareRuntimeData(ctx, logger, evaluator)
+	assert.NoError(t, err, "prepareRuntimeData should not return an error")
 	assert.NotNil(t, enrichedCtx, "Enriched context should not be nil")
 }
 
-func TestPrepareConfigData(t *testing.T) {
+func TestEvalAndExtractResult(t *testing.T) {
 	// Create a test logger
 	handler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
 		Level: slog.LevelInfo,
@@ -75,49 +96,29 @@ func TestPrepareConfigData(t *testing.T) {
 	logger := slog.New(handler)
 
 	// Find the WASM file
-	wasmFilePath, err := FindWasmFile(logger)
+	wasmFilePath, err := findWasmFile(logger)
 	if err != nil {
-		t.Logf("Skipping test due to missing WASM file: %v", err)
-		t.Skip("WASM file required for this test")
+		t.Errorf("Failed to find WASM file: %v", err)
 		return
 	}
 
+	// Get static test data
+	staticData := getTestStaticData()
+
 	// Create evaluator
-	evaluator, err := CreateExtismEvaluator(wasmFilePath, handler)
+	evaluator, err := createExtismEvaluator(logger, wasmFilePath, staticData)
 	require.NoError(t, err, "Failed to create evaluator")
 	require.NotNil(t, evaluator, "Evaluator should not be nil")
 
-	// Test PrepareConfigData function
+	// Prepare the context
 	ctx := context.Background()
-	enrichedCtx, err := PrepareConfigData(ctx, *evaluator, logger)
-	assert.NoError(t, err, "PrepareConfigData should not return an error")
-	assert.NotNil(t, enrichedCtx, "Enriched context should not be nil")
-}
+	ctx, err = prepareRuntimeData(ctx, logger, evaluator)
+	require.NoError(t, err, "Failed to prepare context")
 
-func TestFindWasmFile(t *testing.T) {
-	// This test just verifies the FindWasmFile function doesn't panic
-	// and follows the expected logic
-	handler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
-		Level: slog.LevelInfo,
-	})
-	logger := slog.New(handler)
-
-	// The function might not find a file but it shouldn't panic
-	wasmPath, err := FindWasmFile(logger)
-	// Log the result without assertion
-	if err != nil {
-		t.Logf("FindWasmFile returned error: %v (this is expected in some environments)", err)
-	} else if wasmPath != "" {
-		t.Logf("Found WASM file at: %s", wasmPath)
-	} else {
-		t.Log("No WASM file found - this is expected in some environments")
-	}
-
-	// Test with nil logger - should not panic
-	_, err = FindWasmFile(nil)
-	if err != nil {
-		t.Logf("FindWasmFile with nil logger returned error: %v (this is expected)", err)
-	}
+	// Test evaluation
+	result, err := evalAndExtractResult(ctx, logger, evaluator)
+	assert.NoError(t, err, "evalAndExtractResult should not return an error")
+	assert.NotNil(t, result, "Result should not be nil")
 }
 
 func TestCreateExtismEvaluator(t *testing.T) {
@@ -125,17 +126,42 @@ func TestCreateExtismEvaluator(t *testing.T) {
 	handler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
 		Level: slog.LevelInfo,
 	})
+	logger := slog.New(handler)
 
 	// Find the WASM file
-	wasmFilePath, err := FindWasmFile(nil)
+	wasmFilePath, err := findWasmFile(logger)
 	if err != nil {
-		t.Logf("Skipping test due to missing WASM file: %v", err)
-		t.Skip("WASM file required for this test")
+		t.Errorf("Failed to find WASM file: %v", err)
 		return
 	}
 
-	// Test CreateExtismEvaluator function
-	evaluator, err := CreateExtismEvaluator(wasmFilePath, handler)
-	require.NoError(t, err, "Should create evaluator without error")
-	require.NotNil(t, evaluator, "Evaluator should not be nil")
+	// Get static test data
+	staticData := getTestStaticData()
+
+	// Test createExtismEvaluator function
+	evaluator, err := createExtismEvaluator(logger, wasmFilePath, staticData)
+	assert.NoError(t, err, "Should create evaluator without error")
+	assert.NotNil(t, evaluator, "Evaluator should not be nil")
+}
+
+func TestFindWasmFile(t *testing.T) {
+	// This test just verifies the findWasmFile function doesn't panic
+	// and follows the expected logic
+	handler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+		Level: slog.LevelInfo,
+	})
+	logger := slog.New(handler)
+
+	// The function might not find a file but it shouldn't panic
+	wasmPath, err := findWasmFile(logger)
+	if err != nil {
+		t.Errorf("findWasmFile returned error: %v", err)
+		return
+	}
+
+	t.Logf("Found WASM file at: %s", wasmPath)
+}
+
+func TestRun(t *testing.T) {
+	assert.NoError(t, run(), "run() should execute without error")
 }

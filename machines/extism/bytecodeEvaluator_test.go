@@ -69,7 +69,7 @@ func TestLoadInputData(t *testing.T) {
 			ctx := context.Background()
 
 			if tt.ctxData != nil {
-				//nolint:staticcheck // Temporarily ignoring the "string as context key" warning until type system is fixed
+				// Temporarily ignoring the "string as context key" warning until type system is fixed
 				ctx = context.WithValue(ctx, constants.EvalData, tt.ctxData)
 			}
 
@@ -593,7 +593,6 @@ func TestEvalWithCancelledContext(t *testing.T) {
 	require.Error(t, err)
 }
 
-/*
 // TestStaticAndDynamicDataCombination tests how static data and dynamic data are combined
 // with the CompositeProvider
 func TestStaticAndDynamicDataCombination(t *testing.T) {
@@ -650,11 +649,11 @@ func TestStaticAndDynamicDataCombination(t *testing.T) {
 
 	result2, err := evaluator.loadInputData(enrichedCtx)
 	require.NoError(t, err)
-	
+
 	// Static data should still be there at top level
 	assert.Contains(t, result2, "initial")
 	assert.Equal(t, "value", result2["initial"])
-	
+
 	// Runtime data from the ContextProvider is stored under the 'input_data' key
 	assert.Contains(t, result2, constants.InputData)
 
@@ -666,16 +665,15 @@ func TestStaticAndDynamicDataCombination(t *testing.T) {
 	assert.Contains(t, dynamicData, "input")
 	assert.Equal(t, "test input", dynamicData["input"])
 }
-*/
 
 // TestExtismDirectInputFormat tests how input data is formatted for Extism
 func TestExtismDirectInputFormat(t *testing.T) {
 	// Create a test map that simulates data from our providers
 	inputData := map[string]any{
-		"initial": "top-level-value",  // Static data at top level
-		"input_data": map[string]any{  // Dynamic data nested under input_data
-			"input": "API User",
-			"request": map[string]any{},  // HTTP request data nested under input_data
+		"initial": "top-level-value", // Static data at top level
+		"input_data": map[string]any{ // Dynamic data nested under input_data
+			"input":   "API User",
+			"request": map[string]any{}, // HTTP request data nested under input_data
 		},
 	}
 

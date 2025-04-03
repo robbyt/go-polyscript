@@ -9,14 +9,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestRunStarlarkExampleMultipleTimes(t *testing.T) {
+func TestRunMultipleTimes(t *testing.T) {
 	// Create a test logger
 	handler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
 		Level: slog.LevelInfo,
 	})
 
 	// Run the "compile once, run many times" example
-	results, err := RunStarlarkExampleMultipleTimes(handler)
+	results, err := runMultipleTimes(handler)
 	require.NoError(t, err, "Multiple executions should run without error")
 
 	// Expect 4 results (World, Alice, Bob, Charlie)
@@ -63,4 +63,8 @@ func TestRunStarlarkExampleMultipleTimes(t *testing.T) {
 			assert.Equal(t, expectedLength, lengthValue, "Should have the correct length for %s", name)
 		}
 	}
+}
+
+func TestRun(t *testing.T) {
+	assert.NoError(t, run(), "run() should execute without error")
 }

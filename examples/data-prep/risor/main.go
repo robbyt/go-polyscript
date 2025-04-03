@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	_ "embed"
 	"fmt"
 	"log/slog"
 	"os"
@@ -18,82 +19,87 @@ import (
 // RisorEvaluator is a type alias to make testing cleaner
 type RisorEvaluator = engine.EvaluatorWithPrep
 
-// GetRisorScript returns the script content for the Risor example
-func GetRisorScript() string {
-	return `
-		// Wrap everything in a function for Risor syntax
-		func process() {
-			// Script has access to ctx variable passed from Go
-			name := ctx["name"]
-			timestamp := ctx["timestamp"]
-			
-			// Simple processing for tests
-			result := {}
-			result["greeting"] = "Hello, " + name + "!"
-			result["timestamp"] = timestamp
-			result["message"] = "Processed at " + timestamp
-			
-			return result
-		}
-		
-		// Call the function and return its result
-		process()
-	`
-}
+//go:embed testdata/script.risor
+var risorScript string
 
-// CreateRisorEvaluator creates a new Risor evaluator with the given script and logger
-func CreateRisorEvaluator(scriptContent string, handler slog.Handler) (*RisorEvaluator, error) {
+// createRisorEvaluator creates a new Risor evaluator with the given script and logger.
+// Sets up a CompositeProvider that combines static and dynamic data providers.
+func createRisorEvaluator(
+	logger *slog.Logger,
+	scriptContent string,
+	staticData map[string]any,
+) (RisorEvaluator, error) {
 	// Define globals that will be available to the script
 	globals := []string{constants.Ctx}
 
-	// Create data provider
-	dataProvider := data.NewContextProvider(constants.EvalData)
+	// The static provider enables access to the static data map
+	staticProvider := data.NewStaticProvider(staticData)
+
+	// This context provider enables each request to add different dynamic data
+	dynamicProvider := data.NewContextProvider(constants.EvalData)
+
+	// Composite provider handles static data first, then dynamic data
+	compositeProvider := data.NewCompositeProvider(staticProvider, dynamicProvider)
 
 	// Create evaluator using the functional options pattern
-	evaluator, err := polyscript.FromRisorString(
+	return polyscript.FromRisorString(
 		scriptContent,
 		options.WithDefaults(),
-		options.WithLogger(handler),
-		options.WithDataProvider(dataProvider),
+		options.WithLogger(logger.Handler()),
+		options.WithDataProvider(compositeProvider),
 		risor.WithGlobals(globals),
 	)
-	if err != nil {
-		return nil, err
-	}
-
-	return &evaluator, nil
 }
 
-// PrepareRequestData prepares the context with web request data
-func PrepareRequestData(
+// prepareRuntimeData adds dynamic runtime data to the context.
+// Returns the enriched context or an error.
+func prepareRuntimeData(
 	ctx context.Context,
-	evaluator RisorEvaluator,
 	logger *slog.Logger,
+	evaluator RisorEvaluator,
 ) (context.Context, error) {
-	// Simulate gathering data from a web request
-	logger.Info("Preparing request data")
+	logger.Info("Preparing runtime data")
+
+	// Create user data
+	userData := map[string]any{
+		"id":          "user-123",
+		"role":        "admin",
+		"permissions": "read,write,execute",
+	}
+
+	// Simulate request data
 	requestData := map[string]any{
+		"Method":     "GET",
+		"URL_Path":   "/api/users",
+		"URL_Host":   "example.com",
+		"Host":       "example.com",
+		"RemoteAddr": "192.168.1.1:12345",
+	}
+
+	// General request metadata
+	requestMeta := map[string]any{
 		"name":      "World",
 		"timestamp": time.Now().Format("2006-01-02 15:04:05"),
+		"user_data": userData,
+		"request":   requestData,
 	}
 
-	// Enrich context with request data
-	logger.Info("Adding request data to context", "data", requestData)
-	enrichedCtx, err := evaluator.PrepareContext(ctx, requestData)
+	// Add the request metadata to the context using the data.Provider
+	enrichedCtx, err := evaluator.PrepareContext(ctx, requestMeta)
 	if err != nil {
-		logger.Error("Failed to prepare context with request data", "error", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to prepare context: %w", err)
 	}
 
-	logger.Info("Request data prepared successfully")
+	logger.Debug("Runtime data prepared successfully")
 	return enrichedCtx, nil
 }
 
-// EvaluateScript evaluates the script with the prepared context
-func EvaluateScript(
+// evalAndExtractResult evaluates the script with the prepared context.
+// Returns the result as a map[string]any or an error.
+func evalAndExtractResult(
 	ctx context.Context,
-	evaluator RisorEvaluator,
 	logger *slog.Logger,
+	evaluator RisorEvaluator,
 ) (map[string]any, error) {
 	logger.Info("Evaluating script")
 
@@ -101,7 +107,7 @@ func EvaluateScript(
 	result, err := evaluator.Eval(ctx)
 	if err != nil {
 		logger.Error("Script evaluation failed", "error", err)
-		return nil, fmt.Errorf("script evaluation failed: %w", err)
+		return nil, err
 	}
 
 	// Process the result
@@ -121,61 +127,53 @@ func EvaluateScript(
 	return data, nil
 }
 
-// DemonstrateDataPrepAndEval shows data preparation and evaluation as separate steps
-func DemonstrateDataPrepAndEval(
-	evaluator RisorEvaluator,
-	logger *slog.Logger,
-) (map[string]any, error) {
-	// Create a base context
-	ctx := context.Background()
-
-	// Step 1: Prepare the context with request data
-	logger.Info("Step 1: Preparing context with request data")
-	enrichedCtx, err := PrepareRequestData(ctx, evaluator, logger)
-	if err != nil {
-		return nil, fmt.Errorf("failed to prepare context: %w", err)
-	}
-
-	// Step 2: Evaluate the script with the prepared context
-	logger.Info("Step 2: Evaluating script with prepared context")
-	result, err := EvaluateScript(enrichedCtx, evaluator, logger)
-	if err != nil {
-		return nil, fmt.Errorf("script evaluation failed: %w", err)
-	}
-
-	return result, nil
-}
-
-func main() {
+func run() error {
 	// Create a logger
 	handler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
 		Level: slog.LevelDebug,
 	})
 	logger := slog.New(handler.WithGroup("risor-data-prep-example"))
 
-	// Create a script string
-	scriptContent := GetRisorScript()
-
-	// Create evaluator
-	evaluator, err := CreateRisorEvaluator(scriptContent, handler)
-	if err != nil {
-		logger.Error("Failed to create evaluator", "error", err)
-		os.Exit(1)
+	// Static data loaded into a data provider, sent to the evaluator along with runtime data
+	staticData := map[string]any{
+		"app_version": "1.0.0",
+		"environment": "development",
+		"config": map[string]any{
+			"timeout":     30,
+			"max_retries": 3,
+			"feature_flags": map[string]any{
+				"advanced_features": true,
+				"beta_features":     false,
+			},
+		},
 	}
 
-	// Check if the evaluator is properly initialized
-	if evaluator == nil {
-		logger.Error("Evaluator is nil")
-		os.Exit(1)
+	// Create evaluator with static and dynamic data providers
+	evaluator, err := createRisorEvaluator(logger, risorScript, staticData)
+	if err != nil {
+		return fmt.Errorf("failed to create evaluator: %w", err)
 	}
 
-	// Run the data preparation and evaluation example
-	result, err := DemonstrateDataPrepAndEval(*evaluator, logger)
+	ctx, err := prepareRuntimeData(context.Background(), logger, evaluator)
 	if err != nil {
-		logger.Error("Failed to demonstrate data prep and eval", "error", err)
-		os.Exit(1)
+		return fmt.Errorf("failed to prepare context: %w", err)
+	}
+
+	// Run the example
+	result, err := evalAndExtractResult(ctx, logger, evaluator)
+	if err != nil {
+		return fmt.Errorf("failed to run example: %w", err)
 	}
 
 	// Print the result
 	logger.Info("Final result", "data", result)
+	return nil
+}
+
+func main() {
+	if err := run(); err != nil {
+		fmt.Println("Error:", err)
+		os.Exit(1)
+	}
+	fmt.Println("Success")
 }

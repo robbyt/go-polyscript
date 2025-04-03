@@ -9,14 +9,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestRunExtismMultipleTimes(t *testing.T) {
+func TestRunMultipleTimes(t *testing.T) {
 	// Create a test logger
 	handler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
 		Level: slog.LevelInfo,
 	})
 
 	// Run the multiple execution example
-	results, err := RunExtismMultipleTimes(handler)
+	results, err := runMultipleTimes(handler)
 	if err != nil {
 		t.Logf("Extism example failed: %v - this may be due to missing WASM file", err)
 		t.Skip("Skipping Extism test as it requires a WASM file")
@@ -38,4 +38,8 @@ func TestRunExtismMultipleTimes(t *testing.T) {
 		assert.True(t, ok, "Result should have a greeting field")
 		assert.Equal(t, expectedGreetings[i], greeting, "Should have the correct greeting")
 	}
+}
+
+func TestRun(t *testing.T) {
+	assert.NoError(t, run(), "run() should execute without error")
 }

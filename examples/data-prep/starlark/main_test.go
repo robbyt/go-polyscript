@@ -10,94 +10,118 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Helper function to create Starlark evaluator - makes testing easier
-func createStarlarkEvaluator(handler slog.Handler) (*StarlarkEvaluator, error) {
-	scriptContent := GetStarlarkScript()
-	return CreateStarlarkEvaluator(scriptContent, handler)
+// getTestStaticData returns static data for tests
+func getTestStaticData() map[string]any {
+	return map[string]any{
+		"app_version": "1.0.0-test",
+		"environment": "test",
+		"config": map[string]any{
+			"timeout":     10,
+			"max_retries": 1,
+			"feature_flags": map[string]any{
+				"advanced_features": true,
+				"beta_features":     true,
+			},
+		},
+	}
 }
 
-func TestDemonstrateMultiStepPreparation(t *testing.T) {
-	// This test just verifies the infrastructure compiles properly
-	// Create a test logger
+// setupTestLogger creates a logger for testing
+func setupTestLogger() *slog.Logger {
 	handler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
 		Level: slog.LevelInfo,
 	})
+	return slog.New(handler.WithGroup("starlark-test"))
+}
 
-	// Create evaluator
-	evaluator, err := createStarlarkEvaluator(handler)
-	require.NoError(t, err, "Should create evaluator without error")
-	require.NotNil(t, evaluator, "Evaluator should not be nil")
-
-	// We'll only test the function structure without running it
-	// since the actual script execution depends on various factors
-	t.Log("Starlark evaluator created successfully")
+func TestRun(t *testing.T) {
+	// This is a simple test of the run function
+	err := run()
+	assert.NoError(t, err, "run() should execute without error")
 }
 
 func TestCreateStarlarkEvaluator(t *testing.T) {
-	// Create a test logger
-	handler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
-		Level: slog.LevelInfo,
-	})
+	logger := setupTestLogger()
+	staticData := getTestStaticData()
 
 	// Test creating evaluator
-	evaluator, err := createStarlarkEvaluator(handler)
+	evaluator, err := createStarlarkEvaluator(logger, starlarkScript, staticData)
 	require.NoError(t, err, "Should create evaluator without error")
-	require.NotNil(t, evaluator, "Evaluator should not be nil")
+
+	// Verify the evaluator is functional
+	ctx := context.Background()
+	evalResult, err := evaluator.Eval(ctx)
+	require.NoError(t, err, "Simple evaluation should succeed")
+	require.NotNil(t, evalResult, "Evaluation result should not be nil")
 }
 
-func TestPrepareRequestData(t *testing.T) {
-	// Create a test logger
-	handler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
-		Level: slog.LevelInfo,
-	})
-	logger := slog.New(handler)
+func TestPrepareRuntimeData(t *testing.T) {
+	logger := setupTestLogger()
+	staticData := getTestStaticData()
 
 	// Create evaluator
-	evaluator, err := createStarlarkEvaluator(handler)
+	evaluator, err := createStarlarkEvaluator(logger, starlarkScript, staticData)
 	require.NoError(t, err, "Failed to create evaluator")
-	require.NotNil(t, evaluator, "Evaluator should not be nil")
 
-	// Test PrepareRequestData function
+	// Test prepareRuntimeData function
 	ctx := context.Background()
-	enrichedCtx, err := PrepareRequestData(ctx, *evaluator, logger)
-	assert.NoError(t, err, "PrepareRequestData should not return an error")
+	enrichedCtx, err := prepareRuntimeData(ctx, logger, evaluator)
+	assert.NoError(t, err, "prepareRuntimeData should not return an error")
 	assert.NotNil(t, enrichedCtx, "Enriched context should not be nil")
 }
 
-func TestPrepareUserData(t *testing.T) {
-	// Create a test logger
-	handler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
-		Level: slog.LevelInfo,
-	})
-	logger := slog.New(handler)
+func TestEvalAndExtractResult(t *testing.T) {
+	logger := setupTestLogger()
+	staticData := getTestStaticData()
 
 	// Create evaluator
-	evaluator, err := createStarlarkEvaluator(handler)
+	evaluator, err := createStarlarkEvaluator(logger, starlarkScript, staticData)
 	require.NoError(t, err, "Failed to create evaluator")
-	require.NotNil(t, evaluator, "Evaluator should not be nil")
 
-	// Test PrepareUserData function
+	// Prepare data first
 	ctx := context.Background()
-	enrichedCtx, err := PrepareUserData(ctx, *evaluator, logger)
-	assert.NoError(t, err, "PrepareUserData should not return an error")
-	assert.NotNil(t, enrichedCtx, "Enriched context should not be nil")
-}
+	preparedCtx, err := prepareRuntimeData(ctx, logger, evaluator)
+	require.NoError(t, err, "Failed to prepare context")
 
-func TestEvaluateFunction(t *testing.T) {
-	// Create a test logger
-	handler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
-		Level: slog.LevelInfo,
-	})
+	// Test evaluation
+	result, err := evalAndExtractResult(preparedCtx, logger, evaluator)
+	assert.NoError(t, err, "evalAndExtractResult should not return an error")
+	assert.NotNil(t, result, "Result should not be nil")
 
-	// Just check that the function exists and has the expected signature
-	evaluator, err := createStarlarkEvaluator(handler)
-	require.NoError(t, err, "Failed to create evaluator")
-	require.NotNil(t, evaluator, "Evaluator should not be nil")
+	// Check basic result fields
+	assert.Contains(t, result, "greeting", "Result should contain a greeting")
+	assert.Contains(t, result, "app_info", "Result should contain app info")
 
-	// Verify the EvaluateScript function has the expected signature
-	_ = func(ctx context.Context, eval StarlarkEvaluator, logger *slog.Logger) (map[string]any, error) {
-		return nil, nil
+	// Verify app info contains data from static provider
+	appInfo, hasAppInfo := result["app_info"].(map[string]any)
+	if assert.True(t, hasAppInfo, "app_info should be a map") {
+		assert.Equal(t, "1.0.0-test", appInfo["version"], "Should have correct app version")
+		assert.Equal(t, "test", appInfo["environment"], "Should have test environment")
 	}
+}
 
-	t.Log("EvaluateScript function has the expected signature")
+// TestFullExecution tests the entire execution flow as an integration test
+func TestFullExecution(t *testing.T) {
+	logger := setupTestLogger()
+	staticData := getTestStaticData()
+
+	// Create evaluator with static data
+	evaluator, err := createStarlarkEvaluator(logger, starlarkScript, staticData)
+	require.NoError(t, err, "Failed to create evaluator")
+
+	// Prepare runtime data
+	ctx := context.Background()
+	preparedCtx, err := prepareRuntimeData(ctx, logger, evaluator)
+	require.NoError(t, err, "Failed to prepare runtime data")
+
+	// Execute the script
+	result, err := evalAndExtractResult(preparedCtx, logger, evaluator)
+	require.NoError(t, err, "Failed to evaluate script")
+	require.NotNil(t, result, "Result should not be nil")
+
+	// Verify result has data from both static and dynamic providers
+	assert.Contains(t, result, "greeting", "Result should have greeting from dynamic data")
+	assert.Contains(t, result, "user_id", "Result should have user_id from dynamic data")
+	assert.Contains(t, result, "app_info", "Result should have app_info from static data")
+	assert.Contains(t, result, "request_info", "Result should have request_info from HTTP request")
 }

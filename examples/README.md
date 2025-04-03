@@ -8,18 +8,18 @@ The examples are organized by execution pattern and script engine:
 
 ```
 examples/
-├── simple/                   # Simple one-time execution examples
-│   ├── risor/                # Risor simple example
-│   ├── starlark/             # Starlark simple example
-│   └── extism/               # Extism simple example
-├── multiple/                 # Compile-once-run-many examples
-│   ├── risor/                # Risor multiple execution example
-│   ├── starlark/             # Starlark multiple execution example
-│   └── extism/               # Extism multiple execution example
-└── data-prep/                # Data preparation examples
-    ├── risor/                # Risor with distributed data prep
-    ├── starlark/             # Starlark with multi-step data prep
-    └── extism/               # Extism with async data prep
+├── simple/                        # Simple one-time execution examples
+│   ├── risor/                     # Risor simple example
+│   ├── starlark/                  # Starlark simple example
+│   └── extism/                    # Extism simple example
+├── multiple-instantiation/        # Compile-once-run-many examples
+│   ├── risor/                     # Risor multiple execution example
+│   ├── starlark/                  # Starlark multiple execution example
+│   └── extism/                    # Extism multiple execution example
+└── data-prep/                     # Data preparation examples
+    ├── risor/                     # Risor with data preparation
+    ├── starlark/                  # Starlark with data preparation
+    └── extism/                    # Extism with data preparation
 ```
 
 ## Execution Patterns
@@ -32,29 +32,29 @@ The simplest pattern compiles and executes a script in a single operation:
 
 - Script is compiled every time it runs
 - All data is provided at compilation time through a `StaticProvider`
-- Good for one-off script executions
+- Suitable for one-off script executions
 
 **Examples:** [Risor](/examples/simple/risor), [Starlark](/examples/simple/starlark), [Extism](/examples/simple/extism)
 
-### 2. Compile Once, Run Many Times
+### 2. Multiple Instantiation (Compile Once, Run Many Times)
 
-This advanced pattern separates compilation from execution, providing significant performance benefits:
+This pattern separates compilation from execution for better performance:
 
 - Script is compiled only once into an `ExecutableUnit`
 - The same compiled script is executed multiple times with different data
 - Data is provided at runtime through a `ContextProvider`
-- Dramatically improves performance for multiple executions
+- Improves performance for multiple executions of the same script
 
-**Examples:** [Risor](/examples/multiple/risor), [Starlark](/examples/multiple/starlark), [Extism](/examples/multiple/extism)
+**Examples:** [Risor](/examples/multiple-instantiation/risor), [Starlark](/examples/multiple-instantiation/starlark), [Extism](/examples/multiple-instantiation/extism)
 
-### 3. Distributed Data Preparation
+### 3. Data Preparation Pattern
 
 This pattern separates data preparation from script evaluation:
 
-- Prepares data on one system and evaluates on another
-- Uses the `EvalDataPreparer` interface with the `PrepareContext` method
-- Enables more flexible architecture and clearer separation of concerns
-- Supports multi-step and asynchronous data preparation
+- Uses a combination of static and dynamic data providers
+- Static data (configuration) is provided at compile time
+- Dynamic data (runtime variables) is injected at execution time
+- Enables flexibility in how data is prepared and passed to scripts
 
 **Examples:** [Risor](/examples/data-prep/risor), [Starlark](/examples/data-prep/starlark), [Extism](/examples/data-prep/extism)
 
@@ -72,7 +72,7 @@ This pattern separates data preparation from script evaluation:
 
 [Extism](https://extism.org/) enables WebAssembly module execution within your Go application.
 
-Note: The Extism examples require a WebAssembly module (provided in the `examples/simple/extism` directory).
+Note: The Extism examples require a WebAssembly module (main.wasm).
 
 ## Key Components Across All Examples
 
@@ -92,20 +92,20 @@ The `ctx` global variable serves as a bridge between Go and the script:
 
 - In Go: You populate data in a provider
 - In Script: The script accesses that data through the `ctx` variable
-- This maintains a clean separation between your application and embedded scripts
+- This maintains a clear separation between your application and embedded scripts
 
 ### Evaluators
 
 Evaluators wrap a compiled script in a standardized interface:
 
-- They handle script compilation
+- They handle script compilation and execution
 - They execute the script with provided data
-- They process and validate script results
+- They process script results
 - Each script engine (Starlark, Risor, Extism) has its own evaluator implementation
 
 ### Result Handling
 
-All examples demonstrate proper techniques for:
+All examples demonstrate techniques for:
 - Processing script outputs
 - Validating returned data structures  
 - Converting between Go and script data types

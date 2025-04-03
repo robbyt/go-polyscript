@@ -16,7 +16,7 @@ func TestRunRisorExample(t *testing.T) {
 	})
 
 	// Run the example
-	result, err := RunRisorExample(handler)
+	result, err := runRisorExample(handler)
 	require.NoError(t, err, "Risor example should run without error")
 
 	// Verify the result
@@ -36,4 +36,8 @@ func TestRunRisorExample(t *testing.T) {
 	} else {
 		assert.Equal(t, int64(13), lengthValue, "Should have the correct length")
 	}
+}
+
+func TestRun(t *testing.T) {
+	assert.NoError(t, run(), "run() should execute without errors")
 }

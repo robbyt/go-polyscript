@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	_ "embed"
 	"fmt"
 	"log/slog"
 	"os"
@@ -13,25 +14,11 @@ import (
 	"github.com/robbyt/go-polyscript/options"
 )
 
-// GetStarlarkScript returns the script content for the Starlark example
-func GetStarlarkScript() string {
-	return `
-# Script has access to ctx variable passed from Go
-name = ctx["name"]
-message = "Hello, " + name + "!"
+//go:embed testdata/script.star
+var starlarkScript string
 
-# Return a dictionary with our result - must explicitly return to get a value
-result = {
-    "greeting": message,
-    "length": len(message)
-}
-# In Starlark, the last expression's value becomes the script's return value
-result
-`
-}
-
-// RunStarlarkExample executes a Starlark script once and returns the result
-func RunStarlarkExample(handler slog.Handler) (map[string]any, error) {
+// runStarlarkExample executes a Starlark script once and returns the result
+func runStarlarkExample(handler slog.Handler) (map[string]any, error) {
 	if handler == nil {
 		handler = slog.NewTextHandler(os.Stdout, nil)
 	}
@@ -40,11 +27,7 @@ func RunStarlarkExample(handler slog.Handler) (map[string]any, error) {
 	// Define globals that will be available to the script
 	globals := []string{constants.Ctx}
 
-	// Create a script string
-	scriptContent := GetStarlarkScript()
-
-	// Create input data - this is different from the context data
-	// It will be provided via the data provider during evaluation
+	// Create input data
 	input := map[string]any{
 		"name": "World",
 	}
@@ -52,8 +35,8 @@ func RunStarlarkExample(handler slog.Handler) (map[string]any, error) {
 
 	// Create evaluator using the functional options pattern
 	evaluator, err := polyscript.FromStarlarkString(
-		scriptContent,
-		options.WithDefaults(), // Add defaults option to ensure all required fields are set
+		starlarkScript,
+		options.WithDefaults(),
 		options.WithLogger(handler),
 		options.WithDataProvider(dataProvider),
 		starlark.WithGlobals(globals),
@@ -65,33 +48,20 @@ func RunStarlarkExample(handler slog.Handler) (map[string]any, error) {
 
 	// Execute the script
 	ctx := context.Background()
-	if evaluator == nil {
-		logger.Error("Evaluator is nil")
-		return nil, fmt.Errorf("evaluator is nil")
-	}
 	result, err := evaluator.Eval(ctx)
 	if err != nil {
-		logger.Error(
-			"Script evaluation failed",
-			"error",
-			err,
-			"evaluator",
-			fmt.Sprintf("%T", evaluator),
-		)
+		logger.Error("Failed to evaluate script", "error", err)
 		return nil, err
 	}
 
 	// Handle potential nil result from Interface()
 	val := result.Interface()
 	if val == nil {
-		// Create a default map with expected values for testing
-		return map[string]any{
-			"greeting": "Hello, World!",
-			"length":   int64(13),
-		}, nil
+		logger.Warn("Result is nil")
+		return map[string]any{}, nil
 	}
 
-	// Otherwise return the actual result
+	// Process the result
 	data, ok := val.(map[string]any)
 	if !ok {
 		logger.Error("Result is not a map", "type", fmt.Sprintf("%T", val))
@@ -100,17 +70,25 @@ func RunStarlarkExample(handler slog.Handler) (map[string]any, error) {
 	return data, nil
 }
 
-func main() {
+func run() error {
 	// Create a logger
 	handler := slog.NewTextHandler(os.Stdout, nil)
+	logger := slog.New(handler.WithGroup("starlark-simple-example"))
 
 	// Run the example
-	result, err := RunStarlarkExample(handler)
+	result, err := runStarlarkExample(handler)
 	if err != nil {
-		fmt.Printf("Error: %v\n", err)
-		return
+		return fmt.Errorf("failed to run example: %w", err)
 	}
 
 	// Print the result
-	fmt.Printf("Result: %v\n", result)
+	logger.Info("Result", "data", result)
+	return nil
+}
+
+func main() {
+	if err := run(); err != nil {
+		fmt.Println("Error:", err)
+		os.Exit(1)
+	}
 }

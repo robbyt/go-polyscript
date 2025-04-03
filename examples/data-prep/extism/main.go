@@ -1,3 +1,4 @@
+// Package main provides an example of using Extism with go-polyscript
 package main
 
 import (
@@ -5,10 +6,12 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/robbyt/go-polyscript"
 	"github.com/robbyt/go-polyscript/engine"
+	"github.com/robbyt/go-polyscript/execution/constants"
 	"github.com/robbyt/go-polyscript/execution/data"
 	"github.com/robbyt/go-polyscript/machines/extism"
 	"github.com/robbyt/go-polyscript/options"
@@ -17,88 +20,72 @@ import (
 // ExtismEvaluator is a type alias to make testing cleaner
 type ExtismEvaluator = engine.EvaluatorWithPrep
 
-// CreateExtismEvaluator creates a new Extism evaluator with the given WASM file and logger
-func CreateExtismEvaluator(wasmFilePath string, handler slog.Handler) (*ExtismEvaluator, error) {
-	// Create a StaticProvider with compile-time data
-	staticData := map[string]any{
-		// Put the input field directly at the top level for Extism
-		"input": "API User",
-	}
+// createExtismEvaluator creates a new Extism evaluator with the given WASM file and logger.
+// Sets up a CompositeProvider that combines static and dynamic data providers.
+func createExtismEvaluator(
+	logger *slog.Logger,
+	wasmFilePath string,
+	staticData map[string]any,
+) (ExtismEvaluator, error) {
+	// The static provider enables access to the static data map
 	staticProvider := data.NewStaticProvider(staticData)
 
-	// Also create a ContextProvider for any runtime data
-	// Using the eval_data key where data will be stored in the context
-	ctxProvider := data.NewContextProvider("eval_data")
+	// This context provider enables each request to add different dynamic data
+	dynamicProvider := data.NewContextProvider(constants.EvalData)
 
-	// Create a CompositeProvider that combines both static and runtime data
-	// The ordering is important: runtime data (ctxProvider) will override static data
-	compositeProvider := data.NewCompositeProvider(staticProvider, ctxProvider)
+	// Composite provider handles static data first, then dynamic data
+	compositeProvider := data.NewCompositeProvider(staticProvider, dynamicProvider)
 
 	// Create evaluator using the functional options pattern
-	evaluator, err := polyscript.FromExtismFile(
+	return polyscript.FromExtismFile(
 		wasmFilePath,
-		options.WithLogger(handler),
-		options.WithDataProvider(compositeProvider), // Use the composite provider
+		options.WithLogger(logger.Handler()),
+		options.WithDataProvider(compositeProvider),
 		extism.WithEntryPoint("greet"),
 	)
-	if err != nil {
-		return nil, err
-	}
-
-	return &evaluator, nil
 }
 
-// PrepareRequestData prepares the context with request data
-func PrepareRequestData(
+// prepareRuntimeData adds dynamic runtime data to the context.
+// Returns the enriched context or an error.
+func prepareRuntimeData(
 	ctx context.Context,
-	evaluator ExtismEvaluator,
 	logger *slog.Logger,
+	evaluator ExtismEvaluator,
 ) (context.Context, error) {
-	// Simulate gathering data from an API request
-	logger.Info("Preparing request data")
+	logger.Info("Preparing runtime data")
+
+	// Create user data
+	userData := map[string]any{
+		"id":          "user-123",
+		"role":        "admin",
+		"permissions": "read,write,execute",
+	}
 
 	// For Extism, we need to structure our data so that the "input" field
-	// will be directly accessible to the WASM module. The ContextProvider wraps
-	// map[string]any data in input_data, so we need to add our data there.
-	inputData := map[string]any{
-		"input": "API User", // This is what the Extism WASM module needs
+	// will be directly accessible to the WASM module
+	requestMeta := map[string]any{
+		"input":     "World", // This is what the Extism WASM module needs
+		"user_data": userData,
+		"timestamp": time.Now().Format("2006-01-02 15:04:05"),
 	}
 
-	// Enrich context with request data
-	enrichedCtx, err := evaluator.PrepareContext(ctx, inputData)
+	// Add the request metadata to the context using the data.Provider
+	enrichedCtx, err := evaluator.PrepareContext(ctx, requestMeta)
 	if err != nil {
 		logger.Error("Failed to prepare context with request data", "error", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to prepare context: %w", err)
 	}
 
-	logger.Info("Request data prepared successfully")
+	logger.Debug("Runtime data prepared successfully")
 	return enrichedCtx, nil
 }
 
-// PrepareConfigData prepares the context with configuration data
-func PrepareConfigData(
+// evalAndExtractResult evaluates the script with the prepared context.
+// Returns the result as a map[string]any or an error.
+func evalAndExtractResult(
 	ctx context.Context,
-	evaluator ExtismEvaluator,
 	logger *slog.Logger,
-) (context.Context, error) {
-	// For Extism, we'll keep using the simple structure since the WASM module
-	// only expects {"input": "..."} format
-	// This function is kept for consistency with other examples and to demonstrate
-	// the multi-step preparation pattern
-	logger.Info("Preparing configuration data")
-
-	// We don't need to add any additional data for this example
-	enrichedCtx := ctx
-
-	logger.Info("Configuration data prepared successfully")
-	return enrichedCtx, nil
-}
-
-// EvaluateScript evaluates the script with the prepared context
-func EvaluateScript(
-	ctx context.Context,
 	evaluator ExtismEvaluator,
-	logger *slog.Logger,
 ) (map[string]any, error) {
 	logger.Info("Evaluating script")
 
@@ -131,63 +118,112 @@ func EvaluateScript(
 	return resultMap, nil
 }
 
-// DemonstrateDataPrepAndEval shows the complete data preparation and evaluation workflow
-func DemonstrateDataPrepAndEval(
-	evaluator ExtismEvaluator,
-	logger *slog.Logger,
-) (map[string]any, error) {
-	// Create a base context
-	ctx := context.Background()
-
-	// Step 1: Prepare context with request data
-	ctx, err := PrepareRequestData(ctx, evaluator, logger)
-	if err != nil {
-		return nil, fmt.Errorf("request data preparation failed: %w", err)
+// findWasmFile searches for the Extism WASM file in various likely locations
+func findWasmFile(logger *slog.Logger) (string, error) {
+	paths := []string{
+		"main.wasm",                   // Current directory
+		"examples/testdata/main.wasm", // Project's main example WASM
+		"../../../machines/extism/testdata/examples/main.wasm", // From machines testdata
+		"machines/extism/testdata/examples/main.wasm",          // From project root to testdata
 	}
 
-	// Step 2: Prepare context with config data
-	ctx, err = PrepareConfigData(ctx, evaluator, logger)
-	if err != nil {
-		return nil, fmt.Errorf("config data preparation failed: %w", err)
+	// Log the searched paths if logger is available
+	if logger != nil {
+		logger.Info("Searching for WASM file in multiple locations")
 	}
 
-	// Step 3: Evaluate the script with the prepared context
-	result, err := EvaluateScript(ctx, evaluator, logger)
-	if err != nil {
-		return nil, fmt.Errorf("script evaluation failed: %w", err)
+	// Track checked paths for better error reporting
+	checkedPaths := []string{}
+
+	for _, path := range paths {
+		if _, err := os.Stat(path); err == nil {
+			absPath, err := filepath.Abs(path)
+			if err == nil {
+				if logger != nil {
+					logger.Info("Found WASM file", "path", absPath)
+				}
+				return absPath, nil
+			}
+		}
+		// Store the absolute path for error reporting
+		absPath, err := filepath.Abs(path)
+		if err != nil {
+			absPath = path // Fallback to relative path if absolute path fails
+		}
+		checkedPaths = append(checkedPaths, absPath)
 	}
 
-	return result, nil
+	// If no WASM file found, provide detailed error with checked paths
+	errMsg := `WASM file not found in any of the expected locations.
+
+To fix this issue:
+1. Run 'make build' in the machines/extism/testdata directory to generate the WASM file
+2. OR copy a pre-built WASM file to one of these locations:
+`
+
+	for _, path := range checkedPaths {
+		errMsg += "   - " + path + "\n"
+	}
+
+	return "", fmt.Errorf("%s", errMsg)
 }
 
-func main() {
+func run() error {
 	// Create a logger
 	handler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
 		Level: slog.LevelDebug,
 	})
 	logger := slog.New(handler.WithGroup("extism-data-prep-example"))
 
+	// Static data loaded into a data provider
+	staticData := map[string]any{
+		"app_version": "1.0.0",
+		"environment": "development",
+		"config": map[string]any{
+			"timeout":     30,
+			"max_retries": 3,
+			"feature_flags": map[string]any{
+				"advanced_features": true,
+				"beta_features":     false,
+			},
+		},
+		// Put the input field directly at the top level for Extism
+		"input": "Static User",
+	}
+
 	// Find the WASM file
-	wasmFilePath, err := FindWasmFile(logger)
+	wasmFilePath, err := findWasmFile(logger)
 	if err != nil {
-		logger.Error("Failed to find WASM file", "error", err)
-		os.Exit(1)
+		return fmt.Errorf("failed to find WASM file: %w", err)
 	}
 
-	// Create evaluator
-	evaluator, err := CreateExtismEvaluator(wasmFilePath, handler)
+	// Create evaluator with static and dynamic data providers
+	evaluator, err := createExtismEvaluator(logger, wasmFilePath, staticData)
 	if err != nil {
-		logger.Error("Failed to create evaluator", "error", err)
-		os.Exit(1)
+		return fmt.Errorf("failed to create evaluator: %w", err)
 	}
 
-	// Run the data preparation and evaluation example
-	result, err := DemonstrateDataPrepAndEval(*evaluator, logger)
+	// Prepare runtime data
+	ctx, err := prepareRuntimeData(context.Background(), logger, evaluator)
 	if err != nil {
-		logger.Error("Failed to run data prep and eval example", "error", err)
-		os.Exit(1)
+		return fmt.Errorf("failed to prepare context: %w", err)
+	}
+
+	// Run the example
+	result, err := evalAndExtractResult(ctx, logger, evaluator)
+	if err != nil {
+		return fmt.Errorf("failed to run example: %w", err)
 	}
 
 	// Print the result
 	logger.Info("Final result", "data", result)
+	return nil
+}
+
+func main() {
+	if err := run(); err != nil {
+		fmt.Println("Error:", err)
+		os.Exit(1)
+	}
+	fmt.Println("Success")
 }
