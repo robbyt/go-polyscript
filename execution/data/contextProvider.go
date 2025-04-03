@@ -13,17 +13,28 @@ import (
 
 // ContextProvider retrieves and stores data in the context using a specified key.
 type ContextProvider struct {
-	contextKey constants.ContextKey
+	contextKey  constants.ContextKey
+	storageKey  string
+	requestKey  string
+	responseKey string
 }
 
 // NewContextProvider creates a new ContextProvider with the given context key.
+// For example, if the context key is "foo", the provider will store the input data under the
+// ctx.Value("foo") key. Later, lookup will also use the same key to retrieve the data from the
+// context object.
 func NewContextProvider(contextKey constants.ContextKey) *ContextProvider {
 	return &ContextProvider{
 		contextKey: contextKey,
+
+		// hard-coded storage keys for accessing the data in the final ctx object.
+		storageKey:  constants.InputData, // ctx["input_data"]
+		requestKey:  constants.Request,   // ctx["request"]
+		responseKey: constants.Response,  // ctx["response"]
 	}
 }
 
-// GetData extracts a map[string]any from the context using the configured key.
+// GetData extracts a map[string]any data object from the context using the previously configured context key.
 func (p *ContextProvider) GetData(ctx context.Context) (map[string]any, error) {
 	if p.contextKey == "" {
 		return nil, fmt.Errorf("context key is empty")
@@ -34,12 +45,12 @@ func (p *ContextProvider) GetData(ctx context.Context) (map[string]any, error) {
 		return make(map[string]any), nil
 	}
 
-	inputData, ok := value.(map[string]any)
+	d, ok := value.(map[string]any)
 	if !ok {
 		return nil, fmt.Errorf("invalid input data type: expected map[string]any, got %T", value)
 	}
 
-	return inputData, nil
+	return d, nil
 }
 
 // AddDataToContext stores data in the context for script execution.
@@ -74,12 +85,27 @@ func (p *ContextProvider) AddDataToContext(
 		}
 
 		switch v := item.(type) {
+		default:
+			// For unhandled types, log an error and continue
+			errz = append(errz, fmt.Errorf("unsupported data type for ContextProvider: %T", item))
+			continue
+		case map[string]any:
+			scriptData := make(map[string]any)
+
+			// Reuse existing data map if available, because we're iterating multiple data
+			if existingScriptData, ok := toStore[p.storageKey].(map[string]any); ok {
+				scriptData = existingScriptData
+			}
+
+			// Copy new data into the map (overwriting any existing keys)
+			maps.Copy(scriptData, v)
+			toStore[p.storageKey] = scriptData
 		case *http.Request:
 			if v == nil {
 				continue
 			}
 
-			if existingValue, exists := toStore[constants.Request]; exists {
+			if existingValue, exists := toStore[p.requestKey]; exists {
 				errz = append(errz, fmt.Errorf("request data already set: %v", existingValue))
 				continue
 			}
@@ -89,10 +115,9 @@ func (p *ContextProvider) AddDataToContext(
 				errz = append(errz, fmt.Errorf("failed to convert HTTP request to map: %w", err))
 				continue
 			}
-			toStore[constants.Request] = reqMap
-
+			toStore[p.requestKey] = reqMap
 		case http.Request:
-			if existingValue, exists := toStore[constants.Request]; exists {
+			if existingValue, exists := toStore[p.requestKey]; exists {
 				errz = append(errz, fmt.Errorf("request data already set: %v", existingValue))
 				continue
 			}
@@ -102,56 +127,38 @@ func (p *ContextProvider) AddDataToContext(
 				errz = append(errz, fmt.Errorf("failed to convert HTTP request to map: %w", err))
 				continue
 			}
-			toStore[constants.Request] = reqMap
-		/*
-			TODO: add helpers.ResponseToMap
-			case *http.Response:
-				if v == nil {
-					continue
-				}
+			toStore[p.requestKey] = reqMap
+			/*
+				TODO: add helpers.ResponseToMap
+				case *http.Response:
+					if v == nil {
+						continue
+					}
 
-				if existingValue, exists := toStore[constants.Response]; exists {
-					errz = append(errz, fmt.Errorf("response data already set: %v", existingValue))
-					continue
-				}
+					if existingValue, exists := toStore[p.responseKey]; exists {
+						errz = append(errz, fmt.Errorf("response data already set: %v", existingValue))
+						continue
+					}
 
-				respMap, err := helpers.ResponseToMap(v)
-				if err != nil {
-					errz = append(errz, fmt.Errorf("failed to convert HTTP response to map: %w", err))
-					continue
-				}
-				toStore[constants.Response] = respMap
+					respMap, err := helpers.ResponseToMap(v)
+					if err != nil {
+						errz = append(errz, fmt.Errorf("failed to convert HTTP response to map: %w", err))
+						continue
+					}
+					toStore[p.responseKey] = respMap
+				case http.Response:
+					if existingValue, exists := toStore[p.responseKey]; exists {
+						errz = append(errz, fmt.Errorf("response data already set: %v", existingValue))
+						continue
+					}
 
-			case http.Response:
-				if existingValue, exists := toStore[constants.Response]; exists {
-					errz = append(errz, fmt.Errorf("response data already set: %v", existingValue))
-					continue
-				}
-
-				respMap, err := helpers.ResponseToMap(&v)
-				if err != nil {
-					errz = append(errz, fmt.Errorf("failed to convert HTTP response to map: %w", err))
-					continue
-				}
-				toStore[constants.Response] = respMap
-
-		*/
-		case map[string]any:
-			// Handle general data - store the object under the input_data key
-			scriptData := make(map[string]any)
-
-			// Reuse existing map if available
-			if existingScriptData, ok := toStore[constants.InputData].(map[string]any); ok {
-				scriptData = existingScriptData
-			}
-
-			// Copy new data into the map (overwriting any existing keys)
-			maps.Copy(scriptData, v)
-			toStore[constants.InputData] = scriptData
-		default:
-			// For unhandled types, log an error and continue
-			errz = append(errz, fmt.Errorf("unsupported data type for ContextProvider: %T", item))
-			continue
+					respMap, err := helpers.ResponseToMap(&v)
+					if err != nil {
+						errz = append(errz, fmt.Errorf("failed to convert HTTP response to map: %w", err))
+						continue
+					}
+					toStore[p.responseKey] = respMap
+			*/
 		}
 	}
 

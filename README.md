@@ -118,54 +118,84 @@ if err != nil {
 result, err := evaluator.Eval(enrichedCtx)
 ```
 
-## Working with InputDataProvider
+## Working with Data Providers
 
-go-polyscript uses the `InputDataProvider` interface to supply data to scripts during evaluation. Several built-in providers are available:
-
-### ContextProvider (Backward Compatibility)
-
-Uses a context value to retrieve script input data:
-
-```go
-// Create a context provider (this is used internally by default)
-provider := data.NewContextProvider(constants.EvalData)
-
-// Prepare context with input data
-ctx := context.Background()
-input := map[string]any{"name": "World"}
-ctx = context.WithValue(ctx, constants.EvalData, input)
-
-// Create evaluator with the provider
-evaluator := risor.NewBytecodeEvaluator(handler, provider)
-```
+go-polyscript uses data providers to supply information to scripts during evaluation. Several built-in providers are available, each with different characteristics:
 
 ### StaticProvider
 
-Provides fixed data for all evaluations:
+Provides fixed data at the top level for all evaluations:
 
 ```go
 // Create a static provider with predefined data
-inputData := map[string]any{"name": "World"}
-provider := data.NewStaticProvider(inputData)
+configData := map[string]any{"name": "World", "timeout": 30}
+provider := data.NewStaticProvider(configData)
 
 // Create evaluator with the provider
 evaluator := risor.NewBytecodeEvaluator(handler, provider)
+
+// In scripts, static data is accessed directly:
+// name := ctx["name"]  // "World"
+```
+
+### ContextProvider
+
+Retrieves dynamic data from context and makes it available under the `input_data` key:
+
+```go
+// Create a context provider (used for dynamic data)
+provider := data.NewContextProvider(constants.EvalData)
+
+// Prepare context with runtime data
+ctx := context.Background()
+userData := map[string]any{"userId": 123, "preferences": {"theme": "dark"}}
+enrichedCtx, _ := provider.AddDataToContext(ctx, userData)
+
+// Create evaluator with the provider
+evaluator := risor.NewBytecodeEvaluator(handler, provider)
+
+// In scripts, dynamic data is accessed via input_data:
+// userId := ctx["input_data"]["userId"]  // 123
 ```
 
 ### CompositeProvider
 
-Combines multiple providers, checking each in sequence:
+Combines multiple providers to enable both static and dynamic data:
 
 ```go
 // Create providers for different data sources
+staticProvider := data.NewStaticProvider(map[string]any{
+    "appName": "MyApp",
+    "version": "1.0",
+})
 ctxProvider := data.NewContextProvider(constants.EvalData)
-defaultProvider := data.NewStaticProvider(map[string]any{"defaultKey": "value"})
 
-// Create a composite provider that tries ctxProvider first, then defaultProvider
-provider := data.NewCompositeProvider(ctxProvider, defaultProvider)
+// Create a composite provider that combines both
+provider := data.NewCompositeProvider(staticProvider, ctxProvider)
 
 // Create evaluator with the provider
 evaluator := risor.NewBytecodeEvaluator(handler, provider)
+
+// In scripts, data can be accessed from both locations:
+// appName := ctx["appName"]  // Static data: "MyApp"
+// userId := ctx["input_data"]["userId"]  // Dynamic data: 123
+```
+
+For maximum script compatibility, use a hybrid data access pattern that checks both locations:
+
+```go
+// Risor script with hybrid data access
+func process() {
+    // Try both locations for accessing data
+    var name = ""
+    if ctx["name"] != nil {
+        name = ctx["name"]  // Try direct access first (StaticProvider)
+    } else if ctx["input_data"] != nil && ctx["input_data"]["name"] != nil {
+        name = ctx["input_data"]["name"]  // Fall back to nested (ContextProvider)
+    }
+    
+    return {"greeting": "Hello, " + name}
+}
 ```
 
 ## Architecture
@@ -178,9 +208,18 @@ go-polyscript is structured around a few key concepts:
 4. **ExecutionPackage** Contains an **ExecutableUnit** and other metadata
 5. **Evaluator**: Executes compiled scripts with provided input data
 6. **EvalDataPreparer**: Prepares data for evaluation (can be separated from evaluation)
-7. **InputDataProvider**: Supplies data to scripts during evaluation
+7. **Provider**: Supplies data to scripts during evaluation
 8. **Machine**: A specific implementation of a scripting engine (Risor, Starlark, Extism)
 9. **EvaluatorResponse** The response object returned from all **Machine**s
+
+### Note on Data Access Patterns
+
+go-polyscript uses a unified `Provider` interface to supply data to scripts. The library has standardized on storing dynamic runtime data under the `input_data` key (previously `script_data`). For maximum compatibility, scripts should handle two data access patterns:
+
+1. Top-level access for static data: `ctx["config_value"]`
+2. Nested access for dynamic data: `ctx["input_data"]["user_data"]`
+
+See the [Data Providers](#working-with-data-providers) section for more details.
 
 ## Preparing Data Separately from Evaluation
 
