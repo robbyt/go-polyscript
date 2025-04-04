@@ -36,4 +36,4 @@ Note: The Extism example requires a WASM file. If not found automatically, you m
 ## Related Patterns
 
 - [Simple Examples](/examples/simple): Basic one-time execution pattern
-- [Multiple Examples](/examples/multiple-instantiation): Compile-once-run-many pattern
+- [Multiple Instantiation Examples](/examples/multiple-instantiation): Compile-once-run-many pattern

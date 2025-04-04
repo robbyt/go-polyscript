@@ -1,10 +1,10 @@
 # Simple Execution Examples
 
-This directory contains examples demonstrating the basic "compile and execute once" pattern for script execution in go-polyscript.
+This directory contains examples demonstrating the basic "one-time execution" pattern for script evaluation in go-polyscript.
 
 ## Overview
 
-The simple execution pattern is the most straightforward way to run embedded scripts with go-polyscript. It creates an evaluator and immediately executes the script in a single operation, providing a clean, concise approach for one-off script executions.
+The simple execution pattern is the most straightforward way to run scripts with go-polyscript. It creates an evaluator and immediately executes the script in a single operation, providing a clean, concise approach for one-off script executions.
 
 ## When to Use This Pattern
 
@@ -31,7 +31,7 @@ These examples follow a consistent pattern:
 In all examples, scripts access data using a `ctx` global variable:
 - Starlark: `name = ctx["name"]`
 - Risor: `name := ctx["name"]`
-- Extism: Input data is available directly to the WASM module
+- Extism: Input data is passed to the WASM module
 
 ## Running the Examples
 
@@ -41,9 +41,9 @@ Each example follows the same pattern but demonstrates it with a different scrip
 go run examples/simple/<engine>/main.go
 ```
 
-Note: The Extism example requires a WebAssembly module. It uses the `FindWasmFile` function to locate the module in various directories.
+Note: The Extism example requires a WebAssembly module. It uses the `findWasmFile` function to locate the module in various directories.
 
 ## Related Patterns
 
-- [Multiple Instantiation Examples](/examples/multiple-instantiation): Compile once, run many times pattern
-- [Data Preparation Examples](/examples/data-prep): Separating static configuration from dynamic runtime data
+- [Multiple Instantiation Examples](/examples/multiple-instantiation): Compile-once-run-many pattern
+- [Data Preparation Examples](/examples/data-prep): Pattern for separating static configuration from dynamic runtime data
