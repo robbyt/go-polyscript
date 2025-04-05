@@ -3,11 +3,17 @@ package polyscript
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	"github.com/robbyt/go-polyscript/engine"
+	"github.com/robbyt/go-polyscript/execution/constants"
+	"github.com/robbyt/go-polyscript/execution/data"
 	"github.com/robbyt/go-polyscript/execution/script"
 	"github.com/robbyt/go-polyscript/execution/script/loader"
 	"github.com/robbyt/go-polyscript/machines"
+	"github.com/robbyt/go-polyscript/machines/extism"
+	"github.com/robbyt/go-polyscript/machines/risor"
+	"github.com/robbyt/go-polyscript/machines/starlark"
 	"github.com/robbyt/go-polyscript/machines/types"
 	"github.com/robbyt/go-polyscript/options"
 )
@@ -74,10 +80,13 @@ func (e *EvaluatorWrapper) WithExecutableUnit(
 	}
 }
 
-// NewStarlarkEvaluator creates a new evaluator for Starlark scripts
-func NewStarlarkEvaluator(opts ...options.Option) (engine.EvaluatorWithPrep, error) {
-	// Initialize with Starlark defaults
-	cfg := options.DefaultConfig(types.Starlark)
+// NewEvaluator creates a new evaluator for the specified machine type
+func NewEvaluator(
+	machineType types.Type,
+	opts ...options.Option,
+) (engine.EvaluatorWithPrep, error) {
+	// Initialize with machine-specific defaults
+	cfg := options.DefaultConfig(machineType)
 
 	// Apply all options
 	for _, opt := range opts {
@@ -97,56 +106,21 @@ func NewStarlarkEvaluator(opts ...options.Option) (engine.EvaluatorWithPrep, err
 	}
 
 	return createEvaluator(cfg)
+}
+
+// NewStarlarkEvaluator creates a new evaluator for Starlark scripts
+func NewStarlarkEvaluator(opts ...options.Option) (engine.EvaluatorWithPrep, error) {
+	return NewEvaluator(types.Starlark, opts...)
 }
 
 // NewRisorEvaluator creates a new evaluator for Risor scripts
 func NewRisorEvaluator(opts ...options.Option) (engine.EvaluatorWithPrep, error) {
-	// Initialize with Risor defaults
-	cfg := options.DefaultConfig(types.Risor)
-
-	// Apply all options
-	for _, opt := range opts {
-		if err := opt(cfg); err != nil {
-			return nil, fmt.Errorf("error applying option: %w", err)
-		}
-	}
-
-	// Apply defaults option as final step to fill in any missing values
-	if err := options.WithDefaults()(cfg); err != nil {
-		return nil, fmt.Errorf("error applying defaults: %w", err)
-	}
-
-	// Validate configuration
-	if err := cfg.Validate(); err != nil {
-		return nil, err
-	}
-
-	return createEvaluator(cfg)
+	return NewEvaluator(types.Risor, opts...)
 }
 
 // NewExtismEvaluator creates a new evaluator for Extism WASM
 func NewExtismEvaluator(opts ...options.Option) (engine.EvaluatorWithPrep, error) {
-	// Initialize with Extism defaults
-	cfg := options.DefaultConfig(types.Extism)
-
-	// Apply all options
-	for _, opt := range opts {
-		if err := opt(cfg); err != nil {
-			return nil, fmt.Errorf("error applying option: %w", err)
-		}
-	}
-
-	// Apply defaults option as final step to fill in any missing values
-	if err := options.WithDefaults()(cfg); err != nil {
-		return nil, fmt.Errorf("error applying defaults: %w", err)
-	}
-
-	// Validate configuration
-	if err := cfg.Validate(); err != nil {
-		return nil, err
-	}
-
-	return createEvaluator(cfg)
+	return NewEvaluator(types.Extism, opts...)
 }
 
 // createEvaluator is a helper function to create an evaluator from a config
@@ -190,8 +164,12 @@ func createEvaluator(cfg *options.Config) (engine.EvaluatorWithPrep, error) {
 	return NewEvaluatorWrapper(machineEvaluator, execUnit), nil
 }
 
-// FromStarlarkString creates a Starlark evaluator from a script string
-func FromStarlarkString(content string, opts ...options.Option) (engine.EvaluatorWithPrep, error) {
+// fromStringLoader creates an evaluator from a string content using the specified machine type
+func fromStringLoader(
+	machineType types.Type,
+	content string,
+	opts ...options.Option,
+) (engine.EvaluatorWithPrep, error) {
 	// Create a string loader
 	l, err := loader.NewFromString(content)
 	if err != nil {
@@ -201,25 +179,15 @@ func FromStarlarkString(content string, opts ...options.Option) (engine.Evaluato
 	// Combine options, adding the loader
 	allOpts := append([]options.Option{options.WithLoader(l)}, opts...)
 
-	return NewStarlarkEvaluator(allOpts...)
+	return NewEvaluator(machineType, allOpts...)
 }
 
-// FromRisorString creates a Risor evaluator from a script string
-func FromRisorString(content string, opts ...options.Option) (engine.EvaluatorWithPrep, error) {
-	// Create a string loader
-	l, err := loader.NewFromString(content)
-	if err != nil {
-		return nil, err
-	}
-
-	// Combine options, adding the loader
-	allOpts := append([]options.Option{options.WithLoader(l)}, opts...)
-
-	return NewRisorEvaluator(allOpts...)
-}
-
-// FromExtismFile creates an Extism evaluator from a WASM file
-func FromExtismFile(filePath string, opts ...options.Option) (engine.EvaluatorWithPrep, error) {
+// fromFileLoader creates an evaluator from a file path using the specified machine type
+func fromFileLoader(
+	machineType types.Type,
+	filePath string,
+	opts ...options.Option,
+) (engine.EvaluatorWithPrep, error) {
 	// Create a file loader
 	l, err := loader.NewFromDisk(filePath)
 	if err != nil {
@@ -229,5 +197,119 @@ func FromExtismFile(filePath string, opts ...options.Option) (engine.EvaluatorWi
 	// Combine options, adding the loader
 	allOpts := append([]options.Option{options.WithLoader(l)}, opts...)
 
-	return NewExtismEvaluator(allOpts...)
+	return NewEvaluator(machineType, allOpts...)
+}
+
+// FromStarlarkString creates a Starlark evaluator from a script string
+func FromStarlarkString(content string, opts ...options.Option) (engine.EvaluatorWithPrep, error) {
+	return fromStringLoader(types.Starlark, content, opts...)
+}
+
+// FromRisorString creates a Risor evaluator from a script string
+func FromRisorString(content string, opts ...options.Option) (engine.EvaluatorWithPrep, error) {
+	return fromStringLoader(types.Risor, content, opts...)
+}
+
+// FromExtismFile creates an Extism evaluator from a WASM file
+func FromExtismFile(filePath string, opts ...options.Option) (engine.EvaluatorWithPrep, error) {
+	return fromFileLoader(types.Extism, filePath, opts...)
+}
+
+// WithCompositeProvider creates an option to use a composite provider combining static and dynamic data
+func WithCompositeProvider(staticData map[string]any) options.Option {
+	return func(cfg *options.Config) error {
+		staticProvider := data.NewStaticProvider(staticData)
+		dynamicProvider := data.NewContextProvider(constants.EvalData)
+		compositeProvider := data.NewCompositeProvider(staticProvider, dynamicProvider)
+		return options.WithDataProvider(compositeProvider)(cfg)
+	}
+}
+
+// PrepareAndEval combines context preparation and evaluation in a single operation
+func PrepareAndEval(
+	ctx context.Context,
+	evaluator engine.EvaluatorWithPrep,
+	data map[string]any,
+) (interface{}, error) {
+	// Prepare context with data
+	enrichedCtx, err := evaluator.PrepareContext(ctx, data)
+	if err != nil {
+		return nil, fmt.Errorf("failed to prepare context: %w", err)
+	}
+
+	// Evaluate with the enriched context
+	result, err := evaluator.Eval(enrichedCtx)
+	if err != nil {
+		return nil, fmt.Errorf("script evaluation failed: %w", err)
+	}
+
+	return result.Interface(), nil
+}
+
+// EvalAndExtractMap runs evaluation and extracts result as a map[string]any
+func EvalAndExtractMap(ctx context.Context, evaluator engine.Evaluator) (map[string]any, error) {
+	// Evaluate the script
+	result, err := evaluator.Eval(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("script evaluation failed: %w", err)
+	}
+
+	// Process the result
+	val := result.Interface()
+	if val == nil {
+		return map[string]any{}, nil
+	}
+
+	data, ok := val.(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("result is not a map: %T", val)
+	}
+
+	return data, nil
+}
+
+// NewRisorWithData creates a Risor evaluator with both static and dynamic data capabilities
+func NewRisorWithData(
+	script string,
+	staticData map[string]any,
+	logger slog.Handler,
+) (engine.EvaluatorWithPrep, error) {
+	return FromRisorString(
+		script,
+		options.WithDefaults(),
+		options.WithLogger(logger),
+		WithCompositeProvider(staticData),
+		risor.WithGlobals([]string{constants.Ctx}),
+	)
+}
+
+// NewStarlarkWithData creates a Starlark evaluator with both static and dynamic data capabilities
+func NewStarlarkWithData(
+	script string,
+	staticData map[string]any,
+	logger slog.Handler,
+) (engine.EvaluatorWithPrep, error) {
+	return FromStarlarkString(
+		script,
+		options.WithDefaults(),
+		options.WithLogger(logger),
+		WithCompositeProvider(staticData),
+		starlark.WithGlobals([]string{constants.Ctx}),
+	)
+}
+
+// NewExtismWithData creates an Extism evaluator with both static and dynamic data capabilities
+func NewExtismWithData(
+	filePath string,
+	staticData map[string]any,
+	logger slog.Handler,
+	entryPoint string,
+) (engine.EvaluatorWithPrep, error) {
+	return FromExtismFile(
+		filePath,
+		options.WithDefaults(),
+		options.WithLogger(logger),
+		WithCompositeProvider(staticData),
+		extism.WithEntryPoint(entryPoint),
+	)
 }
