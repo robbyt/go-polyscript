@@ -1,6 +1,7 @@
 package options
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 
@@ -56,15 +57,23 @@ func WithLoader(l loader.Loader) Option {
 	}
 }
 
-// Validate performs basic validation on the configuration
+// Validate performs basic validation on the common configuration. Machine-specific
+// validation is performed in each machine-specific VM package.
 func (c *Config) Validate() error {
-	if c.loader == nil {
-		return fmt.Errorf("no loader specified")
+	var errz []error
+	if c.handler == nil {
+		errz = append(errz, fmt.Errorf("no logger specified"))
 	}
 	if c.machineType == "" {
-		return fmt.Errorf("no machine type specified")
+		errz = append(errz, fmt.Errorf("no machine type specified"))
 	}
-	return nil
+	if c.dataProvider == nil {
+		errz = append(errz, fmt.Errorf("no data provider specified"))
+	}
+	if c.loader == nil {
+		errz = append(errz, fmt.Errorf("no loader specified"))
+	}
+	return errors.Join(errz...)
 }
 
 // GetHandler returns the configured logger
