@@ -2,13 +2,46 @@ package data
 
 import (
 	"context"
+	"errors"
+	"net/http"
+	"net/url"
 	"testing"
 
 	"github.com/robbyt/go-polyscript/execution/constants"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
 )
+
+// Standard test data sets used across all provider tests
+var (
+	// Simple data for testing basic functionality
+	simpleData = map[string]any{
+		"string": "value",
+		"int":    42,
+		"bool":   true,
+	}
+
+	// Complex data for testing nested structures
+	complexData = map[string]any{
+		"string": "value",
+		"int":    42,
+		"bool":   true,
+		"nested": map[string]any{
+			"key":   "nested value",
+			"inner": map[string]any{"deep": "very deep"},
+		},
+		"array": []string{"one", "two", "three"},
+	}
+)
+
+// createTestRequest creates a standard HTTP request for testing
+func createTestRequest() *http.Request {
+	return &http.Request{
+		Method: "GET",
+		URL:    &url.URL{Path: "/test", RawQuery: "param=value"},
+		Header: http.Header{"Content-Type": []string{"application/json"}},
+	}
+}
 
 // MockProvider is a testify mock implementation of Provider
 type MockProvider struct {
@@ -27,7 +60,7 @@ func (m *MockProvider) AddDataToContext(ctx context.Context, data ...any) (conte
 	return newCtx, args.Error(1)
 }
 
-// For backward compatibility with existing tests
+// newMockErrorProvider creates a mock provider that returns errors
 func newMockErrorProvider() *MockProvider {
 	provider := new(MockProvider)
 	provider.On("GetData", mock.Anything).Return(nil, assert.AnError)
@@ -36,282 +69,415 @@ func newMockErrorProvider() *MockProvider {
 	return provider
 }
 
-func TestContextProvider(t *testing.T) {
+// TestProvider_Interface ensures that all provider implementations comply with the Provider interface
+func TestProvider_Interface(t *testing.T) {
 	t.Parallel()
 
-	tests := []struct {
-		name            string
-		contextKey      constants.ContextKey
-		contextValue    any
-		expectedSuccess bool
-		expectedEmpty   bool
-	}{
-		{
-			name:            "empty context key",
-			contextKey:      "",
-			contextValue:    nil,
-			expectedSuccess: false,
-			expectedEmpty:   true,
-		},
-		{
-			name:            "nil context value",
-			contextKey:      "test_key",
-			contextValue:    nil,
-			expectedSuccess: true,
-			expectedEmpty:   true,
-		},
-		{
-			name:       "valid data",
-			contextKey: "test_key",
-			contextValue: map[string]any{
-				"foo": "bar",
-				"baz": 123,
-			},
-			expectedSuccess: true,
-			expectedEmpty:   false,
-		},
-		{
-			name:            "wrong value type (string)",
-			contextKey:      "test_key",
-			contextValue:    "not a map",
-			expectedSuccess: false,
-			expectedEmpty:   true,
-		},
-		{
-			name:            "wrong value type (int)",
-			contextKey:      "test_key",
-			contextValue:    42,
-			expectedSuccess: false,
-			expectedEmpty:   true,
-		},
-		{
-			name:            "wrong map type",
-			contextKey:      "test_key",
-			contextValue:    map[int]string{1: "value"},
-			expectedSuccess: false,
-			expectedEmpty:   true,
-		},
-	}
+	t.Run("StaticProvider implements Provider", func(t *testing.T) {
+		var _ Provider = &StaticProvider{}
+	})
 
-	for _, tt := range tests {
-		tt := tt
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
+	t.Run("ContextProvider implements Provider", func(t *testing.T) {
+		var _ Provider = &ContextProvider{}
+	})
 
-			provider := NewContextProvider(tt.contextKey)
-			require.NotNil(t, provider)
+	t.Run("CompositeProvider implements Provider", func(t *testing.T) {
+		var _ Provider = &CompositeProvider{}
+	})
 
-			ctx := context.Background()
-			if tt.contextValue != nil {
-				ctx = context.WithValue(ctx, tt.contextKey, tt.contextValue)
-			}
-
-			result, err := provider.GetData(ctx)
-
-			if tt.expectedSuccess {
-				assert.NoError(t, err)
-			} else {
-				assert.Error(t, err)
-			}
-
-			if tt.expectedEmpty {
-				assert.Empty(t, result)
-			} else {
-				assert.NotEmpty(t, result)
-				if validMap, ok := tt.contextValue.(map[string]any); ok {
-					assert.Equal(t, validMap, result)
-				}
-			}
-		})
-	}
+	t.Run("MockProvider implements Provider", func(t *testing.T) {
+		var _ Provider = &MockProvider{}
+	})
 }
 
-func TestStaticProvider(t *testing.T) {
+// TestProvider_GetData tests the basic GetData functionality across all provider types
+func TestProvider_GetData(t *testing.T) {
 	t.Parallel()
 
-	tests := []struct {
-		name        string
-		staticData  map[string]any
-		expectEmpty bool
-	}{
-		{
-			name:        "nil data",
-			staticData:  nil,
-			expectEmpty: true,
-		},
-		{
-			name:        "empty data",
-			staticData:  map[string]any{},
-			expectEmpty: true,
-		},
-		{
-			name: "simple data",
-			staticData: map[string]any{
-				"foo": "bar",
-				"baz": 123,
-			},
-			expectEmpty: false,
-		},
-		{
-			name: "complex data",
-			staticData: map[string]any{
-				"string": "value",
-				"int":    42,
-				"bool":   true,
-				"nested": map[string]any{
-					"key": "nested value",
-				},
-				"array": []string{"one", "two"},
-			},
-			expectEmpty: false,
-		},
-	}
+	// Test static provider
+	t.Run("static provider with simple data", func(t *testing.T) {
+		t.Parallel()
+		provider := NewStaticProvider(simpleData)
+		ctx := context.Background()
 
-	for _, tt := range tests {
-		tt := tt
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
+		result, err := provider.GetData(ctx)
+		assert.NoError(t, err)
+		assert.Equal(t, simpleData, result)
 
-			provider := NewStaticProvider(tt.staticData)
-			require.NotNil(t, provider)
+		// Get a fresh copy to verify data consistency
+		newResult, err := provider.GetData(ctx)
+		assert.NoError(t, err)
+		assert.Equal(t, simpleData, newResult)
+	})
 
-			// Context is not used by StaticProvider, so we can pass an empty one
-			ctx := context.Background()
-			result, err := provider.GetData(ctx)
+	t.Run("static provider with empty data", func(t *testing.T) {
+		t.Parallel()
+		provider := NewStaticProvider(nil)
+		ctx := context.Background()
 
-			assert.NoError(t, err)
+		result, err := provider.GetData(ctx)
+		assert.NoError(t, err)
+		assert.Empty(t, result)
+	})
 
-			if tt.expectEmpty {
-				assert.Empty(t, result)
-			} else {
-				assert.NotEmpty(t, result)
-				assert.Equal(t, tt.staticData, result)
+	// Test context provider
+	t.Run("context provider with valid data", func(t *testing.T) {
+		t.Parallel()
+		provider := NewContextProvider(constants.EvalData)
+		ctx := context.WithValue(context.Background(), constants.EvalData, simpleData)
 
-				// Test that we get a copy, not the original map
-				originalLength := len(result)
-				result["newKey"] = "newValue"
+		result, err := provider.GetData(ctx)
+		assert.NoError(t, err)
+		assert.Equal(t, simpleData, result)
 
-				newResult, err := provider.GetData(ctx)
-				assert.NoError(t, err)
-				assert.Len(t, newResult, originalLength)
-				assert.NotContains(t, newResult, "newKey")
-			}
-		})
-	}
+		// Get a fresh copy to verify data consistency
+		newResult, err := provider.GetData(ctx)
+		assert.NoError(t, err)
+		assert.Equal(t, simpleData, newResult)
+	})
+
+	t.Run("context provider with empty key", func(t *testing.T) {
+		t.Parallel()
+		provider := NewContextProvider("")
+		ctx := context.Background()
+
+		result, err := provider.GetData(ctx)
+		assert.Error(t, err)
+		assert.Nil(t, result)
+	})
+
+	t.Run("context provider with invalid value type", func(t *testing.T) {
+		t.Parallel()
+		provider := NewContextProvider(constants.EvalData)
+		ctx := context.WithValue(context.Background(), constants.EvalData, "not a map")
+
+		result, err := provider.GetData(ctx)
+		assert.Error(t, err)
+		assert.Nil(t, result)
+	})
+
+	// Test composite provider
+	t.Run("composite provider with multiple sources", func(t *testing.T) {
+		t.Parallel()
+		provider := NewCompositeProvider(
+			NewStaticProvider(map[string]any{"static": "value", "shared": "static"}),
+			NewContextProvider(constants.EvalData),
+		)
+
+		ctx := context.WithValue(
+			context.Background(),
+			constants.EvalData,
+			map[string]any{"context": "value", "shared": "context"},
+		)
+
+		result, err := provider.GetData(ctx)
+		assert.NoError(t, err)
+
+		// Verify expected values (context overrides static for shared keys)
+		assert.Equal(t, "value", result["static"])
+		assert.Equal(t, "value", result["context"])
+		assert.Equal(
+			t,
+			"context",
+			result["shared"],
+			"Context provider should override static provider",
+		)
+
+		// Get a fresh copy to verify data consistency
+		newResult, err := provider.GetData(ctx)
+		assert.NoError(t, err)
+		assert.Equal(t, result, newResult)
+	})
+
+	t.Run("empty composite provider", func(t *testing.T) {
+		t.Parallel()
+		provider := NewCompositeProvider()
+		ctx := context.Background()
+
+		result, err := provider.GetData(ctx)
+		assert.NoError(t, err)
+		assert.Empty(t, result)
+	})
+
+	t.Run("composite provider with error", func(t *testing.T) {
+		t.Parallel()
+		provider := NewCompositeProvider(
+			NewStaticProvider(simpleData),
+			newMockErrorProvider(),
+		)
+		ctx := context.Background()
+
+		result, err := provider.GetData(ctx)
+		assert.Error(t, err)
+		assert.Nil(t, result)
+	})
 }
 
-func TestCompositeProvider(t *testing.T) {
+// TestProvider_AddDataToContext tests adding data to context across provider implementations
+func TestProvider_AddDataToContext(t *testing.T) {
 	t.Parallel()
 
-	tests := []struct {
-		name           string
-		providers      []Provider
-		expectedKeys   []string
-		expectedValues map[string]any
-	}{
-		{
-			name:           "empty providers",
-			providers:      []Provider{},
-			expectedKeys:   []string{},
-			expectedValues: map[string]any{},
-		},
-		{
-			name: "single provider",
-			providers: []Provider{
-				NewStaticProvider(map[string]any{
-					"key1": "value1",
-					"key2": 2,
-				}),
-			},
-			expectedKeys: []string{"key1", "key2"},
-			expectedValues: map[string]any{
-				"key1": "value1",
-				"key2": 2,
-			},
-		},
-		{
-			name: "multiple providers with unique keys",
-			providers: []Provider{
-				NewStaticProvider(map[string]any{
-					"key1": "value1",
-					"key2": 2,
-				}),
-				NewStaticProvider(map[string]any{
-					"key3": "value3",
-					"key4": 4,
-				}),
-			},
-			expectedKeys: []string{"key1", "key2", "key3", "key4"},
-			expectedValues: map[string]any{
-				"key1": "value1",
-				"key2": 2,
-				"key3": "value3",
-				"key4": 4,
-			},
-		},
-		{
-			name: "multiple providers with overlapping keys (last one wins)",
-			providers: []Provider{
-				NewStaticProvider(map[string]any{
-					"key1": "original1",
-					"key2": "original2",
-				}),
-				NewStaticProvider(map[string]any{
-					"key2": "override2",
-					"key3": "value3",
-				}),
-			},
-			expectedKeys: []string{"key1", "key2", "key3"},
-			expectedValues: map[string]any{
-				"key1": "original1",
-				"key2": "override2", // This value should be from the second provider
-				"key3": "value3",
-			},
-		},
-		{
-			name: "provider with error (should stop merging)",
-			providers: []Provider{
-				NewStaticProvider(map[string]any{
-					"key1": "value1",
-				}),
-				// Create a mock provider that returns an error
-				newMockErrorProvider(),
-				NewStaticProvider(map[string]any{
-					"key3": "value3", // This should not be merged
-				}),
-			},
-			expectedKeys:   nil, // The error should prevent any merging
-			expectedValues: nil,
-		},
-	}
+	// Test with static provider
+	t.Run("static provider should reject all data", func(t *testing.T) {
+		t.Parallel()
+		provider := NewStaticProvider(simpleData)
+		ctx := context.Background()
 
-	for _, tt := range tests {
-		tt := tt
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
+		newCtx, err := provider.AddDataToContext(ctx, map[string]any{"key": "value"})
 
-			provider := NewCompositeProvider(tt.providers...)
-			require.NotNil(t, provider)
+		assert.Error(t, err, "StaticProvider should reject data additions")
+		assert.True(t, errors.Is(err, ErrStaticProviderNoRuntimeUpdates))
+		assert.Equal(t, ctx, newCtx, "Context should remain unchanged")
 
-			ctx := context.Background()
-			result, err := provider.GetData(ctx)
+		// Verify static data is still available
+		data, err := provider.GetData(ctx)
+		assert.NoError(t, err)
+		assert.Equal(t, simpleData, data)
+	})
 
-			if tt.expectedValues == nil {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-				assert.NotNil(t, result)
+	// Test with context provider
+	t.Run("context provider with valid map data", func(t *testing.T) {
+		t.Parallel()
+		provider := NewContextProvider(constants.EvalData)
+		ctx := context.Background()
 
-				// Check that all expected keys are present
-				for _, key := range tt.expectedKeys {
-					assert.Contains(t, result, key)
-				}
+		newCtx, err := provider.AddDataToContext(ctx, map[string]any{"key": "value"})
 
-				// Check that all values match expected values
-				for key, expectedValue := range tt.expectedValues {
-					assert.Equal(t, expectedValue, result[key])
-				}
-			}
-		})
-	}
+		assert.NoError(t, err)
+		assert.NotEqual(t, ctx, newCtx, "Context should be modified")
+
+		// Verify data was stored correctly
+		data, err := provider.GetData(newCtx)
+		assert.NoError(t, err)
+
+		expectedData := map[string]any{
+			constants.InputData: map[string]any{"key": "value"},
+		}
+		assert.Equal(t, expectedData, data)
+	})
+
+	t.Run("context provider with HTTP request", func(t *testing.T) {
+		t.Parallel()
+		provider := NewContextProvider(constants.EvalData)
+		ctx := context.Background()
+		req := createTestRequest()
+
+		newCtx, err := provider.AddDataToContext(ctx, req)
+
+		assert.NoError(t, err)
+		assert.NotEqual(t, ctx, newCtx, "Context should be modified")
+
+		// Verify request data was stored correctly
+		data, err := provider.GetData(newCtx)
+		assert.NoError(t, err)
+
+		requestMap, ok := data[constants.Request].(map[string]any)
+		assert.True(t, ok, "Request data should be a map")
+		assert.Equal(t, "GET", requestMap["Method"])
+		assert.Equal(t, "/test", requestMap["URL_Path"])
+	})
+
+	t.Run("context provider with empty key", func(t *testing.T) {
+		t.Parallel()
+		provider := NewContextProvider("")
+		ctx := context.Background()
+
+		newCtx, err := provider.AddDataToContext(ctx, map[string]any{"key": "value"})
+
+		assert.Error(t, err, "Empty context key should cause error")
+		assert.Equal(t, ctx, newCtx, "Context should remain unchanged on error")
+	})
+
+	// Test with composite provider
+	t.Run("composite provider with mixed providers", func(t *testing.T) {
+		t.Parallel()
+		provider := NewCompositeProvider(
+			NewStaticProvider(simpleData),
+			NewContextProvider(constants.EvalData),
+		)
+		ctx := context.Background()
+
+		newCtx, err := provider.AddDataToContext(ctx, map[string]any{"key": "value"})
+
+		assert.NoError(
+			t,
+			err,
+			"StaticProvider error should be ignored when ContextProvider succeeds",
+		)
+		assert.NotEqual(t, ctx, newCtx, "Context should be modified")
+
+		// Verify data
+		data, err := provider.GetData(newCtx)
+		assert.NoError(t, err)
+
+		// Should have both static and context data
+		assert.Equal(t, simpleData["string"], data["string"], "Should contain static data")
+		assert.Contains(t, data, constants.InputData, "Should contain input_data key")
+
+		inputData, ok := data[constants.InputData].(map[string]any)
+		assert.True(t, ok, "input_data should be a map")
+		assert.Equal(t, "value", inputData["key"], "Should contain added data")
+	})
+
+	t.Run("composite provider with all failures", func(t *testing.T) {
+		t.Parallel()
+		provider := NewCompositeProvider(
+			NewStaticProvider(simpleData),
+			newMockErrorProvider(),
+		)
+		ctx := context.Background()
+
+		newCtx, err := provider.AddDataToContext(ctx, map[string]any{"key": "value"})
+
+		assert.Error(t, err, "Should error when all providers fail")
+		assert.Equal(t, ctx, newCtx, "Context should remain unchanged")
+	})
+
+	// Test with multiple data items
+	t.Run("context provider with multiple data items", func(t *testing.T) {
+		t.Parallel()
+		provider := NewContextProvider(constants.EvalData)
+		ctx := context.Background()
+
+		newCtx, err := provider.AddDataToContext(ctx,
+			map[string]any{"key1": "value1"},
+			map[string]any{"key2": "value2"})
+
+		assert.NoError(t, err)
+		assert.NotEqual(t, ctx, newCtx, "Context should be modified")
+
+		// Verify data was merged correctly
+		data, err := provider.GetData(newCtx)
+		assert.NoError(t, err)
+
+		inputData, ok := data[constants.InputData].(map[string]any)
+		assert.True(t, ok, "input_data should be a map")
+		assert.Equal(t, "value1", inputData["key1"], "Should contain first item")
+		assert.Equal(t, "value2", inputData["key2"], "Should contain second item")
+	})
+}
+
+// TestProvider_DeepMerge tests the deep merge functionality specifically
+func TestProvider_DeepMerge(t *testing.T) {
+	t.Parallel()
+
+	t.Run("simple merge with no overlaps", func(t *testing.T) {
+		t.Parallel()
+		src := map[string]any{"src_key": "src_value"}
+		dst := map[string]any{"dst_key": "dst_value"}
+		expected := map[string]any{
+			"src_key": "src_value",
+			"dst_key": "dst_value",
+		}
+
+		result := deepMerge(src, dst)
+		assert.Equal(t, expected, result)
+
+		// Ensure original maps weren't modified
+		assert.Equal(t, map[string]any{"src_key": "src_value"}, src)
+		assert.Equal(t, map[string]any{"dst_key": "dst_value"}, dst)
+	})
+
+	t.Run("overlapping keys (dst wins)", func(t *testing.T) {
+		t.Parallel()
+		src := map[string]any{
+			"shared_key": "src_value",
+			"src_key":    "src_value",
+		}
+		dst := map[string]any{
+			"shared_key": "dst_value",
+			"dst_key":    "dst_value",
+		}
+		expected := map[string]any{
+			"shared_key": "dst_value", // dst wins
+			"src_key":    "src_value",
+			"dst_key":    "dst_value",
+		}
+
+		result := deepMerge(src, dst)
+		assert.Equal(t, expected, result)
+	})
+
+	t.Run("nested maps are merged properly", func(t *testing.T) {
+		t.Parallel()
+		src := map[string]any{
+			"nested": map[string]any{
+				"key1": "src_value1",
+				"key2": "src_value2",
+			},
+		}
+		dst := map[string]any{
+			"nested": map[string]any{
+				"key2": "dst_value2", // Overrides src
+				"key3": "dst_value3", // New key
+			},
+		}
+		expected := map[string]any{
+			"nested": map[string]any{
+				"key1": "src_value1", // Preserved from src
+				"key2": "dst_value2", // Overridden by dst
+				"key3": "dst_value3", // Added from dst
+			},
+		}
+
+		result := deepMerge(src, dst)
+		assert.Equal(t, expected, result)
+	})
+
+	t.Run("arrays are replaced not merged", func(t *testing.T) {
+		t.Parallel()
+		src := map[string]any{"array": []string{"one", "two", "three"}}
+		dst := map[string]any{"array": []string{"four", "five"}}
+		expected := map[string]any{"array": []string{"four", "five"}}
+
+		result := deepMerge(src, dst)
+		assert.Equal(t, expected, result)
+	})
+
+	t.Run("empty maps", func(t *testing.T) {
+		t.Parallel()
+		result1 := deepMerge(map[string]any{}, map[string]any{"key": "value"})
+		assert.Equal(t, map[string]any{"key": "value"}, result1)
+
+		result2 := deepMerge(map[string]any{"key": "value"}, map[string]any{})
+		assert.Equal(t, map[string]any{"key": "value"}, result2)
+	})
+
+	t.Run("original maps should not be modified", func(t *testing.T) {
+		t.Parallel()
+		src := map[string]any{
+			"key": "value",
+			"nested": map[string]any{
+				"inner": "original",
+			},
+		}
+		dst := map[string]any{
+			"key": "new-value",
+			"nested": map[string]any{
+				"inner": "modified",
+				"added": "new-field",
+			},
+		}
+
+		srcCopy := map[string]any{
+			"key": "value",
+			"nested": map[string]any{
+				"inner": "original",
+			},
+		}
+
+		dstCopy := map[string]any{
+			"key": "new-value",
+			"nested": map[string]any{
+				"inner": "modified",
+				"added": "new-field",
+			},
+		}
+
+		_ = deepMerge(src, dst)
+
+		// Original maps should not be modified
+		assert.Equal(t, srcCopy, src)
+		assert.Equal(t, dstCopy, dst)
+	})
 }

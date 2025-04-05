@@ -80,7 +80,19 @@ func (p *ContextProvider) AddDataToContext(
 	var errz []error
 
 	// Initialize the data storage map
+	// First check if there's existing data in the context
 	toStore := make(map[string]any)
+
+	// Get existing data from context if available
+	// This is important for preserving data across multiple calls to AddDataToContext
+	// on the same context. Each call should add to or update the existing data rather
+	// than replacing it completely.
+	if existingData := ctx.Value(p.contextKey); existingData != nil {
+		if existingMap, ok := existingData.(map[string]any); ok {
+			// Deep copy the existing data to preserve it while allowing modifications
+			maps.Copy(toStore, existingMap)
+		}
+	}
 
 	// Process each data item based on its type
 	for _, item := range data {
