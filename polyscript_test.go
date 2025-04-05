@@ -331,7 +331,21 @@ func TestNewWithData(t *testing.T) {
 	}
 
 	// Test NewStarlarkWithData
-	starlarkScript := "# Access static data\nversion = ctx[\"app_version\"]\ntimeout = ctx[\"config\"][\"timeout\"]\n\n# Access dynamic data\nname = ctx[\"input_data\"][\"name\"]\n\n# Return result\n= {\n    \"message\": \"Hello, \" + name + \" (v\" + version + \")\",\n    \"timeout\": timeout\n}\n\n# Starlark requires assignment to _ for return values\n_ = result"
+	starlarkScript := `# Access static data
+version = ctx["app_version"]
+timeout = ctx["config"]["timeout"]
+
+# Access dynamic data
+name = ctx["input_data"]["name"]
+
+# Create a dictionary value
+result = {
+    "message": "Hello, " + name + " (v" + version + ")",
+    "timeout": timeout
+}
+
+# Starlark requires assignment to _ for return values
+_ = result`
 
 	starlarkEval, err := polyscript.NewStarlarkWithData(
 		starlarkScript,
