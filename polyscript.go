@@ -175,7 +175,6 @@ func createEvaluator(cfg *options.Config) (engine.EvaluatorWithPrep, error) {
 		cfg.GetLoader(),
 		compiler,
 		cfg.GetDataProvider(),
-		nil, // No compile-time supplemental script_data
 	)
 	if err != nil {
 		return nil, err

@@ -1,6 +1,7 @@
 package script
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -126,7 +127,6 @@ func TestNewVersion(t *testing.T) {
 			mockLoader,
 			comp,
 			data.NewStaticProvider(emptyScriptData),
-			emptyScriptData,
 		)
 		require.NoError(t, err, "Expected no error when creating executable unit")
 		require.NotNil(t, exe, "Expected executable unit to be non-nil")
@@ -155,7 +155,6 @@ func TestNewVersion(t *testing.T) {
 			lod,
 			comp,
 			data.NewStaticProvider(emptyScriptData),
-			emptyScriptData,
 		)
 		require.NoError(t, err, "Expected no error when creating a new version with valid content")
 		require.NotNil(t, exe, "Expected version to be non-nil")
@@ -197,7 +196,6 @@ func TestNewVersion(t *testing.T) {
 			lod,
 			comp,
 			data.NewStaticProvider(emptyScriptData),
-			emptyScriptData,
 		)
 		require.Error(t, err)
 		require.Nil(t, exe)
@@ -235,7 +233,6 @@ func TestNewVersion(t *testing.T) {
 			mockLoader,
 			mockCompiler,
 			data.NewStaticProvider(emptyScriptData),
-			emptyScriptData,
 		)
 		require.NoError(t, err)
 		require.NotNil(t, exe)
@@ -263,7 +260,6 @@ func TestNewVersion(t *testing.T) {
 			&mockLoader{},
 			nil,
 			data.NewStaticProvider(emptyScriptData),
-			emptyScriptData,
 		)
 		require.Error(t, err)
 		require.Nil(t, exe)
@@ -295,7 +291,6 @@ func TestNewVersion(t *testing.T) {
 			mockLoader,
 			mockCompiler,
 			data.NewStaticProvider(emptyScriptData),
-			emptyScriptData,
 		)
 		require.Error(t, err)
 		require.Nil(t, exe)
@@ -318,7 +313,6 @@ func TestNewVersion(t *testing.T) {
 			mockLoader,
 			new(MockCompiler),
 			data.NewStaticProvider(emptyScriptData),
-			emptyScriptData,
 		)
 		require.Error(t, err)
 		require.Nil(t, exe)
@@ -346,7 +340,6 @@ func TestNewVersion(t *testing.T) {
 			mockLoader,
 			mockCompiler,
 			data.NewStaticProvider(emptyScriptData),
-			emptyScriptData,
 		)
 		require.Error(t, err)
 		require.Nil(t, exe)
@@ -425,11 +418,13 @@ func TestNewVersionWithScriptData(t *testing.T) {
 			loader,
 			mockCompiler,
 			data.NewStaticProvider(scriptData),
-			scriptData,
 		)
 		require.NoError(t, err, "Expected no error creating executable unit")
 		require.NotNil(t, exe, "Expected executable unit to be non-nil")
-		require.Equal(t, scriptData, exe.GetScriptData(), "Expected script data to match")
+
+		dataFromProvider, err := exe.DataProvider.GetData(context.Background())
+		require.NoError(t, err, "Expected no error when getting data from provider")
+		require.Equal(t, scriptData, dataFromProvider, "Expected script data to match")
 
 		// Verify all mocks
 		mockCompiler.AssertExpectations(t)
@@ -456,15 +451,20 @@ func TestNewVersionWithScriptData(t *testing.T) {
 			lod,
 			comp,
 			data.NewStaticProvider(nil),
-			nil,
 		)
-		require.NoError(
-			t,
-			err,
+		require.NoError(t, err,
 			"Expected no error when creating a new version with nil script data",
 		)
+
 		require.NotNil(t, exe, "Expected version to be non-nil")
-		require.Empty(t, exe.GetScriptData(), "Expected script data to be empty")
+		dataFromProvider, err := exe.DataProvider.GetData(context.Background())
+		require.NoError(t, err, "Expected no error when getting data from provider")
+		require.Equal(
+			t,
+			emptyScriptData,
+			dataFromProvider,
+			"Expected script data to match empty map",
+		)
 
 		comp.AssertExpectations(t)
 		mockContent.AssertExpectations(t)

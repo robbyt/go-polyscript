@@ -15,8 +15,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var emptyScriptData = make(map[string]any)
-
 // TestValidScript tests evaluating valid scripts
 func TestValidScript(t *testing.T) {
 	t.Parallel()
@@ -53,7 +51,6 @@ _ = request_handler(ctx.get("request"))
 			loader,
 			NewCompiler(handler, &StarlarkOptions{Globals: []string{constants.Ctx}}),
 			ctxProvider,
-			emptyScriptData,
 		)
 		require.NoError(t, err, "Failed to create new version")
 
