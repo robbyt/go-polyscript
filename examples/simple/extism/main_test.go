@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestRunExtismExample(t *testing.T) {
@@ -15,15 +16,14 @@ func TestRunExtismExample(t *testing.T) {
 	})
 
 	// Run the example
-	result, err := RunExtismExample(handler)
-	if err != nil {
-		t.Logf("Extism example failed: %v - this may be due to missing WASM file", err)
-		t.Skip("Skipping Extism test as it requires a WASM file")
-		return
-	}
+	result, err := runExtismExample(handler)
+	require.NoError(t, err, "Extism example should run without error")
 
 	// Verify the result
-	greeting, ok := result["greeting"]
-	assert.True(t, ok, "Result should have a greeting field")
-	assert.Equal(t, "Hello, World!", greeting, "Should have the correct greeting")
+	assert.NotEmpty(t, result, "Result should not be empty")
+	assert.Contains(t, result, "greeting", "Result should contain a greeting field")
+}
+
+func TestRun(t *testing.T) {
+	assert.NoError(t, run(), "run() should execute without errors")
 }

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	_ "embed"
 	"fmt"
 	"log/slog"
 	"os"
@@ -13,23 +14,11 @@ import (
 	"github.com/robbyt/go-polyscript/options"
 )
 
-// GetRisorScript returns the script content for the Risor example
-func GetRisorScript() string {
-	return `
-		// Script has access to ctx variable passed from Go
-		name := ctx["name"]
-		message := "Hello, " + name + "!"
-		
-		// Return a map with our result
-		{
-			"greeting": message,
-			"length": len(message)
-		}
-	`
-}
+//go:embed testdata/script.risor
+var risorScript string
 
-// RunRisorExample executes a Risor script once and returns the result
-func RunRisorExample(handler slog.Handler) (map[string]any, error) {
+// runRisorExample executes a Risor script once and returns the result
+func runRisorExample(handler slog.Handler) (map[string]any, error) {
 	if handler == nil {
 		handler = slog.NewTextHandler(os.Stdout, nil)
 	}
@@ -37,9 +26,6 @@ func RunRisorExample(handler slog.Handler) (map[string]any, error) {
 
 	// Define globals that will be available to the script
 	globals := []string{constants.Ctx}
-
-	// Create a script string
-	scriptContent := GetRisorScript()
 
 	// Create input data
 	input := map[string]any{
@@ -49,7 +35,7 @@ func RunRisorExample(handler slog.Handler) (map[string]any, error) {
 
 	// Create evaluator using the functional options pattern
 	evaluator, err := polyscript.FromRisorString(
-		scriptContent,
+		risorScript,
 		options.WithDefaults(), // Add defaults option to ensure all required fields are set
 		options.WithLogger(handler),
 		options.WithDataProvider(dataProvider),
@@ -97,17 +83,25 @@ func RunRisorExample(handler slog.Handler) (map[string]any, error) {
 	return data, nil
 }
 
-func main() {
+func run() error {
 	// Create a logger
 	handler := slog.NewTextHandler(os.Stdout, nil)
+	logger := slog.New(handler.WithGroup("risor-simple-example"))
 
 	// Run the example
-	result, err := RunRisorExample(handler)
+	result, err := runRisorExample(handler)
 	if err != nil {
-		fmt.Printf("Error: %v\n", err)
-		return
+		return fmt.Errorf("failed to run example: %w", err)
 	}
 
 	// Print the result
-	fmt.Printf("Result: %v\n", result)
+	logger.Info("Result", "data", result)
+	return nil
+}
+
+func main() {
+	if err := run(); err != nil {
+		fmt.Println("Error:", err)
+		os.Exit(1)
+	}
 }

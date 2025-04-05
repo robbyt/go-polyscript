@@ -9,14 +9,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestRunRisorExampleMultipleTimes(t *testing.T) {
+func TestRunMultipleTimes(t *testing.T) {
 	// Create a test logger
 	handler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
 		Level: slog.LevelInfo,
 	})
 
 	// Run the example
-	results, err := RunRisorExampleMultipleTimes(handler)
+	results, err := runMultipleTimes(handler)
 	require.NoError(t, err, "Risor example should run without error")
 
 	// Verify we got the expected number of results
@@ -65,4 +65,8 @@ func TestRunRisorExampleMultipleTimes(t *testing.T) {
 			assert.Equal(t, expectedLengths[i], lengthValue, "Should have the correct length")
 		}
 	}
+}
+
+func TestRun(t *testing.T) {
+	assert.NoError(t, run(), "run() should execute without error")
 }

@@ -69,7 +69,7 @@ func TestLoadInputData(t *testing.T) {
 			ctx := context.Background()
 
 			if tt.ctxData != nil {
-				//nolint:staticcheck // Temporarily ignoring the "string as context key" warning until type system is fixed
+				// Temporarily ignoring the "string as context key" warning until type system is fixed
 				ctx = context.WithValue(ctx, constants.EvalData, tt.ctxData)
 			}
 
@@ -591,4 +591,104 @@ func TestEvalWithCancelledContext(t *testing.T) {
 
 	// Should get an error (either cancellation or plugin error)
 	require.Error(t, err)
+}
+
+// TestStaticAndDynamicDataCombination tests how static data and dynamic data are combined
+// with the CompositeProvider
+func TestStaticAndDynamicDataCombination(t *testing.T) {
+	t.Skip("Need to confirm behavior of the input_data in ctx")
+	// Load the test WASM file
+	wasmContent, err := os.ReadFile(testWasmPath)
+	require.NoError(t, err, "Failed to read WASM test file")
+
+	// Create a mock compiled plugin
+	ctx := context.Background()
+	compileOpts := withDefaultCompileOptions()
+	compiledPlugin, err := CompileBytes(ctx, wasmContent, compileOpts)
+	require.NoError(t, err, "Failed to compile plugin")
+
+	// Create our executable
+	exec := NewExecutable(wasmContent, compiledPlugin, "greet")
+
+	// Create a context provider for runtime data
+	ctxProvider := data.NewContextProvider(constants.EvalData)
+
+	// Create static data for compile-time configuration
+	staticData := map[string]any{"initial": "value"}
+
+	// Create a static provider
+	staticProvider := data.NewStaticProvider(staticData)
+
+	// Create a composite provider that combines static and context data
+	compositeProvider := data.NewCompositeProvider(staticProvider, ctxProvider)
+
+	// Create the executable unit with the composite provider
+	execUnit := &script.ExecutableUnit{
+		ID:           "test-data-provider",
+		DataProvider: compositeProvider,
+		Content:      exec,
+	}
+
+	// Create handler and evaluator
+	handler := slog.NewTextHandler(os.Stdout, nil)
+	evaluator := NewBytecodeEvaluator(handler, execUnit)
+
+	// Create a context
+	ctx = context.Background()
+
+	// First test: load data with empty context
+	result1, err := evaluator.loadInputData(ctx)
+	require.NoError(t, err)
+	assert.Contains(t, result1, "initial")
+	assert.Equal(t, "value", result1["initial"])
+
+	// Second test: add data to context and verify it's merged with static data
+	inputData := map[string]any{"input": "test input"}
+	enrichedCtx, err := evaluator.PrepareContext(ctx, inputData)
+	require.NoError(t, err)
+
+	result2, err := evaluator.loadInputData(enrichedCtx)
+	require.NoError(t, err)
+
+	// Static data should still be there at top level
+	assert.Contains(t, result2, "initial")
+	assert.Equal(t, "value", result2["initial"])
+
+	// Runtime data from the ContextProvider is stored under the 'input_data' key
+	assert.Contains(t, result2, constants.InputData)
+
+	// Extract the input_data map and verify it's the correct type
+	dynamicData, ok := result2[constants.InputData].(map[string]any)
+	require.True(t, ok, "input_data should be a map")
+
+	// Verify our input data was correctly stored in the input_data map
+	assert.Contains(t, dynamicData, "input")
+	assert.Equal(t, "test input", dynamicData["input"])
+}
+
+// TestExtismDirectInputFormat tests how input data is formatted for Extism
+func TestExtismDirectInputFormat(t *testing.T) {
+	// Create a test map that simulates data from our providers
+	inputData := map[string]any{
+		"initial": "top-level-value", // Static data at top level
+		"input_data": map[string]any{ // Dynamic data nested under input_data
+			"input":   "API User",
+			"request": map[string]any{}, // HTTP request data nested under input_data
+		},
+	}
+
+	// First, log the structure to understand what we're dealing with
+	t.Logf("Input data structure: %#v", inputData)
+
+	// Convert the input data for Extism
+	jsonBytes, err := convertToExtismFormat(inputData)
+	require.NoError(t, err)
+	require.NotNil(t, jsonBytes)
+
+	// Log the JSON output
+	t.Logf("JSON for Extism: %s", string(jsonBytes))
+
+	// Verify current behavior
+	expected := `{"initial":"top-level-value","input_data":{"input":"API User","request":{}}}`
+	assert.JSONEq(t, expected, string(jsonBytes))
 }

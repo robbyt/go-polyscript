@@ -27,7 +27,7 @@ func TestEvalDataPreparerInterface(t *testing.T) {
 	// Create an evaluator with PrepareContext capability
 	evaluator, err := polyscript.FromRisorString(`
 method := ctx["request"]["Method"] 
-greeting := ctx["script_data"]["greeting"]
+greeting := ctx["input_data"]["greeting"]
 method + " " + greeting
 `,
 		options.WithLogger(handler),
@@ -59,8 +59,8 @@ method + " " + greeting
 	assert.Equal(t, "GET", requestData["Method"], "Request method should be stored")
 
 	// Verify script data
-	scriptDataStored, ok := storedData[constants.ScriptData].(map[string]any)
-	require.True(t, ok, "Script data should be available")
+	scriptDataStored, ok := storedData[constants.InputData].(map[string]any)
+	require.True(t, ok, "input_data should be available")
 	assert.Equal(t, "Hello, World!", scriptDataStored["greeting"], "Greeting should be stored")
 
 	// Test evaluation with the enriched context

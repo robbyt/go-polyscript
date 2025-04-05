@@ -18,12 +18,13 @@ linters:
     - dupword       # Find duplicate words in comments and strings
     - errcheck
     - errorlint     # Check error handling
-    - whitespace    # Check for unnecessary whitespace
     - misspell      # Find commonly misspelled English words
     - unconvert     # Remove unnecessary type conversions
     - reassign      # Checks that package variables are not reassigned
     - tagalign      # Check that struct tags are well aligned
     - nilerr        # Finds code that returns nil even if it checks that the error is not nil
+    - nolintlint    # Checks for invalid or missing nolint directives
+    - whitespace    # Check for unnecessary whitespace
     - thelper       # Detects test helpers which should start with t.Helper()
     - govet         # Examines Go source code and reports suspicious constructs
     - ineffassign   # Detects when assignments to existing variables are not used
@@ -40,14 +41,14 @@ linters:
       errorf: true
       asserts: true
       comparison: true
-      
+
 formatters:
   enable:
-    - gci           # Control Go package import order
-    - gofmt         # Format Go source code
-    - gofumpt       # Stricter Go formatting
-    - goimports     # Check and format imports
-    - golines       # Formats long lines
+    - gci
+    - gofmt
+    - goimports
+    - gofumpt
+    - golines
 
 issues:
   max-issues-per-linter: 20

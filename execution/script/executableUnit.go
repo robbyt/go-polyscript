@@ -32,12 +32,10 @@ type ExecutableUnit struct {
 	// Content holds the compiled bytecode and source representation of the script.
 	Content ExecutableContent
 
-	// ScriptData contains key-value pairs that can be accessed by the script at runtime.
-	// This data is made available to the script during evaluation.
-	ScriptData map[string]any
-
-	// DataProvider provides access to variable runtime data during script evaluation.
-	// Enabling the "compile once, run many times" design.
+	// DataProvider provides access to both static compile-time data and variable runtime data
+	// during script evaluation. Enabling the "compile once, run many times" design.
+	// When created with NewExecutableUnit, this is typically a CompositeProvider containing
+	// a StaticProvider (for compile-time data) and another provider (for runtime data).
 	DataProvider data.Provider
 
 	// Logging components
@@ -53,16 +51,11 @@ func NewExecutableUnit(
 	scriptLoader loader.Loader,
 	compiler Compiler,
 	dataProvider data.Provider,
-	sData map[string]any,
 ) (*ExecutableUnit, error) {
 	handler, logger := helpers.SetupLogger(handler, "script", "ExecutableUnit")
 
 	if compiler == nil {
 		return nil, errors.New("compiler is nil")
-	}
-
-	if sData == nil {
-		sData = make(map[string]any)
 	}
 
 	reader, err := scriptLoader.GetReader()
@@ -88,7 +81,6 @@ func NewExecutableUnit(
 		ScriptLoader: scriptLoader,
 		Content:      exe,
 		Compiler:     compiler,
-		ScriptData:   sData,
 		DataProvider: dataProvider,
 		logHandler:   handler,
 		logger:       logger.With("ID", versionID),
@@ -128,11 +120,6 @@ func (exe *ExecutableUnit) GetCompiler() Compiler {
 // GetLoader returns the loader used to load the script.
 func (exe *ExecutableUnit) GetLoader() loader.Loader {
 	return exe.ScriptLoader
-}
-
-// GetScriptData returns the script data associated with this version.
-func (exe *ExecutableUnit) GetScriptData() map[string]any {
-	return exe.ScriptData
 }
 
 // GetDataProvider returns the data provider for this executable unit.
