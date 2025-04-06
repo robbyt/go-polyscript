@@ -27,11 +27,21 @@ type Config struct {
 // Option is a function that modifies Config
 type Option func(*Config) error
 
-// WithLogger sets the logger for the script engine
-func WithLogger(handler slog.Handler) Option {
+// WithLogHandler sets the logger for the script engine
+func WithLogHandler(handler slog.Handler) Option {
 	return func(c *Config) error {
 		if handler != nil {
 			c.handler = handler
+		}
+		return nil
+	}
+}
+
+// WithSlog sets the slog logger for the script engine
+func WithSlog(logger *slog.Logger) Option {
+	return func(c *Config) error {
+		if logger != nil {
+			c.handler = logger.Handler()
 		}
 		return nil
 	}

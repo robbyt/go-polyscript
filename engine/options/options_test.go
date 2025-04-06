@@ -58,7 +58,7 @@ func TestWithOptions(t *testing.T) {
 	testLoader := NewMockLoader()
 
 	// Create and apply options
-	loggerOpt := WithLogger(testHandler)
+	loggerOpt := WithLogHandler(testHandler)
 	dataProviderOpt := WithDataProvider(testDataProvider)
 	loaderOpt := WithLoader(testLoader)
 

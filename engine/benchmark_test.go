@@ -31,11 +31,11 @@ import (
 	"testing"
 
 	"github.com/robbyt/go-polyscript"
+	"github.com/robbyt/go-polyscript/engine/options"
 	"github.com/robbyt/go-polyscript/execution/constants"
 	"github.com/robbyt/go-polyscript/execution/data"
 	"github.com/robbyt/go-polyscript/machines/risor"
 	"github.com/robbyt/go-polyscript/machines/starlark"
-	"github.com/robbyt/go-polyscript/options"
 )
 
 // quietHandler is a slog.Handler that discards all logs
@@ -70,7 +70,7 @@ func BenchmarkEvaluationPatterns(b *testing.B) {
 				scriptContent,
 				options.WithDefaults(),
 				options.WithDataProvider(dataProvider),
-				options.WithLogger(quietHandler),
+				options.WithLogHandler(quietHandler),
 				risor.WithGlobals([]string{constants.Ctx}),
 			)
 			if err != nil {
@@ -94,7 +94,7 @@ func BenchmarkEvaluationPatterns(b *testing.B) {
 			scriptContent,
 			options.WithDefaults(),
 			options.WithDataProvider(dataProvider),
-			options.WithLogger(quietHandler),
+			options.WithLogHandler(quietHandler),
 			risor.WithGlobals([]string{constants.Ctx}),
 		)
 		if err != nil {
@@ -138,7 +138,7 @@ func BenchmarkDataProviders(b *testing.B) {
 			scriptContent,
 			options.WithDefaults(),
 			options.WithDataProvider(dataProvider),
-			options.WithLogger(quietHandler),
+			options.WithLogHandler(quietHandler),
 			risor.WithGlobals([]string{constants.Ctx}),
 		)
 		if err != nil {
@@ -160,7 +160,7 @@ func BenchmarkDataProviders(b *testing.B) {
 			scriptContent,
 			options.WithDefaults(),
 			options.WithDataProvider(dataProvider),
-			options.WithLogger(quietHandler),
+			options.WithLogHandler(quietHandler),
 			risor.WithGlobals([]string{constants.Ctx}),
 		)
 		if err != nil {
@@ -187,7 +187,7 @@ func BenchmarkDataProviders(b *testing.B) {
 			scriptContent,
 			options.WithDefaults(),
 			options.WithDataProvider(compositeProvider),
-			options.WithLogger(quietHandler),
+			options.WithLogHandler(quietHandler),
 			risor.WithGlobals([]string{constants.Ctx}),
 		)
 		if err != nil {
@@ -244,7 +244,7 @@ message = "Hello, " + name + "!"
 			risorScript,
 			options.WithDefaults(),
 			options.WithDataProvider(staticProvider),
-			options.WithLogger(quietHandler),
+			options.WithLogHandler(quietHandler),
 			risor.WithGlobals([]string{constants.Ctx}),
 		)
 		if err != nil {
@@ -265,7 +265,7 @@ message = "Hello, " + name + "!"
 			starlarkScript,
 			options.WithDefaults(),
 			options.WithDataProvider(staticProvider),
-			options.WithLogger(quietHandler),
+			options.WithLogHandler(quietHandler),
 			starlark.WithGlobals([]string{constants.Ctx}),
 		)
 		if err != nil {

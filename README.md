@@ -50,7 +50,7 @@ import (
 	"github.com/robbyt/go-polyscript/execution/constants"
 	"github.com/robbyt/go-polyscript/execution/data"
 	"github.com/robbyt/go-polyscript/machines/risor"
-	"github.com/robbyt/go-polyscript/options"
+	"github.com/robbyt/go-polyscript/engine/options"
 )
 
 func main() {
@@ -79,7 +79,7 @@ func main() {
 	evaluator, err := polyscript.FromRisorString(
 		scriptContent,
 		options.WithDefaults(),
-		options.WithLogger(handler),
+		options.WithLogHandler(handler),
 		options.WithDataProvider(dataProvider),
 		risor.WithGlobals([]string{"ctx"}),
 	)
