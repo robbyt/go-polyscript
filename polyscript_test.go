@@ -1,4 +1,4 @@
-package polyscript_test
+package polyscript
 
 import (
 	"context"
@@ -13,7 +13,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/robbyt/go-polyscript"
 	"github.com/robbyt/go-polyscript/engine"
 	"github.com/robbyt/go-polyscript/execution/constants"
 	"github.com/robbyt/go-polyscript/execution/data"
@@ -150,7 +149,7 @@ func TestMachineEvaluators(t *testing.T) {
 			name:        "NewStarlarkEvaluator",
 			content:     `print("Hello, World!")`,
 			machineType: types.Starlark,
-			creator:     polyscript.NewStarlarkEvaluator,
+			creator:     NewStarlarkEvaluator,
 			options: []options.Option{
 				starlark.WithGlobals([]string{"ctx"}),
 			},
@@ -159,7 +158,7 @@ func TestMachineEvaluators(t *testing.T) {
 			name:        "NewRisorEvaluator",
 			content:     `print("Hello, World!")`,
 			machineType: types.Risor,
-			creator:     polyscript.NewRisorEvaluator,
+			creator:     NewRisorEvaluator,
 			options: []options.Option{
 				risor.WithGlobals([]string{"ctx"}),
 			},
@@ -280,11 +279,11 @@ func TestNewEvaluator(t *testing.T) {
 
 			switch tc.machineType {
 			case types.Starlark:
-				evaluator, err = polyscript.NewStarlarkEvaluator(tc.options...)
+				evaluator, err = NewStarlarkEvaluator(tc.options...)
 			case types.Risor:
-				evaluator, err = polyscript.NewRisorEvaluator(tc.options...)
+				evaluator, err = NewRisorEvaluator(tc.options...)
 			case types.Extism:
-				evaluator, err = polyscript.NewExtismEvaluator(tc.options...)
+				evaluator, err = NewExtismEvaluator(tc.options...)
 			default:
 				t.Fatalf("unsupported machine type: %s", tc.machineType)
 			}
@@ -316,28 +315,28 @@ func TestFromStringLoaders(t *testing.T) {
 		{
 			name:        "FromStarlarkString - Valid",
 			content:     `print("Hello, World!")`,
-			creator:     polyscript.FromStarlarkString,
+			creator:     FromStarlarkString,
 			options:     []options.Option{starlark.WithGlobals([]string{"ctx"})},
 			expectError: false,
 		},
 		{
 			name:        "FromRisorString - Valid",
 			content:     `print("Hello, World!")`,
-			creator:     polyscript.FromRisorString,
+			creator:     FromRisorString,
 			options:     []options.Option{risor.WithGlobals([]string{"ctx"})},
 			expectError: false,
 		},
 		{
 			name:        "FromStarlarkString - Empty",
 			content:     "",
-			creator:     polyscript.FromStarlarkString,
+			creator:     FromStarlarkString,
 			options:     []options.Option{},
 			expectError: true,
 		},
 		{
 			name:        "FromRisorString - Empty",
 			content:     "",
-			creator:     polyscript.FromRisorString,
+			creator:     FromRisorString,
 			options:     []options.Option{},
 			expectError: true,
 		},
@@ -366,7 +365,7 @@ func TestFromStringLoaders(t *testing.T) {
 	t.Run("FromRisorString - Invalid Option", func(t *testing.T) {
 		t.Parallel()
 
-		_, err := polyscript.FromRisorString(
+		_, err := FromRisorString(
 			"print('test')",
 			func(cfg *options.Config) error {
 				return errors.New("invalid option test")
@@ -410,7 +409,7 @@ _ = result`
 	}{
 		{
 			name:       "FromExtismFile - Valid",
-			loaderFunc: polyscript.FromExtismFile,
+			loaderFunc: FromExtismFile,
 			filePath:   wasmPath,
 			options: []options.Option{
 				options.WithLogger(getLogger()),
@@ -423,14 +422,14 @@ _ = result`
 		},
 		{
 			name:        "FromExtismFile - Invalid Path",
-			loaderFunc:  polyscript.FromExtismFile,
+			loaderFunc:  FromExtismFile,
 			filePath:    "non-existent-file.wasm",
 			options:     []options.Option{},
 			expectError: true,
 		},
 		{
 			name:       "FromRisorFile - Valid",
-			loaderFunc: polyscript.FromRisorFile,
+			loaderFunc: FromRisorFile,
 			filePath:   risorPath,
 			options: []options.Option{
 				options.WithLogger(getLogger()),
@@ -440,14 +439,14 @@ _ = result`
 		},
 		{
 			name:        "FromRisorFile - Invalid Path",
-			loaderFunc:  polyscript.FromRisorFile,
+			loaderFunc:  FromRisorFile,
 			filePath:    "non-existent-file.risor",
 			options:     []options.Option{},
 			expectError: true,
 		},
 		{
 			name:       "FromStarlarkFile - Valid",
-			loaderFunc: polyscript.FromStarlarkFile,
+			loaderFunc: FromStarlarkFile,
 			filePath:   starlarkPath,
 			options: []options.Option{
 				options.WithLogger(getLogger()),
@@ -457,7 +456,7 @@ _ = result`
 		},
 		{
 			name:        "FromStarlarkFile - Invalid Path",
-			loaderFunc:  polyscript.FromStarlarkFile,
+			loaderFunc:  FromStarlarkFile,
 			filePath:    "non-existent-file.star",
 			options:     []options.Option{},
 			expectError: true,
@@ -504,9 +503,9 @@ func TestDataProviders(t *testing.T) {
 		}
 
 		// Create an evaluator with composite provider
-		evaluator, err := polyscript.FromStarlarkString(
+		evaluator, err := FromStarlarkString(
 			script,
-			polyscript.WithCompositeProvider(staticData),
+			withCompositeProvider(staticData),
 			starlark.WithGlobals([]string{constants.Ctx}),
 		)
 		require.NoError(t, err)
@@ -540,11 +539,11 @@ func TestEvalHelpers(t *testing.T) {
 		`
 
 		// Create an evaluator with the CompositeProvider
-		evaluator, err := polyscript.FromRisorString(
+		evaluator, err := FromRisorString(
 			script,
 			options.WithDefaults(),
 			options.WithLogger(getLogger()),
-			polyscript.WithCompositeProvider(map[string]any{}),
+			withCompositeProvider(map[string]any{}),
 			risor.WithGlobals([]string{constants.Ctx}),
 		)
 		require.NoError(t, err)
@@ -653,7 +652,7 @@ func TestEvalHelpers(t *testing.T) {
 		`
 
 		// Create an evaluator
-		evaluator, err := polyscript.FromRisorString(
+		evaluator, err := FromRisorString(
 			script,
 			options.WithDefaults(),
 			options.WithLogger(getLogger()),
@@ -682,7 +681,7 @@ func TestEvalHelpers(t *testing.T) {
 
 		// Test with nil result
 		nilScript := `nil`
-		nilEvaluator, err := polyscript.FromRisorString(
+		nilEvaluator, err := FromRisorString(
 			nilScript,
 			options.WithDefaults(),
 			options.WithLogger(getLogger()),
@@ -696,7 +695,7 @@ func TestEvalHelpers(t *testing.T) {
 
 		// Test with non-map result (should error)
 		numScript := `42`
-		numEvaluator, err := polyscript.FromRisorString(
+		numEvaluator, err := FromRisorString(
 			numScript,
 			options.WithDefaults(),
 			options.WithLogger(getLogger()),
@@ -784,7 +783,7 @@ _ = result`
 		`
 
 		// Create evaluator
-		risorEval, err := polyscript.FromRisorStringWithData(risorScript, staticData, getLogger())
+		risorEval, err := FromRisorStringWithData(risorScript, staticData, getLogger())
 		require.NoError(t, err)
 
 		// Test with dynamic data
@@ -817,7 +816,7 @@ _ = result`
 		t.Parallel()
 
 		// Create evaluator
-		starlarkEval, err := polyscript.FromStarlarkStringWithData(
+		starlarkEval, err := FromStarlarkStringWithData(
 			starlarkFileContent,
 			staticData,
 			getLogger(),
@@ -861,7 +860,7 @@ _ = result`
 		t.Parallel()
 
 		// Create evaluator with static data that includes input
-		extismEval, err := polyscript.FromExtismFileWithData(
+		extismEval, err := FromExtismFileWithData(
 			wasmPath,
 			map[string]any{"input": "Test User"},
 			getLogger(),
@@ -883,7 +882,7 @@ _ = result`
 		assert.Equal(t, "Hello, Test User!", resultMap["greeting"])
 
 		// Test evaluator with no input (should fail)
-		extismEvalNoInput, err := polyscript.FromExtismFileWithData(
+		extismEvalNoInput, err := FromExtismFileWithData(
 			wasmPath,
 			staticData, // Only static config data, no input
 			getLogger(),
@@ -921,7 +920,7 @@ func TestFileWithDataFunctions(t *testing.T) {
 		staticData := map[string]any{"test": "data"}
 
 		// This just needs to call the function, even if execution would fail later
-		_, err := polyscript.FromRisorFileWithData(risorPath, staticData, logger)
+		_, err := FromRisorFileWithData(risorPath, staticData, logger)
 		// We don't assert on the result since we just want to cover the function
 		_ = err
 	})
@@ -932,7 +931,7 @@ func TestFileWithDataFunctions(t *testing.T) {
 		staticData := map[string]any{"test": "data"}
 
 		// This just needs to call the function, even if execution would fail later
-		_, err := polyscript.FromStarlarkFileWithData(starlarkPath, staticData, logger)
+		_, err := FromStarlarkFileWithData(starlarkPath, staticData, logger)
 		// We don't assert on the result since we just want to cover the function
 		_ = err
 	})
@@ -954,7 +953,7 @@ func TestFromStringLoader(t *testing.T) {
 		opts := []options.Option{options.WithLoader(l)}
 
 		// Create Extism evaluator, which should fail
-		_, err = polyscript.NewExtismEvaluator(opts...)
+		_, err = NewExtismEvaluator(opts...)
 		// We just want to make sure it errors out
 		require.Error(t, err)
 	})
@@ -969,7 +968,7 @@ func TestCreateEvaluatorEdgeCases2(t *testing.T) {
 		mockLoader := &mockLoader{}
 
 		// Create an evaluator with this loader
-		_, err := polyscript.NewRisorEvaluator(
+		_, err := NewRisorEvaluator(
 			options.WithLoader(mockLoader),
 			options.WithDefaults(),
 		)
@@ -1006,7 +1005,7 @@ func TestNewExtismEvaluator(t *testing.T) {
 	handler := getLogger()
 
 	// Create an evaluator with file loader
-	evaluator, err := polyscript.NewExtismEvaluator(
+	evaluator, err := NewExtismEvaluator(
 		options.WithDefaults(),
 		options.WithLoader(
 			func() loader.Loader {
@@ -1048,7 +1047,7 @@ func TestCreateEvaluatorEdgeCases(t *testing.T) {
 		t.Parallel()
 
 		// Try to create an evaluator without a loader
-		_, err := polyscript.NewRisorEvaluator()
+		_, err := NewRisorEvaluator()
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "no loader specified")
 	})
@@ -1063,7 +1062,7 @@ func TestCreateEvaluatorEdgeCases(t *testing.T) {
 		}
 
 		// This should fail when applying the option
-		_, err := polyscript.NewRisorEvaluator(invalidOption)
+		_, err := NewRisorEvaluator(invalidOption)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "custom invalid option error")
 	})
