@@ -3,8 +3,8 @@ package extism
 import (
 	"testing"
 
+	"github.com/robbyt/go-polyscript/engine/options"
 	"github.com/robbyt/go-polyscript/machines/types"
-	"github.com/robbyt/go-polyscript/options"
 	"github.com/stretchr/testify/require"
 )
 

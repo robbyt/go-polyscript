@@ -8,10 +8,10 @@ import (
 	"os"
 
 	"github.com/robbyt/go-polyscript"
+	"github.com/robbyt/go-polyscript/engine/options"
 	"github.com/robbyt/go-polyscript/execution/constants"
 	"github.com/robbyt/go-polyscript/execution/data"
 	"github.com/robbyt/go-polyscript/machines/risor"
-	"github.com/robbyt/go-polyscript/options"
 )
 
 //go:embed testdata/script.risor
@@ -37,7 +37,7 @@ func runRisorExample(handler slog.Handler) (map[string]any, error) {
 	evaluator, err := polyscript.FromRisorString(
 		risorScript,
 		options.WithDefaults(), // Add defaults option to ensure all required fields are set
-		options.WithLogger(handler),
+		options.WithLogHandler(handler),
 		options.WithDataProvider(dataProvider),
 		risor.WithGlobals(globals),
 	)

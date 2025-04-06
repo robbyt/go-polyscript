@@ -9,10 +9,10 @@ import (
 	"testing"
 
 	"github.com/robbyt/go-polyscript"
+	"github.com/robbyt/go-polyscript/engine/options"
 	"github.com/robbyt/go-polyscript/execution/constants"
 	"github.com/robbyt/go-polyscript/execution/data"
 	"github.com/robbyt/go-polyscript/machines/risor"
-	"github.com/robbyt/go-polyscript/options"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -30,7 +30,7 @@ method := ctx["request"]["Method"]
 greeting := ctx["input_data"]["greeting"]
 method + " " + greeting
 `,
-		options.WithLogger(handler),
+		options.WithLogHandler(handler),
 		options.WithDataProvider(provider),
 		risor.WithGlobals([]string{constants.Ctx}),
 	)
@@ -84,7 +84,7 @@ func TestEvaluatorWithPrepErrors(t *testing.T) {
 	// Test with StaticProvider (which doesn't support adding data)
 	staticProvider := data.NewStaticProvider(map[string]any{"static": "data"})
 	evaluator, err := polyscript.FromRisorString(`ctx["static"]`,
-		options.WithLogger(handler),
+		options.WithLogHandler(handler),
 		options.WithDataProvider(staticProvider),
 		risor.WithGlobals([]string{constants.Ctx}),
 	)
@@ -106,7 +106,7 @@ func TestEvaluatorWithPrepErrors(t *testing.T) {
 	// Test with evaluator that has a ContextProvider
 	contextProvider := data.NewContextProvider(constants.EvalData)
 	evaluator, err = polyscript.FromRisorString(`ctx["request"]["ID"] || "no id"`,
-		options.WithLogger(handler),
+		options.WithLogHandler(handler),
 		options.WithDataProvider(contextProvider),
 		risor.WithGlobals([]string{constants.Ctx}),
 	)

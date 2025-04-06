@@ -14,6 +14,7 @@ import (
 	"testing"
 
 	"github.com/robbyt/go-polyscript/engine"
+	"github.com/robbyt/go-polyscript/engine/options"
 	"github.com/robbyt/go-polyscript/execution/constants"
 	"github.com/robbyt/go-polyscript/execution/data"
 	"github.com/robbyt/go-polyscript/execution/script/loader"
@@ -21,7 +22,6 @@ import (
 	"github.com/robbyt/go-polyscript/machines/risor"
 	"github.com/robbyt/go-polyscript/machines/starlark"
 	"github.com/robbyt/go-polyscript/machines/types"
-	"github.com/robbyt/go-polyscript/options"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -178,7 +178,7 @@ func TestMachineEvaluators(t *testing.T) {
 			opts := append(
 				[]options.Option{
 					options.WithLoader(l),
-					options.WithLogger(getLogger()),
+					options.WithLogHandler(getLogger()),
 				},
 				tc.options...,
 			)
@@ -210,7 +210,7 @@ func TestNewEvaluator(t *testing.T) {
 					require.NoError(t, err)
 					return l
 				}()),
-				options.WithLogger(getLogger()),
+				options.WithLogHandler(getLogger()),
 				starlark.WithGlobals([]string{"ctx"}),
 			},
 			expectError: false,
@@ -224,7 +224,7 @@ func TestNewEvaluator(t *testing.T) {
 					require.NoError(t, err)
 					return l
 				}()),
-				options.WithLogger(getLogger()),
+				options.WithLogHandler(getLogger()),
 				risor.WithGlobals([]string{"ctx"}),
 			},
 			expectError: false,
@@ -233,7 +233,7 @@ func TestNewEvaluator(t *testing.T) {
 			name:        "No Loader",
 			machineType: types.Starlark,
 			options: []options.Option{
-				options.WithLogger(getLogger()),
+				options.WithLogHandler(getLogger()),
 			},
 			expectError: true,
 			errorMsg:    "no loader specified",
@@ -412,7 +412,7 @@ _ = result`
 			loaderFunc: FromExtismFile,
 			filePath:   wasmPath,
 			options: []options.Option{
-				options.WithLogger(getLogger()),
+				options.WithLogHandler(getLogger()),
 				extism.WithEntryPoint("greet"),
 				options.WithDataProvider(data.NewStaticProvider(map[string]any{
 					"input": "Test User", // Required for WASM execution
@@ -432,7 +432,7 @@ _ = result`
 			loaderFunc: FromRisorFile,
 			filePath:   risorPath,
 			options: []options.Option{
-				options.WithLogger(getLogger()),
+				options.WithLogHandler(getLogger()),
 				risor.WithGlobals([]string{"ctx"}),
 			},
 			expectError: false,
@@ -449,7 +449,7 @@ _ = result`
 			loaderFunc: FromStarlarkFile,
 			filePath:   starlarkPath,
 			options: []options.Option{
-				options.WithLogger(getLogger()),
+				options.WithLogHandler(getLogger()),
 				starlark.WithGlobals([]string{"ctx"}),
 			},
 			expectError: false,
@@ -491,7 +491,7 @@ _ = result`
 func TestDataProviders(t *testing.T) {
 	t.Parallel()
 
-	t.Run("WithCompositeProvider", func(t *testing.T) {
+	t.Run("withCompositeProvider", func(t *testing.T) {
 		t.Parallel()
 
 		// Create a simple script that uses composite data
@@ -542,7 +542,7 @@ func TestEvalHelpers(t *testing.T) {
 		evaluator, err := FromRisorString(
 			script,
 			options.WithDefaults(),
-			options.WithLogger(getLogger()),
+			options.WithLogHandler(getLogger()),
 			withCompositeProvider(map[string]any{}),
 			risor.WithGlobals([]string{constants.Ctx}),
 		)
@@ -655,7 +655,7 @@ func TestEvalHelpers(t *testing.T) {
 		evaluator, err := FromRisorString(
 			script,
 			options.WithDefaults(),
-			options.WithLogger(getLogger()),
+			options.WithLogHandler(getLogger()),
 			risor.WithGlobals([]string{constants.Ctx}),
 		)
 		require.NoError(t, err)
@@ -684,7 +684,7 @@ func TestEvalHelpers(t *testing.T) {
 		nilEvaluator, err := FromRisorString(
 			nilScript,
 			options.WithDefaults(),
-			options.WithLogger(getLogger()),
+			options.WithLogHandler(getLogger()),
 			risor.WithGlobals([]string{constants.Ctx}),
 		)
 		require.NoError(t, err)
@@ -698,7 +698,7 @@ func TestEvalHelpers(t *testing.T) {
 		numEvaluator, err := FromRisorString(
 			numScript,
 			options.WithDefaults(),
-			options.WithLogger(getLogger()),
+			options.WithLogHandler(getLogger()),
 			risor.WithGlobals([]string{constants.Ctx}),
 		)
 		require.NoError(t, err)
@@ -1014,7 +1014,7 @@ func TestNewExtismEvaluator(t *testing.T) {
 				return loader
 			}(),
 		),
-		options.WithLogger(handler),
+		options.WithLogHandler(handler),
 		options.WithDataProvider(data.NewStaticProvider(map[string]any{
 			"input": "Test User", // Put the input directly at the top level
 		})),

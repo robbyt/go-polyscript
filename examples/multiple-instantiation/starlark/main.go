@@ -9,10 +9,10 @@ import (
 
 	"github.com/robbyt/go-polyscript"
 	"github.com/robbyt/go-polyscript/engine"
+	"github.com/robbyt/go-polyscript/engine/options"
 	"github.com/robbyt/go-polyscript/execution/constants"
 	"github.com/robbyt/go-polyscript/execution/data"
 	"github.com/robbyt/go-polyscript/machines/starlark"
-	"github.com/robbyt/go-polyscript/options"
 )
 
 // StarlarkEvaluator is a type alias to make testing cleaner
@@ -38,7 +38,7 @@ func createEvaluator(handler slog.Handler) (StarlarkEvaluator, error) {
 	evaluator, err := polyscript.FromStarlarkString(
 		starlarkScript,
 		options.WithDefaults(),
-		options.WithLogger(handler),
+		options.WithLogHandler(handler),
 		options.WithDataProvider(ctxProvider),
 		starlark.WithGlobals(globals),
 	)

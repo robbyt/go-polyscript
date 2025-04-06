@@ -3,8 +3,8 @@ package extism
 import (
 	"fmt"
 
+	"github.com/robbyt/go-polyscript/engine/options"
 	"github.com/robbyt/go-polyscript/machines/types"
-	"github.com/robbyt/go-polyscript/options"
 )
 
 // ExtismOptions provides configuration options for the Extism compiler

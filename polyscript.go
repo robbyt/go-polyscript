@@ -5,6 +5,7 @@ import (
 	"log/slog"
 
 	"github.com/robbyt/go-polyscript/engine"
+	"github.com/robbyt/go-polyscript/engine/options"
 	"github.com/robbyt/go-polyscript/execution/constants"
 	"github.com/robbyt/go-polyscript/execution/data"
 	"github.com/robbyt/go-polyscript/execution/script"
@@ -14,7 +15,6 @@ import (
 	"github.com/robbyt/go-polyscript/machines/risor"
 	"github.com/robbyt/go-polyscript/machines/starlark"
 	"github.com/robbyt/go-polyscript/machines/types"
-	"github.com/robbyt/go-polyscript/options"
 )
 
 // FromExtismFile creates an Extism evaluator from a WASM file
@@ -59,7 +59,7 @@ func FromExtismFileWithData(
 	return FromExtismFile(
 		filePath,
 		options.WithDefaults(),
-		options.WithLogger(logHandler),
+		options.WithLogHandler(logHandler),
 		withCompositeProvider(staticData),
 		extism.WithEntryPoint(entryPoint),
 	)
@@ -80,7 +80,7 @@ func FromRisorFileWithData(
 	return FromRisorFile(
 		filePath,
 		options.WithDefaults(),
-		options.WithLogger(logHandler),
+		options.WithLogHandler(logHandler),
 		withCompositeProvider(staticData),
 	)
 }
@@ -100,7 +100,7 @@ func FromStarlarkFileWithData(
 	return FromStarlarkFile(
 		filePath,
 		options.WithDefaults(),
-		options.WithLogger(logHandler),
+		options.WithLogHandler(logHandler),
 		withCompositeProvider(staticData),
 	)
 }
@@ -120,7 +120,7 @@ func FromRisorStringWithData(
 	return FromRisorString(
 		script,
 		options.WithDefaults(),
-		options.WithLogger(logHandler),
+		options.WithLogHandler(logHandler),
 		withCompositeProvider(staticData),
 		risor.WithGlobals([]string{constants.Ctx}),
 	)
@@ -142,7 +142,7 @@ func FromStarlarkStringWithData(
 	return FromStarlarkString(
 		script,
 		options.WithDefaults(),
-		options.WithLogger(logHandler),
+		options.WithLogHandler(logHandler),
 		withCompositeProvider(staticData),
 		starlark.WithGlobals([]string{constants.Ctx}),
 	)

@@ -8,10 +8,10 @@ import (
 	"os"
 
 	"github.com/robbyt/go-polyscript"
+	"github.com/robbyt/go-polyscript/engine/options"
 	"github.com/robbyt/go-polyscript/execution/constants"
 	"github.com/robbyt/go-polyscript/execution/data"
 	"github.com/robbyt/go-polyscript/machines/starlark"
-	"github.com/robbyt/go-polyscript/options"
 )
 
 //go:embed testdata/script.star
@@ -37,7 +37,7 @@ func runStarlarkExample(handler slog.Handler) (map[string]any, error) {
 	evaluator, err := polyscript.FromStarlarkString(
 		starlarkScript,
 		options.WithDefaults(),
-		options.WithLogger(handler),
+		options.WithLogHandler(handler),
 		options.WithDataProvider(dataProvider),
 		starlark.WithGlobals(globals),
 	)
