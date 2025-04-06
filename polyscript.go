@@ -60,7 +60,7 @@ func FromExtismFileWithData(
 		filePath,
 		options.WithDefaults(),
 		options.WithLogger(logHandler),
-		WithCompositeProvider(staticData),
+		withCompositeProvider(staticData),
 		extism.WithEntryPoint(entryPoint),
 	)
 }
@@ -81,7 +81,7 @@ func FromRisorFileWithData(
 		filePath,
 		options.WithDefaults(),
 		options.WithLogger(logHandler),
-		WithCompositeProvider(staticData),
+		withCompositeProvider(staticData),
 	)
 }
 
@@ -101,7 +101,7 @@ func FromStarlarkFileWithData(
 		filePath,
 		options.WithDefaults(),
 		options.WithLogger(logHandler),
-		WithCompositeProvider(staticData),
+		withCompositeProvider(staticData),
 	)
 }
 
@@ -121,7 +121,7 @@ func FromRisorStringWithData(
 		script,
 		options.WithDefaults(),
 		options.WithLogger(logHandler),
-		WithCompositeProvider(staticData),
+		withCompositeProvider(staticData),
 		risor.WithGlobals([]string{constants.Ctx}),
 	)
 }
@@ -143,7 +143,7 @@ func FromStarlarkStringWithData(
 		script,
 		options.WithDefaults(),
 		options.WithLogger(logHandler),
-		WithCompositeProvider(staticData),
+		withCompositeProvider(staticData),
 		starlark.WithGlobals([]string{constants.Ctx}),
 	)
 }
@@ -163,9 +163,9 @@ func NewRisorEvaluator(opts ...options.Option) (engine.EvaluatorWithPrep, error)
 	return newEvaluator(types.Risor, opts...)
 }
 
-// WithCompositeProvider creates an option to use a composite provider combining static and
+// withCompositeProvider creates an option to use a composite provider combining static and
 // dynamic data. This allows adding some initial static data, as well as dynamic runtime data.
-func WithCompositeProvider(staticData map[string]any) options.Option {
+func withCompositeProvider(staticData map[string]any) options.Option {
 	return func(cfg *options.Config) error {
 		staticProvider := data.NewStaticProvider(staticData)
 		dynamicProvider := data.NewContextProvider(constants.EvalData)
