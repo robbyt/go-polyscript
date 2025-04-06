@@ -95,8 +95,10 @@ func TestConfigValidation(t *testing.T) {
 
 	// Test with valid config
 	cfg3 := &Config{
-		machineType: types.Starlark,
-		loader:      NewMockLoader(),
+		machineType:  types.Starlark,
+		loader:       NewMockLoader(),
+		handler:      slog.NewTextHandler(os.Stdout, nil),
+		dataProvider: data.NewStaticProvider(map[string]any{"test": "value"}),
 	}
 	err = cfg3.Validate()
 	require.NoError(t, err)
