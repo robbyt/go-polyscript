@@ -155,16 +155,11 @@ func TestPrepareContextHelper(t *testing.T) {
 		) // Integer is not supported
 
 		assert.Error(t, err)
-		assert.NotEqual(t, baseCtx, enrichedCtx, "Context should be modified despite error")
+		assert.Equal(t, baseCtx, enrichedCtx, "Context should be unchanged when there's an error")
 
-		// Context is still created even with error
+		// No data should be added to context when there's an error
 		data := enrichedCtx.Value(constants.EvalData)
-		require.NotNil(t, data)
-
-		// Should be an empty map
-		contextMap, ok := data.(map[string]any)
-		require.True(t, ok, "Context value should be a map")
-		assert.Empty(t, contextMap)
+		assert.Nil(t, data, "Context should not have data added when there's an error")
 	})
 
 	t.Run("composite provider with mixed success", func(t *testing.T) {
@@ -201,7 +196,7 @@ func TestPrepareContextWithErrorHandling(t *testing.T) {
 	// Create a test logger that discards output
 	logger := slog.Default()
 
-	t.Run("provider returns error but still modifies context", func(t *testing.T) {
+	t.Run("provider returns error and keeps original context", func(t *testing.T) {
 		t.Parallel()
 
 		// Create a context provider
@@ -217,19 +212,11 @@ func TestPrepareContextWithErrorHandling(t *testing.T) {
 		// Should return an error
 		assert.Error(t, err)
 
-		// But context should still be modified
-		assert.NotEqual(t, baseCtx, enrichedCtx)
+		// Context should remain unchanged when there's an error
+		assert.Equal(t, baseCtx, enrichedCtx, "Context should be unchanged when there's an error")
 
-		// Verify the valid data was added
+		// No data should be added to context
 		data := enrichedCtx.Value(constants.EvalData)
-		require.NotNil(t, data)
-
-		contextMap, ok := data.(map[string]any)
-		require.True(t, ok)
-
-		assert.Contains(t, contextMap, constants.InputData)
-		inputData, ok := contextMap[constants.InputData].(map[string]any)
-		require.True(t, ok)
-		assert.Equal(t, "data", inputData["valid"])
+		assert.Nil(t, data, "Context should not have data added when there's an error")
 	})
 }

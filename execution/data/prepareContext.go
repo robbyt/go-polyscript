@@ -25,16 +25,19 @@ func PrepareContextHelper(
 	provider Provider,
 	d ...any,
 ) (context.Context, error) {
+	if logger == nil {
+		logger = slog.Default()
+	}
+
 	if provider == nil {
 		logger.WarnContext(ctx, "no data provider available for context preparation")
 		return ctx, fmt.Errorf("no data provider available")
 	}
 
-	// Use the data provider to store the raw data
+	// Use the data provider plugin to store the raw data
 	enrichedCtx, err := provider.AddDataToContext(ctx, d...)
 	if err != nil {
-		logger.ErrorContext(ctx, "failed to prepare context", "error", err)
-		// Return the partial context even with errors, as it may have some usable data
+		return ctx, fmt.Errorf("failed to prepare context: %w", err)
 	}
 
 	return enrichedCtx, err
