@@ -235,7 +235,7 @@ func TestPrepareContext(t *testing.T) {
 
 		// Verify error is returned
 		require.Error(t, err)
-		require.Equal(t, expectedErr, err)
+		require.ErrorIs(t, err, expectedErr)
 		mockProvider.AssertExpectations(t)
 	})
 
