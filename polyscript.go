@@ -47,17 +47,14 @@ func FromExtismFileWithData(
 	cfg.SetLoader(l)
 
 	// Set the data provider
-	staticProvider := data.NewStaticProvider(staticData)
-	dynamicProvider := data.NewContextProvider(constants.EvalData)
-	compositeProvider := data.NewCompositeProvider(staticProvider, dynamicProvider)
-	cfg.SetDataProvider(compositeProvider)
+	cfg.SetDataProvider(buildCompositeDataProvider(staticData))
 
 	// Create an evaluator using our custom createExtismEvaluator function
 	return createExtismEvaluator(cfg, []extism.CompilerOption{extism.WithEntryPoint(entryPoint)})
 }
 
 // FromRisorFile creates a Risor evaluator from a .risor file
-func FromRisorFile(filePath string, opts ...interface{}) (engine.EvaluatorWithPrep, error) {
+func FromRisorFile(filePath string, opts ...any) (engine.EvaluatorWithPrep, error) {
 	return fromFileLoader(types.Risor, filePath, opts...)
 }
 
@@ -84,10 +81,7 @@ func FromRisorFileWithData(
 	cfg.SetLoader(l)
 
 	// Set the data provider
-	staticProvider := data.NewStaticProvider(staticData)
-	dynamicProvider := data.NewContextProvider(constants.EvalData)
-	compositeProvider := data.NewCompositeProvider(staticProvider, dynamicProvider)
-	cfg.SetDataProvider(compositeProvider)
+	cfg.SetDataProvider(buildCompositeDataProvider(staticData))
 
 	// Create an evaluator using our custom createRisorEvaluator function
 	return createRisorEvaluator(
@@ -97,7 +91,7 @@ func FromRisorFileWithData(
 }
 
 // FromRisorString creates a Risor evaluator from a script string
-func FromRisorString(content string, opts ...interface{}) (engine.EvaluatorWithPrep, error) {
+func FromRisorString(content string, opts ...any) (engine.EvaluatorWithPrep, error) {
 	return fromStringLoader(types.Risor, content, opts...)
 }
 
@@ -124,10 +118,7 @@ func FromRisorStringWithData(
 	cfg.SetLoader(l)
 
 	// Set the data provider
-	staticProvider := data.NewStaticProvider(staticData)
-	dynamicProvider := data.NewContextProvider(constants.EvalData)
-	compositeProvider := data.NewCompositeProvider(staticProvider, dynamicProvider)
-	cfg.SetDataProvider(compositeProvider)
+	cfg.SetDataProvider(buildCompositeDataProvider(staticData))
 
 	// Create an evaluator using our custom createRisorEvaluator function
 	return createRisorEvaluator(
@@ -137,7 +128,7 @@ func FromRisorStringWithData(
 }
 
 // FromStarlarkFile creates a Starlark evaluator from a .star file
-func FromStarlarkFile(filePath string, opts ...interface{}) (engine.EvaluatorWithPrep, error) {
+func FromStarlarkFile(filePath string, opts ...any) (engine.EvaluatorWithPrep, error) {
 	return fromFileLoader(types.Starlark, filePath, opts...)
 }
 
@@ -164,10 +155,7 @@ func FromStarlarkFileWithData(
 	cfg.SetLoader(l)
 
 	// Set the data provider
-	staticProvider := data.NewStaticProvider(staticData)
-	dynamicProvider := data.NewContextProvider(constants.EvalData)
-	compositeProvider := data.NewCompositeProvider(staticProvider, dynamicProvider)
-	cfg.SetDataProvider(compositeProvider)
+	cfg.SetDataProvider(buildCompositeDataProvider(staticData))
 
 	// Create an evaluator using our custom createStarlarkEvaluator function
 	return createStarlarkEvaluator(
@@ -177,7 +165,7 @@ func FromStarlarkFileWithData(
 }
 
 // FromStarlarkString creates a Starlark evaluator from a script string
-func FromStarlarkString(content string, opts ...interface{}) (engine.EvaluatorWithPrep, error) {
+func FromStarlarkString(content string, opts ...any) (engine.EvaluatorWithPrep, error) {
 	return fromStringLoader(types.Starlark, content, opts...)
 }
 
@@ -205,10 +193,7 @@ func FromStarlarkStringWithData(
 	cfg.SetLoader(l)
 
 	// Set the data provider
-	staticProvider := data.NewStaticProvider(staticData)
-	dynamicProvider := data.NewContextProvider(constants.EvalData)
-	compositeProvider := data.NewCompositeProvider(staticProvider, dynamicProvider)
-	cfg.SetDataProvider(compositeProvider)
+	cfg.SetDataProvider(buildCompositeDataProvider(staticData))
 
 	// Create an evaluator using our custom createStarlarkEvaluator function
 	return createStarlarkEvaluator(
@@ -230,7 +215,7 @@ func fromFileLoader(
 	}
 
 	// Combine options, adding the loader
-	allOpts := append([]interface{}{options.WithLoader(l)}, opts...)
+	allOpts := append([]any{options.WithLoader(l)}, opts...)
 
 	return NewEvaluator(machineType, allOpts...)
 }
@@ -252,7 +237,7 @@ func fromStringLoader(
 	}
 
 	// Combine options, adding the loader
-	allOpts := append([]interface{}{options.WithLoader(l)}, opts...)
+	allOpts := append([]any{options.WithLoader(l)}, opts...)
 
 	return NewEvaluator(machineType, allOpts...)
 }
@@ -284,7 +269,7 @@ func fromStringLoader(
 //	}
 func NewEvaluator(
 	machineType types.Type,
-	opts ...interface{},
+	opts ...any,
 ) (engine.EvaluatorWithPrep, error) {
 	switch machineType {
 	case types.Extism:
@@ -299,7 +284,7 @@ func NewEvaluator(
 }
 
 // NewExtismEvaluator creates a new evaluator for Extism WASM
-func NewExtismEvaluator(opts ...interface{}) (engine.EvaluatorWithPrep, error) {
+func NewExtismEvaluator(opts ...any) (engine.EvaluatorWithPrep, error) {
 	// First create a config with the engine options
 	cfg := options.DefaultConfig(types.Extism)
 
@@ -339,7 +324,6 @@ func createExtismEvaluator(
 	cfg *options.Config,
 	compilerOptions []extism.CompilerOption,
 ) (engine.EvaluatorWithPrep, error) {
-
 	// Create compiler using machine-specific factory function
 	compiler, err := machines.NewExtismCompiler(compilerOptions...)
 	if err != nil {
@@ -376,7 +360,7 @@ func createExtismEvaluator(
 }
 
 // NewRisorEvaluator creates a new evaluator for Risor scripts
-func NewRisorEvaluator(opts ...interface{}) (engine.EvaluatorWithPrep, error) {
+func NewRisorEvaluator(opts ...any) (engine.EvaluatorWithPrep, error) {
 	// First create a config with the engine options
 	cfg := options.DefaultConfig(types.Risor)
 
@@ -416,7 +400,6 @@ func createRisorEvaluator(
 	cfg *options.Config,
 	compilerOptions []risor.CompilerOption,
 ) (engine.EvaluatorWithPrep, error) {
-
 	// Create compiler using machine-specific factory function
 	compiler, err := machines.NewRisorCompiler(compilerOptions...)
 	if err != nil {
@@ -453,7 +436,7 @@ func createRisorEvaluator(
 }
 
 // NewStarlarkEvaluator creates a new evaluator for Starlark scripts
-func NewStarlarkEvaluator(opts ...interface{}) (engine.EvaluatorWithPrep, error) {
+func NewStarlarkEvaluator(opts ...any) (engine.EvaluatorWithPrep, error) {
 	// First create a config with the engine options
 	cfg := options.DefaultConfig(types.Starlark)
 
@@ -493,7 +476,6 @@ func createStarlarkEvaluator(
 	cfg *options.Config,
 	compilerOptions []starlark.CompilerOption,
 ) (engine.EvaluatorWithPrep, error) {
-
 	// Create compiler using machine-specific factory function
 	compiler, err := machines.NewStarlarkCompiler(compilerOptions...)
 	if err != nil {
@@ -527,4 +509,13 @@ func createStarlarkEvaluator(
 
 	// Wrap the evaluator to store the executable unit
 	return NewEvaluatorWrapper(machineEvaluator, execUnit), nil
+}
+
+// buildCompositeDataProvider creates a composite data provider from a static data map
+func buildCompositeDataProvider(
+	staticData map[string]any,
+) data.Provider {
+	staticProvider := data.NewStaticProvider(staticData)
+	dynamicProvider := data.NewContextProvider(constants.EvalData)
+	return data.NewCompositeProvider(staticProvider, dynamicProvider)
 }
