@@ -76,7 +76,7 @@ func runTestCase(t *testing.T, tt testCase) {
 	require.Equal(t, tt.script, execContent.GetSource(), "Script content does not match")
 
 	// Check that the bytecode is correct
-	risorExec, ok := execContent.(*Executable)
+	risorExec, ok := execContent.(*executable)
 	require.True(t, ok, "Expected execContent to be a *Executable")
 	require.NotNil(t, risorExec.GetRisorByteCode(), "Expected bytecode to be non-nil")
 

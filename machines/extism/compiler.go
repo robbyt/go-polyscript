@@ -116,7 +116,7 @@ func (c *Compiler) Compile(scriptReader io.ReadCloser) (script.ExecutableContent
 	}
 
 	// Create executable with the compiled plugin
-	executable := NewExecutable(scriptBytes, plugin, funcName)
+	executable := newExecutable(scriptBytes, plugin, funcName)
 	if executable == nil {
 		logger.Warn("Failed to create Executable from WASM plugin")
 		return nil, ErrExecCreationFailed

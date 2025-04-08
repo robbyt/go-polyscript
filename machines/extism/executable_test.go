@@ -73,25 +73,25 @@ func TestNewExecutable(t *testing.T) {
 
 	// Empty entry point test
 	t.Run("empty entry point", func(t *testing.T) {
-		exe := NewExecutable(wasmBytes, mockPlugin, "")
+		exe := newExecutable(wasmBytes, mockPlugin, "")
 		assert.Nil(t, exe)
 	})
 
 	// Empty script bytes test
 	t.Run("empty script bytes", func(t *testing.T) {
-		exe := NewExecutable(nil, mockPlugin, entryPoint)
+		exe := newExecutable(nil, mockPlugin, entryPoint)
 		assert.Nil(t, exe)
 	})
 
 	// Nil plugin test
 	t.Run("nil plugin", func(t *testing.T) {
-		exe := NewExecutable(wasmBytes, nil, entryPoint)
+		exe := newExecutable(wasmBytes, nil, entryPoint)
 		assert.Nil(t, exe)
 	})
 
 	// Valid creation test
 	t.Run("valid creation", func(t *testing.T) {
-		exe := NewExecutable(wasmBytes, mockPlugin, entryPoint)
+		exe := newExecutable(wasmBytes, mockPlugin, entryPoint)
 		require.NotNil(t, exe)
 
 		// Verify properties
@@ -117,7 +117,7 @@ func TestExecutable_Close(t *testing.T) {
 	mockPlugin.On("Close", ctx).Return(nil)
 
 	// Create executable
-	exe := NewExecutable(wasmBytes, mockPlugin, entryPoint)
+	exe := newExecutable(wasmBytes, mockPlugin, entryPoint)
 	require.NotNil(t, exe)
 
 	// Verify initial state

@@ -5,34 +5,34 @@ import (
 	machineTypes "github.com/robbyt/go-polyscript/machines/types"
 )
 
-type Executable struct {
+type executable struct {
 	scriptBodyBytes []byte
 	ByteCode        *risorCompiler.Code
 }
 
-func NewExecutable(scriptBodyBytes []byte, byteCode *risorCompiler.Code) *Executable {
+func newExecutable(scriptBodyBytes []byte, byteCode *risorCompiler.Code) *executable {
 	if len(scriptBodyBytes) == 0 || byteCode == nil {
 		return nil
 	}
 
-	return &Executable{
+	return &executable{
 		scriptBodyBytes: scriptBodyBytes,
 		ByteCode:        byteCode,
 	}
 }
 
-func (e *Executable) GetSource() string {
+func (e *executable) GetSource() string {
 	return string(e.scriptBodyBytes)
 }
 
-func (e *Executable) GetByteCode() any {
+func (e *executable) GetByteCode() any {
 	return e.ByteCode
 }
 
-func (e *Executable) GetRisorByteCode() *risorCompiler.Code {
+func (e *executable) GetRisorByteCode() *risorCompiler.Code {
 	return e.ByteCode
 }
 
-func (e *Executable) GetMachineType() machineTypes.Type {
+func (e *executable) GetMachineType() machineTypes.Type {
 	return machineTypes.Risor
 }

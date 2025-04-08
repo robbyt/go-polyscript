@@ -55,7 +55,7 @@ func (c *Compiler) Compile(scriptLoader io.ReadCloser) (script.ExecutableContent
 	return c.compile(scriptBodyBytes)
 }
 
-func (c *Compiler) compile(scriptBodyBytes []byte) (*Executable, error) {
+func (c *Compiler) compile(scriptBodyBytes []byte) (*executable, error) {
 	logger := c.logger.WithGroup("compile")
 	if len(scriptBodyBytes) == 0 {
 		return nil, ErrContentNil
@@ -104,7 +104,7 @@ func (c *Compiler) compile(scriptBodyBytes []byte) (*Executable, error) {
 		return nil, ErrNoInstructions
 	}
 
-	risorExec := NewExecutable(scriptBodyBytes, bc)
+	risorExec := newExecutable(scriptBodyBytes, bc)
 	if risorExec == nil {
 		logger.Warn("Failed to create Executable from bytecode")
 		return nil, ErrExecCreationFailed
