@@ -453,7 +453,7 @@ func TestLoadInputData(t *testing.T) {
 // TestGetMachineType tests the GetMachineType method
 func TestGetMachineType(t *testing.T) {
 	t.Parallel()
-	exe := &Executable{}
+	exe := &executable{}
 	require.Equal(t, types.Risor, exe.GetMachineType())
 }
 

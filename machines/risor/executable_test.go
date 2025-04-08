@@ -13,7 +13,7 @@ func TestNewExecutableValid(t *testing.T) {
 	content := "print('Hello, World!')"
 	bytecode := &risorCompiler.Code{}
 
-	executable := NewExecutable([]byte(content), bytecode)
+	executable := newExecutable([]byte(content), bytecode)
 	require.NotNil(t, executable)
 	assert.Equal(t, content, executable.GetSource())
 	assert.Equal(t, bytecode, executable.GetByteCode())
@@ -24,7 +24,7 @@ func TestNewExecutableValid(t *testing.T) {
 func TestNewExecutableNilContent(t *testing.T) {
 	bytecode := &risorCompiler.Code{}
 
-	executable := NewExecutable(nil, bytecode)
+	executable := newExecutable(nil, bytecode)
 	require.Nil(t, executable)
 }
 
@@ -32,13 +32,13 @@ func TestNewExecutableNilContent(t *testing.T) {
 func TestNewExecutableNilByteCode(t *testing.T) {
 	content := "print('Hello, World!')"
 
-	executable := NewExecutable([]byte(content), nil)
+	executable := newExecutable([]byte(content), nil)
 	require.Nil(t, executable)
 }
 
 // TestNewExecutableNilContentAndByteCode tests creating an Executable with nil content and bytecode
 func TestNewExecutableNilContentAndByteCode(t *testing.T) {
-	executable := NewExecutable(nil, nil)
+	executable := newExecutable(nil, nil)
 	require.Nil(t, executable)
 }
 
@@ -46,7 +46,7 @@ func TestNewExecutableNilContentAndByteCode(t *testing.T) {
 func TestExecutable_GetBody(t *testing.T) {
 	content := "print('Hello, World!')"
 	bytecode := &risorCompiler.Code{}
-	executable := NewExecutable([]byte(content), bytecode)
+	executable := newExecutable([]byte(content), bytecode)
 	require.NotNil(t, executable)
 
 	body := executable.GetSource()
@@ -57,7 +57,7 @@ func TestExecutable_GetBody(t *testing.T) {
 func TestExecutable_GetByteCode(t *testing.T) {
 	content := "print('Hello, World!')"
 	bytecode := &risorCompiler.Code{}
-	executable := NewExecutable([]byte(content), bytecode)
+	executable := newExecutable([]byte(content), bytecode)
 	require.NotNil(t, executable)
 
 	code := executable.GetByteCode()
@@ -72,7 +72,7 @@ func TestExecutable_GetByteCode(t *testing.T) {
 func TestExecutable_GetRisorByteCode(t *testing.T) {
 	content := "print('Hello, World!')"
 	bytecode := &risorCompiler.Code{}
-	executable := NewExecutable([]byte(content), bytecode)
+	executable := newExecutable([]byte(content), bytecode)
 	require.NotNil(t, executable)
 
 	code := executable.GetRisorByteCode()
@@ -84,7 +84,7 @@ func TestNewExecutable(t *testing.T) {
 		content := "print('test')"
 		bytecode := &risorCompiler.Code{}
 
-		exe := NewExecutable([]byte(content), bytecode)
+		exe := newExecutable([]byte(content), bytecode)
 		require.NotNil(t, exe)
 		assert.Equal(t, content, exe.GetSource())
 		assert.Equal(t, bytecode, exe.ByteCode)
@@ -92,18 +92,18 @@ func TestNewExecutable(t *testing.T) {
 
 	t.Run("nil content", func(t *testing.T) {
 		bytecode := &risorCompiler.Code{}
-		exe := NewExecutable(nil, bytecode)
+		exe := newExecutable(nil, bytecode)
 		assert.Nil(t, exe)
 	})
 
 	t.Run("nil bytecode", func(t *testing.T) {
 		content := "print('test')"
-		exe := NewExecutable([]byte(content), nil)
+		exe := newExecutable([]byte(content), nil)
 		assert.Nil(t, exe)
 	})
 
 	t.Run("both nil", func(t *testing.T) {
-		exe := NewExecutable(nil, nil)
+		exe := newExecutable(nil, nil)
 		assert.Nil(t, exe)
 	})
 }

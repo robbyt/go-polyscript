@@ -13,7 +13,7 @@ func TestNewExecutableValid(t *testing.T) {
 	content := "print('Hello, World!')"
 	bytecode := &starlarkLib.Program{}
 
-	executable := NewExecutable([]byte(content), bytecode)
+	executable := newExecutable([]byte(content), bytecode)
 	require.NotNil(t, executable)
 	assert.Equal(t, content, executable.GetSource())
 	assert.Equal(t, bytecode, executable.GetByteCode())
@@ -23,25 +23,25 @@ func TestNewExecutableValid(t *testing.T) {
 
 func TestNewExecutableNilContent(t *testing.T) {
 	bytecode := &starlarkLib.Program{}
-	executable := NewExecutable(nil, bytecode)
+	executable := newExecutable(nil, bytecode)
 	require.Nil(t, executable)
 }
 
 func TestNewExecutableNilByteCode(t *testing.T) {
 	content := "print('Hello, World!')"
-	executable := NewExecutable([]byte(content), nil)
+	executable := newExecutable([]byte(content), nil)
 	require.Nil(t, executable)
 }
 
 func TestNewExecutableNilContentAndByteCode(t *testing.T) {
-	executable := NewExecutable(nil, nil)
+	executable := newExecutable(nil, nil)
 	require.Nil(t, executable)
 }
 
 func TestExecutable_GetSource(t *testing.T) {
 	content := "print('Hello, World!')"
 	bytecode := &starlarkLib.Program{}
-	executable := NewExecutable([]byte(content), bytecode)
+	executable := newExecutable([]byte(content), bytecode)
 	require.NotNil(t, executable)
 
 	source := executable.GetSource()
@@ -51,7 +51,7 @@ func TestExecutable_GetSource(t *testing.T) {
 func TestExecutable_GetByteCode(t *testing.T) {
 	content := "print('Hello, World!')"
 	bytecode := &starlarkLib.Program{}
-	executable := NewExecutable([]byte(content), bytecode)
+	executable := newExecutable([]byte(content), bytecode)
 	require.NotNil(t, executable)
 
 	code := executable.GetByteCode()
@@ -65,7 +65,7 @@ func TestExecutable_GetByteCode(t *testing.T) {
 func TestExecutable_GetStarlarkByteCode(t *testing.T) {
 	content := "print('Hello, World!')"
 	bytecode := &starlarkLib.Program{}
-	executable := NewExecutable([]byte(content), bytecode)
+	executable := newExecutable([]byte(content), bytecode)
 	require.NotNil(t, executable)
 
 	code := executable.GetStarlarkByteCode()
@@ -77,7 +77,7 @@ func TestNewExecutable(t *testing.T) {
 		content := "print('test')"
 		bytecode := &starlarkLib.Program{}
 
-		exe := NewExecutable([]byte(content), bytecode)
+		exe := newExecutable([]byte(content), bytecode)
 		require.NotNil(t, exe)
 		assert.Equal(t, content, exe.GetSource())
 		assert.Equal(t, bytecode, exe.ByteCode)
@@ -85,18 +85,18 @@ func TestNewExecutable(t *testing.T) {
 
 	t.Run("nil content", func(t *testing.T) {
 		bytecode := &starlarkLib.Program{}
-		exe := NewExecutable(nil, bytecode)
+		exe := newExecutable(nil, bytecode)
 		assert.Nil(t, exe)
 	})
 
 	t.Run("nil bytecode", func(t *testing.T) {
 		content := "print('test')"
-		exe := NewExecutable([]byte(content), nil)
+		exe := newExecutable([]byte(content), nil)
 		assert.Nil(t, exe)
 	})
 
 	t.Run("both nil", func(t *testing.T) {
-		exe := NewExecutable(nil, nil)
+		exe := newExecutable(nil, nil)
 		assert.Nil(t, exe)
 	})
 }

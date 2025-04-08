@@ -559,7 +559,7 @@ func TestEvalWithCancelledContext(t *testing.T) {
 	require.NoError(t, err, "Failed to compile plugin")
 
 	// Create our executable
-	exec := NewExecutable(wasmContent, compiledPlugin, "greet")
+	exec := newExecutable(wasmContent, compiledPlugin, "greet")
 
 	// Create a context provider
 	ctxProvider := data.NewContextProvider(constants.EvalData)
@@ -608,7 +608,7 @@ func TestStaticAndDynamicDataCombination(t *testing.T) {
 	require.NoError(t, err, "Failed to compile plugin")
 
 	// Create our executable
-	exec := NewExecutable(wasmContent, compiledPlugin, "greet")
+	exec := newExecutable(wasmContent, compiledPlugin, "greet")
 
 	// Create a context provider for runtime data
 	ctxProvider := data.NewContextProvider(constants.EvalData)

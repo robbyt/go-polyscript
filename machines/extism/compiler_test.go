@@ -77,7 +77,7 @@ func TestCompiler(t *testing.T) {
 		require.NotNil(t, execContent)
 
 		// Type assertion
-		executable, ok := execContent.(*Executable)
+		executable, ok := execContent.(*executable)
 		require.True(t, ok, "Expected *Executable type")
 
 		// Validate source matches
@@ -138,7 +138,7 @@ func TestCompiler(t *testing.T) {
 		require.NotNil(t, execContent)
 
 		// Type assertion
-		executable, ok := execContent.(*Executable)
+		executable, ok := execContent.(*executable)
 		require.True(t, ok, "Expected *Executable type")
 
 		// Validate source matches
@@ -189,7 +189,7 @@ func TestCompiler(t *testing.T) {
 		require.NotNil(t, execContent)
 
 		// Type assertion
-		executable, ok := execContent.(*Executable)
+		executable, ok := execContent.(*executable)
 		require.True(t, ok, "Expected *Executable type")
 
 		// Validate source matches

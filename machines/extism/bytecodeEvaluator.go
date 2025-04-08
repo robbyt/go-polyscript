@@ -165,7 +165,7 @@ func (be *BytecodeEvaluator) Eval(ctx context.Context) (engine.EvaluatorResponse
 	logger = logger.With("exeID", exeID)
 
 	// 1. Type assert to WASM module, and get the compiled plugin object
-	wasmExe, ok := be.execUnit.GetContent().(*Executable)
+	wasmExe, ok := be.execUnit.GetContent().(*executable)
 	if !ok {
 		return nil, fmt.Errorf(
 			"invalid executable type: expected *Executable, got %T",

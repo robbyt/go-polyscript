@@ -54,7 +54,7 @@ func (c *Compiler) Compile(scriptReader io.ReadCloser) (script.ExecutableContent
 	return c.compile(scriptBodyBytes)
 }
 
-func (c *Compiler) compile(scriptBodyBytes []byte) (*Executable, error) {
+func (c *Compiler) compile(scriptBodyBytes []byte) (*executable, error) {
 	logger := c.logger.WithGroup("compile")
 	if len(scriptBodyBytes) == 0 {
 		logger.Error("Compile called with nil script")
@@ -76,7 +76,7 @@ func (c *Compiler) compile(scriptBodyBytes []byte) (*Executable, error) {
 	}
 
 	// Create executable with the compiled program
-	starlarkExec := NewExecutable(scriptBodyBytes, program)
+	starlarkExec := newExecutable(scriptBodyBytes, program)
 	if starlarkExec == nil {
 		logger.Warn("Failed to create Executable from program")
 		return nil, ErrExecCreationFailed
