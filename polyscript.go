@@ -90,7 +90,10 @@ func FromRisorFileWithData(
 	cfg.SetDataProvider(compositeProvider)
 
 	// Create an evaluator using our custom createRisorEvaluator function
-	return createRisorEvaluator(cfg, []risor.CompilerOption{risor.WithGlobals([]string{constants.Ctx})})
+	return createRisorEvaluator(
+		cfg,
+		[]risor.CompilerOption{risor.WithGlobals([]string{constants.Ctx})},
+	)
 }
 
 // FromRisorString creates a Risor evaluator from a script string
@@ -127,7 +130,10 @@ func FromRisorStringWithData(
 	cfg.SetDataProvider(compositeProvider)
 
 	// Create an evaluator using our custom createRisorEvaluator function
-	return createRisorEvaluator(cfg, []risor.CompilerOption{risor.WithGlobals([]string{constants.Ctx})})
+	return createRisorEvaluator(
+		cfg,
+		[]risor.CompilerOption{risor.WithGlobals([]string{constants.Ctx})},
+	)
 }
 
 // FromStarlarkFile creates a Starlark evaluator from a .star file
@@ -341,7 +347,9 @@ func createExtismEvaluator(
 	}
 
 	// Always include the handler in options
-	allOpts := append([]extism.CompilerOption{extism.WithLogHandler(cfg.GetHandler())}, machineOpts...)
+	allOpts := append(
+		[]extism.CompilerOption{extism.WithLogHandler(cfg.GetHandler())},
+		machineOpts...)
 
 	// Create compiler using machine-specific factory function
 	compiler, err := machines.NewExtismCompiler(allOpts...)
@@ -420,7 +428,9 @@ func createRisorEvaluator(
 	}
 
 	// Always include the handler in options
-	allOpts := append([]risor.CompilerOption{risor.WithLogHandler(cfg.GetHandler())}, machineOpts...)
+	allOpts := append(
+		[]risor.CompilerOption{risor.WithLogHandler(cfg.GetHandler())},
+		machineOpts...)
 
 	// Create compiler using machine-specific factory function
 	compiler, err := machines.NewRisorCompiler(allOpts...)
@@ -499,7 +509,9 @@ func createStarlarkEvaluator(
 	}
 
 	// Always include the handler in options
-	allOpts := append([]starlark.CompilerOption{starlark.WithLogHandler(cfg.GetHandler())}, machineOpts...)
+	allOpts := append(
+		[]starlark.CompilerOption{starlark.WithLogHandler(cfg.GetHandler())},
+		machineOpts...)
 
 	// Create compiler using machine-specific factory function
 	compiler, err := machines.NewStarlarkCompiler(allOpts...)
