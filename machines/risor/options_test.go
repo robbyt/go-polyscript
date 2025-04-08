@@ -1,35 +1,92 @@
 package risor
 
 import (
+	"bytes"
+	"log/slog"
 	"testing"
 
-	"github.com/robbyt/go-polyscript/engine/options"
-	"github.com/robbyt/go-polyscript/machines/types"
 	"github.com/stretchr/testify/require"
 )
 
 func TestWithGlobals(t *testing.T) {
-	// Test with correct machine type
-	cfg1 := &options.Config{}
-	opt := WithGlobals([]string{"ctx", "print"})
-	err := opt(cfg1)
+	// Test that WithGlobals properly sets the globals field
+	globals := []string{"ctx", "print"}
+
+	cfg := &compilerConfig{}
+	opt := WithGlobals(globals)
+	err := opt(cfg)
+
 	require.NoError(t, err)
+	require.Equal(t, globals, cfg.Globals)
+}
 
-	// Check that options were set correctly
-	compOpts, ok := cfg1.GetCompilerOptions().(*RisorOptions)
-	require.True(t, ok, "Expected *RisorOptions")
-	require.Equal(t, []string{"ctx", "print"}, compOpts.GetGlobals())
+func TestWithLogHandler(t *testing.T) {
+	// Test that WithLogHandler properly sets the handler field
+	var buf bytes.Buffer
+	handler := slog.NewTextHandler(&buf, nil)
 
-	// Test with explicit Risor machine type
-	cfg2 := &options.Config{}
-	cfg2.SetMachineType(types.Risor)
-	err = opt(cfg2)
+	cfg := &compilerConfig{}
+	opt := WithLogHandler(handler)
+	err := opt(cfg)
+
 	require.NoError(t, err)
+	require.Equal(t, handler, cfg.LogHandler)
+	require.Nil(t, cfg.Logger) // Should clear Logger field
 
-	// Test with wrong machine type
-	cfg3 := &options.Config{}
-	cfg3.SetMachineType(types.Starlark)
-	err = opt(cfg3)
+	// Test with nil handler
+	nilOpt := WithLogHandler(nil)
+	err = nilOpt(cfg)
+
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "can only be used with Risor machine")
+	require.Contains(t, err.Error(), "log handler cannot be nil")
+}
+
+func TestWithLogger(t *testing.T) {
+	// Test that WithLogger properly sets the logger field
+	var buf bytes.Buffer
+	handler := slog.NewTextHandler(&buf, nil)
+	logger := slog.New(handler)
+
+	cfg := &compilerConfig{}
+	opt := WithLogger(logger)
+	err := opt(cfg)
+
+	require.NoError(t, err)
+	require.Equal(t, logger, cfg.Logger)
+	require.Nil(t, cfg.LogHandler) // Should clear LogHandler field
+
+	// Test with nil logger
+	nilOpt := WithLogger(nil)
+	err = nilOpt(cfg)
+
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "logger cannot be nil")
+}
+
+func TestApplyDefaults(t *testing.T) {
+	// Test that defaults are properly applied to an empty config
+	cfg := &compilerConfig{}
+	applyDefaults(cfg)
+
+	require.NotNil(t, cfg.LogHandler)
+	require.Nil(t, cfg.Logger)
+	require.NotNil(t, cfg.Globals)
+	require.Empty(t, cfg.Globals)
+}
+
+func TestValidate(t *testing.T) {
+	// Test validation with empty config
+	cfg := &compilerConfig{}
+	applyDefaults(cfg)
+
+	err := validate(cfg)
+	require.NoError(t, err)
+
+	// Test validation with manually cleared logger and handler
+	cfg.LogHandler = nil
+	cfg.Logger = nil
+
+	err = validate(cfg)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "either log handler or logger must be specified")
 }

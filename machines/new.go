@@ -16,7 +16,7 @@ import (
 	machineTypes "github.com/robbyt/go-polyscript/machines/types"
 )
 
-// NewEvaluator creates a new VM with the given CPU type and globals
+// NewEvaluator creates a new VM with the given CPU type and globals.
 // This will load a script from a ExecutableUnit object into the VM, and can be run immediately.
 // The ExecutableUnit contains a DataProvider that provides runtime data for evaluation.
 func NewEvaluator(handler slog.Handler, ver *script.ExecutableUnit) (engine.Evaluator, error) {
@@ -39,31 +39,32 @@ func NewEvaluator(handler slog.Handler, ver *script.ExecutableUnit) (engine.Eval
 	}
 }
 
-// NewCompiler creates a compiler for the specified machine type with given globals
-func NewCompiler(handler slog.Handler, machineType machineTypes.Type, compilerOptions any) (script.Compiler, error) {
-	switch machineType {
-	case machineTypes.Risor:
-		// Risor VM: https://github.com/risor-io/risor
-		risorOptions, ok := compilerOptions.(risorMachine.CompilerOptions)
-		if !ok {
-			return nil, fmt.Errorf("invalid compiler options for Risor machine, got %T", compilerOptions)
-		}
-		return risorMachine.NewCompiler(handler, risorOptions), nil
-	case machineTypes.Starlark:
-		// Starlark VM: https://github.com/google/starlark-go
-		starlarkOptions, ok := compilerOptions.(starlarkMachine.CompilerOptions)
-		if !ok {
-			return nil, fmt.Errorf("invalid compiler options for Starlark machine, got %T", compilerOptions)
-		}
-		return starlarkMachine.NewCompiler(handler, starlarkOptions), nil
-	case machineTypes.Extism:
-		// Extism WASM VM: https://extism.org/
-		extismOptions, ok := compilerOptions.(extismMachine.CompilerOptions)
-		if !ok {
-			return nil, fmt.Errorf("invalid compiler options for Extism machine, got %T", compilerOptions)
-		}
-		return extismMachine.NewCompiler(handler, extismOptions), nil
-	default:
-		return nil, fmt.Errorf("unsupported machine type: %s", machineType)
+// NewRisorCompiler creates a new Risor compiler using the functional options pattern.
+// See the risorMachine package for available options.
+func NewRisorCompiler(opts ...risorMachine.Option) (script.Compiler, error) {
+	compiler, err := risorMachine.NewCompiler(opts...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Risor compiler: %w", err)
 	}
+	return compiler, nil
+}
+
+// NewStarlarkCompiler creates a new Starlark compiler using the functional options pattern.
+// See the starlarkMachine package for available options.
+func NewStarlarkCompiler(opts ...starlarkMachine.Option) (script.Compiler, error) {
+	compiler, err := starlarkMachine.NewCompiler(opts...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Starlark compiler: %w", err)
+	}
+	return compiler, nil
+}
+
+// NewExtismCompiler creates a new Extism compiler using the functional options pattern.
+// See the extismMachine package for available options.
+func NewExtismCompiler(opts ...extismMachine.Option) (script.Compiler, error) {
+	compiler, err := extismMachine.NewCompiler(opts...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Extism compiler: %w", err)
+	}
+	return compiler, nil
 }

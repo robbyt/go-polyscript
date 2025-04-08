@@ -16,7 +16,7 @@ import (
 	machineTypes "github.com/robbyt/go-polyscript/machines/types"
 )
 
-// NewEvaluator creates a new VM with the given CPU type and globals
+// NewEvaluator creates a new VM with the given CPU type and globals.
 // This will load a script from a ExecutableUnit object into the VM, and can be run immediately.
 // The ExecutableUnit contains a DataProvider that provides runtime data for evaluation.
 func NewEvaluator(handler slog.Handler, ver *script.ExecutableUnit) (engine.Evaluator, error) {
@@ -35,19 +35,14 @@ func NewEvaluator(handler slog.Handler, ver *script.ExecutableUnit) (engine.Eval
 	}
 }
 
-// NewCompiler creates a compiler for the specified machine type with given globals
-func NewCompiler(handler slog.Handler, machineType machineTypes.Type, compilerOptions any) (script.Compiler, error) {
-    switch machineType {
-    {{- range .Types}}
-    case machineTypes.{{.Name}}:
-        // {{.Description}}
-        {{.Value}}Options, ok := compilerOptions.({{.Value}}Machine.CompilerOptions)
-        if !ok {
-            return nil, fmt.Errorf("invalid compiler options for {{.Name}} machine, got %T", compilerOptions)
-        }
-        return {{.Value}}Machine.NewCompiler(handler, {{.Value}}Options), nil
-    {{- end}}
-    default:
-        return nil, fmt.Errorf("unsupported machine type: %s", machineType)
-    }
+{{range .Types}}
+// New{{.Name}}Compiler creates a new {{.Name}} compiler using the functional options pattern.
+// See the {{.Value}}Machine package for available options.
+func New{{.Name}}Compiler(opts ...{{.Value}}Machine.Option) (script.Compiler, error) {
+	compiler, err := {{.Value}}Machine.NewCompiler(opts...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create {{.Name}} compiler: %w", err)
+	}
+	return compiler, nil
 }
+{{end}}

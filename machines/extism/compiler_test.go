@@ -14,15 +14,20 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"github.com/tetratelabs/wazero"
 )
 
-// defaultCompilerOptions is a simple implementation of CompilerOptions for tests
-type defaultCompilerOptions struct {
-	entryPointName string
-}
+// createTestCompiler creates a compiler with the given entry point for testing
+func createTestCompiler(t *testing.T, entryPoint string) *Compiler {
+	t.Helper()
 
-func (o *defaultCompilerOptions) GetEntryPointName() string {
-	return o.entryPointName
+	comp, err := NewCompiler(
+		WithEntryPoint(entryPoint),
+		WithLogHandler(slog.NewTextHandler(os.Stdout, nil)),
+	)
+	require.NoError(t, err)
+	require.NotNil(t, comp)
+	return comp
 }
 
 // mockScriptReaderCloser implements io.ReadCloser for testing
@@ -61,11 +66,8 @@ func TestCompiler(t *testing.T) {
 		wasmBytes := readTestWasm(t)
 		entryPoint := "greet"
 
-		// Create compiler
-		compilerOptions := &defaultCompilerOptions{entryPointName: "main"}
-		handler := slog.NewTextHandler(os.Stdout, nil)
-		comp := NewCompiler(handler, compilerOptions)
-		comp.SetEntryPointName(entryPoint)
+		// Create compiler using functional options
+		comp := createTestCompiler(t, entryPoint)
 
 		// Create mock reader with content
 		reader := newMockScriptReaderCloser(wasmBytes)
@@ -122,11 +124,8 @@ func TestCompiler(t *testing.T) {
 		wasmBytes := readTestWasm(t)
 		entryPoint := "process_complex"
 
-		// Create compiler
-		compilerOptions := &defaultCompilerOptions{entryPointName: "main"}
-		handler := slog.NewTextHandler(os.Stdout, nil)
-		comp := NewCompiler(handler, compilerOptions)
-		comp.SetEntryPointName(entryPoint)
+		// Create compiler using functional options
+		comp := createTestCompiler(t, entryPoint)
 
 		// Create mock reader with content
 		reader := newMockScriptReaderCloser(wasmBytes)
@@ -173,11 +172,14 @@ func TestCompiler(t *testing.T) {
 		wasmBytes := readTestWasm(t)
 		entryPoint := "greet"
 
-		// Create compiler
-		compilerOptions := &defaultCompilerOptions{entryPointName: "main"}
-		handler := slog.NewTextHandler(os.Stdout, nil)
-		comp := NewCompiler(handler, compilerOptions)
-		comp.SetEntryPointName(entryPoint)
+		// Create compiler with custom runtime config
+		comp, err := NewCompiler(
+			WithEntryPoint(entryPoint),
+			WithLogHandler(slog.NewTextHandler(os.Stdout, nil)),
+			WithRuntimeConfig(wazero.NewRuntimeConfig()),
+		)
+		require.NoError(t, err)
+		require.NotNil(t, comp)
 
 		// Create mock reader with content
 		reader := newMockScriptReaderCloser(wasmBytes)
@@ -206,10 +208,13 @@ func TestCompiler(t *testing.T) {
 	t.Run("nil content", func(t *testing.T) {
 		t.Parallel()
 
-		// Create compiler
-		compilerOptions := &defaultCompilerOptions{entryPointName: "main"}
-		handler := slog.NewTextHandler(os.Stdout, nil)
-		comp := NewCompiler(handler, compilerOptions)
+		// Create compiler using functional options
+		comp, err := NewCompiler(
+			WithEntryPoint("main"),
+			WithLogHandler(slog.NewTextHandler(os.Stdout, nil)),
+		)
+		require.NoError(t, err)
+		require.NotNil(t, comp)
 
 		// Compile with nil reader
 		execContent, err := comp.Compile(nil)
@@ -222,10 +227,13 @@ func TestCompiler(t *testing.T) {
 	t.Run("empty content", func(t *testing.T) {
 		t.Parallel()
 
-		// Create compiler
-		compilerOptions := &defaultCompilerOptions{entryPointName: "main"}
-		handler := slog.NewTextHandler(os.Stdout, nil)
-		comp := NewCompiler(handler, compilerOptions)
+		// Create compiler using functional options
+		comp, err := NewCompiler(
+			WithEntryPoint("main"),
+			WithLogHandler(slog.NewTextHandler(os.Stdout, nil)),
+		)
+		require.NoError(t, err)
+		require.NotNil(t, comp)
 
 		// Create empty reader
 		reader := newMockScriptReaderCloser([]byte{})
@@ -245,10 +253,13 @@ func TestCompiler(t *testing.T) {
 	t.Run("invalid wasm binary", func(t *testing.T) {
 		t.Parallel()
 
-		// Create compiler
-		compilerOptions := &defaultCompilerOptions{entryPointName: "main"}
-		handler := slog.NewTextHandler(os.Stdout, nil)
-		comp := NewCompiler(handler, compilerOptions)
+		// Create compiler using functional options
+		comp, err := NewCompiler(
+			WithEntryPoint("main"),
+			WithLogHandler(slog.NewTextHandler(os.Stdout, nil)),
+		)
+		require.NoError(t, err)
+		require.NotNil(t, comp)
 
 		// Create reader with invalid content
 		reader := newMockScriptReaderCloser([]byte("not-wasm"))
@@ -269,11 +280,13 @@ func TestCompiler(t *testing.T) {
 		t.Parallel()
 		wasmBytes := readTestWasm(t)
 
-		// Create compiler
-		compilerOptions := &defaultCompilerOptions{entryPointName: "main"}
-		handler := slog.NewTextHandler(os.Stdout, nil)
-		comp := NewCompiler(handler, compilerOptions)
-		comp.SetEntryPointName("nonexistent_function")
+		// Create compiler with non-existent function
+		comp, err := NewCompiler(
+			WithEntryPoint("nonexistent_function"),
+			WithLogHandler(slog.NewTextHandler(os.Stdout, nil)),
+		)
+		require.NoError(t, err)
+		require.NotNil(t, comp)
 
 		// Create mock reader with content
 		reader := newMockScriptReaderCloser(wasmBytes)

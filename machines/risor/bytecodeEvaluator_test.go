@@ -101,12 +101,10 @@ handle(ctx["request"])
 	ld, err := loader.NewFromString(scriptContent)
 	require.NoError(t, err)
 
-	opt := &RisorOptions{Globals: []string{constants.Ctx}}
-
 	// Create a context provider to use with our test context
 	ctxProvider := data.NewContextProvider(constants.EvalData)
 
-	exe, err := createTestExecutable(handler, ld, opt, ctxProvider)
+	exe, err := createTestExecutable(handler, ld, []string{constants.Ctx}, ctxProvider)
 	require.NoError(t, err)
 
 	evaluator := NewBytecodeEvaluator(handler, exe)
@@ -489,10 +487,17 @@ func TestNewBytecodeEvaluator(t *testing.T) {
 func createTestExecutable(
 	handler slog.Handler,
 	ld loader.Loader,
-	opt *RisorOptions,
+	globals []string,
 	provider data.Provider,
 ) (*script.ExecutableUnit, error) {
-	compiler := NewCompiler(handler, opt)
+	compiler, err := NewCompiler(
+		WithLogHandler(handler),
+		WithGlobals(globals),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create compiler: %w", err)
+	}
+
 	reader, err := ld.GetReader()
 	if err != nil {
 		return nil, err

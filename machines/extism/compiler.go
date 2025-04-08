@@ -23,30 +23,55 @@ type Compiler struct {
 	logger         *slog.Logger
 }
 
-type CompilerOptions interface {
-	GetEntryPointName() string
-}
+// NewCompiler creates a new Extism WASM Compiler instance with the provided options.
+func NewCompiler(opts ...Option) (*Compiler, error) {
+	// Initialize config with defaults
+	cfg := &compilerConfig{}
+	applyDefaults(cfg)
 
-// NewCompiler creates a new Extism WASM Compiler instance. External config of the compiler not
-// currently supported.
-func NewCompiler(handler slog.Handler, compilerOptions CompilerOptions) *Compiler {
-	handler, logger := helpers.SetupLogger(handler, "extism", "Compiler")
-
-	entryPointName := compilerOptions.GetEntryPointName()
-	if entryPointName == "" {
-		entryPointName = defaultEntryPoint
+	// Apply all options
+	for _, opt := range opts {
+		if err := opt(cfg); err != nil {
+			return nil, fmt.Errorf("error applying compiler option: %w", err)
+		}
 	}
 
-	var funcName atomic.Value
-	funcName.Store(entryPointName)
+	// Validate the configuration
+	if err := validate(cfg); err != nil {
+		return nil, fmt.Errorf("invalid compiler configuration: %w", err)
+	}
+
+	var handler slog.Handler
+	var logger *slog.Logger
+
+	// Set up logging based on provided options
+	if cfg.Logger != nil {
+		// User provided a custom logger
+		logger = cfg.Logger
+		handler = logger.Handler()
+	} else {
+		// User provided a handler or we're using the default
+		handler, logger = helpers.SetupLogger(cfg.LogHandler, "extism", "Compiler")
+	}
+
+	// Set up entry point name in atomic.Value
+	var entryPointAtomicValue atomic.Value
+	entryPointAtomicValue.Store(cfg.EntryPoint)
+
+	// Create compile options from config
+	compileOpts := &compileOptions{
+		EnableWASI:    cfg.EnableWASI,
+		RuntimeConfig: cfg.RuntimeConfig,
+		HostFunctions: cfg.HostFunctions,
+	}
 
 	return &Compiler{
-		entryPointName: funcName,
+		entryPointName: entryPointAtomicValue,
 		ctx:            context.Background(),
-		options:        withDefaultCompileOptions(),
+		options:        compileOpts,
 		logHandler:     handler,
 		logger:         logger,
-	}
+	}, nil
 }
 
 func (c *Compiler) String() string {

@@ -45,11 +45,18 @@ _ = request_handler(ctx.get("request"))
 		// Create a context provider to use with our test context
 		ctxProvider := data.NewContextProvider(constants.EvalData)
 
+		// Create compiler with options
+		compiler, err := NewCompiler(
+			WithLogHandler(handler),
+			WithCtxGlobal(),
+		)
+		require.NoError(t, err, "Failed to create compiler")
+
 		exe, err := script.NewExecutableUnit(
 			handler,
 			scriptContent,
 			loader,
-			NewCompiler(handler, &StarlarkOptions{Globals: []string{constants.Ctx}}),
+			compiler,
 			ctxProvider,
 		)
 		require.NoError(t, err, "Failed to create new version")
