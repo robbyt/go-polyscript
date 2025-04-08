@@ -39,6 +39,73 @@ func NewEvaluator(handler slog.Handler, ver *script.ExecutableUnit) (engine.Eval
 	}
 }
 
+// NewCompiler creates a compiler based on the option types.
+// It determines which compiler to use by checking the types of the provided options.
+func NewCompiler(opts ...any) (script.Compiler, error) {
+	if len(opts) == 0 {
+		return nil, fmt.Errorf("no options provided")
+	}
+
+	// Check for Risor options
+	{
+		var risorOpts []risorMachine.Option
+		allMatch := true
+
+		for _, opt := range opts {
+			if o, ok := opt.(risorMachine.Option); ok {
+				risorOpts = append(risorOpts, o)
+			} else {
+				allMatch = false
+				break
+			}
+		}
+
+		if allMatch && len(risorOpts) > 0 {
+			return NewRisorCompiler(risorOpts...)
+		}
+	}
+
+	// Check for Starlark options
+	{
+		var starlarkOpts []starlarkMachine.Option
+		allMatch := true
+
+		for _, opt := range opts {
+			if o, ok := opt.(starlarkMachine.Option); ok {
+				starlarkOpts = append(starlarkOpts, o)
+			} else {
+				allMatch = false
+				break
+			}
+		}
+
+		if allMatch && len(starlarkOpts) > 0 {
+			return NewStarlarkCompiler(starlarkOpts...)
+		}
+	}
+
+	// Check for Extism options
+	{
+		var extismOpts []extismMachine.Option
+		allMatch := true
+
+		for _, opt := range opts {
+			if o, ok := opt.(extismMachine.Option); ok {
+				extismOpts = append(extismOpts, o)
+			} else {
+				allMatch = false
+				break
+			}
+		}
+
+		if allMatch && len(extismOpts) > 0 {
+			return NewExtismCompiler(extismOpts...)
+		}
+	}
+
+	return nil, fmt.Errorf("unable to determine compiler type from provided options")
+}
+
 // NewRisorCompiler creates a new Risor compiler using the functional options pattern.
 // See the risorMachine package for available options.
 func NewRisorCompiler(opts ...risorMachine.Option) (script.Compiler, error) {

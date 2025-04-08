@@ -35,6 +35,37 @@ func NewEvaluator(handler slog.Handler, ver *script.ExecutableUnit) (engine.Eval
 	}
 }
 
+// NewCompiler creates a compiler based on the option types.
+// It determines which compiler to use by checking the types of the provided options.
+func NewCompiler(opts ...any) (script.Compiler, error) {
+	if len(opts) == 0 {
+		return nil, fmt.Errorf("no options provided")
+	}
+
+	{{range .Types}}
+	// Check for {{.Name}} options
+	{
+		var {{.Value}}Opts []{{.Value}}Machine.Option
+		allMatch := true
+
+		for _, opt := range opts {
+			if o, ok := opt.({{.Value}}Machine.Option); ok {
+				{{.Value}}Opts = append({{.Value}}Opts, o)
+			} else {
+				allMatch = false
+				break
+			}
+		}
+
+		if allMatch && len({{.Value}}Opts) > 0 {
+			return New{{.Name}}Compiler({{.Value}}Opts...)
+		}
+	}
+	{{end}}
+
+	return nil, fmt.Errorf("unable to determine compiler type from provided options")
+}
+
 {{range .Types}}
 // New{{.Name}}Compiler creates a new {{.Name}} compiler using the functional options pattern.
 // See the {{.Value}}Machine package for available options.

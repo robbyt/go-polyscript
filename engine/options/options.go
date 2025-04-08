@@ -7,9 +7,6 @@ import (
 
 	"github.com/robbyt/go-polyscript/execution/data"
 	"github.com/robbyt/go-polyscript/execution/script/loader"
-	extismMachine "github.com/robbyt/go-polyscript/machines/extism"
-	risorMachine "github.com/robbyt/go-polyscript/machines/risor"
-	starlarkMachine "github.com/robbyt/go-polyscript/machines/starlark"
 	"github.com/robbyt/go-polyscript/machines/types"
 )
 
@@ -127,49 +124,13 @@ func (c *Config) SetLoader(l loader.Loader) {
 	c.loader = l
 }
 
-// Wrapper functions for machine-specific options
+// Type Conversion Helpers (used internally, not part of the public API)
+// These functions help polyscript.go handle the correct conversion between engine options and machine options
 
-// WithExtismOptions converts Extism-specific options to engine options
-func WithExtismOptions(opts ...extismMachine.Option) Option {
-	return func(c *Config) error {
-		// Store the options for later use by createExtismEvaluator
-		// The specific handling is done in polyscript.go
-		return nil
-	}
-}
-
-// WithRisorOptions converts Risor-specific options to engine options
-func WithRisorOptions(opts ...risorMachine.Option) Option {
-	return func(c *Config) error {
-		// Store the options for later use by createRisorEvaluator
-		// The specific handling is done in polyscript.go
-		return nil
-	}
-}
-
-// WithStarlarkOptions converts Starlark-specific options to engine options
-func WithStarlarkOptions(opts ...starlarkMachine.Option) Option {
-	return func(c *Config) error {
-		// Store the options for later use by createStarlarkEvaluator
-		// The specific handling is done in polyscript.go
-		return nil
-	}
-}
-
-// Convenience wrappers for common machine-specific options
-
-// WithExtismEntryPoint sets the entry point for Extism
-func WithExtismEntryPoint(entryPoint string) Option {
-	return WithExtismOptions(extismMachine.WithEntryPoint(entryPoint))
-}
-
-// WithRisorGlobals sets globals for Risor
-func WithRisorGlobals(globals []string) Option {
-	return WithRisorOptions(risorMachine.WithGlobals(globals))
-}
-
-// WithStarlarkGlobals sets globals for Starlark
-func WithStarlarkGlobals(globals []string) Option {
-	return WithStarlarkOptions(starlarkMachine.WithGlobals(globals))
-}
-
+// This file no longer contains machine-specific option wrappers.
+// Machine-specific options should be used directly from their respective packages:
+// - extismMachine.WithEntryPoint()
+// - risorMachine.WithGlobals()
+// - risorMachine.WithCtxGlobal()
+// - starlarkMachine.WithGlobals()
+// - starlarkMachine.WithCtxGlobal()
