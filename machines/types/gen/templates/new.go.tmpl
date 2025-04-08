@@ -11,6 +11,7 @@ import (
 	"github.com/robbyt/go-polyscript/execution/script"
 {{- range .Types}}
 	{{.Value}}Machine "github.com/robbyt/go-polyscript/machines/{{.Value}}"
+	{{.Value}}Compiler "github.com/robbyt/go-polyscript/machines/{{.Value}}/compiler"
 {{- end}}
 	
 	machineTypes "github.com/robbyt/go-polyscript/machines/types"
@@ -45,11 +46,11 @@ func NewCompiler(opts ...any) (script.Compiler, error) {
 	{{range .Types}}
 	// Check for {{.Name}} options
 	{
-		var {{.Value}}Opts []{{.Value}}Machine.CompilerOption
+		var {{.Value}}Opts []{{.Value}}Compiler.FunctionalOption
 		allMatch := true
 
 		for _, opt := range opts {
-			if o, ok := opt.({{.Value}}Machine.CompilerOption); ok {
+			if o, ok := opt.({{.Value}}Compiler.FunctionalOption); ok {
 				{{.Value}}Opts = append({{.Value}}Opts, o)
 			} else {
 				allMatch = false
@@ -69,7 +70,7 @@ func NewCompiler(opts ...any) (script.Compiler, error) {
 {{range .Types}}
 // New{{.Name}}Compiler creates a new {{.Name}} compiler using the functional options pattern.
 // See the {{.Value}}Machine package for available compiler options.
-func New{{.Name}}Compiler(opts ...{{.Value}}Machine.CompilerOption) (script.Compiler, error) {
+func New{{.Name}}Compiler(opts ...{{.Value}}Compiler.FunctionalOption) (script.Compiler, error) {
 	compiler, err := {{.Value}}Machine.NewCompiler(opts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create {{.Name}} compiler: %w", err)

@@ -12,7 +12,7 @@ import (
 	"github.com/robbyt/go-polyscript/engine/options"
 	"github.com/robbyt/go-polyscript/execution/constants"
 	"github.com/robbyt/go-polyscript/execution/data"
-	"github.com/robbyt/go-polyscript/machines/risor"
+	risorCompiler "github.com/robbyt/go-polyscript/machines/risor/compiler"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -32,7 +32,7 @@ method + " " + greeting
 `,
 		options.WithLogHandler(handler),
 		options.WithDataProvider(provider),
-		risor.WithGlobals([]string{constants.Ctx}),
+		risorCompiler.WithGlobals([]string{constants.Ctx}),
 	)
 	require.NoError(t, err)
 	require.NotNil(t, evaluator)
@@ -86,7 +86,7 @@ func TestEvaluatorWithPrepErrors(t *testing.T) {
 	evaluator, err := polyscript.FromRisorString(`ctx["static"]`,
 		options.WithLogHandler(handler),
 		options.WithDataProvider(staticProvider),
-		risor.WithGlobals([]string{constants.Ctx}),
+		risorCompiler.WithGlobals([]string{constants.Ctx}),
 	)
 	require.NoError(t, err)
 
@@ -108,7 +108,7 @@ func TestEvaluatorWithPrepErrors(t *testing.T) {
 	evaluator, err = polyscript.FromRisorString(`ctx["request"]["ID"] || "no id"`,
 		options.WithLogHandler(handler),
 		options.WithDataProvider(contextProvider),
-		risor.WithGlobals([]string{constants.Ctx}),
+		risorCompiler.WithGlobals([]string{constants.Ctx}),
 	)
 	require.NoError(t, err)
 

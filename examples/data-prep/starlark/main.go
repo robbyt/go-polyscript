@@ -15,7 +15,7 @@ import (
 	"github.com/robbyt/go-polyscript/engine/options"
 	"github.com/robbyt/go-polyscript/execution/constants"
 	"github.com/robbyt/go-polyscript/execution/data"
-	"github.com/robbyt/go-polyscript/machines/starlark"
+	"github.com/robbyt/go-polyscript/machines/starlark/compiler"
 )
 
 // StarlarkEvaluator is a type alias to make testing cleaner
@@ -49,7 +49,7 @@ func createStarlarkEvaluator(
 		options.WithDefaults(),
 		options.WithLogHandler(logger.Handler()),
 		options.WithDataProvider(compositeProvider),
-		starlark.WithGlobals(globals),
+		compiler.WithGlobals(globals),
 	)
 }
 

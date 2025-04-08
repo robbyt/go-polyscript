@@ -34,8 +34,8 @@ import (
 	"github.com/robbyt/go-polyscript/engine/options"
 	"github.com/robbyt/go-polyscript/execution/constants"
 	"github.com/robbyt/go-polyscript/execution/data"
-	"github.com/robbyt/go-polyscript/machines/risor"
-	"github.com/robbyt/go-polyscript/machines/starlark"
+	risorCompiler "github.com/robbyt/go-polyscript/machines/risor/compiler"
+	starlarkCompiler "github.com/robbyt/go-polyscript/machines/starlark/compiler"
 )
 
 // quietHandler is a slog.Handler that discards all logs
@@ -71,7 +71,7 @@ func BenchmarkEvaluationPatterns(b *testing.B) {
 				options.WithDefaults(),
 				options.WithDataProvider(dataProvider),
 				options.WithLogHandler(quietHandler),
-				risor.WithGlobals([]string{constants.Ctx}),
+				risorCompiler.WithGlobals([]string{constants.Ctx}),
 			)
 			if err != nil {
 				b.Fatalf("Failed to create evaluator: %v", err)
@@ -95,7 +95,7 @@ func BenchmarkEvaluationPatterns(b *testing.B) {
 			options.WithDefaults(),
 			options.WithDataProvider(dataProvider),
 			options.WithLogHandler(quietHandler),
-			risor.WithGlobals([]string{constants.Ctx}),
+			risorCompiler.WithGlobals([]string{constants.Ctx}),
 		)
 		if err != nil {
 			b.Fatalf("Failed to create evaluator: %v", err)
@@ -139,7 +139,7 @@ func BenchmarkDataProviders(b *testing.B) {
 			options.WithDefaults(),
 			options.WithDataProvider(dataProvider),
 			options.WithLogHandler(quietHandler),
-			risor.WithGlobals([]string{constants.Ctx}),
+			risorCompiler.WithGlobals([]string{constants.Ctx}),
 		)
 		if err != nil {
 			b.Fatalf("Failed to create evaluator: %v", err)
@@ -161,7 +161,7 @@ func BenchmarkDataProviders(b *testing.B) {
 			options.WithDefaults(),
 			options.WithDataProvider(dataProvider),
 			options.WithLogHandler(quietHandler),
-			risor.WithGlobals([]string{constants.Ctx}),
+			risorCompiler.WithGlobals([]string{constants.Ctx}),
 		)
 		if err != nil {
 			b.Fatalf("Failed to create evaluator: %v", err)
@@ -188,7 +188,7 @@ func BenchmarkDataProviders(b *testing.B) {
 			options.WithDefaults(),
 			options.WithDataProvider(compositeProvider),
 			options.WithLogHandler(quietHandler),
-			risor.WithGlobals([]string{constants.Ctx}),
+			risorCompiler.WithGlobals([]string{constants.Ctx}),
 		)
 		if err != nil {
 			b.Fatalf("Failed to create evaluator: %v", err)
@@ -245,7 +245,7 @@ message = "Hello, " + name + "!"
 			options.WithDefaults(),
 			options.WithDataProvider(staticProvider),
 			options.WithLogHandler(quietHandler),
-			risor.WithGlobals([]string{constants.Ctx}),
+			risorCompiler.WithGlobals([]string{constants.Ctx}),
 		)
 		if err != nil {
 			b.Fatalf("Failed to create Risor evaluator: %v", err)
@@ -266,7 +266,7 @@ message = "Hello, " + name + "!"
 			options.WithDefaults(),
 			options.WithDataProvider(staticProvider),
 			options.WithLogHandler(quietHandler),
-			starlark.WithGlobals([]string{constants.Ctx}),
+			starlarkCompiler.WithGlobals([]string{constants.Ctx}),
 		)
 		if err != nil {
 			b.Fatalf("Failed to create Starlark evaluator: %v", err)

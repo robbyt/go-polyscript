@@ -11,7 +11,7 @@ import (
 	"github.com/robbyt/go-polyscript/engine/options"
 	"github.com/robbyt/go-polyscript/execution/constants"
 	"github.com/robbyt/go-polyscript/execution/data"
-	"github.com/robbyt/go-polyscript/machines/starlark"
+	"github.com/robbyt/go-polyscript/machines/starlark/compiler"
 )
 
 //go:embed testdata/script.star
@@ -39,7 +39,7 @@ func runStarlarkExample(handler slog.Handler) (map[string]any, error) {
 		options.WithDefaults(),
 		options.WithLogHandler(handler),
 		options.WithDataProvider(dataProvider),
-		starlark.WithGlobals(globals),
+		compiler.WithGlobals(globals),
 	)
 	if err != nil {
 		logger.Error("Failed to create evaluator", "error", err)

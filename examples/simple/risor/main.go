@@ -11,7 +11,7 @@ import (
 	"github.com/robbyt/go-polyscript/engine/options"
 	"github.com/robbyt/go-polyscript/execution/constants"
 	"github.com/robbyt/go-polyscript/execution/data"
-	"github.com/robbyt/go-polyscript/machines/risor"
+	"github.com/robbyt/go-polyscript/machines/risor/compiler"
 )
 
 //go:embed testdata/script.risor
@@ -39,7 +39,7 @@ func runRisorExample(handler slog.Handler) (map[string]any, error) {
 		options.WithDefaults(), // Add defaults option to ensure all required fields are set
 		options.WithLogHandler(handler),
 		options.WithDataProvider(dataProvider),
-		risor.WithGlobals(globals),
+		compiler.WithGlobals(globals),
 	)
 	if err != nil {
 		logger.Error("Failed to create evaluator", "error", err)
