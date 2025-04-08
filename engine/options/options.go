@@ -123,14 +123,3 @@ func (c *Config) GetLoader() loader.Loader {
 func (c *Config) SetLoader(l loader.Loader) {
 	c.loader = l
 }
-
-// Type Conversion Helpers (used internally, not part of the public API)
-// These functions help polyscript.go handle the correct conversion between engine options and machine options
-
-// This file no longer contains machine-specific option wrappers.
-// Machine-specific options should be used directly from their respective packages:
-// - extismMachine.WithEntryPoint()
-// - risorMachine.WithGlobals()
-// - risorMachine.WithCtxGlobal()
-// - starlarkMachine.WithGlobals()
-// - starlarkMachine.WithCtxGlobal()

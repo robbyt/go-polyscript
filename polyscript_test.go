@@ -45,10 +45,10 @@ func withCompositeProvider(staticData map[string]any) any {
 
 // Create a mock evaluator response
 type mockResponse struct {
-	value interface{}
+	value any
 }
 
-func (m mockResponse) Interface() interface{} {
+func (m mockResponse) Interface() any {
 	return m.value
 }
 

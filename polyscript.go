@@ -233,7 +233,7 @@ func fromFileLoader(
 func fromStringLoader(
 	machineType types.Type,
 	content string,
-	opts ...interface{},
+	opts ...any,
 ) (engine.EvaluatorWithPrep, error) {
 	if machineType == types.Extism {
 		return nil, fmt.Errorf("extism does not currently support string loaders")
