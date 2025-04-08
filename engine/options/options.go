@@ -20,8 +20,6 @@ type Config struct {
 	dataProvider data.Provider
 	// Loader for the script content
 	loader loader.Loader
-	// Machine-specific options
-	compilerOptions any
 }
 
 // Option is a function that modifies Config
@@ -121,12 +119,7 @@ func (c *Config) GetLoader() loader.Loader {
 	return c.loader
 }
 
-// GetCompilerOptions returns the machine-specific compiler options
-func (c *Config) GetCompilerOptions() any {
-	return c.compilerOptions
-}
-
-// SetCompilerOptions sets the machine-specific compiler options
-func (c *Config) SetCompilerOptions(options any) {
-	c.compilerOptions = options
+// SetLoader sets the loader
+func (c *Config) SetLoader(l loader.Loader) {
+	c.loader = l
 }

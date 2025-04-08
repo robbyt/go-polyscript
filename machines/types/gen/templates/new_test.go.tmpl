@@ -9,6 +9,9 @@ import (
 
 	"github.com/robbyt/go-polyscript/execution/data"
 	"github.com/robbyt/go-polyscript/execution/script"
+{{- range .Types}}
+	{{.Value}}Machine "github.com/robbyt/go-polyscript/machines/{{.Value}}"
+{{- end}}
 	machineTypes "github.com/robbyt/go-polyscript/machines/types"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -65,6 +68,16 @@ func TestNewEvaluator(t *testing.T) {
 		})
 	}
 }
+
+{{range .Types}}
+func TestNew{{.Name}}Compiler(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		compiler, err := New{{.Name}}Compiler({{.Value}}Machine.WithLogHandler(slog.NewTextHandler(os.Stdout, nil)))
+		require.NoError(t, err)
+		require.NotNil(t, compiler)
+	})
+}
+{{end}}
 
 type mockExecutableContent struct {
 	mock.Mock

@@ -35,12 +35,20 @@ func getLogger() slog.Handler {
 	return slog.NewTextHandler(os.Stdout, nil)
 }
 
-// Create a mock evaluator response
-type mockResponse struct {
-	value interface{}
+// withCompositeProvider creates a composite provider with static data
+func withCompositeProvider(staticData map[string]any) any {
+	return options.WithDataProvider(data.NewCompositeProvider(
+		data.NewStaticProvider(staticData),
+		data.NewContextProvider(constants.Ctx),
+	))
 }
 
-func (m mockResponse) Interface() interface{} {
+// Create a mock evaluator response
+type mockResponse struct {
+	value any
+}
+
+func (m mockResponse) Interface() any {
 	return m.value
 }
 
@@ -142,16 +150,16 @@ func TestMachineEvaluators(t *testing.T) {
 		name        string
 		content     string
 		machineType types.Type
-		creator     func(opts ...options.Option) (engine.EvaluatorWithPrep, error)
-		options     []options.Option
+		creator     func(opts ...any) (engine.EvaluatorWithPrep, error)
+		options     []any
 	}{
 		{
 			name:        "NewStarlarkEvaluator",
 			content:     `print("Hello, World!")`,
 			machineType: types.Starlark,
 			creator:     NewStarlarkEvaluator,
-			options: []options.Option{
-				starlark.WithGlobals([]string{"ctx"}),
+			options: []any{
+				options.WithDefaults(),
 			},
 		},
 		{
@@ -159,8 +167,8 @@ func TestMachineEvaluators(t *testing.T) {
 			content:     `print("Hello, World!")`,
 			machineType: types.Risor,
 			creator:     NewRisorEvaluator,
-			options: []options.Option{
-				risor.WithGlobals([]string{"ctx"}),
+			options: []any{
+				options.WithDefaults(),
 			},
 		},
 	}
@@ -176,7 +184,7 @@ func TestMachineEvaluators(t *testing.T) {
 
 			// Combine options with loader
 			opts := append(
-				[]options.Option{
+				[]any{
 					options.WithLoader(l),
 					options.WithLogHandler(getLogger()),
 				},
@@ -197,42 +205,40 @@ func TestNewEvaluator(t *testing.T) {
 	tests := []struct {
 		name        string
 		machineType types.Type
-		options     []options.Option
+		options     []any
 		expectError bool
 		errorMsg    string
 	}{
 		{
 			name:        "Valid Starlark",
 			machineType: types.Starlark,
-			options: []options.Option{
+			options: []any{
 				options.WithLoader(func() loader.Loader {
 					l, err := loader.NewFromString("print('test')")
 					require.NoError(t, err)
 					return l
 				}()),
 				options.WithLogHandler(getLogger()),
-				starlark.WithGlobals([]string{"ctx"}),
 			},
 			expectError: false,
 		},
 		{
 			name:        "Valid Risor",
 			machineType: types.Risor,
-			options: []options.Option{
+			options: []any{
 				options.WithLoader(func() loader.Loader {
 					l, err := loader.NewFromString("print('test')")
 					require.NoError(t, err)
 					return l
 				}()),
 				options.WithLogHandler(getLogger()),
-				risor.WithGlobals([]string{"ctx"}),
 			},
 			expectError: false,
 		},
 		{
 			name:        "No Loader",
 			machineType: types.Starlark,
-			options: []options.Option{
+			options: []any{
 				options.WithLogHandler(getLogger()),
 			},
 			expectError: true,
@@ -241,7 +247,7 @@ func TestNewEvaluator(t *testing.T) {
 		{
 			name:        "Invalid Option",
 			machineType: types.Starlark,
-			options: []options.Option{
+			options: []any{
 				options.WithLoader(func() loader.Loader {
 					l, err := loader.NewFromString("print('test')")
 					require.NoError(t, err)
@@ -252,20 +258,19 @@ func TestNewEvaluator(t *testing.T) {
 				},
 			},
 			expectError: true,
-			errorMsg:    "error applying option: invalid option",
+			errorMsg:    "unsupported option type",
 		},
 		{
-			name:        "Incompatible Option",
+			name:        "Option Type Test",
 			machineType: types.Risor,
-			options: []options.Option{
+			options: []any{
 				options.WithLoader(func() loader.Loader {
 					l, err := loader.NewFromString("print('test')")
 					require.NoError(t, err)
 					return l
 				}()),
-				starlark.WithGlobals([]string{"ctx"}), // Starlark option with Risor
 			},
-			expectError: true,
+			expectError: false,
 		},
 	}
 
@@ -308,36 +313,36 @@ func TestFromStringLoaders(t *testing.T) {
 	tests := []struct {
 		name        string
 		content     string
-		creator     func(content string, opts ...options.Option) (engine.EvaluatorWithPrep, error)
-		options     []options.Option
+		creator     func(content string, opts ...any) (engine.EvaluatorWithPrep, error)
+		options     []any
 		expectError bool
 	}{
 		{
 			name:        "FromStarlarkString - Valid",
 			content:     `print("Hello, World!")`,
 			creator:     FromStarlarkString,
-			options:     []options.Option{starlark.WithGlobals([]string{"ctx"})},
+			options:     []any{starlark.WithGlobals([]string{"ctx"})},
 			expectError: false,
 		},
 		{
 			name:        "FromRisorString - Valid",
 			content:     `print("Hello, World!")`,
 			creator:     FromRisorString,
-			options:     []options.Option{risor.WithGlobals([]string{"ctx"})},
+			options:     []any{risor.WithGlobals([]string{"ctx"})},
 			expectError: false,
 		},
 		{
 			name:        "FromStarlarkString - Empty",
 			content:     "",
 			creator:     FromStarlarkString,
-			options:     []options.Option{},
+			options:     []any{},
 			expectError: true,
 		},
 		{
 			name:        "FromRisorString - Empty",
 			content:     "",
 			creator:     FromRisorString,
-			options:     []options.Option{},
+			options:     []any{},
 			expectError: true,
 		},
 	}
@@ -372,7 +377,7 @@ func TestFromStringLoaders(t *testing.T) {
 			},
 		)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "invalid option test")
+		assert.Contains(t, err.Error(), "unsupported option type")
 	})
 }
 
@@ -402,16 +407,16 @@ _ = result`
 
 	tests := []struct {
 		name        string
-		loaderFunc  func(string, ...options.Option) (engine.EvaluatorWithPrep, error)
+		loaderFunc  func(string, ...any) (engine.EvaluatorWithPrep, error)
 		filePath    string
-		options     []options.Option
+		options     []any
 		expectError bool
 	}{
 		{
 			name:       "FromExtismFile - Valid",
 			loaderFunc: FromExtismFile,
 			filePath:   wasmPath,
-			options: []options.Option{
+			options: []any{
 				options.WithLogHandler(getLogger()),
 				extism.WithEntryPoint("greet"),
 				options.WithDataProvider(data.NewStaticProvider(map[string]any{
@@ -424,14 +429,14 @@ _ = result`
 			name:        "FromExtismFile - Invalid Path",
 			loaderFunc:  FromExtismFile,
 			filePath:    "non-existent-file.wasm",
-			options:     []options.Option{},
+			options:     []any{},
 			expectError: true,
 		},
 		{
 			name:       "FromRisorFile - Valid",
 			loaderFunc: FromRisorFile,
 			filePath:   risorPath,
-			options: []options.Option{
+			options: []any{
 				options.WithLogHandler(getLogger()),
 				risor.WithGlobals([]string{"ctx"}),
 			},
@@ -441,14 +446,14 @@ _ = result`
 			name:        "FromRisorFile - Invalid Path",
 			loaderFunc:  FromRisorFile,
 			filePath:    "non-existent-file.risor",
-			options:     []options.Option{},
+			options:     []any{},
 			expectError: true,
 		},
 		{
 			name:       "FromStarlarkFile - Valid",
 			loaderFunc: FromStarlarkFile,
 			filePath:   starlarkPath,
-			options: []options.Option{
+			options: []any{
 				options.WithLogHandler(getLogger()),
 				starlark.WithGlobals([]string{"ctx"}),
 			},
@@ -458,7 +463,7 @@ _ = result`
 			name:        "FromStarlarkFile - Invalid Path",
 			loaderFunc:  FromStarlarkFile,
 			filePath:    "non-existent-file.star",
-			options:     []options.Option{},
+			options:     []any{},
 			expectError: true,
 		},
 	}
@@ -950,7 +955,7 @@ func TestFromStringLoader(t *testing.T) {
 		require.NoError(t, err)
 
 		// Create the options with the string loader
-		opts := []options.Option{options.WithLoader(l)}
+		opts := []any{options.WithLoader(l)}
 
 		// Create Extism evaluator, which should fail
 		_, err = NewExtismEvaluator(opts...)
@@ -1064,6 +1069,6 @@ func TestCreateEvaluatorEdgeCases(t *testing.T) {
 		// This should fail when applying the option
 		_, err := NewRisorEvaluator(invalidOption)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "custom invalid option error")
+		assert.Contains(t, err.Error(), "unsupported option type")
 	})
 }

@@ -108,19 +108,16 @@ func TestConfigGetters(t *testing.T) {
 	testHandler := slog.NewTextHandler(os.Stdout, nil)
 	testDataProvider := data.NewStaticProvider(map[string]any{"test": "value"})
 	testLoader := NewMockLoader()
-	testCompilerOpts := "test-options"
 
 	cfg := &Config{
-		handler:         testHandler,
-		machineType:     types.Starlark,
-		dataProvider:    testDataProvider,
-		loader:          testLoader,
-		compilerOptions: testCompilerOpts,
+		handler:      testHandler,
+		machineType:  types.Starlark,
+		dataProvider: testDataProvider,
+		loader:       testLoader,
 	}
 
 	require.Equal(t, testHandler, cfg.GetHandler())
 	require.Equal(t, types.Starlark, cfg.GetMachineType())
 	require.Equal(t, testDataProvider, cfg.GetDataProvider())
 	require.Equal(t, testLoader, cfg.GetLoader())
-	require.Equal(t, testCompilerOpts, cfg.GetCompilerOptions())
 }

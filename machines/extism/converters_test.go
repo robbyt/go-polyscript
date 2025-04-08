@@ -88,7 +88,7 @@ func TestConvertToExtismFormat(t *testing.T) {
 									// JSON unmarshaling converts numbers to float64
 									assert.Equal(t, float64(intVal), checkData[k])
 								} else if _, isIntSlice := expectedVal.([]int); isIntSlice {
-									// Skip int slice checks (arrays become []interface{})
+									// Skip int slice checks (arrays become []any)
 								} else if _, isSlice := expectedVal.([]any); !isSlice {
 									assert.Equal(t, expectedVal, checkData[k])
 								}

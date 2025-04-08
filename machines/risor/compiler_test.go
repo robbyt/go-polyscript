@@ -1,6 +1,7 @@
 package risor
 
 import (
+	"bytes"
 	"errors"
 	"io"
 	"log/slog"
@@ -51,9 +52,13 @@ func runTestCase(t *testing.T, tt testCase) {
 	t.Helper()
 	t.Parallel()
 
-	// Create mock compiler and reader
-	handler := slog.NewTextHandler(os.Stdout, nil)
-	comp := NewCompiler(handler, &RisorOptions{Globals: tt.globals})
+	// Create compiler with options
+	comp, err := NewCompiler(
+		WithLogHandler(slog.NewTextHandler(os.Stdout, nil)),
+		WithGlobals(tt.globals),
+	)
+	require.NoError(t, err, "Failed to create compiler")
+
 	reader := io.ReadCloser(newMockScriptReaderCloser(tt.script))
 	if mockReader, ok := reader.(*mockScriptReaderCloser); ok {
 		mockReader.On("Close").Return(nil)
@@ -162,38 +167,85 @@ main()
 	}
 }
 
-func TestCompileWithCustomOptions(t *testing.T) {
+func TestCompilerOptions(t *testing.T) {
 	t.Parallel()
-	// Test that we can compile a script with a custom memory limit
-	handler := slog.NewTextHandler(os.Stdout, nil)
-	comp := NewCompiler(handler, &RisorOptions{
-		Globals: []string{"ctx"},
+
+	t.Run("WithLogHandler option", func(t *testing.T) {
+		// Create a custom handler
+		handler := slog.NewTextHandler(os.Stdout, nil)
+		comp, err := NewCompiler(WithLogHandler(handler))
+		require.NoError(t, err)
+		require.NotNil(t, comp)
+		require.Equal(t, "risor.Compiler", comp.String())
 	})
-	require.NotNil(t, comp, "Expected compiler to be non-nil")
-	require.Equal(t, "risor.Compiler", comp.String(), "Expected compiler name to be risor.Compiler")
 
-	// Make sure the compiler creates a valid Executable
-	script := `print("Hello, World!")`
-	reader := io.ReadCloser(newMockScriptReaderCloser(script))
-	if mockReader, ok := reader.(*mockScriptReaderCloser); ok {
-		mockReader.On("Close").Return(nil)
-	} else {
-		t.Fatal("Failed to create mock reader")
-	}
+	t.Run("WithLogger option", func(t *testing.T) {
+		// Create a custom logger
+		var buf bytes.Buffer
+		handler := slog.NewTextHandler(&buf, nil)
+		logger := slog.New(handler)
+		comp, err := NewCompiler(WithLogger(logger))
+		require.NoError(t, err)
+		require.NotNil(t, comp)
+		require.Equal(t, "risor.Compiler", comp.String())
+	})
 
-	// Execute test
-	execContent, err := comp.Compile(reader)
-	require.NoError(t, err, "Did not expect an error but got one")
-	require.NotNil(t, execContent, "Expected execContent to be non-nil")
-	require.Equal(t, script, execContent.GetSource(), "Script content does not match")
+	t.Run("WithGlobals option", func(t *testing.T) {
+		globals := []string{"request", "response"}
+		comp, err := NewCompiler(
+			WithLogHandler(slog.NewTextHandler(os.Stdout, nil)),
+			WithGlobals(globals),
+		)
+		require.NoError(t, err)
+		require.NotNil(t, comp)
+
+		// Test with a script using the globals
+		script := `print(request, response)`
+		reader := io.ReadCloser(newMockScriptReaderCloser(script))
+		if mockReader, ok := reader.(*mockScriptReaderCloser); ok {
+			mockReader.On("Close").Return(nil)
+		}
+
+		execContent, err := comp.Compile(reader)
+		require.NoError(t, err)
+		require.NotNil(t, execContent)
+	})
+
+	t.Run("Default options", func(t *testing.T) {
+		// Test with no explicit options
+		comp, err := NewCompiler()
+		require.NoError(t, err)
+		require.NotNil(t, comp)
+
+		// Simple script that doesn't require globals
+		script := `print("Hello")`
+		reader := io.ReadCloser(newMockScriptReaderCloser(script))
+		if mockReader, ok := reader.(*mockScriptReaderCloser); ok {
+			mockReader.On("Close").Return(nil)
+		}
+
+		execContent, err := comp.Compile(reader)
+		require.NoError(t, err)
+		require.NotNil(t, execContent)
+	})
+
+	t.Run("Option error handling", func(t *testing.T) {
+		// Test with nil logger
+		_, err := NewCompiler(WithLogger(nil))
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "logger cannot be nil")
+
+		// Test with nil handler
+		_, err = NewCompiler(WithLogHandler(nil))
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "log handler cannot be nil")
+	})
 }
 
 func TestCompileError(t *testing.T) {
 	// Test that the compiler returns the correct error when the script is nil
-	handler := slog.NewTextHandler(os.Stdout, nil)
-	comp := NewCompiler(handler, &RisorOptions{
-		Globals: []string{"ctx"},
-	})
+	comp, err := NewCompiler(WithLogHandler(slog.NewTextHandler(os.Stdout, nil)))
+	require.NoError(t, err)
 	require.NotNil(t, comp, "Expected compiler to be non-nil")
 
 	// Execute test with nil reader
@@ -204,10 +256,11 @@ func TestCompileError(t *testing.T) {
 }
 
 func TestCompileWithBytecode(t *testing.T) {
-	handler := slog.NewTextHandler(os.Stdout, nil)
-	comp := NewCompiler(handler, &RisorOptions{
-		Globals: []string{"ctx"},
-	})
+	comp, err := NewCompiler(
+		WithLogHandler(slog.NewTextHandler(os.Stdout, nil)),
+		WithGlobals([]string{"ctx"}),
+	)
+	require.NoError(t, err)
 	require.NotNil(t, comp, "Expected compiler to be non-nil")
 
 	// Here we test that we can directly call the compile method with a byteslice
@@ -227,10 +280,11 @@ func TestCompileWithBytecode(t *testing.T) {
 
 func TestCompileIOError(t *testing.T) {
 	// Test that we return the correct error when there's an IO error
-	handler := slog.NewTextHandler(os.Stdout, nil)
-	comp := NewCompiler(handler, &RisorOptions{
-		Globals: []string{"ctx"},
-	})
+	comp, err := NewCompiler(
+		WithLogHandler(slog.NewTextHandler(os.Stdout, nil)),
+		WithGlobals([]string{"ctx"}),
+	)
+	require.NoError(t, err)
 	require.NotNil(t, comp, "Expected compiler to be non-nil")
 
 	// Create a reader that will return an error
@@ -248,10 +302,10 @@ func TestCompileIOError(t *testing.T) {
 
 func TestCompileCloseError(t *testing.T) {
 	// Test that we return the correct error when there's an error closing the reader
-	handler := slog.NewTextHandler(os.Stdout, nil)
-	comp := NewCompiler(handler, &RisorOptions{
-		Globals: []string{"ctx"},
-	})
+	comp, err := NewCompiler(
+		WithLogHandler(slog.NewTextHandler(os.Stdout, nil)),
+	)
+	require.NoError(t, err)
 	require.NotNil(t, comp, "Expected compiler to be non-nil")
 
 	// Create a reader that will return an error on close
@@ -282,10 +336,8 @@ func (m *mockErrorReader) Close() error {
 
 // Test compiler string representation
 func TestCompilerString(t *testing.T) {
-	handler := slog.NewTextHandler(os.Stdout, nil)
-	comp := NewCompiler(handler, &RisorOptions{
-		Globals: []string{"ctx"},
-	})
+	comp, err := NewCompiler(WithLogHandler(slog.NewTextHandler(os.Stdout, nil)))
+	require.NoError(t, err)
 	require.NotNil(t, comp, "Expected compiler to be non-nil")
 	require.Equal(t, "risor.Compiler", comp.String(), "Expected compiler name to be risor.Compiler")
 }

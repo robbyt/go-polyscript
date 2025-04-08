@@ -15,20 +15,43 @@ type Compiler struct {
 	logger     *slog.Logger
 }
 
-type CompilerOptions interface {
-	GetGlobals() []string
-}
-
-// NewCompiler creates a new Starlark-specific Compiler instance with the provided global variables.
+// NewCompiler creates a new Starlark-specific Compiler instance with the provided options.
 // Global variables are used during script parsing to validate global name usage.
-func NewCompiler(handler slog.Handler, compilerOptions CompilerOptions) *Compiler {
-	handler, logger := helpers.SetupLogger(handler, "starlark", "Compiler")
+func NewCompiler(opts ...CompilerOption) (*Compiler, error) {
+	// Initialize config with defaults
+	cfg := &compilerOptions{}
+	applyDefaults(cfg)
+
+	// Apply all options
+	for _, opt := range opts {
+		if err := opt(cfg); err != nil {
+			return nil, fmt.Errorf("error applying compiler option: %w", err)
+		}
+	}
+
+	// Validate the configuration
+	if err := validate(cfg); err != nil {
+		return nil, fmt.Errorf("invalid compiler configuration: %w", err)
+	}
+
+	var handler slog.Handler
+	var logger *slog.Logger
+
+	// Set up logging based on provided options
+	if cfg.Logger != nil {
+		// User provided a custom logger
+		logger = cfg.Logger
+		handler = logger.Handler()
+	} else {
+		// User provided a handler or we're using the default
+		handler, logger = helpers.SetupLogger(cfg.LogHandler, "starlark", "Compiler")
+	}
 
 	return &Compiler{
-		globals:    compilerOptions.GetGlobals(),
+		globals:    cfg.Globals,
 		logHandler: handler,
 		logger:     logger,
-	}
+	}, nil
 }
 
 func (c *Compiler) String() string {
