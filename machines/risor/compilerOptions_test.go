@@ -12,7 +12,7 @@ func TestWithGlobals(t *testing.T) {
 	// Test that WithGlobals properly sets the globals field
 	globals := []string{"ctx", "print"}
 
-	cfg := &compilerConfig{}
+	cfg := &compilerOptions{}
 	opt := WithGlobals(globals)
 	err := opt(cfg)
 
@@ -25,7 +25,7 @@ func TestWithLogHandler(t *testing.T) {
 	var buf bytes.Buffer
 	handler := slog.NewTextHandler(&buf, nil)
 
-	cfg := &compilerConfig{}
+	cfg := &compilerOptions{}
 	opt := WithLogHandler(handler)
 	err := opt(cfg)
 
@@ -47,7 +47,7 @@ func TestWithLogger(t *testing.T) {
 	handler := slog.NewTextHandler(&buf, nil)
 	logger := slog.New(handler)
 
-	cfg := &compilerConfig{}
+	cfg := &compilerOptions{}
 	opt := WithLogger(logger)
 	err := opt(cfg)
 
@@ -65,7 +65,7 @@ func TestWithLogger(t *testing.T) {
 
 func TestApplyDefaults(t *testing.T) {
 	// Test that defaults are properly applied to an empty config
-	cfg := &compilerConfig{}
+	cfg := &compilerOptions{}
 	applyDefaults(cfg)
 
 	require.NotNil(t, cfg.LogHandler)
@@ -76,7 +76,7 @@ func TestApplyDefaults(t *testing.T) {
 
 func TestValidate(t *testing.T) {
 	// Test validation with empty config
-	cfg := &compilerConfig{}
+	cfg := &compilerOptions{}
 	applyDefaults(cfg)
 
 	err := validate(cfg)

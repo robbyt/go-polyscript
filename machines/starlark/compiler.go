@@ -17,9 +17,9 @@ type Compiler struct {
 
 // NewCompiler creates a new Starlark-specific Compiler instance with the provided options.
 // Global variables are used during script parsing to validate global name usage.
-func NewCompiler(opts ...Option) (*Compiler, error) {
+func NewCompiler(opts ...CompilerOption) (*Compiler, error) {
 	// Initialize config with defaults
-	cfg := &compilerConfig{}
+	cfg := &compilerOptions{}
 	applyDefaults(cfg)
 
 	// Apply all options

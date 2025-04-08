@@ -15,7 +15,7 @@ func TestWithEntryPoint(t *testing.T) {
 	// Test that WithEntryPoint properly sets the entry point
 	entryPoint := "custom_entrypoint"
 
-	cfg := &compilerConfig{}
+	cfg := &compilerOptions{}
 	opt := WithEntryPoint(entryPoint)
 	err := opt(cfg)
 
@@ -35,7 +35,7 @@ func TestWithLogHandler(t *testing.T) {
 	var buf bytes.Buffer
 	handler := slog.NewTextHandler(&buf, nil)
 
-	cfg := &compilerConfig{}
+	cfg := &compilerOptions{}
 	opt := WithLogHandler(handler)
 	err := opt(cfg)
 
@@ -57,7 +57,7 @@ func TestWithLogger(t *testing.T) {
 	handler := slog.NewTextHandler(&buf, nil)
 	logger := slog.New(handler)
 
-	cfg := &compilerConfig{}
+	cfg := &compilerOptions{}
 	opt := WithLogger(logger)
 	err := opt(cfg)
 
@@ -75,7 +75,7 @@ func TestWithLogger(t *testing.T) {
 
 func TestWithWASIEnabled(t *testing.T) {
 	// Test that WithWASIEnabled properly sets the EnableWASI field
-	cfg := &compilerConfig{}
+	cfg := &compilerOptions{}
 
 	// Test enabling WASI
 	enableOpt := WithWASIEnabled(true)
@@ -96,7 +96,7 @@ func TestWithRuntimeConfig(t *testing.T) {
 	// Test that WithRuntimeConfig properly sets the RuntimeConfig field
 	runtimeConfig := wazero.NewRuntimeConfig()
 
-	cfg := &compilerConfig{}
+	cfg := &compilerOptions{}
 	opt := WithRuntimeConfig(runtimeConfig)
 	err := opt(cfg)
 
@@ -124,7 +124,7 @@ func TestWithHostFunctions(t *testing.T) {
 
 	hostFuncs := []extismSDK.HostFunction{testHostFn}
 
-	cfg := &compilerConfig{}
+	cfg := &compilerOptions{}
 	opt := WithHostFunctions(hostFuncs)
 	err := opt(cfg)
 
@@ -141,7 +141,7 @@ func TestWithHostFunctions(t *testing.T) {
 
 func TestApplyDefaults(t *testing.T) {
 	// Test that defaults are properly applied to an empty config
-	cfg := &compilerConfig{}
+	cfg := &compilerOptions{}
 	applyDefaults(cfg)
 
 	require.NotNil(t, cfg.LogHandler)
@@ -155,14 +155,14 @@ func TestApplyDefaults(t *testing.T) {
 
 func TestValidate(t *testing.T) {
 	// Test validation with proper defaults
-	cfg := &compilerConfig{}
+	cfg := &compilerOptions{}
 	applyDefaults(cfg)
 
 	err := validate(cfg)
 	require.NoError(t, err)
 
 	// Test validation with manually cleared logger and handler
-	cfg = &compilerConfig{}
+	cfg = &compilerOptions{}
 	applyDefaults(cfg)
 	cfg.LogHandler = nil
 	cfg.Logger = nil
@@ -172,7 +172,7 @@ func TestValidate(t *testing.T) {
 	require.Contains(t, err.Error(), "either log handler or logger must be specified")
 
 	// Test validation with empty entry point
-	cfg = &compilerConfig{}
+	cfg = &compilerOptions{}
 	applyDefaults(cfg)
 	cfg.EntryPoint = ""
 
@@ -181,7 +181,7 @@ func TestValidate(t *testing.T) {
 	require.Contains(t, err.Error(), "entry point must be specified")
 
 	// Test validation with nil runtime config
-	cfg = &compilerConfig{}
+	cfg = &compilerOptions{}
 	applyDefaults(cfg)
 	cfg.RuntimeConfig = nil
 

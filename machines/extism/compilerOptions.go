@@ -9,8 +9,8 @@ import (
 	"github.com/tetratelabs/wazero"
 )
 
-// compilerConfig holds the configuration for the Extism compiler
-type compilerConfig struct {
+// compilerOptions holds the configuration for the Extism compiler
+type compilerOptions struct {
 	EntryPoint    string
 	LogHandler    slog.Handler
 	Logger        *slog.Logger
@@ -19,12 +19,12 @@ type compilerConfig struct {
 	HostFunctions []extismSDK.HostFunction
 }
 
-// Option is a function that configures a compilerConfig
-type Option func(*compilerConfig) error
+// CompilerOption is a function that configures a compilerOptions instance
+type CompilerOption func(*compilerOptions) error
 
 // WithEntryPoint creates an option to set the entry point for Extism WASM modules
-func WithEntryPoint(entryPoint string) Option {
-	return func(cfg *compilerConfig) error {
+func WithEntryPoint(entryPoint string) CompilerOption {
+	return func(cfg *compilerOptions) error {
 		if entryPoint == "" {
 			return fmt.Errorf("entry point cannot be empty")
 		}
@@ -36,8 +36,8 @@ func WithEntryPoint(entryPoint string) Option {
 // WithLogHandler creates an option to set the log handler for Extism compiler.
 // This is the preferred option for logging configuration as it provides
 // more flexibility through the slog.Handler interface.
-func WithLogHandler(handler slog.Handler) Option {
-	return func(cfg *compilerConfig) error {
+func WithLogHandler(handler slog.Handler) CompilerOption {
+	return func(cfg *compilerOptions) error {
 		if handler == nil {
 			return fmt.Errorf("log handler cannot be nil")
 		}
@@ -51,8 +51,8 @@ func WithLogHandler(handler slog.Handler) Option {
 // WithLogger creates an option to set a specific logger for Extism compiler.
 // This is less flexible than WithLogHandler but allows users to customize
 // their logging group configuration.
-func WithLogger(logger *slog.Logger) Option {
-	return func(cfg *compilerConfig) error {
+func WithLogger(logger *slog.Logger) CompilerOption {
+	return func(cfg *compilerOptions) error {
 		if logger == nil {
 			return fmt.Errorf("logger cannot be nil")
 		}
@@ -64,16 +64,16 @@ func WithLogger(logger *slog.Logger) Option {
 }
 
 // WithWASIEnabled creates an option to enable or disable WASI support
-func WithWASIEnabled(enabled bool) Option {
-	return func(cfg *compilerConfig) error {
+func WithWASIEnabled(enabled bool) CompilerOption {
+	return func(cfg *compilerOptions) error {
 		cfg.EnableWASI = enabled
 		return nil
 	}
 }
 
 // WithRuntimeConfig creates an option to set a custom wazero runtime configuration
-func WithRuntimeConfig(config wazero.RuntimeConfig) Option {
-	return func(cfg *compilerConfig) error {
+func WithRuntimeConfig(config wazero.RuntimeConfig) CompilerOption {
+	return func(cfg *compilerOptions) error {
 		if config == nil {
 			return fmt.Errorf("runtime config cannot be nil")
 		}
@@ -83,15 +83,15 @@ func WithRuntimeConfig(config wazero.RuntimeConfig) Option {
 }
 
 // WithHostFunctions creates an option to set additional host functions
-func WithHostFunctions(funcs []extismSDK.HostFunction) Option {
-	return func(cfg *compilerConfig) error {
+func WithHostFunctions(funcs []extismSDK.HostFunction) CompilerOption {
+	return func(cfg *compilerOptions) error {
 		cfg.HostFunctions = funcs
 		return nil
 	}
 }
 
 // applyDefaults sets the default values for a compilerConfig
-func applyDefaults(cfg *compilerConfig) {
+func applyDefaults(cfg *compilerOptions) {
 	// Default to stderr for logging if neither handler nor logger specified
 	if cfg.LogHandler == nil && cfg.Logger == nil {
 		cfg.LogHandler = slog.NewTextHandler(os.Stderr, nil)
@@ -117,7 +117,7 @@ func applyDefaults(cfg *compilerConfig) {
 }
 
 // validate checks if the configuration is valid
-func validate(cfg *compilerConfig) error {
+func validate(cfg *compilerOptions) error {
 	// Ensure we have either a logger or a handler
 	if cfg.LogHandler == nil && cfg.Logger == nil {
 		return fmt.Errorf("either log handler or logger must be specified")

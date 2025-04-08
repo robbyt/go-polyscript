@@ -18,7 +18,7 @@ import (
 )
 
 // FromExtismFile creates an Extism evaluator from a WASM file
-func FromExtismFile(filePath string, opts ...interface{}) (engine.EvaluatorWithPrep, error) {
+func FromExtismFile(filePath string, opts ...any) (engine.EvaluatorWithPrep, error) {
 	return fromFileLoader(types.Extism, filePath, opts...)
 }
 
@@ -53,7 +53,7 @@ func FromExtismFileWithData(
 	cfg.SetDataProvider(compositeProvider)
 
 	// Create an evaluator using our custom createExtismEvaluator function
-	return createExtismEvaluator(cfg, []extism.Option{extism.WithEntryPoint(entryPoint)})
+	return createExtismEvaluator(cfg, []extism.CompilerOption{extism.WithEntryPoint(entryPoint)})
 }
 
 // FromRisorFile creates a Risor evaluator from a .risor file
@@ -90,7 +90,7 @@ func FromRisorFileWithData(
 	cfg.SetDataProvider(compositeProvider)
 
 	// Create an evaluator using our custom createRisorEvaluator function
-	return createRisorEvaluator(cfg, []risor.Option{risor.WithGlobals([]string{constants.Ctx})})
+	return createRisorEvaluator(cfg, []risor.CompilerOption{risor.WithGlobals([]string{constants.Ctx})})
 }
 
 // FromRisorString creates a Risor evaluator from a script string
@@ -127,7 +127,7 @@ func FromRisorStringWithData(
 	cfg.SetDataProvider(compositeProvider)
 
 	// Create an evaluator using our custom createRisorEvaluator function
-	return createRisorEvaluator(cfg, []risor.Option{risor.WithGlobals([]string{constants.Ctx})})
+	return createRisorEvaluator(cfg, []risor.CompilerOption{risor.WithGlobals([]string{constants.Ctx})})
 }
 
 // FromStarlarkFile creates a Starlark evaluator from a .star file
@@ -166,7 +166,7 @@ func FromStarlarkFileWithData(
 	// Create an evaluator using our custom createStarlarkEvaluator function
 	return createStarlarkEvaluator(
 		cfg,
-		[]starlark.Option{starlark.WithGlobals([]string{constants.Ctx})},
+		[]starlark.CompilerOption{starlark.WithGlobals([]string{constants.Ctx})},
 	)
 }
 
@@ -207,7 +207,7 @@ func FromStarlarkStringWithData(
 	// Create an evaluator using our custom createStarlarkEvaluator function
 	return createStarlarkEvaluator(
 		cfg,
-		[]starlark.Option{starlark.WithGlobals([]string{constants.Ctx})},
+		[]starlark.CompilerOption{starlark.WithGlobals([]string{constants.Ctx})},
 	)
 }
 
@@ -215,7 +215,7 @@ func FromStarlarkStringWithData(
 func fromFileLoader(
 	machineType types.Type,
 	filePath string,
-	opts ...interface{},
+	opts ...any,
 ) (engine.EvaluatorWithPrep, error) {
 	// Create a file loader
 	l, err := loader.NewFromDisk(filePath)
@@ -299,13 +299,13 @@ func NewExtismEvaluator(opts ...interface{}) (engine.EvaluatorWithPrep, error) {
 
 	// Separate engine options from machine options
 	var engineOpts []options.Option
-	var machineOpts []extism.Option
+	var machineOpts []extism.CompilerOption
 
 	for _, opt := range opts {
 		switch o := opt.(type) {
 		case options.Option:
 			engineOpts = append(engineOpts, o)
-		case extism.Option:
+		case extism.CompilerOption:
 			machineOpts = append(machineOpts, o)
 		default:
 			return nil, fmt.Errorf("unsupported option type: %T", opt)
@@ -331,7 +331,7 @@ func NewExtismEvaluator(opts ...interface{}) (engine.EvaluatorWithPrep, error) {
 // createExtismEvaluator creates an Extism evaluator with the given options
 func createExtismEvaluator(
 	cfg *options.Config,
-	machineOpts []extism.Option,
+	machineOpts []extism.CompilerOption,
 ) (engine.EvaluatorWithPrep, error) {
 	// Create executable unit ID from source URL
 	execUnitID := ""
@@ -341,7 +341,7 @@ func createExtismEvaluator(
 	}
 
 	// Always include the handler in options
-	allOpts := append([]extism.Option{extism.WithLogHandler(cfg.GetHandler())}, machineOpts...)
+	allOpts := append([]extism.CompilerOption{extism.WithLogHandler(cfg.GetHandler())}, machineOpts...)
 
 	// Create compiler using machine-specific factory function
 	compiler, err := machines.NewExtismCompiler(allOpts...)
@@ -378,13 +378,13 @@ func NewRisorEvaluator(opts ...interface{}) (engine.EvaluatorWithPrep, error) {
 
 	// Separate engine options from machine options
 	var engineOpts []options.Option
-	var machineOpts []risor.Option
+	var machineOpts []risor.CompilerOption
 
 	for _, opt := range opts {
 		switch o := opt.(type) {
 		case options.Option:
 			engineOpts = append(engineOpts, o)
-		case risor.Option:
+		case risor.CompilerOption:
 			machineOpts = append(machineOpts, o)
 		default:
 			return nil, fmt.Errorf("unsupported option type: %T", opt)
@@ -410,7 +410,7 @@ func NewRisorEvaluator(opts ...interface{}) (engine.EvaluatorWithPrep, error) {
 // createRisorEvaluator creates a Risor evaluator with the given options
 func createRisorEvaluator(
 	cfg *options.Config,
-	machineOpts []risor.Option,
+	machineOpts []risor.CompilerOption,
 ) (engine.EvaluatorWithPrep, error) {
 	// Create executable unit ID from source URL
 	execUnitID := ""
@@ -420,7 +420,7 @@ func createRisorEvaluator(
 	}
 
 	// Always include the handler in options
-	allOpts := append([]risor.Option{risor.WithLogHandler(cfg.GetHandler())}, machineOpts...)
+	allOpts := append([]risor.CompilerOption{risor.WithLogHandler(cfg.GetHandler())}, machineOpts...)
 
 	// Create compiler using machine-specific factory function
 	compiler, err := machines.NewRisorCompiler(allOpts...)
@@ -457,13 +457,13 @@ func NewStarlarkEvaluator(opts ...interface{}) (engine.EvaluatorWithPrep, error)
 
 	// Separate engine options from machine options
 	var engineOpts []options.Option
-	var machineOpts []starlark.Option
+	var machineOpts []starlark.CompilerOption
 
 	for _, opt := range opts {
 		switch o := opt.(type) {
 		case options.Option:
 			engineOpts = append(engineOpts, o)
-		case starlark.Option:
+		case starlark.CompilerOption:
 			machineOpts = append(machineOpts, o)
 		default:
 			return nil, fmt.Errorf("unsupported option type: %T", opt)
@@ -489,7 +489,7 @@ func NewStarlarkEvaluator(opts ...interface{}) (engine.EvaluatorWithPrep, error)
 // createStarlarkEvaluator creates a Starlark evaluator with the given options
 func createStarlarkEvaluator(
 	cfg *options.Config,
-	machineOpts []starlark.Option,
+	machineOpts []starlark.CompilerOption,
 ) (engine.EvaluatorWithPrep, error) {
 	// Create executable unit ID from source URL
 	execUnitID := ""
@@ -499,7 +499,7 @@ func createStarlarkEvaluator(
 	}
 
 	// Always include the handler in options
-	allOpts := append([]starlark.Option{starlark.WithLogHandler(cfg.GetHandler())}, machineOpts...)
+	allOpts := append([]starlark.CompilerOption{starlark.WithLogHandler(cfg.GetHandler())}, machineOpts...)
 
 	// Create compiler using machine-specific factory function
 	compiler, err := machines.NewStarlarkCompiler(allOpts...)

@@ -24,9 +24,9 @@ type Compiler struct {
 }
 
 // NewCompiler creates a new Extism WASM Compiler instance with the provided options.
-func NewCompiler(opts ...Option) (*Compiler, error) {
+func NewCompiler(opts ...CompilerOption) (*Compiler, error) {
 	// Initialize config with defaults
-	cfg := &compilerConfig{}
+	cfg := &compilerOptions{}
 	applyDefaults(cfg)
 
 	// Apply all options

@@ -48,11 +48,11 @@ func NewCompiler(opts ...any) (script.Compiler, error) {
 
 	// Check for Risor options
 	{
-		var risorOpts []risorMachine.Option
+		var risorOpts []risorMachine.CompilerOption
 		allMatch := true
 
 		for _, opt := range opts {
-			if o, ok := opt.(risorMachine.Option); ok {
+			if o, ok := opt.(risorMachine.CompilerOption); ok {
 				risorOpts = append(risorOpts, o)
 			} else {
 				allMatch = false
@@ -67,11 +67,11 @@ func NewCompiler(opts ...any) (script.Compiler, error) {
 
 	// Check for Starlark options
 	{
-		var starlarkOpts []starlarkMachine.Option
+		var starlarkOpts []starlarkMachine.CompilerOption
 		allMatch := true
 
 		for _, opt := range opts {
-			if o, ok := opt.(starlarkMachine.Option); ok {
+			if o, ok := opt.(starlarkMachine.CompilerOption); ok {
 				starlarkOpts = append(starlarkOpts, o)
 			} else {
 				allMatch = false
@@ -86,11 +86,11 @@ func NewCompiler(opts ...any) (script.Compiler, error) {
 
 	// Check for Extism options
 	{
-		var extismOpts []extismMachine.Option
+		var extismOpts []extismMachine.CompilerOption
 		allMatch := true
 
 		for _, opt := range opts {
-			if o, ok := opt.(extismMachine.Option); ok {
+			if o, ok := opt.(extismMachine.CompilerOption); ok {
 				extismOpts = append(extismOpts, o)
 			} else {
 				allMatch = false
@@ -107,8 +107,8 @@ func NewCompiler(opts ...any) (script.Compiler, error) {
 }
 
 // NewRisorCompiler creates a new Risor compiler using the functional options pattern.
-// See the risorMachine package for available options.
-func NewRisorCompiler(opts ...risorMachine.Option) (script.Compiler, error) {
+// See the risorMachine package for available compiler options.
+func NewRisorCompiler(opts ...risorMachine.CompilerOption) (script.Compiler, error) {
 	compiler, err := risorMachine.NewCompiler(opts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Risor compiler: %w", err)
@@ -117,8 +117,8 @@ func NewRisorCompiler(opts ...risorMachine.Option) (script.Compiler, error) {
 }
 
 // NewStarlarkCompiler creates a new Starlark compiler using the functional options pattern.
-// See the starlarkMachine package for available options.
-func NewStarlarkCompiler(opts ...starlarkMachine.Option) (script.Compiler, error) {
+// See the starlarkMachine package for available compiler options.
+func NewStarlarkCompiler(opts ...starlarkMachine.CompilerOption) (script.Compiler, error) {
 	compiler, err := starlarkMachine.NewCompiler(opts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Starlark compiler: %w", err)
@@ -127,8 +127,8 @@ func NewStarlarkCompiler(opts ...starlarkMachine.Option) (script.Compiler, error
 }
 
 // NewExtismCompiler creates a new Extism compiler using the functional options pattern.
-// See the extismMachine package for available options.
-func NewExtismCompiler(opts ...extismMachine.Option) (script.Compiler, error) {
+// See the extismMachine package for available compiler options.
+func NewExtismCompiler(opts ...extismMachine.CompilerOption) (script.Compiler, error) {
 	compiler, err := extismMachine.NewCompiler(opts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Extism compiler: %w", err)
