@@ -337,24 +337,20 @@ func NewExtismEvaluator(opts ...interface{}) (engine.EvaluatorWithPrep, error) {
 // createExtismEvaluator creates an Extism evaluator with the given options
 func createExtismEvaluator(
 	cfg *options.Config,
-	machineOpts []extism.CompilerOption,
+	compilerOptions []extism.CompilerOption,
 ) (engine.EvaluatorWithPrep, error) {
+
+	// Create compiler using machine-specific factory function
+	compiler, err := machines.NewExtismCompiler(compilerOptions...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Extism compiler: %w", err)
+	}
+
 	// Create executable unit ID from source URL
 	execUnitID := ""
 	sourceURL := cfg.GetLoader().GetSourceURL()
 	if sourceURL != nil {
 		execUnitID = sourceURL.String()
-	}
-
-	// Always include the handler in options
-	allOpts := append(
-		[]extism.CompilerOption{extism.WithLogHandler(cfg.GetHandler())},
-		machineOpts...)
-
-	// Create compiler using machine-specific factory function
-	compiler, err := machines.NewExtismCompiler(allOpts...)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create Extism compiler: %w", err)
 	}
 
 	// Create executable unit (to compile and prepare the script)
@@ -418,24 +414,20 @@ func NewRisorEvaluator(opts ...interface{}) (engine.EvaluatorWithPrep, error) {
 // createRisorEvaluator creates a Risor evaluator with the given options
 func createRisorEvaluator(
 	cfg *options.Config,
-	machineOpts []risor.CompilerOption,
+	compilerOptions []risor.CompilerOption,
 ) (engine.EvaluatorWithPrep, error) {
+
+	// Create compiler using machine-specific factory function
+	compiler, err := machines.NewRisorCompiler(compilerOptions...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Risor compiler: %w", err)
+	}
+
 	// Create executable unit ID from source URL
 	execUnitID := ""
 	sourceURL := cfg.GetLoader().GetSourceURL()
 	if sourceURL != nil {
 		execUnitID = sourceURL.String()
-	}
-
-	// Always include the handler in options
-	allOpts := append(
-		[]risor.CompilerOption{risor.WithLogHandler(cfg.GetHandler())},
-		machineOpts...)
-
-	// Create compiler using machine-specific factory function
-	compiler, err := machines.NewRisorCompiler(allOpts...)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create Risor compiler: %w", err)
 	}
 
 	// Create executable unit (to compile and prepare the script)
@@ -499,24 +491,20 @@ func NewStarlarkEvaluator(opts ...interface{}) (engine.EvaluatorWithPrep, error)
 // createStarlarkEvaluator creates a Starlark evaluator with the given options
 func createStarlarkEvaluator(
 	cfg *options.Config,
-	machineOpts []starlark.CompilerOption,
+	compilerOptions []starlark.CompilerOption,
 ) (engine.EvaluatorWithPrep, error) {
+
+	// Create compiler using machine-specific factory function
+	compiler, err := machines.NewStarlarkCompiler(compilerOptions...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Starlark compiler: %w", err)
+	}
+
 	// Create executable unit ID from source URL
 	execUnitID := ""
 	sourceURL := cfg.GetLoader().GetSourceURL()
 	if sourceURL != nil {
 		execUnitID = sourceURL.String()
-	}
-
-	// Always include the handler in options
-	allOpts := append(
-		[]starlark.CompilerOption{starlark.WithLogHandler(cfg.GetHandler())},
-		machineOpts...)
-
-	// Create compiler using machine-specific factory function
-	compiler, err := machines.NewStarlarkCompiler(allOpts...)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create Starlark compiler: %w", err)
 	}
 
 	// Create executable unit (to compile and prepare the script)
