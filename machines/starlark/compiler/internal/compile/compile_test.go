@@ -3,6 +3,7 @@ package compile
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	starlarkLib "go.starlark.net/starlark"
 	"go.starlark.net/syntax"
@@ -106,25 +107,25 @@ func TestCompileSyntaxError(t *testing.T) {
 		script  string
 		globals []string
 		opts    *syntax.FileOptions
-		wantErr string
+		wantErr error
 	}{
 		{
 			name:    "unclosed string",
 			script:  `print("Hello, World!`,
 			opts:    &syntax.FileOptions{},
-			wantErr: "compilation error:",
+			wantErr: ErrCompileFailed,
 		},
 		{
 			name:    "invalid syntax",
 			script:  `if true print("test")`,
 			opts:    &syntax.FileOptions{},
-			wantErr: "compilation error:",
+			wantErr: ErrCompileFailed,
 		},
 		{
 			name:    "predeclared global",
 			script:  `print(request)`,
 			globals: []string{"print"},
-			wantErr: "undefined",
+			wantErr: ErrCompileFailed,
 		},
 	}
 
@@ -146,7 +147,7 @@ func TestCompileSyntaxError(t *testing.T) {
 				_, err = compile(scriptBytes, tt.opts, emptyGlobals)
 			}
 			require.Error(t, err)
-			require.ErrorContains(t, err, tt.wantErr)
+			assert.ErrorIs(t, err, tt.wantErr)
 		})
 	}
 }
@@ -155,16 +156,16 @@ func TestCompileNil(t *testing.T) {
 	tests := []struct {
 		name    string
 		globals []string
-		wantErr string
+		wantErr error
 	}{
 		{
 			name:    "nil script",
-			wantErr: "script content is nil",
+			wantErr: ErrContentNil,
 		},
 		{
 			name:    "nil script with globals",
 			globals: []string{"request"},
-			wantErr: "script content is nil",
+			wantErr: ErrContentNil,
 		},
 	}
 
@@ -184,7 +185,7 @@ func TestCompileNil(t *testing.T) {
 				_, err = compile(nil, &syntax.FileOptions{}, emptyGlobals)
 			}
 			require.Error(t, err)
-			require.Contains(t, err.Error(), tt.wantErr)
+			assert.ErrorIs(t, err, tt.wantErr)
 		})
 	}
 }

@@ -3,6 +3,6 @@ package compile
 import "errors"
 
 var (
-	ErrContentNil    = errors.New("script content is nil")
-	ErrCompileFailed = errors.New("compilation failed")
+	ErrCompileFailed = errors.New("failed to compile risor script")
+	ErrContentNil    = errors.New("risor content is nil")
 )
