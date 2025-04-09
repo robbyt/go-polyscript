@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"log/slog"
-	"sync/atomic"
 	"testing"
 
 	extismSDK "github.com/extism/go-sdk"
@@ -18,7 +17,7 @@ func TestWithEntryPoint(t *testing.T) {
 	entryPoint := "custom_entrypoint"
 
 	c := &Compiler{
-		entryPointName: atomic.Value{},
+		entryPointName: "",
 	}
 	c.applyDefaults()
 	opt := WithEntryPoint(entryPoint)
@@ -156,19 +155,69 @@ func TestWithHostFunctions(t *testing.T) {
 }
 
 func TestApplyDefaults(t *testing.T) {
-	// Test that defaults are properly applied to an empty compiler
-	c := &Compiler{}
-	c.applyDefaults()
+	t.Run("empty compiler", func(t *testing.T) {
+		// Test that defaults are properly applied to an empty compiler
+		c := &Compiler{}
+		c.applyDefaults()
 
-	require.NotNil(t, c.logHandler)
-	require.Nil(t, c.logger)
-	require.Equal(t, defaultEntryPoint, c.GetEntryPointName())
-	require.NotNil(t, c.options)
-	require.True(t, c.options.EnableWASI)
-	require.NotNil(t, c.options.RuntimeConfig)
-	require.NotNil(t, c.options.HostFunctions)
-	require.Empty(t, c.options.HostFunctions)
-	require.NotNil(t, c.ctx)
+		require.NotNil(t, c.logHandler)
+		require.Nil(t, c.logger)
+		require.Equal(t, defaultEntryPoint, c.GetEntryPointName())
+		require.NotNil(t, c.options)
+		require.True(t, c.options.EnableWASI)
+		require.NotNil(t, c.options.RuntimeConfig)
+		require.NotNil(t, c.options.HostFunctions)
+		require.Empty(t, c.options.HostFunctions)
+		require.NotNil(t, c.ctx)
+	})
+
+	t.Run("empty string entrypoint", func(t *testing.T) {
+		// Test with an empty string entrypoint
+		c := &Compiler{
+			entryPointName: "",
+			options:        &compile.Settings{},
+			ctx:            context.Background(),
+		}
+		c.applyDefaults()
+
+		// Check if the defaultEntryPoint was correctly applied
+		require.Equal(t, defaultEntryPoint, c.entryPointName)
+	})
+
+	t.Run("reset empty entrypoint", func(t *testing.T) {
+		// Test that emptying the entry point and reapplying defaults sets it back
+		c := &Compiler{
+			entryPointName: "initialValue",
+			options:        &compile.Settings{},
+			ctx:            context.Background(),
+		}
+
+		// First verify the initial value
+		require.Equal(t, "initialValue", c.entryPointName)
+
+		// Now set to empty string and apply defaults again
+		c.entryPointName = ""
+		c.applyDefaults()
+
+		// Should be reset to defaultEntryPoint
+		require.Equal(t, defaultEntryPoint, c.entryPointName)
+	})
+
+	t.Run("non-default value preserved", func(t *testing.T) {
+		// Test that a non-default value is preserved through applyDefaults
+		customEntryPoint := "custom_function"
+		c := &Compiler{
+			entryPointName: customEntryPoint,
+			options:        &compile.Settings{},
+			ctx:            context.Background(),
+		}
+
+		// Apply defaults, which should not change the entry point
+		c.applyDefaults()
+
+		// The custom value should be preserved
+		require.Equal(t, customEntryPoint, c.entryPointName)
+	})
 }
 
 func TestValidate(t *testing.T) {
@@ -192,7 +241,7 @@ func TestValidate(t *testing.T) {
 	// Test validation with empty entry point
 	c = &Compiler{}
 	c.applyDefaults()
-	c.entryPointName.Store("")
+	c.entryPointName = ""
 
 	err = c.validate()
 	require.Error(t, err)
@@ -228,4 +277,26 @@ func TestWithContext(t *testing.T) {
 
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "context cannot be nil")
+}
+
+func TestGetEntryPointName(t *testing.T) {
+	t.Run("normal value", func(t *testing.T) {
+		// Test with a normal value
+		c := &Compiler{
+			entryPointName: "test_function",
+		}
+
+		// Should return the stored value
+		require.Equal(t, "test_function", c.GetEntryPointName())
+	})
+
+	t.Run("empty string value", func(t *testing.T) {
+		// Test with empty string
+		c := &Compiler{
+			entryPointName: "",
+		}
+
+		// Should return empty string
+		require.Equal(t, "", c.GetEntryPointName())
+	})
 }

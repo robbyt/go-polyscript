@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"sync/atomic"
 
 	extismSDK "github.com/extism/go-sdk"
 	"github.com/robbyt/go-polyscript/execution/script"
@@ -15,7 +14,7 @@ import (
 
 // Compiler implements the script.Compiler interface for WASM modules
 type Compiler struct {
-	entryPointName atomic.Value
+	entryPointName string
 	ctx            context.Context
 	options        *compile.Settings
 	logHandler     slog.Handler
@@ -26,7 +25,7 @@ type Compiler struct {
 func NewCompiler(opts ...FunctionalOption) (*Compiler, error) {
 	// Initialize compiler with empty values
 	c := &Compiler{
-		entryPointName: atomic.Value{},
+		entryPointName: defaultEntryPoint,
 		options:        &compile.Settings{},
 	}
 
@@ -136,14 +135,10 @@ func (c *Compiler) Compile(scriptReader io.ReadCloser) (script.ExecutableContent
 
 // SetEntryPointName is a way to point the compiler at a different entrypoint in the wasm binary
 func (c *Compiler) SetEntryPointName(fName string) {
-	c.entryPointName.Store(fName)
+	c.entryPointName = fName
 }
 
 // GetEntryPointName is a getter for the func name entrypoint
 func (c *Compiler) GetEntryPointName() string {
-	val := c.entryPointName.Load()
-	if val == nil {
-		return ""
-	}
-	return val.(string)
+	return c.entryPointName
 }

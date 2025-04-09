@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"sync/atomic"
 
 	extismSDK "github.com/extism/go-sdk"
 	"github.com/robbyt/go-polyscript/machines/extism/compiler/internal/compile"
@@ -21,7 +20,7 @@ func WithEntryPoint(entryPoint string) FunctionalOption {
 		if entryPoint == "" {
 			return fmt.Errorf("entry point cannot be empty")
 		}
-		c.entryPointName.Store(entryPoint)
+		c.entryPointName = entryPoint
 		return nil
 	}
 }
@@ -110,12 +109,9 @@ func (c *Compiler) applyDefaults() {
 		c.logHandler = slog.NewTextHandler(os.Stderr, nil)
 	}
 
-	// Initialize the entryPointName atomic.Value if needed
-	if c.entryPointName == (atomic.Value{}) {
-		c.entryPointName = atomic.Value{}
-		c.entryPointName.Store(defaultEntryPoint)
-	} else if c.entryPointName.Load() == nil {
-		c.entryPointName.Store(defaultEntryPoint)
+	// Set default entry point if empty
+	if c.entryPointName == "" {
+		c.entryPointName = defaultEntryPoint
 	}
 
 	// Initialize options with defaults if nil
@@ -151,8 +147,7 @@ func (c *Compiler) validate() error {
 	}
 
 	// Entry point must be non-empty
-	entryPoint := c.GetEntryPointName()
-	if entryPoint == "" {
+	if c.entryPointName == "" {
 		return fmt.Errorf("entry point must be specified")
 	}
 
