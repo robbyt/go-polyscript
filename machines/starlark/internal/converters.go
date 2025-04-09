@@ -21,7 +21,7 @@ func ConvertToStarlarkFormat(inputData map[string]any) (starlarkLib.StringDict, 
 	// Convert each input data key-value pair and add to the ctxDict
 	errz := make([]error, 0, len(inputData))
 	for k, v := range inputData {
-		starlarkVal, err := convertToStarlarkValue(v)
+		starlarkVal, err := ConvertToStarlarkValue(v)
 		if err != nil {
 			// Collect errors but continue processing
 			errz = append(errz, fmt.Errorf("failed to convert input value for key %q: %w", k, err))
@@ -102,7 +102,8 @@ func ConvertStarlarkValueToInterface(v starlarkLib.Value) (any, error) {
 	}
 }
 
-func convertToStarlarkValue(v any) (starlarkLib.Value, error) {
+// ConvertToStarlarkValue converts a Go value to a Starlark value
+func ConvertToStarlarkValue(v any) (starlarkLib.Value, error) {
 	if v == nil {
 		return starlarkLib.None, nil
 	}
@@ -124,7 +125,7 @@ func convertToStarlarkValue(v any) (starlarkLib.Value, error) {
 		elements := make([]starlarkLib.Value, len(val))
 		for i, elem := range val {
 			var err error
-			elements[i], err = convertToStarlarkValue(elem)
+			elements[i], err = ConvertToStarlarkValue(elem)
 			if err != nil {
 				return nil, fmt.Errorf("failed to convert list element: %w", err)
 			}
@@ -156,7 +157,7 @@ func convertToStarlarkValue(v any) (starlarkLib.Value, error) {
 	case map[string]any:
 		dict := starlarkLib.NewDict(len(val))
 		for k, v := range val {
-			starlarkVal, err := convertToStarlarkValue(v)
+			starlarkVal, err := ConvertToStarlarkValue(v)
 			if err != nil {
 				return nil, fmt.Errorf("failed to convert dict value: %w", err)
 			}

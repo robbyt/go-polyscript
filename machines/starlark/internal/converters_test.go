@@ -444,7 +444,7 @@ func TestConvertToStarlarkValue(t *testing.T) {
 
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
-				result, err := convertToStarlarkValue(tt.input)
+				result, err := ConvertToStarlarkValue(tt.input)
 				require.NoError(t, err)
 				require.Equal(t, tt.expected.String(), result.String())
 				require.Equal(t, tt.expected.Type(), result.Type())
@@ -480,7 +480,7 @@ func TestConvertToStarlarkValue(t *testing.T) {
 
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
-				result, err := convertToStarlarkValue(tt.input)
+				result, err := ConvertToStarlarkValue(tt.input)
 				require.NoError(t, err)
 				require.Equal(t, tt.expected.String(), result.String())
 				require.Equal(t, tt.expected.Type(), result.Type())
@@ -516,7 +516,7 @@ func TestConvertToStarlarkValue(t *testing.T) {
 
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
-				result, err := convertToStarlarkValue(tt.input)
+				result, err := ConvertToStarlarkValue(tt.input)
 				require.NoError(t, err)
 				expected := tt.expected()
 				require.Equal(t, expected.String(), result.String())
@@ -531,7 +531,7 @@ func TestConvertToStarlarkValue(t *testing.T) {
 				"headers": {"value1", "value2"},
 				"empty":   {},
 			}
-			result, err := convertToStarlarkValue(input)
+			result, err := ConvertToStarlarkValue(input)
 			require.NoError(t, err)
 			dict := result.(*starlarkLib.Dict)
 
@@ -561,7 +561,7 @@ func TestConvertToStarlarkValue(t *testing.T) {
 				"nested": map[string]any{"key": "value"},
 			}
 
-			result, err := convertToStarlarkValue(input)
+			result, err := ConvertToStarlarkValue(input)
 			require.NoError(t, err)
 			dict := result.(*starlarkLib.Dict)
 
@@ -622,7 +622,7 @@ func TestConvertToStarlarkValue(t *testing.T) {
 
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
-				_, err := convertToStarlarkValue(tt.input)
+				_, err := ConvertToStarlarkValue(tt.input)
 				require.Error(t, err)
 				require.Contains(t, err.Error(), tt.errorMsg)
 			})
