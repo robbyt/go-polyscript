@@ -19,40 +19,34 @@ type Compiler struct {
 // NewCompiler creates a new Starlark-specific Compiler instance with the provided options.
 // Global variables are used during script parsing to validate global name usage.
 func NewCompiler(opts ...FunctionalOption) (*Compiler, error) {
-	// Initialize config with defaults
-	cfg := &Option{}
-	ApplyDefaults(cfg)
+	// Initialize compiler with empty values
+	c := &Compiler{}
+
+	// Apply defaults
+	c.applyDefaults()
 
 	// Apply all options
 	for _, opt := range opts {
-		if err := opt(cfg); err != nil {
+		if err := opt(c); err != nil {
 			return nil, fmt.Errorf("error applying compiler option: %w", err)
 		}
 	}
 
 	// Validate the configuration
-	if err := Validate(cfg); err != nil {
+	if err := c.validate(); err != nil {
 		return nil, fmt.Errorf("invalid compiler configuration: %w", err)
 	}
 
-	var handler slog.Handler
-	var logger *slog.Logger
-
 	// Set up logging based on provided options
-	if cfg.Logger != nil {
+	if c.logger != nil {
 		// User provided a custom logger
-		logger = cfg.Logger
-		handler = logger.Handler()
+		c.logHandler = c.logger.Handler()
 	} else {
 		// User provided a handler or we're using the default
-		handler, logger = helpers.SetupLogger(cfg.LogHandler, "starlark", "Compiler")
+		c.logHandler, c.logger = helpers.SetupLogger(c.logHandler, "starlark", "Compiler")
 	}
 
-	return &Compiler{
-		globals:    cfg.Globals,
-		logHandler: handler,
-		logger:     logger,
-	}, nil
+	return c, nil
 }
 
 func (c *Compiler) String() string {

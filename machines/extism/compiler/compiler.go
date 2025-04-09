@@ -24,53 +24,37 @@ type Compiler struct {
 
 // NewCompiler creates a new Extism WASM Compiler instance with the provided options.
 func NewCompiler(opts ...FunctionalOption) (*Compiler, error) {
-	// Initialize config with defaults
-	cfg := &Options{}
-	ApplyDefaults(cfg)
+	// Initialize compiler with empty values
+	c := &Compiler{
+		entryPointName: atomic.Value{},
+		options:        &compile.Settings{},
+	}
+
+	// Apply defaults
+	c.applyDefaults()
 
 	// Apply all options
 	for _, opt := range opts {
-		if err := opt(cfg); err != nil {
+		if err := opt(c); err != nil {
 			return nil, fmt.Errorf("error applying compiler option: %w", err)
 		}
 	}
 
 	// Validate the configuration
-	if err := Validate(cfg); err != nil {
+	if err := c.validate(); err != nil {
 		return nil, fmt.Errorf("invalid compiler configuration: %w", err)
 	}
 
-	var handler slog.Handler
-	var logger *slog.Logger
-
 	// Set up logging based on provided options
-	if cfg.Logger != nil {
+	if c.logger != nil {
 		// User provided a custom logger
-		logger = cfg.Logger
-		handler = logger.Handler()
+		c.logHandler = c.logger.Handler()
 	} else {
 		// User provided a handler or we're using the default
-		handler, logger = helpers.SetupLogger(cfg.LogHandler, "extism", "Compiler")
+		c.logHandler, c.logger = helpers.SetupLogger(c.logHandler, "extism", "Compiler")
 	}
 
-	// Set up entry point name in atomic.Value
-	var entryPointAtomicValue atomic.Value
-	entryPointAtomicValue.Store(cfg.EntryPoint)
-
-	// Create compile options from config
-	compileOpts := &compile.Settings{
-		EnableWASI:    cfg.EnableWASI,
-		RuntimeConfig: cfg.RuntimeConfig,
-		HostFunctions: cfg.HostFunctions,
-	}
-
-	return &Compiler{
-		entryPointName: entryPointAtomicValue,
-		ctx:            context.Background(),
-		options:        compileOpts,
-		logHandler:     handler,
-		logger:         logger,
-	}, nil
+	return c, nil
 }
 
 func (c *Compiler) String() string {
@@ -157,5 +141,9 @@ func (c *Compiler) SetEntryPointName(fName string) {
 
 // GetEntryPointName is a getter for the func name entrypoint
 func (c *Compiler) GetEntryPointName() string {
-	return c.entryPointName.Load().(string)
+	val := c.entryPointName.Load()
+	if val == nil {
+		return ""
+	}
+	return val.(string)
 }

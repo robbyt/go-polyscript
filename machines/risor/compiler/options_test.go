@@ -12,12 +12,13 @@ func TestWithGlobals(t *testing.T) {
 	// Test that WithGlobals properly sets the globals field
 	globals := []string{"ctx", "print"}
 
-	cfg := &Options{}
+	c := &Compiler{}
+	c.applyDefaults()
 	opt := WithGlobals(globals)
-	err := opt(cfg)
+	err := opt(c)
 
 	require.NoError(t, err)
-	require.Equal(t, globals, cfg.Globals)
+	require.Equal(t, globals, c.globals)
 }
 
 func TestWithLogHandler(t *testing.T) {
@@ -25,17 +26,18 @@ func TestWithLogHandler(t *testing.T) {
 	var buf bytes.Buffer
 	handler := slog.NewTextHandler(&buf, nil)
 
-	cfg := &Options{}
+	c := &Compiler{}
+	c.applyDefaults()
 	opt := WithLogHandler(handler)
-	err := opt(cfg)
+	err := opt(c)
 
 	require.NoError(t, err)
-	require.Equal(t, handler, cfg.LogHandler)
-	require.Nil(t, cfg.Logger) // Should clear Logger field
+	require.Equal(t, handler, c.logHandler)
+	require.Nil(t, c.logger) // Should clear Logger field
 
 	// Test with nil handler
 	nilOpt := WithLogHandler(nil)
-	err = nilOpt(cfg)
+	err = nilOpt(c)
 
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "log handler cannot be nil")
@@ -47,46 +49,47 @@ func TestWithLogger(t *testing.T) {
 	handler := slog.NewTextHandler(&buf, nil)
 	logger := slog.New(handler)
 
-	cfg := &Options{}
+	c := &Compiler{}
+	c.applyDefaults()
 	opt := WithLogger(logger)
-	err := opt(cfg)
+	err := opt(c)
 
 	require.NoError(t, err)
-	require.Equal(t, logger, cfg.Logger)
-	require.Nil(t, cfg.LogHandler) // Should clear LogHandler field
+	require.Equal(t, logger, c.logger)
+	require.Nil(t, c.logHandler) // Should clear LogHandler field
 
 	// Test with nil logger
 	nilOpt := WithLogger(nil)
-	err = nilOpt(cfg)
+	err = nilOpt(c)
 
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "logger cannot be nil")
 }
 
 func TestApplyDefaults(t *testing.T) {
-	// Test that defaults are properly applied to an empty config
-	cfg := &Options{}
-	ApplyDefaults(cfg)
+	// Test that defaults are properly applied to an empty compiler
+	c := &Compiler{}
+	c.applyDefaults()
 
-	require.NotNil(t, cfg.LogHandler)
-	require.Nil(t, cfg.Logger)
-	require.NotNil(t, cfg.Globals)
-	require.Empty(t, cfg.Globals)
+	require.NotNil(t, c.logHandler)
+	require.Nil(t, c.logger)
+	require.NotNil(t, c.globals)
+	require.Empty(t, c.globals)
 }
 
 func TestValidate(t *testing.T) {
-	// Test validation with empty config
-	cfg := &Options{}
-	ApplyDefaults(cfg)
+	// Test validation with empty compiler
+	c := &Compiler{}
+	c.applyDefaults()
 
-	err := Validate(cfg)
+	err := c.validate()
 	require.NoError(t, err)
 
 	// Test validation with manually cleared logger and handler
-	cfg.LogHandler = nil
-	cfg.Logger = nil
+	c.logHandler = nil
+	c.logger = nil
 
-	err = Validate(cfg)
+	err = c.validate()
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "either log handler or logger must be specified")
 }

@@ -9,29 +9,22 @@ import (
 	"github.com/robbyt/go-polyscript/execution/constants"
 )
 
-// Option holds the configuration for the Starlark compiler
-type Option struct {
-	Globals    []string
-	LogHandler slog.Handler
-	Logger     *slog.Logger
-}
-
-// FunctionalOption is a function that configures a compilerOptions instance
-type FunctionalOption func(*Option) error
+// FunctionalOption is a function that configures a Compiler instance
+type FunctionalOption func(*Compiler) error
 
 // WithGlobals creates an option to set the globals for Starlark scripts
 func WithGlobals(globals []string) FunctionalOption {
-	return func(cfg *Option) error {
-		cfg.Globals = globals
+	return func(c *Compiler) error {
+		c.globals = globals
 		return nil
 	}
 }
 
 // WithCtxGlobal is a convenience option to set the user-specified global to 'ctx'
 func WithCtxGlobal() FunctionalOption {
-	return func(cfg *Option) error {
-		if !slices.Contains(cfg.Globals, constants.Ctx) {
-			cfg.Globals = append(cfg.Globals, constants.Ctx)
+	return func(c *Compiler) error {
+		if !slices.Contains(c.globals, constants.Ctx) {
+			c.globals = append(c.globals, constants.Ctx)
 		}
 		return nil
 	}
@@ -41,13 +34,13 @@ func WithCtxGlobal() FunctionalOption {
 // This is the preferred option for logging configuration as it provides
 // more flexibility through the slog.Handler interface.
 func WithLogHandler(handler slog.Handler) FunctionalOption {
-	return func(cfg *Option) error {
+	return func(c *Compiler) error {
 		if handler == nil {
 			return fmt.Errorf("log handler cannot be nil")
 		}
-		cfg.LogHandler = handler
+		c.logHandler = handler
 		// Clear logger if handler is explicitly set
-		cfg.Logger = nil
+		c.logger = nil
 		return nil
 	}
 }
@@ -56,36 +49,36 @@ func WithLogHandler(handler slog.Handler) FunctionalOption {
 // This is less flexible than WithLogHandler but allows users to customize
 // their logging group configuration.
 func WithLogger(logger *slog.Logger) FunctionalOption {
-	return func(cfg *Option) error {
+	return func(c *Compiler) error {
 		if logger == nil {
 			return fmt.Errorf("logger cannot be nil")
 		}
-		cfg.Logger = logger
+		c.logger = logger
 		// Clear handler if logger is explicitly set
-		cfg.LogHandler = nil
+		c.logHandler = nil
 		return nil
 	}
 }
 
-// ApplyDefaults sets the default values for a compilerConfig
-func ApplyDefaults(cfg *Option) {
-	// Default to stderr for logging if neither handler nor logger specified
-	if cfg.LogHandler == nil && cfg.Logger == nil {
-		cfg.LogHandler = slog.NewTextHandler(os.Stderr, nil)
-	}
-
-	// Default to empty globals if not specified
-	if cfg.Globals == nil {
-		cfg.Globals = []string{}
-	}
-}
-
-// Validate checks if the configuration is valid
-func Validate(cfg *Option) error {
+// validate checks if the compiler configuration is valid
+func (c *Compiler) validate() error {
 	// Ensure we have either a logger or a handler
-	if cfg.LogHandler == nil && cfg.Logger == nil {
+	if c.logHandler == nil && c.logger == nil {
 		return fmt.Errorf("either log handler or logger must be specified")
 	}
 
 	return nil
+}
+
+// applyDefaults sets the default values for a compiler
+func (c *Compiler) applyDefaults() {
+	// Default to stderr for logging if neither handler nor logger specified
+	if c.logHandler == nil && c.logger == nil {
+		c.logHandler = slog.NewTextHandler(os.Stderr, nil)
+	}
+
+	// Default to empty globals if not specified
+	if c.globals == nil {
+		c.globals = []string{}
+	}
 }
