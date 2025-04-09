@@ -23,7 +23,9 @@ func WithGlobals(globals []string) FunctionalOption {
 // WithCtxGlobal is a convenience option to set the user-specified global to 'ctx'
 func WithCtxGlobal() FunctionalOption {
 	return func(c *Compiler) error {
-		if !slices.Contains(c.globals, constants.Ctx) {
+		if len(c.globals) == 0 {
+			c.globals = []string{constants.Ctx}
+		} else if !slices.Contains(c.globals, constants.Ctx) {
 			c.globals = append(c.globals, constants.Ctx)
 		}
 		return nil

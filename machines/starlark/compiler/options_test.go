@@ -20,6 +20,25 @@ func TestWithGlobals(t *testing.T) {
 
 	require.NoError(t, err)
 	require.Equal(t, globals, c.globals)
+
+	// Test with nil globals
+	c = &Compiler{}
+	c.applyDefaults()
+	nilOpt := WithGlobals(nil)
+	err = nilOpt(c)
+
+	require.NoError(t, err)
+	require.Nil(t, c.globals)
+
+	// Test with empty globals
+	c = &Compiler{}
+	c.applyDefaults()
+	emptyOpt := WithGlobals([]string{})
+	err = emptyOpt(c)
+
+	require.NoError(t, err)
+	require.NotNil(t, c.globals)
+	require.Empty(t, c.globals)
 }
 
 func TestWithCtxGlobal(t *testing.T) {
@@ -45,6 +64,13 @@ func TestWithCtxGlobal(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, []string{constants.Ctx, "request"}, c3.globals)
 	require.Len(t, c3.globals, 2) // Should not add duplicate
+
+	// Test with nil globals
+	c4 := &Compiler{globals: nil}
+	err = opt(c4)
+
+	require.NoError(t, err)
+	require.Equal(t, []string{constants.Ctx}, c4.globals)
 }
 
 func TestWithLogHandler(t *testing.T) {
@@ -93,18 +119,53 @@ func TestWithLogger(t *testing.T) {
 }
 
 func TestApplyDefaults(t *testing.T) {
-	// Test that defaults are properly applied to an empty compiler
-	c := &Compiler{}
-	c.applyDefaults()
+	t.Run("empty compiler", func(t *testing.T) {
+		// Test that defaults are properly applied to an empty compiler
+		c := &Compiler{}
+		c.applyDefaults()
 
-	require.NotNil(t, c.logHandler)
-	require.Nil(t, c.logger)
-	require.NotNil(t, c.globals)
-	require.Empty(t, c.globals)
+		require.NotNil(t, c.logHandler)
+		require.Nil(t, c.logger)
+		require.NotNil(t, c.globals)
+		require.Empty(t, c.globals)
+	})
+
+	t.Run("nil globals", func(t *testing.T) {
+		// Test with a nil globals field
+		c := &Compiler{
+			globals: nil,
+		}
+		c.applyDefaults()
+
+		require.NotNil(t, c.globals)
+		require.Empty(t, c.globals)
+	})
+
+	t.Run("preserve non-nil globals", func(t *testing.T) {
+		// Test that non-nil globals are preserved
+		globals := []string{"test", "globals"}
+		c := &Compiler{
+			globals: globals,
+		}
+		c.applyDefaults()
+
+		require.Equal(t, globals, c.globals)
+	})
+
+	t.Run("preserve empty globals", func(t *testing.T) {
+		// Test that empty but non-nil globals are preserved
+		c := &Compiler{
+			globals: []string{},
+		}
+		c.applyDefaults()
+
+		require.NotNil(t, c.globals)
+		require.Empty(t, c.globals)
+	})
 }
 
 func TestValidate(t *testing.T) {
-	// Test validation with empty compiler
+	// Test validation with empty compiler after defaults
 	c := &Compiler{}
 	c.applyDefaults()
 
@@ -118,4 +179,19 @@ func TestValidate(t *testing.T) {
 	err = c.validate()
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "either log handler or logger must be specified")
+
+	// Test validation with either logger or handler
+	c = &Compiler{}
+	c.logHandler = slog.NewTextHandler(bytes.NewBuffer(nil), nil)
+	c.logger = nil
+
+	err = c.validate()
+	require.NoError(t, err)
+
+	c = &Compiler{}
+	c.logHandler = nil
+	c.logger = slog.New(slog.NewTextHandler(bytes.NewBuffer(nil), nil))
+
+	err = c.validate()
+	require.NoError(t, err)
 }
