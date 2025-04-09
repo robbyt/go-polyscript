@@ -109,29 +109,28 @@ func (c *Compiler) applyDefaults() {
 		c.logHandler = slog.NewTextHandler(os.Stderr, nil)
 	}
 
-	// Set default entry point if empty
+	// Set default entry point
 	if c.entryPointName == "" {
 		c.entryPointName = defaultEntryPoint
 	}
 
-	// Initialize options with defaults if nil
+	// Initialize options struct if nil
 	if c.options == nil {
-		c.options = &compile.Settings{
-			EnableWASI:    true,
-			RuntimeConfig: wazero.NewRuntimeConfig(),
-			HostFunctions: []extismSDK.HostFunction{},
-		}
-	} else {
-		// Set individual defaults if not already set
-		if c.options.RuntimeConfig == nil {
-			c.options.RuntimeConfig = wazero.NewRuntimeConfig()
-		}
-		if c.options.HostFunctions == nil {
-			c.options.HostFunctions = []extismSDK.HostFunction{}
-		}
-		// Default WASI to true (EnableWASI is a bool so we don't need to check if it's nil)
-		c.options.EnableWASI = true
+		c.options = &compile.Settings{}
 	}
+
+	// Set default runtime config if not already set
+	if c.options.RuntimeConfig == nil {
+		c.options.RuntimeConfig = wazero.NewRuntimeConfig()
+	}
+
+	// Set default host functions if not already set
+	if c.options.HostFunctions == nil {
+		c.options.HostFunctions = []extismSDK.HostFunction{}
+	}
+
+	// Default WASI to true (EnableWASI is a bool so we don't need to check if it's nil)
+	c.options.EnableWASI = true
 
 	// Default context
 	if c.ctx == nil {

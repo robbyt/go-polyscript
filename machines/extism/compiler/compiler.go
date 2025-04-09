@@ -23,11 +23,8 @@ type Compiler struct {
 
 // NewCompiler creates a new Extism WASM Compiler instance with the provided options.
 func NewCompiler(opts ...FunctionalOption) (*Compiler, error) {
-	// Initialize compiler with empty values
-	c := &Compiler{
-		entryPointName: defaultEntryPoint,
-		options:        &compile.Settings{},
-	}
+	// Initialize the compiler with an empty struct
+	c := &Compiler{}
 
 	// Apply defaults
 	c.applyDefaults()
@@ -45,8 +42,10 @@ func NewCompiler(opts ...FunctionalOption) (*Compiler, error) {
 	}
 
 	// Set up logging based on provided options
+	// Note: This must happen after applying options so that any user-specified logger or handler
+	// is properly configured before we complete the setup.
 	if c.logger != nil {
-		// User provided a custom logger
+		// User provided a custom logger - extract its handler
 		c.logHandler = c.logger.Handler()
 	} else {
 		// User provided a handler or we're using the default
