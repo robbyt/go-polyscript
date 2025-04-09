@@ -22,7 +22,7 @@ func (m *MockCompiler) Compile(scriptReader io.ReadCloser) (ExecutableContent, e
 	return execContent, args.Error(1)
 }
 
-// MockExecutableContent is a mock implementation of the ExecutableContent interface.
+// MockExecutableContent is a mock implementation of the ExecutableContent interface for testing.
 type MockExecutableContent struct {
 	mock.Mock
 }
@@ -40,9 +40,4 @@ func (m *MockExecutableContent) GetByteCode() any {
 func (m *MockExecutableContent) GetMachineType() machineTypes.Type {
 	args := m.Called()
 	return args.Get(0).(machineTypes.Type)
-}
-
-func (m *MockExecutableContent) GetBodyChecksum() string {
-	args := m.Called()
-	return args.String(0)
 }

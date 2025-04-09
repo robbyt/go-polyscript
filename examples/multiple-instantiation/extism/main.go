@@ -13,7 +13,7 @@ import (
 	"github.com/robbyt/go-polyscript/engine/options"
 	"github.com/robbyt/go-polyscript/execution/constants"
 	"github.com/robbyt/go-polyscript/execution/data"
-	"github.com/robbyt/go-polyscript/machines/extism"
+	"github.com/robbyt/go-polyscript/machines/extism/compiler"
 )
 
 // ExtismEvaluator is a type alias to make testing cleaner
@@ -67,7 +67,7 @@ func createEvaluator(handler slog.Handler) (ExtismEvaluator, error) {
 		wasmFilePath,
 		options.WithLogHandler(handler),
 		options.WithDataProvider(dataProvider),
-		extism.WithEntryPoint("greet"),
+		compiler.WithEntryPoint("greet"),
 	)
 	if err != nil {
 		logger.Error("Failed to create evaluator", "error", err)

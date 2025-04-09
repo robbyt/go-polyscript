@@ -21,7 +21,6 @@ import (
 var emptyScriptData = make(map[string]any)
 
 // Mock implementations
-
 type mockLoader struct {
 	mock.Mock
 }

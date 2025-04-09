@@ -11,9 +11,9 @@ import (
 	"github.com/robbyt/go-polyscript/execution/script"
 	"github.com/robbyt/go-polyscript/execution/script/loader"
 	"github.com/robbyt/go-polyscript/machines"
-	"github.com/robbyt/go-polyscript/machines/extism"
-	"github.com/robbyt/go-polyscript/machines/risor"
-	"github.com/robbyt/go-polyscript/machines/starlark"
+	extismCompiler "github.com/robbyt/go-polyscript/machines/extism/compiler"
+	risorCompiler "github.com/robbyt/go-polyscript/machines/risor/compiler"
+	starlarkCompiler "github.com/robbyt/go-polyscript/machines/starlark/compiler"
 	"github.com/robbyt/go-polyscript/machines/types"
 )
 
@@ -50,7 +50,10 @@ func FromExtismFileWithData(
 	cfg.SetDataProvider(buildCompositeDataProvider(staticData))
 
 	// Create an evaluator using our custom createExtismEvaluator function
-	return createExtismEvaluator(cfg, []extism.CompilerOption{extism.WithEntryPoint(entryPoint)})
+	return createExtismEvaluator(
+		cfg,
+		[]extismCompiler.FunctionalOption{extismCompiler.WithEntryPoint(entryPoint)},
+	)
 }
 
 // FromRisorFile creates a Risor evaluator from a .risor file
@@ -86,7 +89,7 @@ func FromRisorFileWithData(
 	// Create an evaluator using our custom createRisorEvaluator function
 	return createRisorEvaluator(
 		cfg,
-		[]risor.CompilerOption{risor.WithGlobals([]string{constants.Ctx})},
+		[]risorCompiler.FunctionalOption{risorCompiler.WithGlobals([]string{constants.Ctx})},
 	)
 }
 
@@ -123,7 +126,7 @@ func FromRisorStringWithData(
 	// Create an evaluator using our custom createRisorEvaluator function
 	return createRisorEvaluator(
 		cfg,
-		[]risor.CompilerOption{risor.WithGlobals([]string{constants.Ctx})},
+		[]risorCompiler.FunctionalOption{risorCompiler.WithGlobals([]string{constants.Ctx})},
 	)
 }
 
@@ -160,7 +163,7 @@ func FromStarlarkFileWithData(
 	// Create an evaluator using our custom createStarlarkEvaluator function
 	return createStarlarkEvaluator(
 		cfg,
-		[]starlark.CompilerOption{starlark.WithGlobals([]string{constants.Ctx})},
+		[]starlarkCompiler.FunctionalOption{starlarkCompiler.WithGlobals([]string{constants.Ctx})},
 	)
 }
 
@@ -198,7 +201,7 @@ func FromStarlarkStringWithData(
 	// Create an evaluator using our custom createStarlarkEvaluator function
 	return createStarlarkEvaluator(
 		cfg,
-		[]starlark.CompilerOption{starlark.WithGlobals([]string{constants.Ctx})},
+		[]starlarkCompiler.FunctionalOption{starlarkCompiler.WithGlobals([]string{constants.Ctx})},
 	)
 }
 
@@ -290,13 +293,13 @@ func NewExtismEvaluator(opts ...any) (engine.EvaluatorWithPrep, error) {
 
 	// Separate engine options from machine options
 	var engineOpts []options.Option
-	var machineOpts []extism.CompilerOption
+	var machineOpts []extismCompiler.FunctionalOption
 
 	for _, opt := range opts {
 		switch o := opt.(type) {
 		case options.Option:
 			engineOpts = append(engineOpts, o)
-		case extism.CompilerOption:
+		case extismCompiler.FunctionalOption:
 			machineOpts = append(machineOpts, o)
 		default:
 			return nil, fmt.Errorf("unsupported option type: %T", opt)
@@ -322,7 +325,7 @@ func NewExtismEvaluator(opts ...any) (engine.EvaluatorWithPrep, error) {
 // createExtismEvaluator creates an Extism evaluator with the given options
 func createExtismEvaluator(
 	cfg *options.Config,
-	compilerOptions []extism.CompilerOption,
+	compilerOptions []extismCompiler.FunctionalOption,
 ) (engine.EvaluatorWithPrep, error) {
 	// Create compiler using machine-specific factory function
 	compiler, err := machines.NewExtismCompiler(compilerOptions...)
@@ -366,13 +369,13 @@ func NewRisorEvaluator(opts ...any) (engine.EvaluatorWithPrep, error) {
 
 	// Separate engine options from machine options
 	var engineOpts []options.Option
-	var machineOpts []risor.CompilerOption
+	var machineOpts []risorCompiler.FunctionalOption
 
 	for _, opt := range opts {
 		switch o := opt.(type) {
 		case options.Option:
 			engineOpts = append(engineOpts, o)
-		case risor.CompilerOption:
+		case risorCompiler.FunctionalOption:
 			machineOpts = append(machineOpts, o)
 		default:
 			return nil, fmt.Errorf("unsupported option type: %T", opt)
@@ -398,7 +401,7 @@ func NewRisorEvaluator(opts ...any) (engine.EvaluatorWithPrep, error) {
 // createRisorEvaluator creates a Risor evaluator with the given options
 func createRisorEvaluator(
 	cfg *options.Config,
-	compilerOptions []risor.CompilerOption,
+	compilerOptions []risorCompiler.FunctionalOption,
 ) (engine.EvaluatorWithPrep, error) {
 	// Create compiler using machine-specific factory function
 	compiler, err := machines.NewRisorCompiler(compilerOptions...)
@@ -442,13 +445,13 @@ func NewStarlarkEvaluator(opts ...any) (engine.EvaluatorWithPrep, error) {
 
 	// Separate engine options from machine options
 	var engineOpts []options.Option
-	var machineOpts []starlark.CompilerOption
+	var machineOpts []starlarkCompiler.FunctionalOption
 
 	for _, opt := range opts {
 		switch o := opt.(type) {
 		case options.Option:
 			engineOpts = append(engineOpts, o)
-		case starlark.CompilerOption:
+		case starlarkCompiler.FunctionalOption:
 			machineOpts = append(machineOpts, o)
 		default:
 			return nil, fmt.Errorf("unsupported option type: %T", opt)
@@ -474,7 +477,7 @@ func NewStarlarkEvaluator(opts ...any) (engine.EvaluatorWithPrep, error) {
 // createStarlarkEvaluator creates a Starlark evaluator with the given options
 func createStarlarkEvaluator(
 	cfg *options.Config,
-	compilerOptions []starlark.CompilerOption,
+	compilerOptions []starlarkCompiler.FunctionalOption,
 ) (engine.EvaluatorWithPrep, error) {
 	// Create compiler using machine-specific factory function
 	compiler, err := machines.NewStarlarkCompiler(compilerOptions...)

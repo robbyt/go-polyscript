@@ -12,7 +12,7 @@ import (
 	"github.com/robbyt/go-polyscript/engine/options"
 	"github.com/robbyt/go-polyscript/execution/constants"
 	"github.com/robbyt/go-polyscript/execution/data"
-	"github.com/robbyt/go-polyscript/machines/risor"
+	"github.com/robbyt/go-polyscript/machines/risor/compiler"
 )
 
 // RisorEvaluator is a type alias to make testing cleaner
@@ -40,7 +40,7 @@ func createEvaluator(handler slog.Handler) (RisorEvaluator, error) {
 		options.WithDefaults(),
 		options.WithLogHandler(handler),
 		options.WithDataProvider(ctxProvider),
-		risor.WithGlobals(globals),
+		compiler.WithGlobals(globals),
 	)
 	if err != nil {
 		logger.Error("Failed to create evaluator", "error", err)

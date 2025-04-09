@@ -18,9 +18,9 @@ import (
 	"github.com/robbyt/go-polyscript/execution/constants"
 	"github.com/robbyt/go-polyscript/execution/data"
 	"github.com/robbyt/go-polyscript/execution/script/loader"
-	"github.com/robbyt/go-polyscript/machines/extism"
-	"github.com/robbyt/go-polyscript/machines/risor"
-	"github.com/robbyt/go-polyscript/machines/starlark"
+	extismCompiler "github.com/robbyt/go-polyscript/machines/extism/compiler"
+	risorCompiler "github.com/robbyt/go-polyscript/machines/risor/compiler"
+	starlarkCompiler "github.com/robbyt/go-polyscript/machines/starlark/compiler"
 	"github.com/robbyt/go-polyscript/machines/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -321,14 +321,14 @@ func TestFromStringLoaders(t *testing.T) {
 			name:        "FromStarlarkString - Valid",
 			content:     `print("Hello, World!")`,
 			creator:     FromStarlarkString,
-			options:     []any{starlark.WithGlobals([]string{"ctx"})},
+			options:     []any{starlarkCompiler.WithGlobals([]string{"ctx"})},
 			expectError: false,
 		},
 		{
 			name:        "FromRisorString - Valid",
 			content:     `print("Hello, World!")`,
 			creator:     FromRisorString,
-			options:     []any{risor.WithGlobals([]string{"ctx"})},
+			options:     []any{risorCompiler.WithGlobals([]string{"ctx"})},
 			expectError: false,
 		},
 		{
@@ -418,7 +418,7 @@ _ = result`
 			filePath:   wasmPath,
 			options: []any{
 				options.WithLogHandler(getLogger()),
-				extism.WithEntryPoint("greet"),
+				extismCompiler.WithEntryPoint("greet"),
 				options.WithDataProvider(data.NewStaticProvider(map[string]any{
 					"input": "Test User", // Required for WASM execution
 				})),
@@ -438,7 +438,7 @@ _ = result`
 			filePath:   risorPath,
 			options: []any{
 				options.WithLogHandler(getLogger()),
-				risor.WithGlobals([]string{"ctx"}),
+				risorCompiler.WithGlobals([]string{"ctx"}),
 			},
 			expectError: false,
 		},
@@ -455,7 +455,7 @@ _ = result`
 			filePath:   starlarkPath,
 			options: []any{
 				options.WithLogHandler(getLogger()),
-				starlark.WithGlobals([]string{"ctx"}),
+				starlarkCompiler.WithGlobals([]string{"ctx"}),
 			},
 			expectError: false,
 		},
@@ -511,7 +511,7 @@ func TestDataProviders(t *testing.T) {
 		evaluator, err := FromStarlarkString(
 			script,
 			withCompositeProvider(staticData),
-			starlark.WithGlobals([]string{constants.Ctx}),
+			starlarkCompiler.WithGlobals([]string{constants.Ctx}),
 		)
 		require.NoError(t, err)
 		require.NotNil(t, evaluator)
@@ -549,7 +549,7 @@ func TestEvalHelpers(t *testing.T) {
 			options.WithDefaults(),
 			options.WithLogHandler(getLogger()),
 			withCompositeProvider(map[string]any{}),
-			risor.WithGlobals([]string{constants.Ctx}),
+			risorCompiler.WithGlobals([]string{constants.Ctx}),
 		)
 		require.NoError(t, err)
 
@@ -661,7 +661,7 @@ func TestEvalHelpers(t *testing.T) {
 			script,
 			options.WithDefaults(),
 			options.WithLogHandler(getLogger()),
-			risor.WithGlobals([]string{constants.Ctx}),
+			risorCompiler.WithGlobals([]string{constants.Ctx}),
 		)
 		require.NoError(t, err)
 
@@ -690,7 +690,7 @@ func TestEvalHelpers(t *testing.T) {
 			nilScript,
 			options.WithDefaults(),
 			options.WithLogHandler(getLogger()),
-			risor.WithGlobals([]string{constants.Ctx}),
+			risorCompiler.WithGlobals([]string{constants.Ctx}),
 		)
 		require.NoError(t, err)
 
@@ -704,7 +704,7 @@ func TestEvalHelpers(t *testing.T) {
 			numScript,
 			options.WithDefaults(),
 			options.WithLogHandler(getLogger()),
-			risor.WithGlobals([]string{constants.Ctx}),
+			risorCompiler.WithGlobals([]string{constants.Ctx}),
 		)
 		require.NoError(t, err)
 
@@ -978,7 +978,7 @@ func TestCreateEvaluatorEdgeCases2(t *testing.T) {
 			options.WithDefaults(),
 		)
 
-		// Because we specified risor.WithGlobals, we'll get compiler options error
+		// Because we specified risorCompiler.WithGlobals, we'll get compiler options error
 		require.Error(t, err)
 	})
 }
@@ -1023,7 +1023,7 @@ func TestNewExtismEvaluator(t *testing.T) {
 		options.WithDataProvider(data.NewStaticProvider(map[string]any{
 			"input": "Test User", // Put the input directly at the top level
 		})),
-		extism.WithEntryPoint("greet"),
+		extismCompiler.WithEntryPoint("greet"),
 	)
 
 	require.NoError(t, err)
