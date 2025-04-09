@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/robbyt/go-polyscript/execution/script"
-	"github.com/robbyt/go-polyscript/internal/helpers"
 	"github.com/robbyt/go-polyscript/machines/risor/compiler/internal/compile"
 )
 
@@ -20,40 +19,28 @@ type Compiler struct {
 // NewCompiler creates a new Risor-specific Compiler instance with the provided options.
 // Global variables are used for initial script parsing while building the executable bytecode.
 func NewCompiler(opts ...FunctionalOption) (*Compiler, error) {
-	// Initialize config with defaults
-	cfg := &Options{}
-	ApplyDefaults(cfg)
+	// Initialize the compiler with an empty struct
+	c := &Compiler{}
+
+	// Apply defaults
+	c.applyDefaults()
 
 	// Apply all options
 	for _, opt := range opts {
-		if err := opt(cfg); err != nil {
+		if err := opt(c); err != nil {
 			return nil, fmt.Errorf("error applying compiler option: %w", err)
 		}
 	}
 
 	// Validate the configuration
-	if err := Validate(cfg); err != nil {
+	if err := c.validate(); err != nil {
 		return nil, fmt.Errorf("invalid compiler configuration: %w", err)
 	}
 
-	var handler slog.Handler
-	var logger *slog.Logger
+	// Finalize logger setup after all options have been applied
+	c.setupLogger()
 
-	// Set up logging based on provided options
-	if cfg.Logger != nil {
-		// User provided a custom logger
-		logger = cfg.Logger
-		handler = logger.Handler()
-	} else {
-		// User provided a handler or we're using the default
-		handler, logger = helpers.SetupLogger(cfg.LogHandler, "risor", "Compiler")
-	}
-
-	return &Compiler{
-		globals:    cfg.Globals,
-		logHandler: handler,
-		logger:     logger,
-	}, nil
+	return c, nil
 }
 
 func (c *Compiler) String() string {
@@ -89,7 +76,6 @@ func (c *Compiler) compile(scriptBodyBytes []byte) (*executable, error) {
 	// Check for empty script
 	trimmedScript := strings.TrimSpace(scriptContent)
 	if trimmedScript == "" {
-		logger.Warn("Empty script content")
 		return nil, ErrNoInstructions
 	}
 
@@ -104,36 +90,32 @@ func (c *Compiler) compile(scriptBodyBytes []byte) (*executable, error) {
 		}
 	}
 	if isCommentOnly {
-		logger.Warn("Script contains only comments")
+		logger.Debug("Script contains only comments")
 		return nil, ErrNoInstructions
 	}
 
-	logger.Debug("Starting validation", "script", scriptContent, "globals", c.globals)
+	logger.Debug("Starting Risor compilation", "scriptLength", len(trimmedScript))
 
 	bc, err := compile.CompileWithGlobals(&scriptContent, c.globals)
 	if err != nil {
-		logger.Warn("Compilation failed", "error", err)
 		return nil, fmt.Errorf("%w: %w", ErrValidationFailed, err)
 	}
 
 	if bc == nil {
-		logger.Error("Compilation returned nil bytecode")
 		return nil, ErrBytecodeNil
 	}
 
 	instructionCount := bc.InstructionCount()
-	logger.Debug("Compilation successful", "instructionCount", instructionCount)
+	logger.Debug("Bytecode compile completed", "instructionCount", instructionCount)
 	if instructionCount < 1 {
-		logger.Warn("Bytecode has zero instructions")
 		return nil, ErrNoInstructions
 	}
 
 	risorExec := newExecutable(scriptBodyBytes, bc)
 	if risorExec == nil {
-		logger.Warn("Failed to create Executable from bytecode")
 		return nil, ErrExecCreationFailed
 	}
 
-	logger.Debug("Validation completed")
+	logger.Debug("Risor compilation completed")
 	return risorExec, nil
 }

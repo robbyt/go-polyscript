@@ -1,34 +1,27 @@
 package compiler
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"os"
 
 	extismSDK "github.com/extism/go-sdk"
+	"github.com/robbyt/go-polyscript/internal/helpers"
+	"github.com/robbyt/go-polyscript/machines/extism/compiler/internal/compile"
 	"github.com/tetratelabs/wazero"
 )
 
-// Options holds the configuration for the Extism compiler
-type Options struct {
-	EntryPoint    string
-	LogHandler    slog.Handler
-	Logger        *slog.Logger
-	EnableWASI    bool
-	RuntimeConfig wazero.RuntimeConfig
-	HostFunctions []extismSDK.HostFunction
-}
-
-// FunctionalOption is a function that configures a Options instance
-type FunctionalOption func(*Options) error
+// FunctionalOption is a function that configures a Compiler instance
+type FunctionalOption func(*Compiler) error
 
 // WithEntryPoint creates an option to set the entry point for Extism WASM modules
 func WithEntryPoint(entryPoint string) FunctionalOption {
-	return func(cfg *Options) error {
+	return func(c *Compiler) error {
 		if entryPoint == "" {
 			return fmt.Errorf("entry point cannot be empty")
 		}
-		cfg.EntryPoint = entryPoint
+		c.entryPointName = entryPoint
 		return nil
 	}
 }
@@ -37,13 +30,13 @@ func WithEntryPoint(entryPoint string) FunctionalOption {
 // This is the preferred option for logging configuration as it provides
 // more flexibility through the slog.Handler interface.
 func WithLogHandler(handler slog.Handler) FunctionalOption {
-	return func(cfg *Options) error {
+	return func(c *Compiler) error {
 		if handler == nil {
 			return fmt.Errorf("log handler cannot be nil")
 		}
-		cfg.LogHandler = handler
+		c.logHandler = handler
 		// Clear logger if handler is explicitly set
-		cfg.Logger = nil
+		c.logger = nil
 		return nil
 	}
 }
@@ -52,85 +45,132 @@ func WithLogHandler(handler slog.Handler) FunctionalOption {
 // This is less flexible than WithLogHandler but allows users to customize
 // their logging group configuration.
 func WithLogger(logger *slog.Logger) FunctionalOption {
-	return func(cfg *Options) error {
+	return func(c *Compiler) error {
 		if logger == nil {
 			return fmt.Errorf("logger cannot be nil")
 		}
-		cfg.Logger = logger
+		c.logger = logger
 		// Clear handler if logger is explicitly set
-		cfg.LogHandler = nil
+		c.logHandler = nil
 		return nil
 	}
 }
 
 // WithWASIEnabled creates an option to enable or disable WASI support
 func WithWASIEnabled(enabled bool) FunctionalOption {
-	return func(cfg *Options) error {
-		cfg.EnableWASI = enabled
+	return func(c *Compiler) error {
+		if c.options == nil {
+			c.options = &compile.Settings{}
+		}
+		c.options.EnableWASI = enabled
 		return nil
 	}
 }
 
 // WithRuntimeConfig creates an option to set a custom wazero runtime configuration
 func WithRuntimeConfig(config wazero.RuntimeConfig) FunctionalOption {
-	return func(cfg *Options) error {
+	return func(c *Compiler) error {
 		if config == nil {
 			return fmt.Errorf("runtime config cannot be nil")
 		}
-		cfg.RuntimeConfig = config
+		if c.options == nil {
+			c.options = &compile.Settings{}
+		}
+		c.options.RuntimeConfig = config
 		return nil
 	}
 }
 
 // WithHostFunctions creates an option to set additional host functions
 func WithHostFunctions(funcs []extismSDK.HostFunction) FunctionalOption {
-	return func(cfg *Options) error {
-		cfg.HostFunctions = funcs
+	return func(c *Compiler) error {
+		if c.options == nil {
+			c.options = &compile.Settings{}
+		}
+		c.options.HostFunctions = funcs
 		return nil
 	}
 }
 
-// ApplyDefaults sets the default values for a compilerConfig
-func ApplyDefaults(cfg *Options) {
-	// Default to stderr for logging if neither handler nor logger specified
-	if cfg.LogHandler == nil && cfg.Logger == nil {
-		cfg.LogHandler = slog.NewTextHandler(os.Stderr, nil)
-	}
-
-	// Default entry point
-	if cfg.EntryPoint == "" {
-		cfg.EntryPoint = defaultEntryPoint
-	}
-
-	// Default WASI setting
-	cfg.EnableWASI = true
-
-	// Default runtime config
-	if cfg.RuntimeConfig == nil {
-		cfg.RuntimeConfig = wazero.NewRuntimeConfig()
-	}
-
-	// Default to empty host functions
-	if cfg.HostFunctions == nil {
-		cfg.HostFunctions = []extismSDK.HostFunction{}
+// WithContext creates an option to set a custom context for the Extism compiler.
+func WithContext(ctx context.Context) FunctionalOption {
+	return func(c *Compiler) error {
+		if ctx == nil {
+			return fmt.Errorf("context cannot be nil")
+		}
+		c.ctx = ctx
+		return nil
 	}
 }
 
-// Validate checks if the configuration is valid
-func Validate(cfg *Options) error {
+// applyDefaults sets the default values for a compiler
+func (c *Compiler) applyDefaults() {
+	// Default to stderr for logging if neither handler nor logger specified
+	if c.logHandler == nil && c.logger == nil {
+		c.logHandler = slog.NewTextHandler(os.Stderr, nil)
+	}
+
+	// Set default entry point
+	if c.entryPointName == "" {
+		c.entryPointName = defaultEntryPoint
+	}
+
+	// Initialize options struct if nil
+	if c.options == nil {
+		c.options = &compile.Settings{}
+	}
+
+	// Set default runtime config if not already set
+	if c.options.RuntimeConfig == nil {
+		c.options.RuntimeConfig = wazero.NewRuntimeConfig()
+	}
+
+	// Set default host functions if not already set
+	if c.options.HostFunctions == nil {
+		c.options.HostFunctions = []extismSDK.HostFunction{}
+	}
+
+	// Default WASI to true (EnableWASI is a bool so we don't need to check if it's nil)
+	c.options.EnableWASI = true
+
+	// Default context
+	if c.ctx == nil {
+		c.ctx = context.Background()
+	}
+}
+
+// setupLogger configures the logger and handler based on the current state.
+// This is idempotent and can be called multiple times during initialization.
+func (c *Compiler) setupLogger() {
+	if c.logger != nil {
+		// When a logger is explicitly set, extract its handler
+		c.logHandler = c.logger.Handler()
+	} else {
+		// Otherwise use the handler (which might be default or custom) to create the logger
+		c.logHandler, c.logger = helpers.SetupLogger(c.logHandler, "extism", "Compiler")
+	}
+}
+
+// validate checks if the compiler configuration is valid
+func (c *Compiler) validate() error {
 	// Ensure we have either a logger or a handler
-	if cfg.LogHandler == nil && cfg.Logger == nil {
+	if c.logHandler == nil && c.logger == nil {
 		return fmt.Errorf("either log handler or logger must be specified")
 	}
 
 	// Entry point must be non-empty
-	if cfg.EntryPoint == "" {
+	if c.entryPointName == "" {
 		return fmt.Errorf("entry point must be specified")
 	}
 
 	// Runtime config cannot be nil
-	if cfg.RuntimeConfig == nil {
+	if c.options == nil || c.options.RuntimeConfig == nil {
 		return fmt.Errorf("runtime config cannot be nil")
+	}
+
+	// Context cannot be nil
+	if c.ctx == nil {
+		return fmt.Errorf("context cannot be nil")
 	}
 
 	return nil

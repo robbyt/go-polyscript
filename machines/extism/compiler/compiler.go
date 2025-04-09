@@ -5,17 +5,15 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"sync/atomic"
 
 	extismSDK "github.com/extism/go-sdk"
 	"github.com/robbyt/go-polyscript/execution/script"
-	"github.com/robbyt/go-polyscript/internal/helpers"
 	"github.com/robbyt/go-polyscript/machines/extism/compiler/internal/compile"
 )
 
 // Compiler implements the script.Compiler interface for WASM modules
 type Compiler struct {
-	entryPointName atomic.Value
+	entryPointName string
 	ctx            context.Context
 	options        *compile.Settings
 	logHandler     slog.Handler
@@ -24,53 +22,28 @@ type Compiler struct {
 
 // NewCompiler creates a new Extism WASM Compiler instance with the provided options.
 func NewCompiler(opts ...FunctionalOption) (*Compiler, error) {
-	// Initialize config with defaults
-	cfg := &Options{}
-	ApplyDefaults(cfg)
+	// Initialize the compiler with an empty struct
+	c := &Compiler{}
+
+	// Apply defaults
+	c.applyDefaults()
 
 	// Apply all options
 	for _, opt := range opts {
-		if err := opt(cfg); err != nil {
+		if err := opt(c); err != nil {
 			return nil, fmt.Errorf("error applying compiler option: %w", err)
 		}
 	}
 
 	// Validate the configuration
-	if err := Validate(cfg); err != nil {
+	if err := c.validate(); err != nil {
 		return nil, fmt.Errorf("invalid compiler configuration: %w", err)
 	}
 
-	var handler slog.Handler
-	var logger *slog.Logger
+	// Finalize logger setup after all options have been applied
+	c.setupLogger()
 
-	// Set up logging based on provided options
-	if cfg.Logger != nil {
-		// User provided a custom logger
-		logger = cfg.Logger
-		handler = logger.Handler()
-	} else {
-		// User provided a handler or we're using the default
-		handler, logger = helpers.SetupLogger(cfg.LogHandler, "extism", "Compiler")
-	}
-
-	// Set up entry point name in atomic.Value
-	var entryPointAtomicValue atomic.Value
-	entryPointAtomicValue.Store(cfg.EntryPoint)
-
-	// Create compile options from config
-	compileOpts := &compile.Settings{
-		EnableWASI:    cfg.EnableWASI,
-		RuntimeConfig: cfg.RuntimeConfig,
-		HostFunctions: cfg.HostFunctions,
-	}
-
-	return &Compiler{
-		entryPointName: entryPointAtomicValue,
-		ctx:            context.Background(),
-		options:        compileOpts,
-		logHandler:     handler,
-		logger:         logger,
-	}, nil
+	return c, nil
 }
 
 func (c *Compiler) String() string {
@@ -104,34 +77,30 @@ func (c *Compiler) Compile(scriptReader io.ReadCloser) (script.ExecutableContent
 
 	logger.Debug("Starting WASM compilation", "scriptLength", len(scriptBytes))
 
-	// Compile the WASM module using the CompileBytes function
+	// Compile the WASM module using the CompileBytes function from the internal compile package
 	plugin, err := compile.CompileBytes(c.ctx, scriptBytes, c.options)
 	if err != nil {
-		logger.Warn("WASM compilation failed", "error", err)
 		return nil, fmt.Errorf("%w: %w", ErrValidationFailed, err)
 	}
 
 	if plugin == nil {
-		logger.Error("Compilation returned nil plugin")
 		return nil, ErrBytecodeNil
 	}
 
 	// Create a temporary instance to verify the entry point exists
 	instance, err := plugin.Instance(c.ctx, extismSDK.PluginInstanceConfig{})
 	if err != nil {
-		logger.Error("Failed to create test instance", "error", err)
 		return nil, fmt.Errorf("%w: failed to create test instance: %w", ErrValidationFailed, err)
 	}
 	defer func() {
 		if err := instance.Close(c.ctx); err != nil {
-			c.logger.Warn("Failed to close Extism plugin instance in compiler", "error", err)
+			logger.Warn("Failed to close Extism plugin instance in compiler", "error", err)
 		}
 	}()
 
 	// Verify the entry point function exists
 	funcName := c.GetEntryPointName()
 	if !instance.FunctionExists(funcName) {
-		logger.Error("Entry point function not found", "function", funcName)
 		return nil, fmt.Errorf(
 			"%w: entry point function '%s' not found",
 			ErrValidationFailed,
@@ -142,20 +111,14 @@ func (c *Compiler) Compile(scriptReader io.ReadCloser) (script.ExecutableContent
 	// Create executable with the compiled plugin
 	executable := NewExecutable(scriptBytes, plugin, funcName)
 	if executable == nil {
-		logger.Warn("Failed to create Executable from WASM plugin")
 		return nil, ErrExecCreationFailed
 	}
 
-	logger.Debug("WASM compilation completed successfully")
+	logger.Debug("WASM compilation completed")
 	return executable, nil
-}
-
-// SetEntryPointName is a way to point the compiler at a different entrypoint in the wasm binary
-func (c *Compiler) SetEntryPointName(fName string) {
-	c.entryPointName.Store(fName)
 }
 
 // GetEntryPointName is a getter for the func name entrypoint
 func (c *Compiler) GetEntryPointName() string {
-	return c.entryPointName.Load().(string)
+	return c.entryPointName
 }
