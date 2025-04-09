@@ -133,11 +133,6 @@ func (c *Compiler) Compile(scriptReader io.ReadCloser) (script.ExecutableContent
 	return executable, nil
 }
 
-// SetEntryPointName is a way to point the compiler at a different entrypoint in the wasm binary
-func (c *Compiler) SetEntryPointName(fName string) {
-	c.entryPointName = fName
-}
-
 // GetEntryPointName is a getter for the func name entrypoint
 func (c *Compiler) GetEntryPointName() string {
 	return c.entryPointName
