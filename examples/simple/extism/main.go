@@ -11,7 +11,7 @@ import (
 	"github.com/robbyt/go-polyscript"
 	"github.com/robbyt/go-polyscript/engine/options"
 	"github.com/robbyt/go-polyscript/execution/data"
-	extismCompilerOptions "github.com/robbyt/go-polyscript/machines/extism/compiler"
+	"github.com/robbyt/go-polyscript/machines/extism/compiler"
 )
 
 // findWasmFile searches for the Extism WASM file in various likely locations
@@ -66,7 +66,7 @@ func runExtismExample(handler slog.Handler) (map[string]any, error) {
 		options.WithDefaults(),
 		options.WithLogHandler(handler),
 		options.WithDataProvider(dataProvider),
-		extismCompilerOptions.WithEntryPoint("greet"),
+		compiler.WithEntryPoint("greet"),
 	)
 	if err != nil {
 		logger.Error("Failed to create evaluator", "error", err)
