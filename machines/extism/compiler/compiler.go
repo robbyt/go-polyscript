@@ -87,34 +87,30 @@ func (c *Compiler) Compile(scriptReader io.ReadCloser) (script.ExecutableContent
 
 	logger.Debug("Starting WASM compilation", "scriptLength", len(scriptBytes))
 
-	// Compile the WASM module using the CompileBytes function
+	// Compile the WASM module using the CompileBytes function from the internal compile package
 	plugin, err := compile.CompileBytes(c.ctx, scriptBytes, c.options)
 	if err != nil {
-		logger.Warn("WASM compilation failed", "error", err)
 		return nil, fmt.Errorf("%w: %w", ErrValidationFailed, err)
 	}
 
 	if plugin == nil {
-		logger.Error("Compilation returned nil plugin")
 		return nil, ErrBytecodeNil
 	}
 
 	// Create a temporary instance to verify the entry point exists
 	instance, err := plugin.Instance(c.ctx, extismSDK.PluginInstanceConfig{})
 	if err != nil {
-		logger.Error("Failed to create test instance", "error", err)
 		return nil, fmt.Errorf("%w: failed to create test instance: %w", ErrValidationFailed, err)
 	}
 	defer func() {
 		if err := instance.Close(c.ctx); err != nil {
-			c.logger.Warn("Failed to close Extism plugin instance in compiler", "error", err)
+			logger.Warn("Failed to close Extism plugin instance in compiler", "error", err)
 		}
 	}()
 
 	// Verify the entry point function exists
 	funcName := c.GetEntryPointName()
 	if !instance.FunctionExists(funcName) {
-		logger.Error("Entry point function not found", "function", funcName)
 		return nil, fmt.Errorf(
 			"%w: entry point function '%s' not found",
 			ErrValidationFailed,
@@ -125,11 +121,10 @@ func (c *Compiler) Compile(scriptReader io.ReadCloser) (script.ExecutableContent
 	// Create executable with the compiled plugin
 	executable := NewExecutable(scriptBytes, plugin, funcName)
 	if executable == nil {
-		logger.Warn("Failed to create Executable from WASM plugin")
 		return nil, ErrExecCreationFailed
 	}
 
-	logger.Debug("WASM compilation completed successfully")
+	logger.Debug("WASM compilation completed")
 	return executable, nil
 }
 

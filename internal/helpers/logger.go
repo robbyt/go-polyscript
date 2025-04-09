@@ -26,7 +26,7 @@ func SetupLogger(
 		handler = defaultHandler.WithGroup(vmName)
 		// Create a logger from the handler
 		defaultLogger := slog.New(handler)
-		defaultLogger.Warn("Handler is nil, using the default logger configuration.")
+		defaultLogger.Debug("Handler is nil, using the default logger configuration.")
 	}
 
 	var logger *slog.Logger

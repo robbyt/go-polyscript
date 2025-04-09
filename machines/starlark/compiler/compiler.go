@@ -79,27 +79,24 @@ func (c *Compiler) compile(scriptBodyBytes []byte) (*executable, error) {
 		return nil, ErrContentNil
 	}
 
-	logger.Debug("Starting validation")
+	logger.Debug("Starting Starlark compilation", "scriptLength", len(scriptBodyBytes))
 
 	// Compile the script with globals
 	program, err := compile.CompileWithEmptyGlobals(scriptBodyBytes, c.globals)
 	if err != nil {
-		logger.Warn("Compilation failed", "error", err)
 		return nil, fmt.Errorf("%w: %w", ErrValidationFailed, err)
 	}
 
 	if program == nil {
-		logger.Error("Compilation returned nil program")
 		return nil, ErrBytecodeNil
 	}
 
 	// Create executable with the compiled program
 	starlarkExec := newExecutable(scriptBodyBytes, program)
 	if starlarkExec == nil {
-		logger.Warn("Failed to create Executable from program")
 		return nil, ErrExecCreationFailed
 	}
 
-	logger.Debug("Validation completed")
+	logger.Debug("Starlark compilation completed")
 	return starlarkExec, nil
 }

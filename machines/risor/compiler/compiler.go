@@ -83,7 +83,6 @@ func (c *Compiler) compile(scriptBodyBytes []byte) (*executable, error) {
 	// Check for empty script
 	trimmedScript := strings.TrimSpace(scriptContent)
 	if trimmedScript == "" {
-		logger.Warn("Empty script content")
 		return nil, ErrNoInstructions
 	}
 
@@ -98,36 +97,32 @@ func (c *Compiler) compile(scriptBodyBytes []byte) (*executable, error) {
 		}
 	}
 	if isCommentOnly {
-		logger.Warn("Script contains only comments")
+		logger.Debug("Script contains only comments")
 		return nil, ErrNoInstructions
 	}
 
-	logger.Debug("Starting validation", "script", scriptContent, "globals", c.globals)
+	logger.Debug("Starting Risor compilation", "scriptLength", len(trimmedScript))
 
 	bc, err := compile.CompileWithGlobals(&scriptContent, c.globals)
 	if err != nil {
-		logger.Warn("Compilation failed", "error", err)
 		return nil, fmt.Errorf("%w: %w", ErrValidationFailed, err)
 	}
 
 	if bc == nil {
-		logger.Error("Compilation returned nil bytecode")
 		return nil, ErrBytecodeNil
 	}
 
 	instructionCount := bc.InstructionCount()
-	logger.Debug("Compilation successful", "instructionCount", instructionCount)
+	logger.Debug("Bytecode compile completed", "instructionCount", instructionCount)
 	if instructionCount < 1 {
-		logger.Warn("Bytecode has zero instructions")
 		return nil, ErrNoInstructions
 	}
 
 	risorExec := newExecutable(scriptBodyBytes, bc)
 	if risorExec == nil {
-		logger.Warn("Failed to create Executable from bytecode")
 		return nil, ErrExecCreationFailed
 	}
 
-	logger.Debug("Validation completed")
+	logger.Debug("Risor compilation completed")
 	return risorExec, nil
 }
