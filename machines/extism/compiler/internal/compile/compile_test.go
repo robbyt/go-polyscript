@@ -213,31 +213,31 @@ func TestCompileErrors(t *testing.T) {
 		base64    string
 		opts      *Settings
 		useBase64 bool
-		wantErr   string
+		wantErr   error
 	}{
 		{
 			name:    "nil bytes",
 			input:   nil,
-			wantErr: "wasm content is nil",
+			wantErr: ErrContentNil,
 		},
 		{
 			name:      "invalid base64",
 			base64:    "not-base64-encoded",
 			useBase64: true,
-			wantErr:   "invalid WASM binary (must be base64 encoded)",
+			wantErr:   ErrInvalidBinary,
 		},
 		{
 			name:      "valid base64 but invalid wasm",
 			base64:    base64.StdEncoding.EncodeToString([]byte("not-wasm-binary")),
 			useBase64: true,
-			wantErr:   "failed to compile plugin",
+			wantErr:   ErrCompileFailed,
 		},
 		{
 			name: "corrupted wasm",
 			input: append(
 				[]byte{0x00, 0x61, 0x73, 0x6D, 0x01, 0x00, 0x00, 0x00},
 				[]byte("corrupted")...),
-			wantErr: "failed to compile plugin",
+			wantErr: ErrCompileFailed,
 		},
 	}
 
@@ -250,7 +250,7 @@ func TestCompileErrors(t *testing.T) {
 				_, err = CompileBytes(ctx, tt.input, tt.opts)
 			}
 			require.Error(t, err)
-			require.ErrorContains(t, err, tt.wantErr)
+			assert.ErrorIs(t, err, tt.wantErr)
 		})
 	}
 }

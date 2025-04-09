@@ -15,7 +15,7 @@ func compile(
 	globals starlarkLib.StringDict,
 ) (*starlarkLib.Program, error) {
 	if scriptBodyBytes == nil {
-		return nil, fmt.Errorf("script content is nil")
+		return nil, ErrContentNil
 	}
 
 	if opts == nil {
@@ -38,12 +38,12 @@ func compile(
 	// Parse and compile the script
 	f, err := opts.Parse("", scriptBodyBytes, 0)
 	if err != nil {
-		return nil, fmt.Errorf("compilation error: %w", err)
+		return nil, fmt.Errorf("%w: %w", ErrCompileFailed, err)
 	}
 
 	prog, err := starlarkLib.FileProgram(f, mergedGlobals.Has)
 	if err != nil {
-		return nil, fmt.Errorf("compilation error: %w", err)
+		return nil, fmt.Errorf("%w: %w", ErrCompileFailed, err)
 	}
 
 	return prog, nil
