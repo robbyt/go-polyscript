@@ -1,4 +1,4 @@
-package evaluator
+package internal
 
 import (
 	"encoding/json"
@@ -63,7 +63,7 @@ func TestConvertToExtismFormat(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			result, err := convertToExtismFormat(tt.input)
+			result, err := ConvertToExtismFormat(tt.input)
 
 			if tt.wantErr {
 				require.Error(t, err)

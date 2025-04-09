@@ -6,8 +6,10 @@ package adapters
 
 import (
 	"context"
+	"crypto/rand"
 
 	extismSDK "github.com/extism/go-sdk"
+	"github.com/tetratelabs/wazero"
 )
 
 // SdkPluginInstanceConfig is an interface that wraps Extism extismSDK.PluginInstanceConfig
@@ -15,6 +17,22 @@ import (
 type SdkPluginInstanceConfig interface {
 	CallWithContext(ctx context.Context, functionName string, input []byte) (uint32, []byte, error)
 	Close(ctx context.Context) error
+}
+
+// getPluginInstanceConfig creates a new PluginInstanceConfig with recommended settings.
+func NewPluginInstanceConfig() extismSDK.PluginInstanceConfig {
+	// Create base config if none provided
+	moduleConfig := wazero.NewModuleConfig()
+
+	// Configure with recommended options
+	moduleConfig = moduleConfig.
+		WithSysWalltime().          // For consistent time functions
+		WithSysNanotime().          // For high-precision timing
+		WithRandSource(rand.Reader) // For secure randomness
+
+	return extismSDK.PluginInstanceConfig{
+		ModuleConfig: moduleConfig,
+	}
 }
 
 // sdkCompiledPlugin adapts extismSDK.CompiledPlugin to our compiledPlugin interface

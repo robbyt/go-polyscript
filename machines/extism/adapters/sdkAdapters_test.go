@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // Interface verification test
@@ -38,4 +39,13 @@ func TestNilPlugin(t *testing.T) {
 	// Test that NewCompiledPluginAdapter returns nil when given a nil plugin
 	adapter := NewCompiledPluginAdapter(nil)
 	assert.Nil(t, adapter, "Expected nil adapter for nil plugin")
+}
+
+func TestGetPluginInstanceConfig(t *testing.T) {
+	// Get the config
+	config := NewPluginInstanceConfig()
+
+	// Should be a valid config
+	require.NotNil(t, config)
+	require.NotNil(t, config.ModuleConfig)
 }

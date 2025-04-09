@@ -187,7 +187,7 @@ func (be *BytecodeEvaluator) Eval(ctx context.Context) (engine.EvaluatorResponse
 	}
 
 	// 3. Convert input data to JSON for passing into the WASM VM
-	runtimeData, err := convertToExtismFormat(rawInputData)
+	runtimeData, err := internal.ConvertToExtismFormat(rawInputData)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal input data: %w", err)
 	}
@@ -196,7 +196,7 @@ func (be *BytecodeEvaluator) Eval(ctx context.Context) (engine.EvaluatorResponse
 	result, err := be.exec(
 		ctx, plugin,
 		wasmExe.GetEntryPoint(),
-		be.getPluginInstanceConfig(),
+		adapters.NewPluginInstanceConfig(),
 		runtimeData,
 	)
 	if err != nil {

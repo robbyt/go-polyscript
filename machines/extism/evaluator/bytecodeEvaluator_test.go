@@ -10,6 +10,7 @@ import (
 	"github.com/robbyt/go-polyscript/execution/constants"
 	"github.com/robbyt/go-polyscript/execution/data"
 	"github.com/robbyt/go-polyscript/execution/script"
+	"github.com/robbyt/go-polyscript/machines/extism/internal"
 	machineTypes "github.com/robbyt/go-polyscript/machines/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -171,18 +172,6 @@ func TestEvaluatorString(t *testing.T) {
 	// Test the string representation
 	strRep := evaluator.String()
 	require.Equal(t, "extism.BytecodeEvaluator", strRep)
-}
-
-func TestGetPluginInstanceConfig(t *testing.T) {
-	handler := slog.NewTextHandler(os.Stdout, nil)
-	evaluator := NewBytecodeEvaluator(handler, nil)
-
-	// Get the config
-	config := evaluator.getPluginInstanceConfig()
-
-	// Should be a valid config
-	require.NotNil(t, config)
-	require.NotNil(t, config.ModuleConfig)
 }
 
 func TestEvalWithNilExecutableUnit(t *testing.T) {
@@ -681,7 +670,7 @@ func TestExtismDirectInputFormat(t *testing.T) {
 	t.Logf("Input data structure: %#v", inputData)
 
 	// Convert the input data for Extism
-	jsonBytes, err := convertToExtismFormat(inputData)
+	jsonBytes, err := internal.ConvertToExtismFormat(inputData)
 	require.NoError(t, err)
 	require.NotNil(t, jsonBytes)
 
