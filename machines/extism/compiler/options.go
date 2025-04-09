@@ -7,6 +7,7 @@ import (
 	"os"
 
 	extismSDK "github.com/extism/go-sdk"
+	"github.com/robbyt/go-polyscript/internal/helpers"
 	"github.com/robbyt/go-polyscript/machines/extism/compiler/internal/compile"
 	"github.com/tetratelabs/wazero"
 )
@@ -135,6 +136,18 @@ func (c *Compiler) applyDefaults() {
 	// Default context
 	if c.ctx == nil {
 		c.ctx = context.Background()
+	}
+}
+
+// setupLogger configures the logger and handler based on the current state.
+// This is idempotent and can be called multiple times during initialization.
+func (c *Compiler) setupLogger() {
+	if c.logger != nil {
+		// When a logger is explicitly set, extract its handler
+		c.logHandler = c.logger.Handler()
+	} else {
+		// Otherwise use the handler (which might be default or custom) to create the logger
+		c.logHandler, c.logger = helpers.SetupLogger(c.logHandler, "extism", "Compiler")
 	}
 }
 

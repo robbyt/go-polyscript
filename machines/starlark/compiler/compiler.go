@@ -6,7 +6,6 @@ import (
 	"log/slog"
 
 	"github.com/robbyt/go-polyscript/execution/script"
-	"github.com/robbyt/go-polyscript/internal/helpers"
 	"github.com/robbyt/go-polyscript/machines/starlark/compiler/internal/compile"
 )
 
@@ -37,16 +36,8 @@ func NewCompiler(opts ...FunctionalOption) (*Compiler, error) {
 		return nil, fmt.Errorf("invalid compiler configuration: %w", err)
 	}
 
-	// Set up logging based on provided options
-	// Note: This must happen after applying options so that any user-specified logger or handler
-	// is properly configured before we complete the setup.
-	if c.logger != nil {
-		// User provided a custom logger - extract its handler
-		c.logHandler = c.logger.Handler()
-	} else {
-		// User provided a handler or we're using the default
-		c.logHandler, c.logger = helpers.SetupLogger(c.logHandler, "starlark", "Compiler")
-	}
+	// Finalize logger setup after all options have been applied
+	c.setupLogger()
 
 	return c, nil
 }

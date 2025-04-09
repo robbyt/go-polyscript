@@ -7,6 +7,7 @@ import (
 	"slices"
 
 	"github.com/robbyt/go-polyscript/execution/constants"
+	"github.com/robbyt/go-polyscript/internal/helpers"
 )
 
 // FunctionalOption is a function that configures a Compiler instance
@@ -59,6 +60,18 @@ func WithLogger(logger *slog.Logger) FunctionalOption {
 		// Clear handler if logger is explicitly set
 		c.logHandler = nil
 		return nil
+	}
+}
+
+// setupLogger configures the logger and handler based on the current state.
+// This is idempotent and can be called multiple times during initialization.
+func (c *Compiler) setupLogger() {
+	if c.logger != nil {
+		// When a logger is explicitly set, extract its handler
+		c.logHandler = c.logger.Handler()
+	} else {
+		// Otherwise use the handler (which might be default or custom) to create the logger
+		c.logHandler, c.logger = helpers.SetupLogger(c.logHandler, "risor", "Compiler")
 	}
 }
 

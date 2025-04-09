@@ -73,6 +73,93 @@ func TestWithCtxGlobal(t *testing.T) {
 	require.Equal(t, []string{constants.Ctx}, c4.globals)
 }
 
+func TestLoggerConfiguration(t *testing.T) {
+	t.Run("default initialization", func(t *testing.T) {
+		// Create a compiler with default settings
+		c, err := NewCompiler()
+		require.NoError(t, err)
+
+		// Verify that both logHandler and logger are set
+		require.NotNil(t, c.logHandler, "logHandler should be initialized")
+		require.NotNil(t, c.logger, "logger should be initialized")
+	})
+
+	t.Run("with explicit log handler", func(t *testing.T) {
+		// Create a custom handler
+		var buf bytes.Buffer
+		customHandler := slog.NewTextHandler(&buf, nil)
+
+		// Create compiler with the handler
+		c, err := NewCompiler(WithLogHandler(customHandler))
+		require.NoError(t, err)
+
+		// Verify handler was set and used to create logger
+		require.Equal(t, customHandler, c.logHandler, "custom handler should be set")
+		require.NotNil(t, c.logger, "logger should be created from handler")
+
+		// Test logging works with the custom handler
+		c.logger.Info("test message")
+		require.Contains(t, buf.String(), "test message", "log message should be in buffer")
+	})
+
+	t.Run("with explicit logger", func(t *testing.T) {
+		// Create a custom logger
+		var buf bytes.Buffer
+		customHandler := slog.NewTextHandler(&buf, nil)
+		customLogger := slog.New(customHandler)
+
+		// Create compiler with the logger
+		c, err := NewCompiler(WithLogger(customLogger))
+		require.NoError(t, err)
+
+		// Verify logger was set
+		require.Equal(t, customLogger, c.logger, "custom logger should be set")
+		require.NotNil(t, c.logHandler, "handler should be extracted from logger")
+
+		// Test logging works with the custom logger
+		c.logger.Info("test message")
+		require.Contains(t, buf.String(), "test message", "log message should be in buffer")
+	})
+
+	t.Run("with both logger options, last one wins", func(t *testing.T) {
+		// Create two buffers to verify which one receives logs
+		var handlerBuf, loggerBuf bytes.Buffer
+		customHandler := slog.NewTextHandler(&handlerBuf, nil)
+		customLogger := slog.New(slog.NewTextHandler(&loggerBuf, nil))
+
+		// Case 1: Handler then Logger
+		c1, err := NewCompiler(
+			WithLogHandler(customHandler),
+			WithLogger(customLogger),
+		)
+		require.NoError(t, err)
+		require.Equal(t, customLogger, c1.logger, "logger option should take precedence")
+		c1.logger.Info("test message")
+		require.Contains(t, loggerBuf.String(), "test message", "logger buffer should receive logs")
+		require.Empty(t, handlerBuf.String(), "handler buffer should not receive logs")
+
+		// Clear buffers
+		handlerBuf.Reset()
+		loggerBuf.Reset()
+
+		// Case 2: Logger then Handler
+		c2, err := NewCompiler(
+			WithLogger(customLogger),
+			WithLogHandler(customHandler),
+		)
+		require.NoError(t, err)
+		require.Equal(t, customHandler, c2.logHandler, "handler option should take precedence")
+		c2.logger.Info("test message")
+		require.Contains(
+			t,
+			handlerBuf.String(),
+			"test message",
+			"handler buffer should receive logs",
+		)
+		require.Empty(t, loggerBuf.String(), "logger buffer should not receive logs")
+	})
+}
+
 func TestWithLogHandler(t *testing.T) {
 	// Test that WithLogHandler properly sets the handler field
 	var buf bytes.Buffer
