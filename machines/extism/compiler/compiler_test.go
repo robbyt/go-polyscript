@@ -64,22 +64,57 @@ func (m *mockScriptReaderCloser) Close() error {
 	return args.Error(0)
 }
 
-func TestCompiler_String(t *testing.T) {
+func TestNewCompiler(t *testing.T) {
 	t.Parallel()
 
-	// Create a compiler to test the String method
-	comp := createTestCompiler(t, "test_function")
+	t.Run("basic creation", func(t *testing.T) {
+		comp, err := NewCompiler(
+			WithEntryPoint("main"),
+			WithLogHandler(slog.NewTextHandler(io.Discard, nil)),
+		)
+		require.NoError(t, err)
+		require.NotNil(t, comp)
 
-	// Test String method
-	result := comp.String()
-	require.NotEmpty(t, result)
-	require.Contains(t, result, "Compiler")
+		// Test String method
+		result := comp.String()
+		require.NotEmpty(t, result)
+		require.Contains(t, result, "Compiler")
+	})
+
+	t.Run("with entry point", func(t *testing.T) {
+		comp, err := NewCompiler(
+			WithEntryPoint("custom_function"),
+			WithLogHandler(slog.NewTextHandler(io.Discard, nil)),
+		)
+		require.NoError(t, err)
+		require.NotNil(t, comp)
+	})
+
+	t.Run("with custom runtime config", func(t *testing.T) {
+		comp, err := NewCompiler(
+			WithEntryPoint("main"),
+			WithLogHandler(slog.NewTextHandler(io.Discard, nil)),
+			WithRuntimeConfig(wazero.NewRuntimeConfig()),
+		)
+		require.NoError(t, err)
+		require.NotNil(t, comp)
+	})
+
+	t.Run("with custom logger", func(t *testing.T) {
+		handler := slog.NewTextHandler(io.Discard, nil)
+		logger := slog.New(handler)
+		comp, err := NewCompiler(
+			WithEntryPoint("main"),
+			WithLogger(logger),
+		)
+		require.NoError(t, err)
+		require.NotNil(t, comp)
+	})
 }
 
-func TestCompiler(t *testing.T) {
+func TestCompiler_Compile(t *testing.T) {
 	t.Parallel()
 
-	// Success cases
 	t.Run("success cases", func(t *testing.T) {
 		t.Run("valid wasm binary with existing function", func(t *testing.T) {
 			wasmBytes := readTestWasm(t)
@@ -190,7 +225,6 @@ func TestCompiler(t *testing.T) {
 		})
 	})
 
-	// Error cases
 	t.Run("error cases", func(t *testing.T) {
 		t.Run("nil content", func(t *testing.T) {
 			comp, err := NewCompiler(

@@ -9,94 +9,71 @@ import (
 	starlarkLib "go.starlark.net/starlark"
 )
 
-func TestNewExecutableValid(t *testing.T) {
-	content := "print('Hello, World!')"
-	bytecode := &starlarkLib.Program{}
+// TestExecutable tests the functionality of Executable
+func TestExecutable(t *testing.T) {
+	t.Parallel()
 
-	executable := newExecutable([]byte(content), bytecode)
-	require.NotNil(t, executable)
-	assert.Equal(t, content, executable.GetSource())
-	assert.Equal(t, bytecode, executable.GetByteCode())
-	assert.Equal(t, bytecode, executable.GetStarlarkByteCode())
-	assert.Equal(t, machineTypes.Starlark, executable.GetMachineType())
-}
+	// Test creation scenarios
+	t.Run("Creation", func(t *testing.T) {
+		t.Run("valid creation", func(t *testing.T) {
+			content := "print('Hello, World!')"
+			bytecode := &starlarkLib.Program{}
 
-func TestNewExecutableNilContent(t *testing.T) {
-	bytecode := &starlarkLib.Program{}
-	executable := newExecutable(nil, bytecode)
-	require.Nil(t, executable)
-}
+			exe := newExecutable([]byte(content), bytecode)
+			require.NotNil(t, exe)
+			assert.Equal(t, content, exe.GetSource())
+			assert.Equal(t, bytecode, exe.GetByteCode())
+			assert.Equal(t, bytecode, exe.GetStarlarkByteCode())
+			assert.Equal(t, machineTypes.Starlark, exe.GetMachineType())
+		})
 
-func TestNewExecutableNilByteCode(t *testing.T) {
-	content := "print('Hello, World!')"
-	executable := newExecutable([]byte(content), nil)
-	require.Nil(t, executable)
-}
+		t.Run("nil content", func(t *testing.T) {
+			bytecode := &starlarkLib.Program{}
+			exe := newExecutable(nil, bytecode)
+			assert.Nil(t, exe)
+		})
 
-func TestNewExecutableNilContentAndByteCode(t *testing.T) {
-	executable := newExecutable(nil, nil)
-	require.Nil(t, executable)
-}
+		t.Run("nil bytecode", func(t *testing.T) {
+			content := "print('test')"
+			exe := newExecutable([]byte(content), nil)
+			assert.Nil(t, exe)
+		})
 
-func TestExecutable_GetSource(t *testing.T) {
-	content := "print('Hello, World!')"
-	bytecode := &starlarkLib.Program{}
-	executable := newExecutable([]byte(content), bytecode)
-	require.NotNil(t, executable)
+		t.Run("both nil", func(t *testing.T) {
+			exe := newExecutable(nil, nil)
+			assert.Nil(t, exe)
+		})
+	})
 
-	source := executable.GetSource()
-	assert.Equal(t, content, source)
-}
-
-func TestExecutable_GetByteCode(t *testing.T) {
-	content := "print('Hello, World!')"
-	bytecode := &starlarkLib.Program{}
-	executable := newExecutable([]byte(content), bytecode)
-	require.NotNil(t, executable)
-
-	code := executable.GetByteCode()
-	assert.Equal(t, bytecode, code)
-
-	// Test type assertion
-	_, ok := code.(*starlarkLib.Program)
-	assert.True(t, ok)
-}
-
-func TestExecutable_GetStarlarkByteCode(t *testing.T) {
-	content := "print('Hello, World!')"
-	bytecode := &starlarkLib.Program{}
-	executable := newExecutable([]byte(content), bytecode)
-	require.NotNil(t, executable)
-
-	code := executable.GetStarlarkByteCode()
-	assert.Equal(t, bytecode, code)
-}
-
-func TestNewExecutable(t *testing.T) {
-	t.Run("valid creation", func(t *testing.T) {
-		content := "print('test')"
+	// Test getters
+	t.Run("Getters", func(t *testing.T) {
+		content := "print('Hello, World!')"
 		bytecode := &starlarkLib.Program{}
+		executable := newExecutable([]byte(content), bytecode)
+		require.NotNil(t, executable)
 
-		exe := newExecutable([]byte(content), bytecode)
-		require.NotNil(t, exe)
-		assert.Equal(t, content, exe.GetSource())
-		assert.Equal(t, bytecode, exe.ByteCode)
-	})
+		t.Run("GetSource", func(t *testing.T) {
+			source := executable.GetSource()
+			assert.Equal(t, content, source)
+		})
 
-	t.Run("nil content", func(t *testing.T) {
-		bytecode := &starlarkLib.Program{}
-		exe := newExecutable(nil, bytecode)
-		assert.Nil(t, exe)
-	})
+		t.Run("GetByteCode", func(t *testing.T) {
+			code := executable.GetByteCode()
+			assert.Equal(t, bytecode, code)
 
-	t.Run("nil bytecode", func(t *testing.T) {
-		content := "print('test')"
-		exe := newExecutable([]byte(content), nil)
-		assert.Nil(t, exe)
-	})
+			// Test type assertion
+			_, ok := code.(*starlarkLib.Program)
+			assert.True(t, ok)
+		})
 
-	t.Run("both nil", func(t *testing.T) {
-		exe := newExecutable(nil, nil)
-		assert.Nil(t, exe)
+		t.Run("GetStarlarkByteCode", func(t *testing.T) {
+			code := executable.GetStarlarkByteCode()
+			assert.Equal(t, bytecode, code)
+		})
+
+		t.Run("GetMachineType", func(t *testing.T) {
+			machineType := executable.GetMachineType()
+			assert.Equal(t, machineTypes.Starlark, machineType)
+		})
 	})
 }

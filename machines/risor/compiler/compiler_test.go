@@ -40,91 +40,66 @@ func (m *mockScriptReaderCloser) Close() error {
 	return args.Error(0)
 }
 
-type testCase struct {
-	name    string
-	script  string
-	globals []string
-	err     error
-}
-
-// execute a single unit test
-func runTestCase(t *testing.T, tt testCase) {
-	t.Helper()
+func TestNewCompiler(t *testing.T) {
 	t.Parallel()
 
-	// Create compiler with options
-	comp, err := NewCompiler(
-		WithLogHandler(slog.NewTextHandler(os.Stdout, nil)),
-		WithGlobals(tt.globals),
-	)
-	require.NoError(t, err, "Failed to create compiler")
+	t.Run("basic creation", func(t *testing.T) {
+		comp, err := NewCompiler(
+			WithLogHandler(slog.NewTextHandler(os.Stdout, nil)),
+		)
+		require.NoError(t, err)
+		require.NotNil(t, comp)
+		require.Equal(t, "risor.Compiler", comp.String())
+	})
 
-	reader := io.ReadCloser(newMockScriptReaderCloser(tt.script))
-	if mockReader, ok := reader.(*mockScriptReaderCloser); ok {
-		mockReader.On("Close").Return(nil)
-	} else {
-		t.Fatal("Failed to create mock reader")
-	}
+	t.Run("with globals", func(t *testing.T) {
+		globals := []string{"request", "response"}
+		comp, err := NewCompiler(
+			WithLogHandler(slog.NewTextHandler(os.Stdout, nil)),
+			WithGlobals(globals),
+		)
+		require.NoError(t, err)
+		require.NotNil(t, comp)
+	})
 
-	// Execute test
-	execContent, err := comp.Compile(reader)
+	t.Run("with logger", func(t *testing.T) {
+		var buf bytes.Buffer
+		handler := slog.NewTextHandler(&buf, nil)
+		logger := slog.New(handler)
+		comp, err := NewCompiler(WithLogger(logger))
+		require.NoError(t, err)
+		require.NotNil(t, comp)
+	})
 
-	if tt.err != nil {
-		require.Error(t, err, "Expected an error but got none")
-		require.Nil(t, execContent, "Expected execContent to be nil")
-		require.True(t, errors.Is(err, tt.err), "Expected error %v, got %v", tt.err, err)
-		return
-	}
-
-	require.NoError(t, err, "Did not expect an error but got one")
-	require.NotNil(t, execContent, "Expected execContent to be non-nil")
-	require.Equal(t, tt.script, execContent.GetSource(), "Script content does not match")
-
-	// Check that the bytecode is correct
-	risorExec, ok := execContent.(*executable)
-	require.True(t, ok, "Expected execContent to be a *Executable")
-	require.NotNil(t, risorExec.GetRisorByteCode(), "Expected bytecode to be non-nil")
-
-	// Verify mock expectations
-	if mockReader, ok := reader.(*mockScriptReaderCloser); ok {
-		mockReader.AssertExpectations(t)
-	}
+	t.Run("defaults", func(t *testing.T) {
+		comp, err := NewCompiler()
+		require.NoError(t, err)
+		require.NotNil(t, comp)
+	})
 }
 
-func TestCompiler(t *testing.T) {
+func TestCompiler_Compile(t *testing.T) {
 	t.Parallel()
-	tests := []testCase{
-		{
-			name:    "valid script",
-			script:  `print("Hello, World!")`,
-			globals: []string{"request"},
-		},
-		{
-			name:    "syntax error - missing closing parenthesis",
-			script:  `print("Hello, World!"`,
-			globals: []string{"request"},
-			err:     ErrValidationFailed,
-		},
-		{
-			name:    "empty script",
-			script:  ``,
-			globals: []string{"request"},
-			err:     ErrContentNil,
-		},
-		{
-			name:    "undefined global",
-			script:  `print(undefined_global)`,
-			globals: []string{"request"},
-			err:     ErrValidationFailed,
-		},
-		{
-			name:    "with multiple globals",
-			script:  `print(request, response)`,
-			globals: []string{"request", "response"},
-		},
-		{
-			name: "complex valid script with global override",
-			script: `
+
+	t.Run("success cases", func(t *testing.T) {
+		successTests := []struct {
+			name    string
+			script  string
+			globals []string
+		}{
+			{
+				name:    "valid script",
+				script:  `print("Hello, World!")`,
+				globals: []string{"request"},
+			},
+			{
+				name:    "with multiple globals",
+				script:  `print(request, response)`,
+				globals: []string{"request", "response"},
+			},
+			{
+				name: "complex valid script with global override",
+				script: `
 request = true
 func main() {
     if request {
@@ -135,11 +110,11 @@ func main() {
 }
 main()
 `,
-			globals: []string{"request"},
-		},
-		{
-			name: "complex valid script with condition",
-			script: `
+				globals: []string{"request"},
+			},
+			{
+				name: "complex valid script with condition",
+				script: `
 func main() {
     if condition {
         print("Yes")
@@ -149,21 +124,190 @@ func main() {
 }
 main()
 `,
-			globals: []string{"condition"},
-		},
-		{
-			name:    "script using undefined global",
-			script:  `print(undefined)`,
-			globals: []string{"request"},
-			err:     ErrValidationFailed,
-		},
-	}
+				globals: []string{"condition"},
+			},
+		}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			runTestCase(t, tt)
+		for _, tt := range successTests {
+			t.Run(tt.name, func(t *testing.T) {
+				// Create compiler with options
+				comp, err := NewCompiler(
+					WithLogHandler(slog.NewTextHandler(os.Stdout, nil)),
+					WithGlobals(tt.globals),
+				)
+				require.NoError(t, err, "Failed to create compiler")
+
+				reader := io.ReadCloser(newMockScriptReaderCloser(tt.script))
+				if mockReader, ok := reader.(*mockScriptReaderCloser); ok {
+					mockReader.On("Close").Return(nil)
+				} else {
+					t.Fatal("Failed to create mock reader")
+				}
+
+				// Execute test
+				execContent, err := comp.Compile(reader)
+				require.NoError(t, err, "Did not expect an error but got one")
+				require.NotNil(t, execContent, "Expected execContent to be non-nil")
+				require.Equal(
+					t,
+					tt.script,
+					execContent.GetSource(),
+					"Script content does not match",
+				)
+
+				// Check that the bytecode is correct
+				risorExec, ok := execContent.(*executable)
+				require.True(t, ok, "Expected execContent to be a *Executable")
+				require.NotNil(t, risorExec.GetRisorByteCode(), "Expected bytecode to be non-nil")
+
+				// Verify mock expectations
+				if mockReader, ok := reader.(*mockScriptReaderCloser); ok {
+					mockReader.AssertExpectations(t)
+				}
+			})
+		}
+	})
+
+	t.Run("error cases", func(t *testing.T) {
+		errorTests := []struct {
+			name    string
+			script  string
+			globals []string
+			err     error
+		}{
+			{
+				name:    "syntax error - missing closing parenthesis",
+				script:  `print("Hello, World!"`,
+				globals: []string{"request"},
+				err:     ErrValidationFailed,
+			},
+			{
+				name:    "empty script",
+				script:  ``,
+				globals: []string{"request"},
+				err:     ErrContentNil,
+			},
+			{
+				name:    "undefined global",
+				script:  `print(undefined_global)`,
+				globals: []string{"request"},
+				err:     ErrValidationFailed,
+			},
+			{
+				name:    "script using undefined global",
+				script:  `print(undefined)`,
+				globals: []string{"request"},
+				err:     ErrValidationFailed,
+			},
+		}
+
+		for _, tt := range errorTests {
+			t.Run(tt.name, func(t *testing.T) {
+				// Create compiler with options
+				comp, err := NewCompiler(
+					WithLogHandler(slog.NewTextHandler(os.Stdout, nil)),
+					WithGlobals(tt.globals),
+				)
+				require.NoError(t, err, "Failed to create compiler")
+
+				reader := io.ReadCloser(newMockScriptReaderCloser(tt.script))
+				if mockReader, ok := reader.(*mockScriptReaderCloser); ok {
+					mockReader.On("Close").Return(nil)
+				} else {
+					t.Fatal("Failed to create mock reader")
+				}
+
+				// Execute test
+				execContent, err := comp.Compile(reader)
+				require.Error(t, err, "Expected an error but got none")
+				require.Nil(t, execContent, "Expected execContent to be nil")
+				require.True(t, errors.Is(err, tt.err), "Expected error %v, got %v", tt.err, err)
+
+				// Verify mock expectations
+				if mockReader, ok := reader.(*mockScriptReaderCloser); ok {
+					mockReader.AssertExpectations(t)
+				}
+			})
+		}
+
+		t.Run("nil reader", func(t *testing.T) {
+			comp, err := NewCompiler(WithLogHandler(slog.NewTextHandler(os.Stdout, nil)))
+			require.NoError(t, err)
+			require.NotNil(t, comp, "Expected compiler to be non-nil")
+
+			execContent, err := comp.Compile(nil)
+			require.Error(t, err, "Expected an error but got none")
+			require.Nil(t, execContent, "Expected execContent to be nil")
+			require.True(t, errors.Is(err, ErrContentNil), "Expected error to be ErrContentNil")
 		})
-	}
+
+		t.Run("io error", func(t *testing.T) {
+			comp, err := NewCompiler(
+				WithLogHandler(slog.NewTextHandler(os.Stdout, nil)),
+				WithGlobals([]string{"ctx"}),
+			)
+			require.NoError(t, err)
+			require.NotNil(t, comp, "Expected compiler to be non-nil")
+
+			// Create a reader that will return an error
+			reader := &mockErrorReader{}
+			execContent, err := comp.Compile(reader)
+			require.Error(t, err, "Expected an error but got none")
+			require.Nil(t, execContent, "Expected execContent to be nil")
+			require.Contains(
+				t,
+				err.Error(),
+				"failed to read script",
+				"Expected error to contain 'failed to read script'",
+			)
+		})
+
+		t.Run("close error", func(t *testing.T) {
+			comp, err := NewCompiler(
+				WithLogHandler(slog.NewTextHandler(os.Stdout, nil)),
+			)
+			require.NoError(t, err)
+			require.NotNil(t, comp, "Expected compiler to be non-nil")
+
+			// Create a reader that will return an error on close
+			reader := newMockScriptReaderCloser(`print("Hello, World!")`)
+			reader.On("Close").Return(errors.New("test error")).Once()
+
+			execContent, err := comp.Compile(reader)
+			require.Error(t, err, "Expected an error but got none")
+			require.Nil(t, execContent, "Expected execContent to be nil")
+			require.Contains(
+				t,
+				err.Error(),
+				"failed to close reader",
+				"Expected error to contain 'failed to close reader'",
+			)
+		})
+	})
+
+	t.Run("direct bytecode compilation", func(t *testing.T) {
+		comp, err := NewCompiler(
+			WithLogHandler(slog.NewTextHandler(os.Stdout, nil)),
+			WithGlobals([]string{"ctx"}),
+		)
+		require.NoError(t, err)
+		require.NotNil(t, comp, "Expected compiler to be non-nil")
+
+		// Here we test that we can directly call the compile method with a byteslice
+		scriptBytes := []byte(`print("Hello, World!")`)
+		executable, err := comp.compile(scriptBytes)
+		require.NoError(t, err, "Did not expect an error but got one")
+		require.NotNil(t, executable, "Expected execContent to be non-nil")
+		require.Equal(
+			t,
+			string(scriptBytes),
+			executable.GetSource(),
+			"Script content does not match",
+		)
+
+		// Check that the bytecode is valid
+		require.NotNil(t, executable.GetRisorByteCode(), "Expected bytecode to be non-nil")
+	})
 }
 
 func TestCompilerOptions(t *testing.T) {

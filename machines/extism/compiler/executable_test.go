@@ -62,69 +62,107 @@ func (m *MockPluginInstance) Close(ctx context.Context) error {
 	return args.Error(0)
 }
 
-func TestNewExecutable(t *testing.T) {
+// TestExecutable tests the functionality of Executable
+func TestExecutable(t *testing.T) {
 	t.Parallel()
 
-	// Test data
-	wasmBytes := []byte("mock wasm bytes")
-	entryPoint := "run"
+	// Test creation scenarios
+	t.Run("Creation", func(t *testing.T) {
+		// Test data
+		wasmBytes := []byte("mock wasm bytes")
+		entryPoint := "run"
 
-	// Create a mock plugin
-	mockPlugin := new(MockCompiledPlugin)
+		// Create a mock plugin
+		mockPlugin := new(MockCompiledPlugin)
 
-	// Empty entry point test
-	t.Run("empty entry point", func(t *testing.T) {
-		exe := NewExecutable(wasmBytes, mockPlugin, "")
-		assert.Nil(t, exe)
+		t.Run("valid creation", func(t *testing.T) {
+			exe := NewExecutable(wasmBytes, mockPlugin, entryPoint)
+			require.NotNil(t, exe)
+
+			// Verify properties
+			assert.Equal(t, string(wasmBytes), exe.GetSource())
+			assert.Equal(t, mockPlugin, exe.GetByteCode())
+			assert.Equal(t, mockPlugin, exe.GetExtismByteCode())
+			assert.Equal(t, machineTypes.Extism, exe.GetMachineType())
+			assert.Equal(t, entryPoint, exe.GetEntryPoint())
+			assert.False(t, exe.closed.Load())
+		})
+
+		t.Run("empty entry point", func(t *testing.T) {
+			exe := NewExecutable(wasmBytes, mockPlugin, "")
+			assert.Nil(t, exe)
+		})
+
+		t.Run("empty script bytes", func(t *testing.T) {
+			exe := NewExecutable(nil, mockPlugin, entryPoint)
+			assert.Nil(t, exe)
+		})
+
+		t.Run("nil plugin", func(t *testing.T) {
+			exe := NewExecutable(wasmBytes, nil, entryPoint)
+			assert.Nil(t, exe)
+		})
 	})
 
-	// Empty script bytes test
-	t.Run("empty script bytes", func(t *testing.T) {
-		exe := NewExecutable(nil, mockPlugin, entryPoint)
-		assert.Nil(t, exe)
-	})
+	// Test getters
+	t.Run("Getters", func(t *testing.T) {
+		wasmBytes := []byte("mock wasm bytes")
+		entryPoint := "run"
+		mockPlugin := new(MockCompiledPlugin)
 
-	// Nil plugin test
-	t.Run("nil plugin", func(t *testing.T) {
-		exe := NewExecutable(wasmBytes, nil, entryPoint)
-		assert.Nil(t, exe)
-	})
-
-	// Valid creation test
-	t.Run("valid creation", func(t *testing.T) {
 		exe := NewExecutable(wasmBytes, mockPlugin, entryPoint)
 		require.NotNil(t, exe)
 
-		// Verify properties
-		assert.Equal(t, string(wasmBytes), exe.GetSource())
-		assert.Equal(t, mockPlugin, exe.GetByteCode())
-		assert.Equal(t, mockPlugin, exe.GetExtismByteCode())
-		assert.Equal(t, machineTypes.Extism, exe.GetMachineType())
-		assert.Equal(t, entryPoint, exe.GetEntryPoint())
-		assert.False(t, exe.closed.Load())
+		t.Run("GetSource", func(t *testing.T) {
+			source := exe.GetSource()
+			assert.Equal(t, string(wasmBytes), source)
+		})
+
+		t.Run("GetByteCode", func(t *testing.T) {
+			bytecode := exe.GetByteCode()
+			assert.Equal(t, mockPlugin, bytecode)
+		})
+
+		t.Run("GetExtismByteCode", func(t *testing.T) {
+			bytecode := exe.GetExtismByteCode()
+			assert.Equal(t, mockPlugin, bytecode)
+		})
+
+		t.Run("GetMachineType", func(t *testing.T) {
+			machineType := exe.GetMachineType()
+			assert.Equal(t, machineTypes.Extism, machineType)
+		})
+
+		t.Run("GetEntryPoint", func(t *testing.T) {
+			ep := exe.GetEntryPoint()
+			assert.Equal(t, entryPoint, ep)
+		})
 	})
-}
 
-func TestExecutable_Close(t *testing.T) {
-	t.Parallel()
+	// Test Close functionality (specific to Extism)
+	t.Run("Close", func(t *testing.T) {
+		ctx := context.Background()
+		wasmBytes := []byte("mock wasm bytes")
+		entryPoint := "run"
 
-	ctx := context.Background()
-	wasmBytes := []byte("mock wasm bytes")
-	entryPoint := "run"
+		mockPlugin := new(MockCompiledPlugin)
+		mockPlugin.On("Close", ctx).Return(nil)
 
-	mockPlugin := new(MockCompiledPlugin)
-	mockPlugin.On("Close", ctx).Return(nil)
+		exe := NewExecutable(wasmBytes, mockPlugin, entryPoint)
+		require.NotNil(t, exe)
+		assert.False(t, exe.closed.Load())
 
-	exe := NewExecutable(wasmBytes, mockPlugin, entryPoint)
-	require.NotNil(t, exe)
-	assert.False(t, exe.closed.Load())
+		t.Run("first close", func(t *testing.T) {
+			err := exe.Close(ctx)
+			require.NoError(t, err)
+			assert.True(t, exe.closed.Load())
+		})
 
-	err := exe.Close(ctx)
-	require.NoError(t, err)
-	assert.True(t, exe.closed.Load())
+		t.Run("second close (no-op)", func(t *testing.T) {
+			err := exe.Close(ctx)
+			assert.NoError(t, err)
+		})
 
-	err = exe.Close(ctx)
-	assert.NoError(t, err)
-
-	mockPlugin.AssertExpectations(t)
+		mockPlugin.AssertExpectations(t)
+	})
 }
