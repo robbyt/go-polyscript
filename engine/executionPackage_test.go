@@ -12,6 +12,7 @@ import (
 )
 
 func TestNewExecutionPackage(t *testing.T) {
+	t.Parallel()
 	// Setup test mocks
 	mockEvaluator := new(mocks.Evaluator)
 	mockUnit := &script.ExecutableUnit{}
@@ -33,6 +34,7 @@ func TestNewExecutionPackage(t *testing.T) {
 }
 
 func TestExecutionPackage_String(t *testing.T) {
+	t.Parallel()
 	// Setup test mocks
 	mockEvaluator := new(mocks.Evaluator)
 	mockUnit := &script.ExecutableUnit{}
@@ -59,6 +61,7 @@ func TestExecutionPackage_String(t *testing.T) {
 }
 
 func TestExecutionPackage_Getters(t *testing.T) {
+	t.Parallel()
 	// Setup test cases
 	testCases := []struct {
 		name        string
@@ -103,6 +106,7 @@ func TestExecutionPackage_Getters(t *testing.T) {
 }
 
 func TestExecutionPackage_WithNilValues(t *testing.T) {
+	t.Parallel()
 	// Test with nil evaluator (not recommended but should still create the package)
 	execPkgNilEval := engine.NewExecutionPackage(nil, &script.ExecutableUnit{}, 5*time.Second)
 	assert.NotNil(t, execPkgNilEval, "Should create package even with nil evaluator")

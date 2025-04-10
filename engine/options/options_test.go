@@ -47,6 +47,7 @@ func NewMockLoader() *MockLoader {
 }
 
 func TestWithOptions(t *testing.T) {
+	t.Parallel()
 	// Create test config
 	cfg := &Config{
 		machineType: types.Starlark,
@@ -77,6 +78,7 @@ func TestWithOptions(t *testing.T) {
 }
 
 func TestConfigValidation(t *testing.T) {
+	t.Parallel()
 	// Test with missing loader
 	cfg1 := &Config{
 		machineType: types.Starlark,
@@ -105,6 +107,7 @@ func TestConfigValidation(t *testing.T) {
 }
 
 func TestConfigGetters(t *testing.T) {
+	t.Parallel()
 	testHandler := slog.NewTextHandler(os.Stdout, nil)
 	testDataProvider := data.NewStaticProvider(map[string]any{"test": "value"})
 	testLoader := NewMockLoader()

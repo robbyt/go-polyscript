@@ -56,6 +56,7 @@ func (m *mockEvaluatorWithPreparer) PrepareContext(
 }
 
 func TestEvaluatorInterface(t *testing.T) {
+	t.Parallel()
 	// Create a mock evaluator response
 	mockResponse := new(mocks.EvaluatorResponse)
 	mockResponse.On("Interface").Return("test result")
@@ -109,6 +110,7 @@ func TestEvaluatorInterface(t *testing.T) {
 }
 
 func TestEvalDataPreparerInterface(t *testing.T) {
+	t.Parallel()
 	// Create a logger for testing
 	handler := slog.NewTextHandler(os.Stdout, nil)
 
@@ -169,6 +171,7 @@ method + " " + greeting
 }
 
 func TestEvalDataPreparerInterfaceDirectImplementation(t *testing.T) {
+	t.Parallel()
 	// Define a type for the context key to avoid collision
 	type dataKey string
 
@@ -227,6 +230,7 @@ func TestEvalDataPreparerInterfaceDirectImplementation(t *testing.T) {
 }
 
 func TestEvaluatorWithPrepInterface(t *testing.T) {
+	t.Parallel()
 	// Create a mock evaluator response
 	mockResponse := new(mocks.EvaluatorResponse)
 	mockResponse.On("Interface").Return("combined result")
@@ -292,6 +296,7 @@ func TestEvaluatorWithPrepInterface(t *testing.T) {
 }
 
 func TestEvaluatorWithPrepErrors(t *testing.T) {
+	t.Parallel()
 	// Create a logger for testing
 	handler := slog.NewTextHandler(os.Stdout, nil)
 

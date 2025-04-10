@@ -10,6 +10,7 @@ import (
 
 // TestEvaluatorResponseInterface tests all methods of the EvaluatorResponse interface
 func TestEvaluatorResponseInterface(t *testing.T) {
+	t.Parallel()
 	// Create a mock implementation of EvaluatorResponse
 	mockResponse := new(mocks.EvaluatorResponse)
 
@@ -109,6 +110,7 @@ func TestEvaluatorResponseInterface(t *testing.T) {
 
 // TestEvaluatorResponseUsage tests how EvaluatorResponse is typically used in real code
 func TestEvaluatorResponseUsage(t *testing.T) {
+	t.Parallel()
 	// Create a mock implementation
 	mockResponse := new(mocks.EvaluatorResponse)
 
