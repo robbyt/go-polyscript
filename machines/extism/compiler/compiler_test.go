@@ -30,7 +30,7 @@ func createTestCompiler(t *testing.T, entryPoint string) *Compiler {
 
 	comp, err := NewCompiler(
 		WithEntryPoint(entryPoint),
-		WithLogHandler(slog.NewTextHandler(os.Stdout, nil)),
+		WithLogHandler(slog.NewTextHandler(io.Discard, nil)),
 	)
 	require.NoError(t, err)
 	require.NotNil(t, comp)
@@ -63,6 +63,18 @@ func (m *mockScriptReaderCloser) Read(p []byte) (n int, err error) {
 func (m *mockScriptReaderCloser) Close() error {
 	args := m.Called()
 	return args.Error(0)
+}
+
+func TestCompiler_String(t *testing.T) {
+	t.Parallel()
+
+	// Create a compiler to test the String method
+	comp := createTestCompiler(t, "test_function")
+
+	// Test String method
+	result := comp.String()
+	require.NotEmpty(t, result)
+	require.Contains(t, result, "Compiler")
 }
 
 func TestCompiler(t *testing.T) {
@@ -215,71 +227,58 @@ func TestCompiler(t *testing.T) {
 	t.Run("nil content", func(t *testing.T) {
 		t.Parallel()
 
-		// Create compiler using functional options
 		comp, err := NewCompiler(
 			WithEntryPoint("main"),
-			WithLogHandler(slog.NewTextHandler(os.Stdout, nil)),
+			WithLogHandler(slog.NewTextHandler(io.Discard, nil)),
 		)
 		require.NoError(t, err)
 		require.NotNil(t, comp)
 
-		// Compile with nil reader
 		execContent, err := comp.Compile(nil)
 		require.Error(t, err)
 		require.Nil(t, execContent)
-		require.True(t, errors.Is(err, ErrContentNil),
-			"Expected error %v, got %v", ErrContentNil, err)
+		require.True(t, errors.Is(err, ErrContentNil))
 	})
 
 	t.Run("empty content", func(t *testing.T) {
 		t.Parallel()
 
-		// Create compiler using functional options
 		comp, err := NewCompiler(
 			WithEntryPoint("main"),
-			WithLogHandler(slog.NewTextHandler(os.Stdout, nil)),
+			WithLogHandler(slog.NewTextHandler(io.Discard, nil)),
 		)
 		require.NoError(t, err)
 		require.NotNil(t, comp)
 
-		// Create empty reader
 		reader := newMockScriptReaderCloser([]byte{})
 		reader.On("Close").Return(nil)
 
-		// Compile
 		execContent, err := comp.Compile(reader)
 		require.Error(t, err)
 		require.Nil(t, execContent)
-		require.True(t, errors.Is(err, ErrContentNil),
-			"Expected error %v, got %v", ErrContentNil, err)
+		require.ErrorIs(t, err, ErrContentNil)
 
-		// Verify mock expectations
 		reader.AssertExpectations(t)
 	})
 
 	t.Run("invalid wasm binary", func(t *testing.T) {
 		t.Parallel()
 
-		// Create compiler using functional options
 		comp, err := NewCompiler(
 			WithEntryPoint("main"),
-			WithLogHandler(slog.NewTextHandler(os.Stdout, nil)),
+			WithLogHandler(slog.NewTextHandler(io.Discard, nil)),
 		)
 		require.NoError(t, err)
 		require.NotNil(t, comp)
 
-		// Create reader with invalid content
 		reader := newMockScriptReaderCloser([]byte("not-wasm"))
 		reader.On("Close").Return(nil)
 
-		// Compile
 		execContent, err := comp.Compile(reader)
 		require.Error(t, err)
 		require.Nil(t, execContent)
-		require.True(t, errors.Is(err, ErrValidationFailed),
-			"Expected error %v, got %v", ErrValidationFailed, err)
+		require.ErrorIs(t, err, ErrValidationFailed)
 
-		// Verify mock expectations
 		reader.AssertExpectations(t)
 	})
 
@@ -287,26 +286,21 @@ func TestCompiler(t *testing.T) {
 		t.Parallel()
 		wasmBytes := readTestWasm(t)
 
-		// Create compiler with non-existent function
 		comp, err := NewCompiler(
 			WithEntryPoint("nonexistent_function"),
-			WithLogHandler(slog.NewTextHandler(os.Stdout, nil)),
+			WithLogHandler(slog.NewTextHandler(io.Discard, nil)),
 		)
 		require.NoError(t, err)
 		require.NotNil(t, comp)
 
-		// Create mock reader with content
 		reader := newMockScriptReaderCloser(wasmBytes)
 		reader.On("Close").Return(nil)
 
-		// Compile
 		execContent, err := comp.Compile(reader)
 		require.Error(t, err)
 		require.Nil(t, execContent)
-		require.True(t, errors.Is(err, ErrValidationFailed),
-			"Expected error %v, got %v", ErrValidationFailed, err)
+		require.ErrorIs(t, err, ErrValidationFailed)
 
-		// Verify mock expectations
 		reader.AssertExpectations(t)
 	})
 }
