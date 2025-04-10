@@ -36,89 +36,93 @@ func TestWithEntryPoint(t *testing.T) {
 
 func TestLoggerConfiguration(t *testing.T) {
 	t.Parallel()
-	t.Run("default initialization", func(t *testing.T) {
-		// Create a compiler with default settings
-		c, err := NewCompiler()
-		require.NoError(t, err)
 
-		// Verify that both logHandler and logger are set
-		require.NotNil(t, c.logHandler, "logHandler should be initialized")
-		require.NotNil(t, c.logger, "logger should be initialized")
+	// Basic initialization and configuration
+	t.Run("creation and configuration", func(t *testing.T) {
+		t.Parallel()
+
+		t.Run("default initialization", func(t *testing.T) {
+			c, err := NewCompiler()
+			require.NoError(t, err)
+			require.NotNil(t, c.logHandler, "logHandler should be initialized")
+			require.NotNil(t, c.logger, "logger should be initialized")
+		})
+
+		t.Run("with explicit log handler", func(t *testing.T) {
+			var buf bytes.Buffer
+			customHandler := slog.NewTextHandler(&buf, nil)
+
+			c, err := NewCompiler(WithLogHandler(customHandler))
+			require.NoError(t, err)
+
+			require.Equal(t, customHandler, c.logHandler, "custom handler should be set")
+			require.NotNil(t, c.logger, "logger should be created from handler")
+
+			c.logger.Info("test message")
+			require.Contains(t, buf.String(), "test message", "log message should be in buffer")
+		})
+
+		t.Run("with explicit logger", func(t *testing.T) {
+			var buf bytes.Buffer
+			customHandler := slog.NewTextHandler(&buf, nil)
+			customLogger := slog.New(customHandler)
+
+			c, err := NewCompiler(WithLogger(customLogger))
+			require.NoError(t, err)
+
+			require.Equal(t, customLogger, c.logger, "custom logger should be set")
+			require.NotNil(t, c.logHandler, "handler should be extracted from logger")
+
+			c.logger.Info("test message")
+			require.Contains(t, buf.String(), "test message", "log message should be in buffer")
+		})
 	})
 
-	t.Run("with explicit log handler", func(t *testing.T) {
-		// Create a custom handler
-		var buf bytes.Buffer
-		customHandler := slog.NewTextHandler(&buf, nil)
+	// Testing precedence rules
+	t.Run("option precedence", func(t *testing.T) {
+		t.Parallel()
 
-		// Create compiler with the handler
-		c, err := NewCompiler(WithLogHandler(customHandler))
-		require.NoError(t, err)
+		t.Run("last option wins", func(t *testing.T) {
+			var handlerBuf, loggerBuf bytes.Buffer
+			customHandler := slog.NewTextHandler(&handlerBuf, nil)
+			customLogger := slog.New(slog.NewTextHandler(&loggerBuf, nil))
 
-		// Verify handler was set and used to create logger
-		require.Equal(t, customHandler, c.logHandler, "custom handler should be set")
-		require.NotNil(t, c.logger, "logger should be created from handler")
+			// Case 1: Handler then Logger (logger wins)
+			c1, err := NewCompiler(
+				WithLogHandler(customHandler),
+				WithLogger(customLogger),
+			)
+			require.NoError(t, err)
+			require.Equal(t, customLogger, c1.logger, "logger option should take precedence")
+			c1.logger.Info("test message")
+			require.Contains(
+				t,
+				loggerBuf.String(),
+				"test message",
+				"logger buffer should receive logs",
+			)
+			require.Empty(t, handlerBuf.String(), "handler buffer should not receive logs")
 
-		// Test logging works with the custom handler
-		c.logger.Info("test message")
-		require.Contains(t, buf.String(), "test message", "log message should be in buffer")
-	})
+			// Clear buffers
+			handlerBuf.Reset()
+			loggerBuf.Reset()
 
-	t.Run("with explicit logger", func(t *testing.T) {
-		// Create a custom logger
-		var buf bytes.Buffer
-		customHandler := slog.NewTextHandler(&buf, nil)
-		customLogger := slog.New(customHandler)
-
-		// Create compiler with the logger
-		c, err := NewCompiler(WithLogger(customLogger))
-		require.NoError(t, err)
-
-		// Verify logger was set
-		require.Equal(t, customLogger, c.logger, "custom logger should be set")
-		require.NotNil(t, c.logHandler, "handler should be extracted from logger")
-
-		// Test logging works with the custom logger
-		c.logger.Info("test message")
-		require.Contains(t, buf.String(), "test message", "log message should be in buffer")
-	})
-
-	t.Run("with both logger options, last one wins", func(t *testing.T) {
-		// Create two buffers to verify which one receives logs
-		var handlerBuf, loggerBuf bytes.Buffer
-		customHandler := slog.NewTextHandler(&handlerBuf, nil)
-		customLogger := slog.New(slog.NewTextHandler(&loggerBuf, nil))
-
-		// Case 1: Handler then Logger
-		c1, err := NewCompiler(
-			WithLogHandler(customHandler),
-			WithLogger(customLogger),
-		)
-		require.NoError(t, err)
-		require.Equal(t, customLogger, c1.logger, "logger option should take precedence")
-		c1.logger.Info("test message")
-		require.Contains(t, loggerBuf.String(), "test message", "logger buffer should receive logs")
-		require.Empty(t, handlerBuf.String(), "handler buffer should not receive logs")
-
-		// Clear buffers
-		handlerBuf.Reset()
-		loggerBuf.Reset()
-
-		// Case 2: Logger then Handler
-		c2, err := NewCompiler(
-			WithLogger(customLogger),
-			WithLogHandler(customHandler),
-		)
-		require.NoError(t, err)
-		require.Equal(t, customHandler, c2.logHandler, "handler option should take precedence")
-		c2.logger.Info("test message")
-		require.Contains(
-			t,
-			handlerBuf.String(),
-			"test message",
-			"handler buffer should receive logs",
-		)
-		require.Empty(t, loggerBuf.String(), "logger buffer should not receive logs")
+			// Case 2: Logger then Handler (handler wins)
+			c2, err := NewCompiler(
+				WithLogger(customLogger),
+				WithLogHandler(customHandler),
+			)
+			require.NoError(t, err)
+			require.Equal(t, customHandler, c2.logHandler, "handler option should take precedence")
+			c2.logger.Info("test message")
+			require.Contains(
+				t,
+				handlerBuf.String(),
+				"test message",
+				"handler buffer should receive logs",
+			)
+			require.Empty(t, loggerBuf.String(), "logger buffer should not receive logs")
+		})
 	})
 }
 
@@ -167,166 +171,139 @@ func TestWithLogger(t *testing.T) {
 	require.Contains(t, err.Error(), "logger cannot be nil")
 }
 
-func TestWithWASIEnabled(t *testing.T) {
+func TestRuntimeOptions(t *testing.T) {
 	t.Parallel()
 
-	// Test with options initialized
-	t.Run("options initialized", func(t *testing.T) {
-		c := &Compiler{
-			options: &compile.Settings{},
-		}
-		c.applyDefaults()
+	t.Run("WASI options", func(t *testing.T) {
+		t.Parallel()
 
-		// Test enabling WASI
-		enableOpt := WithWASIEnabled(true)
-		err := enableOpt(c)
+		t.Run("enable/disable WASI", func(t *testing.T) {
+			c := &Compiler{
+				options: &compile.Settings{},
+			}
+			c.applyDefaults()
 
-		require.NoError(t, err)
-		require.True(t, c.options.EnableWASI)
+			enableOpt := WithWASIEnabled(true)
+			err := enableOpt(c)
+			require.NoError(t, err)
+			require.True(t, c.options.EnableWASI)
 
-		// Test disabling WASI
-		disableOpt := WithWASIEnabled(false)
-		err = disableOpt(c)
+			disableOpt := WithWASIEnabled(false)
+			err = disableOpt(c)
+			require.NoError(t, err)
+			require.False(t, c.options.EnableWASI)
+		})
 
-		require.NoError(t, err)
-		require.False(t, c.options.EnableWASI)
+		t.Run("with nil options", func(t *testing.T) {
+			c := &Compiler{
+				options: nil,
+			}
+			c.options = &compile.Settings{}
+
+			opt := WithWASIEnabled(true)
+			err := opt(c)
+			require.NoError(t, err)
+			require.True(t, c.options.EnableWASI)
+		})
 	})
 
-	// Note: the WithWASIEnabled function doesn't check if options is nil
-	// because applyDefaults initializes it. This test just verifies its behavior
-	// with a nil options to ensure the code path is covered.
-	t.Run("with nil options", func(t *testing.T) {
-		c := &Compiler{
-			options: nil,
-		}
+	t.Run("runtime config", func(t *testing.T) {
+		t.Parallel()
 
-		// We initialize options first (as applyDefaults would do)
-		c.options = &compile.Settings{}
+		t.Run("normal runtime config", func(t *testing.T) {
+			runtimeConfig := wazero.NewRuntimeConfig()
+			c := &Compiler{
+				options: &compile.Settings{},
+			}
+			c.applyDefaults()
 
-		opt := WithWASIEnabled(true)
-		err := opt(c)
+			opt := WithRuntimeConfig(runtimeConfig)
+			err := opt(c)
+			require.NoError(t, err)
+			require.Equal(t, runtimeConfig, c.options.RuntimeConfig)
+		})
 
-		require.NoError(t, err)
-		require.True(t, c.options.EnableWASI)
-	})
-}
+		t.Run("nil runtime config", func(t *testing.T) {
+			c := &Compiler{
+				options: &compile.Settings{},
+			}
+			c.applyDefaults()
 
-func TestWithRuntimeConfig(t *testing.T) {
-	t.Parallel()
+			nilOpt := WithRuntimeConfig(nil)
+			err := nilOpt(c)
+			require.Error(t, err)
+			require.Contains(t, err.Error(), "runtime config cannot be nil")
+		})
 
-	// Test with normal runtime config
-	t.Run("normal runtime config", func(t *testing.T) {
-		runtimeConfig := wazero.NewRuntimeConfig()
+		t.Run("with nil options", func(t *testing.T) {
+			c := &Compiler{
+				options: nil,
+			}
+			c.options = &compile.Settings{}
+			runtimeConfig := wazero.NewRuntimeConfig()
 
-		c := &Compiler{
-			options: &compile.Settings{},
-		}
-		c.applyDefaults()
-		opt := WithRuntimeConfig(runtimeConfig)
-		err := opt(c)
-
-		require.NoError(t, err)
-		require.Equal(t, runtimeConfig, c.options.RuntimeConfig)
-	})
-
-	// Test with nil runtime config
-	t.Run("nil runtime config", func(t *testing.T) {
-		c := &Compiler{
-			options: &compile.Settings{},
-		}
-		c.applyDefaults()
-
-		nilOpt := WithRuntimeConfig(nil)
-		err := nilOpt(c)
-
-		require.Error(t, err)
-		require.Contains(t, err.Error(), "runtime config cannot be nil")
+			opt := WithRuntimeConfig(runtimeConfig)
+			err := opt(c)
+			require.NoError(t, err)
+			require.Equal(t, runtimeConfig, c.options.RuntimeConfig)
+		})
 	})
 
-	// Note: the WithRuntimeConfig function doesn't check if options is nil
-	// because applyDefaults initializes it. This test just verifies its behavior
-	// with a nil options to ensure the code path is covered.
-	t.Run("with nil options", func(t *testing.T) {
-		c := &Compiler{
-			options: nil,
-		}
+	t.Run("host functions", func(t *testing.T) {
+		t.Parallel()
 
-		// We initialize options first (as applyDefaults would do)
-		c.options = &compile.Settings{}
-		runtimeConfig := wazero.NewRuntimeConfig()
+		t.Run("valid host functions", func(t *testing.T) {
+			testHostFn := extismSDK.NewHostFunctionWithStack(
+				"test_function",
+				func(ctx context.Context, p *extismSDK.CurrentPlugin, stack []uint64) {
+					// No-op function for testing
+				},
+				nil, nil,
+			)
+			testHostFn.SetNamespace("test")
+			hostFuncs := []extismSDK.HostFunction{testHostFn}
 
-		opt := WithRuntimeConfig(runtimeConfig)
-		err := opt(c)
+			c := &Compiler{
+				options: &compile.Settings{},
+			}
+			c.applyDefaults()
 
-		require.NoError(t, err)
-		require.Equal(t, runtimeConfig, c.options.RuntimeConfig)
-	})
-}
+			opt := WithHostFunctions(hostFuncs)
+			err := opt(c)
+			require.NoError(t, err)
+			require.Equal(t, hostFuncs, c.options.HostFunctions)
+		})
 
-func TestWithHostFunctions(t *testing.T) {
-	t.Parallel()
+		t.Run("empty host functions", func(t *testing.T) {
+			c := &Compiler{
+				options: &compile.Settings{},
+			}
+			c.applyDefaults()
 
-	// Test with valid host functions
-	t.Run("valid host functions", func(t *testing.T) {
-		testHostFn := extismSDK.NewHostFunctionWithStack(
-			"test_function",
-			func(ctx context.Context, p *extismSDK.CurrentPlugin, stack []uint64) {
-				// No-op function for testing
-			},
-			nil, nil,
-		)
-		testHostFn.SetNamespace("test")
+			emptyOpt := WithHostFunctions([]extismSDK.HostFunction{})
+			err := emptyOpt(c)
+			require.NoError(t, err)
+			require.Empty(t, c.options.HostFunctions)
+		})
 
-		hostFuncs := []extismSDK.HostFunction{testHostFn}
+		t.Run("with nil options", func(t *testing.T) {
+			c := &Compiler{
+				options: nil,
+			}
+			c.options = &compile.Settings{}
 
-		c := &Compiler{
-			options: &compile.Settings{},
-		}
-		c.applyDefaults()
-		opt := WithHostFunctions(hostFuncs)
-		err := opt(c)
+			testHostFn := extismSDK.NewHostFunctionWithStack(
+				"test_function",
+				func(ctx context.Context, p *extismSDK.CurrentPlugin, stack []uint64) {},
+				nil, nil,
+			)
 
-		require.NoError(t, err)
-		require.Equal(t, hostFuncs, c.options.HostFunctions)
-	})
-
-	// Test with empty host functions
-	t.Run("empty host functions", func(t *testing.T) {
-		c := &Compiler{
-			options: &compile.Settings{},
-		}
-		c.applyDefaults()
-
-		emptyOpt := WithHostFunctions([]extismSDK.HostFunction{})
-		err := emptyOpt(c)
-
-		require.NoError(t, err)
-		require.Empty(t, c.options.HostFunctions)
-	})
-
-	// Note: the WithHostFunctions function doesn't check if options is nil
-	// because applyDefaults initializes it. This test just verifies its behavior
-	// with a nil options to ensure the code path is covered.
-	t.Run("with nil options", func(t *testing.T) {
-		c := &Compiler{
-			options: nil,
-		}
-
-		// We initialize options first (as applyDefaults would do)
-		c.options = &compile.Settings{}
-
-		testHostFn := extismSDK.NewHostFunctionWithStack(
-			"test_function",
-			func(ctx context.Context, p *extismSDK.CurrentPlugin, stack []uint64) {},
-			nil, nil,
-		)
-
-		hostFuncs := []extismSDK.HostFunction{testHostFn}
-		opt := WithHostFunctions(hostFuncs)
-		err := opt(c)
-
-		require.NoError(t, err)
-		require.Equal(t, hostFuncs, c.options.HostFunctions)
+			hostFuncs := []extismSDK.HostFunction{testHostFn}
+			opt := WithHostFunctions(hostFuncs)
+			err := opt(c)
+			require.NoError(t, err)
+			require.Equal(t, hostFuncs, c.options.HostFunctions)
+		})
 	})
 }
 

@@ -108,33 +108,23 @@ func TestNewExecutable(t *testing.T) {
 func TestExecutable_Close(t *testing.T) {
 	t.Parallel()
 
-	// Test data
+	ctx := context.Background()
 	wasmBytes := []byte("mock wasm bytes")
 	entryPoint := "run"
-	ctx := context.Background()
 
-	// Create and setup mock plugin
 	mockPlugin := new(MockCompiledPlugin)
 	mockPlugin.On("Close", ctx).Return(nil)
 
-	// Create executable
 	exe := NewExecutable(wasmBytes, mockPlugin, entryPoint)
 	require.NotNil(t, exe)
-
-	// Verify initial state
 	assert.False(t, exe.closed.Load())
 
-	// Close executable
 	err := exe.Close(ctx)
 	require.NoError(t, err)
-
-	// Verify closed state
 	assert.True(t, exe.closed.Load())
 
-	// Verify idempotent close - should not call plugin Close again
 	err = exe.Close(ctx)
 	assert.NoError(t, err)
 
-	// Verify expectations
 	mockPlugin.AssertExpectations(t)
 }
