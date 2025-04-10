@@ -6,12 +6,12 @@ import (
 	"github.com/robbyt/go-polyscript/execution/data"
 	"github.com/robbyt/go-polyscript/machines/mocks"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestEvaluatorResponseInterface tests all methods of the EvaluatorResponse interface
 func TestEvaluatorResponseInterface(t *testing.T) {
 	t.Parallel()
-	// Create a mock implementation of EvaluatorResponse
 	mockResponse := new(mocks.EvaluatorResponse)
 
 	// Test Type method with various return types
@@ -42,7 +42,6 @@ func TestEvaluatorResponseInterface(t *testing.T) {
 		}
 	})
 
-	// Test Inspect method
 	t.Run("Inspect method", func(t *testing.T) {
 		inspectTests := []struct {
 			name          string
@@ -111,22 +110,19 @@ func TestEvaluatorResponseInterface(t *testing.T) {
 // TestEvaluatorResponseUsage tests how EvaluatorResponse is typically used in real code
 func TestEvaluatorResponseUsage(t *testing.T) {
 	t.Parallel()
-	// Create a mock implementation
 	mockResponse := new(mocks.EvaluatorResponse)
 
 	// Test a typical usage pattern where a string value is returned
 	mockResponse.On("Interface").Return("Hello World").Once()
 	mockResponse.On("Type").Return(data.STRING).Once()
 
-	// Type checking pattern (common in go-polyscript)
+	// Type checking pattern
 	result := mockResponse.Interface()
-	if mockResponse.Type() == data.STRING {
-		strResult, ok := result.(string)
-		assert.True(t, ok, "Should convert to string")
-		assert.Equal(t, "Hello World", strResult, "String value should match")
-	} else {
-		t.Fail()
-	}
+	require.Equal(t, mockResponse.Type(), data.STRING)
+
+	strResult, ok := result.(string)
+	assert.True(t, ok, "Should convert to string")
+	assert.Equal(t, "Hello World", strResult, "String value should match")
 
 	// Test map pattern
 	mapValue := map[string]any{
@@ -138,14 +134,12 @@ func TestEvaluatorResponseUsage(t *testing.T) {
 
 	// Type checking for map
 	result = mockResponse.Interface()
-	if mockResponse.Type() == data.MAP {
-		mapResult, ok := result.(map[string]any)
-		assert.True(t, ok, "Should convert to map")
-		assert.Equal(t, mapValue, mapResult, "Map value should match")
-		assert.Equal(t, "John", mapResult["name"], "Can access map values")
-	} else {
-		t.Fail()
-	}
+	require.Equal(t, mockResponse.Type(), data.MAP)
+
+	mapResult, ok := result.(map[string]any)
+	assert.True(t, ok, "Should convert to map")
+	assert.Equal(t, mapValue, mapResult, "Map value should match")
+	assert.Equal(t, "John", mapResult["name"], "Can access map values")
 
 	// Verify all expected assertions
 	mockResponse.AssertExpectations(t)

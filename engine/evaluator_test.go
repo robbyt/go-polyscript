@@ -65,7 +65,7 @@ func TestEvaluatorInterface(t *testing.T) {
 	mockResponse.On("Type").Return(data.STRING)
 	mockResponse.On("Inspect").Return("test result")
 
-	// Define a type for the context key to avoid collision
+	// use a custom type for the context key lookup, to avoid lint warnings
 	type contextKey string
 	testKey := contextKey("test-key")
 
@@ -172,10 +172,6 @@ method + " " + greeting
 
 func TestEvalDataPreparerInterfaceDirectImplementation(t *testing.T) {
 	t.Parallel()
-	// Define a type for the context key to avoid collision
-	type dataKey string
-
-	// Create a mock data preparer
 	dataPreparer := &mockDataPreparer{}
 
 	// Test with various data types
@@ -186,9 +182,11 @@ func TestEvalDataPreparerInterfaceDirectImplementation(t *testing.T) {
 
 	// Create enriched context with the test data
 	enrichedCtx := ctx
+	type dataKey string
 	for i, item := range []any{data1, data2, data3} {
 		key := dataKey(fmt.Sprintf("data-%d", i))
 		enrichedCtx = context.WithValue(enrichedCtx, key, item)
+		require.NotNil(t, enrichedCtx)
 	}
 
 	// Set up the mock behavior
@@ -200,33 +198,22 @@ func TestEvalDataPreparerInterfaceDirectImplementation(t *testing.T) {
 	require.NotNil(t, resultCtx, "Enriched context should not be nil")
 
 	// Verify data was stored correctly
-	assert.Equal(
-		t,
-		data1,
-		resultCtx.Value(dataKey("data-0")),
-		"First data item should be stored correctly",
-	)
-	assert.Equal(
-		t,
-		data2,
-		resultCtx.Value(dataKey("data-1")),
-		"Second data item should be stored correctly",
-	)
-	assert.Equal(
-		t,
-		data3,
-		resultCtx.Value(dataKey("data-2")),
-		"Third data item should be stored correctly",
-	)
+	for i, item := range []any{data1, data2, data3} {
+		key := dataKey(fmt.Sprintf("data-%d", i))
+		storedItem := resultCtx.Value(key)
+		require.NotNil(t, storedItem, "Stored item should not be nil")
+		assert.Equal(t, item, storedItem, "Stored item should match original data")
+	}
 
 	// Test error case
 	errorPreparer := &mockDataPreparer{}
 	errorPreparer.On("PrepareContext", ctx, []any{"test"}).
 		Return(ctx, errors.New("preparation error"))
 
-	_, err = errorPreparer.PrepareContext(ctx, "test")
+	ogCtx, err := errorPreparer.PrepareContext(ctx, "test")
 	assert.Error(t, err, "Should return an error")
-	assert.Contains(t, err.Error(), "preparation error", "Error message should be preserved")
+	assert.ErrorContains(t, err, "preparation error", "Error message should be preserved")
+	assert.Equal(t, ctx, ogCtx, "Original context should be returned on error")
 }
 
 func TestEvaluatorWithPrepInterface(t *testing.T) {
@@ -239,7 +226,7 @@ func TestEvaluatorWithPrepInterface(t *testing.T) {
 	mockResponse.On("Type").Return(data.STRING)
 	mockResponse.On("Inspect").Return("combined result")
 
-	// Define a type for the context key to avoid collision
+	// use a custom type for the context key lookup, to avoid lint warnings
 	type prepKey string
 	prepDataKey := prepKey("prepared-data")
 
