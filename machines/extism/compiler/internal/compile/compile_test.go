@@ -38,7 +38,6 @@ func TestCompileSuccess(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("default options", func(t *testing.T) {
-		t.Parallel()
 		plugin, err := CompileBytes(ctx, wasmBytes, nil)
 		require.NoError(t, err)
 		require.NotNil(t, plugin)
@@ -55,7 +54,6 @@ func TestCompileSuccess(t *testing.T) {
 	})
 
 	t.Run("custom options", func(t *testing.T) {
-		t.Parallel()
 		opts := &Settings{
 			EnableWASI: true,
 			RuntimeConfig: wazero.NewRuntimeConfig().
@@ -78,7 +76,6 @@ func TestCompileSuccess(t *testing.T) {
 	})
 
 	t.Run("base64 input default options", func(t *testing.T) {
-		t.Parallel()
 		wasmBase64 := base64.StdEncoding.EncodeToString(wasmBytes)
 		plugin, err := CompileBase64(ctx, wasmBase64, nil)
 		require.NoError(t, err)
@@ -96,7 +93,6 @@ func TestCompileSuccess(t *testing.T) {
 	})
 
 	t.Run("base64 input custom options", func(t *testing.T) {
-		t.Parallel()
 		opts := &Settings{
 			EnableWASI:    true,
 			RuntimeConfig: wazero.NewRuntimeConfig(),

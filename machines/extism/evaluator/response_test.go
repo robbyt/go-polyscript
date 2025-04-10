@@ -54,7 +54,6 @@ func TestNewEvalResult(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			handler := slog.NewTextHandler(os.Stdout, nil)
 			result := newEvalResult(handler, tt.value, tt.execTime, tt.versionID)
 			require.NotNil(t, result)
@@ -97,7 +96,6 @@ func TestExecResult_Type(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			handler := slog.NewTextHandler(os.Stdout, nil)
 			result := newEvalResult(handler, tt.value, time.Second, "test-1")
 			assert.Equal(t, tt.expected, result.Type())
@@ -146,7 +144,6 @@ func TestExecResult_String(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			handler := slog.NewTextHandler(os.Stdout, nil)
 			result := newEvalResult(handler, tt.value, tt.execTime, tt.versionID)
 			assert.Equal(t, tt.expected, result.String())
@@ -177,7 +174,6 @@ func TestExecResult_Inspect(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			handler := slog.NewTextHandler(os.Stdout, nil)
 			result := newEvalResult(handler, tt.value, time.Second, "test-1")
 			assert.Equal(t, tt.expected, result.Inspect())

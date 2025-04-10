@@ -13,7 +13,6 @@ func TestBasicAuth(t *testing.T) {
 	t.Parallel()
 
 	t.Run("Valid credentials", func(t *testing.T) {
-		t.Parallel()
 		username := "testuser"
 		password := "testpass"
 
@@ -33,7 +32,6 @@ func TestBasicAuth(t *testing.T) {
 	})
 
 	t.Run("Empty username (no auth applied)", func(t *testing.T) {
-		t.Parallel()
 		username := ""
 		password := "testpass"
 
@@ -52,7 +50,6 @@ func TestBasicAuth(t *testing.T) {
 	})
 
 	t.Run("With context", func(t *testing.T) {
-		t.Parallel()
 		username := "testuser"
 		password := "testpass"
 
@@ -73,7 +70,6 @@ func TestBasicAuth(t *testing.T) {
 	})
 
 	t.Run("With cancelled context", func(t *testing.T) {
-		t.Parallel()
 		username := "testuser"
 		password := "testpass"
 
@@ -92,7 +88,6 @@ func TestBasicAuth(t *testing.T) {
 	})
 
 	t.Run("With timeout context", func(t *testing.T) {
-		t.Parallel()
 		username := "testuser"
 		password := "testpass"
 

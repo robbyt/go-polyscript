@@ -39,8 +39,6 @@ func TestLoggerConfiguration(t *testing.T) {
 
 	// Basic initialization and configuration
 	t.Run("creation and configuration", func(t *testing.T) {
-		t.Parallel()
-
 		t.Run("default initialization", func(t *testing.T) {
 			c, err := NewCompiler()
 			require.NoError(t, err)
@@ -80,8 +78,6 @@ func TestLoggerConfiguration(t *testing.T) {
 
 	// Testing precedence rules
 	t.Run("option precedence", func(t *testing.T) {
-		t.Parallel()
-
 		t.Run("last option wins", func(t *testing.T) {
 			var handlerBuf, loggerBuf bytes.Buffer
 			customHandler := slog.NewTextHandler(&handlerBuf, nil)
@@ -175,8 +171,6 @@ func TestRuntimeOptions(t *testing.T) {
 	t.Parallel()
 
 	t.Run("WASI options", func(t *testing.T) {
-		t.Parallel()
-
 		t.Run("enable/disable WASI", func(t *testing.T) {
 			c := &Compiler{
 				options: &compile.Settings{},
@@ -208,8 +202,6 @@ func TestRuntimeOptions(t *testing.T) {
 	})
 
 	t.Run("runtime config", func(t *testing.T) {
-		t.Parallel()
-
 		t.Run("normal runtime config", func(t *testing.T) {
 			runtimeConfig := wazero.NewRuntimeConfig()
 			c := &Compiler{
@@ -250,8 +242,6 @@ func TestRuntimeOptions(t *testing.T) {
 	})
 
 	t.Run("host functions", func(t *testing.T) {
-		t.Parallel()
-
 		t.Run("valid host functions", func(t *testing.T) {
 			testHostFn := extismSDK.NewHostFunctionWithStack(
 				"test_function",

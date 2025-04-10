@@ -127,8 +127,6 @@ main()
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
 			// Create compiler with options
 			comp, err := NewCompiler(
 				WithLogHandler(slog.NewTextHandler(os.Stdout, nil)),

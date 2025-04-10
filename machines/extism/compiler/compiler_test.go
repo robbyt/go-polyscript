@@ -81,8 +81,6 @@ func TestCompiler(t *testing.T) {
 
 	// Success cases
 	t.Run("success cases", func(t *testing.T) {
-		t.Parallel()
-
 		t.Run("valid wasm binary with existing function", func(t *testing.T) {
 			wasmBytes := readTestWasm(t)
 			entryPoint := "greet"
@@ -194,8 +192,6 @@ func TestCompiler(t *testing.T) {
 
 	// Error cases
 	t.Run("error cases", func(t *testing.T) {
-		t.Parallel()
-
 		t.Run("nil content", func(t *testing.T) {
 			comp, err := NewCompiler(
 				WithEntryPoint("main"),

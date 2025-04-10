@@ -12,8 +12,6 @@ func TestNewFromString(t *testing.T) {
 	t.Parallel()
 
 	t.Run("valid content", func(t *testing.T) {
-		t.Parallel()
-
 		tests := []struct {
 			name    string
 			content string
@@ -49,8 +47,6 @@ func TestNewFromString(t *testing.T) {
 		for _, tc := range tests {
 			tc := tc // Capture range variable
 			t.Run(tc.name, func(t *testing.T) {
-				t.Parallel()
-
 				loader, err := NewFromString(tc.content)
 				require.NoError(t, err)
 				require.NotNil(t, loader)
@@ -67,8 +63,6 @@ func TestNewFromString(t *testing.T) {
 	})
 
 	t.Run("invalid content", func(t *testing.T) {
-		t.Parallel()
-
 		tests := []struct {
 			name    string
 			content string
@@ -86,8 +80,6 @@ func TestNewFromString(t *testing.T) {
 		for _, tc := range tests {
 			tc := tc // Capture range variable
 			t.Run(tc.name, func(t *testing.T) {
-				t.Parallel()
-
 				loader, err := NewFromString(tc.content)
 				require.Error(t, err)
 				require.ErrorIs(t, err, ErrScriptNotAvailable)
@@ -101,8 +93,6 @@ func TestFromString_GetReader(t *testing.T) {
 	t.Parallel()
 
 	t.Run("read content", func(t *testing.T) {
-		t.Parallel()
-
 		content := "test content\nwith multiple lines"
 		loader, err := NewFromString(content)
 		require.NoError(t, err)
@@ -114,8 +104,6 @@ func TestFromString_GetReader(t *testing.T) {
 	})
 
 	t.Run("multiple reads from same loader", func(t *testing.T) {
-		t.Parallel()
-
 		content := FunctionContent
 		loader, err := NewFromString(content)
 		require.NoError(t, err)
@@ -124,8 +112,6 @@ func TestFromString_GetReader(t *testing.T) {
 	})
 
 	t.Run("partial reads", func(t *testing.T) {
-		t.Parallel()
-
 		content := "line1\nline2\nline3\nline4\nline5"
 		loader, err := NewFromString(content)
 		require.NoError(t, err)
@@ -154,8 +140,6 @@ func TestFromString_GetSourceURL(t *testing.T) {
 	t.Parallel()
 
 	t.Run("source url", func(t *testing.T) {
-		t.Parallel()
-
 		content := SimpleContent
 		loader, err := NewFromString(content)
 		require.NoError(t, err)
@@ -172,8 +156,6 @@ func TestFromString_GetSourceURL(t *testing.T) {
 	})
 
 	t.Run("unique urls for different content", func(t *testing.T) {
-		t.Parallel()
-
 		loader1, err := NewFromString("content one")
 		require.NoError(t, err)
 
@@ -189,8 +171,6 @@ func TestFromString_String(t *testing.T) {
 	t.Parallel()
 
 	t.Run("string representation", func(t *testing.T) {
-		t.Parallel()
-
 		// Test with different content lengths
 		tests := []struct {
 			name        string
@@ -212,8 +192,6 @@ func TestFromString_String(t *testing.T) {
 		for _, tc := range tests {
 			tc := tc // Capture range variable
 			t.Run(tc.name, func(t *testing.T) {
-				t.Parallel()
-
 				loader, err := NewFromString(tc.content)
 				require.NoError(t, err)
 

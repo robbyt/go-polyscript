@@ -17,8 +17,6 @@ func TestNewFromHTTP(t *testing.T) {
 	t.Parallel()
 
 	t.Run("Valid HTTPS URL", func(t *testing.T) {
-		t.Parallel()
-
 		// Set up TLS server
 		tlsServer := httptest.NewTLSServer(
 			http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -53,8 +51,6 @@ func TestNewFromHTTP(t *testing.T) {
 	})
 
 	t.Run("Valid HTTP URL", func(t *testing.T) {
-		t.Parallel()
-
 		// Set up HTTP server
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
@@ -81,8 +77,6 @@ func TestNewFromHTTP(t *testing.T) {
 	})
 
 	t.Run("Invalid URL scheme", func(t *testing.T) {
-		t.Parallel()
-
 		testURL := "file:///path/to/script.js"
 
 		loader, err := NewFromHTTP(testURL)
@@ -92,8 +86,6 @@ func TestNewFromHTTP(t *testing.T) {
 	})
 
 	t.Run("Invalid URL format", func(t *testing.T) {
-		t.Parallel()
-
 		testURL := "://invalid-url"
 
 		loader, err := NewFromHTTP(testURL)
@@ -166,8 +158,6 @@ func TestNewFromHTTPWithOptions(t *testing.T) {
 	for _, tc := range tests {
 		tc := tc // Capture range variable
 		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-
 			// Create test server for this test case
 			server := httptest.NewServer(
 				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -217,8 +207,6 @@ func TestFromHTTP_TLSConfig(t *testing.T) {
 	t.Parallel()
 
 	t.Run("with insecure skip verify", func(t *testing.T) {
-		t.Parallel()
-
 		// Create test server for this test
 		server := httptest.NewTLSServer(
 			http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -247,8 +235,6 @@ func TestFromHTTP_TLSConfig(t *testing.T) {
 	})
 
 	t.Run("with custom TLS config", func(t *testing.T) {
-		t.Parallel()
-
 		// Create test server for this test
 		server := httptest.NewTLSServer(
 			http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -285,8 +271,6 @@ func TestFromHTTP_TLSConfig(t *testing.T) {
 	})
 
 	t.Run("TLSConfig takes precedence over InsecureSkipVerify", func(t *testing.T) {
-		t.Parallel()
-
 		// Create test server for this test
 		server := httptest.NewTLSServer(
 			http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -326,8 +310,6 @@ func TestFromHTTP_TLSConfig(t *testing.T) {
 	})
 
 	t.Run("no TLS modifications when neither option is set", func(t *testing.T) {
-		t.Parallel()
-
 		// Create test server for this test
 		server := httptest.NewTLSServer(
 			http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -366,8 +348,6 @@ func TestFromHTTP_GetReader(t *testing.T) {
 
 	// Test with simple basic mocks instead of complex HTTP validation
 	t.Run("successful read", func(t *testing.T) {
-		t.Parallel()
-
 		// Create test server
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
@@ -388,8 +368,6 @@ func TestFromHTTP_GetReader(t *testing.T) {
 	})
 
 	t.Run("unauthorized error", func(t *testing.T) {
-		t.Parallel()
-
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusUnauthorized)
 			_, err := w.Write([]byte("Unauthorized"))
@@ -409,8 +387,6 @@ func TestFromHTTP_GetReader(t *testing.T) {
 	})
 
 	t.Run("not found error", func(t *testing.T) {
-		t.Parallel()
-
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusNotFound)
 			_, err := w.Write([]byte("Not Found"))
@@ -430,8 +406,6 @@ func TestFromHTTP_GetReader(t *testing.T) {
 	})
 
 	t.Run("network error", func(t *testing.T) {
-		t.Parallel()
-
 		// Use any URL since we'll replace the client with a mock
 		testURL := "https://localhost:8080/script.js"
 
@@ -458,8 +432,6 @@ func TestFromHTTP_GetReaderWithContext(t *testing.T) {
 	const testScript = FunctionContent
 
 	t.Run("Success - Background Context", func(t *testing.T) {
-		t.Parallel()
-
 		// Create test server
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
@@ -481,8 +453,6 @@ func TestFromHTTP_GetReaderWithContext(t *testing.T) {
 	})
 
 	t.Run("Failure - Cancelled Context", func(t *testing.T) {
-		t.Parallel()
-
 		// Create test server
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
@@ -516,8 +486,6 @@ func TestFromHTTP_GetReaderWithContext(t *testing.T) {
 	})
 
 	t.Run("Failure - Timeout Context", func(t *testing.T) {
-		t.Parallel()
-
 		// Create test server
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// Delay to ensure timeout happens
@@ -558,8 +526,6 @@ func TestFromHTTP_String(t *testing.T) {
 	t.Parallel()
 
 	t.Run("successful string representation", func(t *testing.T) {
-		t.Parallel()
-
 		// Create test server that returns content
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
@@ -580,8 +546,6 @@ func TestFromHTTP_String(t *testing.T) {
 	})
 
 	t.Run("string representation with network error", func(t *testing.T) {
-		t.Parallel()
-
 		// Create server that deliberately fails connections (invalid port)
 		testURL := "http://localhost:1" // This port is unlikely to be listening
 
@@ -595,8 +559,6 @@ func TestFromHTTP_String(t *testing.T) {
 	})
 
 	t.Run("string representation with HTTP error", func(t *testing.T) {
-		t.Parallel()
-
 		// Create test server that returns an error status
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusNotFound)
@@ -634,8 +596,6 @@ func TestHTTPOptionsWithMethods(t *testing.T) {
 	t.Parallel()
 
 	t.Run("option method chaining", func(t *testing.T) {
-		t.Parallel()
-
 		// Test chaining of option methods
 		options := DefaultHTTPOptions().
 			WithTimeout(60*time.Second).
@@ -651,8 +611,6 @@ func TestHTTPOptionsWithMethods(t *testing.T) {
 	})
 
 	t.Run("with header auth", func(t *testing.T) {
-		t.Parallel()
-
 		headers := map[string]string{
 			"X-API-Key":    "api-key-123",
 			"X-Custom-Key": "custom-value",
@@ -667,8 +625,6 @@ func TestHTTPOptionsWithMethods(t *testing.T) {
 	})
 
 	t.Run("with no auth", func(t *testing.T) {
-		t.Parallel()
-
 		// Start with basic auth
 		options := DefaultHTTPOptions().WithBasicAuth("user", "pass")
 
@@ -685,8 +641,6 @@ func TestFromHTTP_GetSourceURL(t *testing.T) {
 	t.Parallel()
 
 	t.Run("source URL", func(t *testing.T) {
-		t.Parallel()
-
 		// Create test server for this test
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)

@@ -13,8 +13,6 @@ func TestHeaderAuth(t *testing.T) {
 	t.Parallel()
 
 	t.Run("Multiple custom headers", func(t *testing.T) {
-		t.Parallel()
-
 		auth := NewHeaderAuth(map[string]string{
 			"Authorization": "Bearer token123",
 			"X-API-Key":     "secret-key",
@@ -34,8 +32,6 @@ func TestHeaderAuth(t *testing.T) {
 	})
 
 	t.Run("Empty headers map", func(t *testing.T) {
-		t.Parallel()
-
 		auth := NewHeaderAuth(map[string]string{})
 		require.Equal(t, "Header", auth.Name())
 
@@ -49,8 +45,6 @@ func TestHeaderAuth(t *testing.T) {
 	})
 
 	t.Run("Nil headers map", func(t *testing.T) {
-		t.Parallel()
-
 		auth := NewHeaderAuth(nil)
 		require.Equal(t, "Header", auth.Name())
 
@@ -64,8 +58,6 @@ func TestHeaderAuth(t *testing.T) {
 	})
 
 	t.Run("Bearer token helper", func(t *testing.T) {
-		t.Parallel()
-
 		auth := NewBearerAuth("my-test-token")
 		require.Equal(t, "Header", auth.Name())
 
@@ -79,8 +71,6 @@ func TestHeaderAuth(t *testing.T) {
 	})
 
 	t.Run("With context", func(t *testing.T) {
-		t.Parallel()
-
 		auth := NewHeaderAuth(map[string]string{
 			"Authorization": "Bearer token123",
 		})
@@ -97,8 +87,6 @@ func TestHeaderAuth(t *testing.T) {
 	})
 
 	t.Run("With cancelled context", func(t *testing.T) {
-		t.Parallel()
-
 		auth := NewHeaderAuth(map[string]string{
 			"Authorization": "Bearer token123",
 		})
@@ -116,8 +104,6 @@ func TestHeaderAuth(t *testing.T) {
 	})
 
 	t.Run("With timeout context", func(t *testing.T) {
-		t.Parallel()
-
 		auth := NewHeaderAuth(map[string]string{
 			"Authorization": "Bearer token123",
 		})

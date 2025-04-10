@@ -92,8 +92,6 @@ func TestStaticProvider_GetData(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
 			provider := NewStaticProvider(tt.inputData)
 			ctx := context.Background()
 
@@ -133,8 +131,6 @@ func TestStaticProvider_AddDataToContext(t *testing.T) {
 	t.Parallel()
 
 	t.Run("nil context arg returns error", func(t *testing.T) {
-		t.Parallel()
-
 		provider := NewStaticProvider(simpleData)
 		ctx := context.Background()
 
@@ -152,8 +148,6 @@ func TestStaticProvider_AddDataToContext(t *testing.T) {
 	})
 
 	t.Run("map context arg returns error", func(t *testing.T) {
-		t.Parallel()
-
 		provider := NewStaticProvider(simpleData)
 		ctx := context.Background()
 
@@ -166,8 +160,6 @@ func TestStaticProvider_AddDataToContext(t *testing.T) {
 	})
 
 	t.Run("HTTP request context arg returns error", func(t *testing.T) {
-		t.Parallel()
-
 		provider := NewStaticProvider(simpleData)
 		ctx := context.Background()
 
@@ -180,8 +172,6 @@ func TestStaticProvider_AddDataToContext(t *testing.T) {
 	})
 
 	t.Run("multiple args returns error", func(t *testing.T) {
-		t.Parallel()
-
 		provider := NewStaticProvider(simpleData)
 		ctx := context.Background()
 
