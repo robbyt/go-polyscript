@@ -17,47 +17,42 @@ import (
 	"github.com/robbyt/go-polyscript/machines/mocks"
 	risorCompiler "github.com/robbyt/go-polyscript/machines/risor/compiler"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
-// mockEvaluatorImplementation is a minimal struct implementing engine.Evaluator for testing
-type mockEvaluatorImplementation struct {
-	evalFunc func(ctx context.Context) (engine.EvaluatorResponse, error)
+// mockDataPreparer is a mock implementation of engine.EvalDataPreparer
+type mockDataPreparer struct {
+	mock.Mock
 }
 
-func (m *mockEvaluatorImplementation) Eval(ctx context.Context) (engine.EvaluatorResponse, error) {
-	return m.evalFunc(ctx)
-}
-
-// mockEvalDataPreparerImplementation is a minimal struct implementing engine.EvalDataPreparer for testing
-type mockEvalDataPreparerImplementation struct {
-	prepareFunc func(ctx context.Context, data ...any) (context.Context, error)
-}
-
-func (m *mockEvalDataPreparerImplementation) PrepareContext(
+func (m *mockDataPreparer) PrepareContext(
 	ctx context.Context,
 	data ...any,
 ) (context.Context, error) {
-	return m.prepareFunc(ctx, data...)
+	args := m.Called(ctx, data)
+	return args.Get(0).(context.Context), args.Error(1)
 }
 
-// mockEvaluatorWithPrepImplementation is a minimal struct implementing engine.EvaluatorWithPrep for testing
-type mockEvaluatorWithPrepImplementation struct {
-	evalFunc    func(ctx context.Context) (engine.EvaluatorResponse, error)
-	prepareFunc func(ctx context.Context, data ...any) (context.Context, error)
+// mockEvaluatorWithPreparer creates an evaluator implementation that satisfies both interfaces
+type mockEvaluatorWithPreparer struct {
+	mock.Mock
 }
 
-func (m *mockEvaluatorWithPrepImplementation) Eval(
-	ctx context.Context,
-) (engine.EvaluatorResponse, error) {
-	return m.evalFunc(ctx)
+func (m *mockEvaluatorWithPreparer) Eval(ctx context.Context) (engine.EvaluatorResponse, error) {
+	args := m.Called(ctx)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(engine.EvaluatorResponse), args.Error(1)
 }
 
-func (m *mockEvaluatorWithPrepImplementation) PrepareContext(
+func (m *mockEvaluatorWithPreparer) PrepareContext(
 	ctx context.Context,
 	data ...any,
 ) (context.Context, error) {
-	return m.prepareFunc(ctx, data...)
+	args := m.Called(ctx, data)
+	return args.Get(0).(context.Context), args.Error(1)
 }
 
 func TestEvaluatorInterface(t *testing.T) {
@@ -73,20 +68,18 @@ func TestEvaluatorInterface(t *testing.T) {
 	type contextKey string
 	testKey := contextKey("test-key")
 
-	// Create a mock evaluator implementation
-	evaluator := &mockEvaluatorImplementation{
-		evalFunc: func(ctx context.Context) (engine.EvaluatorResponse, error) {
-			// Verify that context is passed correctly
-			_, hasKey := ctx.Value(testKey).(string)
-			if !hasKey {
-				return nil, errors.New("context key missing")
-			}
-			return mockResponse, nil
-		},
-	}
-
-	// Test the Eval method with a context containing a test key
+	// Create a context with a test key
 	ctx := context.WithValue(context.Background(), testKey, "test-value")
+
+	// Create a mock evaluator with success case
+	evaluator := new(mocks.Evaluator)
+	evaluator.On("Eval", mock.MatchedBy(func(c context.Context) bool {
+		// Verify that context is passed correctly
+		_, hasKey := c.Value(testKey).(string)
+		return hasKey
+	})).Return(mockResponse, nil)
+
+	// Test the Eval method with the context
 	response, err := evaluator.Eval(ctx)
 
 	require.NoError(t, err, "Eval should not return an error")
@@ -105,11 +98,11 @@ func TestEvaluatorInterface(t *testing.T) {
 	assert.Equal(t, "test result", response.Inspect(), "Inspect() should return expected value")
 
 	// Test error case
-	evaluator.evalFunc = func(ctx context.Context) (engine.EvaluatorResponse, error) {
-		return nil, errors.New("evaluation error")
-	}
+	errorEvaluator := new(mocks.Evaluator)
+	errorEvaluator.On("Eval", mock.Anything).
+		Return((*mocks.EvaluatorResponse)(nil), errors.New("evaluation error"))
 
-	response, err = evaluator.Eval(context.Background())
+	response, err = errorEvaluator.Eval(context.Background())
 	assert.Error(t, err, "Eval should return an error")
 	assert.Nil(t, response, "Response should be nil when there's an error")
 	assert.Contains(t, err.Error(), "evaluation error", "Error message should be preserved")
@@ -179,18 +172,8 @@ func TestEvalDataPreparerInterfaceDirectImplementation(t *testing.T) {
 	// Define a type for the context key to avoid collision
 	type dataKey string
 
-	// Create a mock data preparer implementation
-	dataPreparer := &mockEvalDataPreparerImplementation{
-		prepareFunc: func(ctx context.Context, data ...any) (context.Context, error) {
-			// Simple implementation to store data in context
-			enrichedCtx := ctx
-			for i, item := range data {
-				key := dataKey(fmt.Sprintf("data-%d", i))
-				enrichedCtx = context.WithValue(enrichedCtx, key, item)
-			}
-			return enrichedCtx, nil
-		},
-	}
+	// Create a mock data preparer
+	dataPreparer := &mockDataPreparer{}
 
 	// Test with various data types
 	ctx := context.Background()
@@ -198,36 +181,47 @@ func TestEvalDataPreparerInterfaceDirectImplementation(t *testing.T) {
 	data2 := map[string]any{"key": "value"}
 	data3 := 123
 
-	enrichedCtx, err := dataPreparer.PrepareContext(ctx, data1, data2, data3)
+	// Create enriched context with the test data
+	enrichedCtx := ctx
+	for i, item := range []any{data1, data2, data3} {
+		key := dataKey(fmt.Sprintf("data-%d", i))
+		enrichedCtx = context.WithValue(enrichedCtx, key, item)
+	}
+
+	// Set up the mock behavior
+	dataPreparer.On("PrepareContext", ctx, []any{data1, data2, data3}).Return(enrichedCtx, nil)
+
+	// Call PrepareContext
+	resultCtx, err := dataPreparer.PrepareContext(ctx, data1, data2, data3)
 	require.NoError(t, err, "PrepareContext should not return an error")
-	require.NotNil(t, enrichedCtx, "Enriched context should not be nil")
+	require.NotNil(t, resultCtx, "Enriched context should not be nil")
 
 	// Verify data was stored correctly
 	assert.Equal(
 		t,
 		data1,
-		enrichedCtx.Value(dataKey("data-0")),
+		resultCtx.Value(dataKey("data-0")),
 		"First data item should be stored correctly",
 	)
 	assert.Equal(
 		t,
 		data2,
-		enrichedCtx.Value(dataKey("data-1")),
+		resultCtx.Value(dataKey("data-1")),
 		"Second data item should be stored correctly",
 	)
 	assert.Equal(
 		t,
 		data3,
-		enrichedCtx.Value(dataKey("data-2")),
+		resultCtx.Value(dataKey("data-2")),
 		"Third data item should be stored correctly",
 	)
 
 	// Test error case
-	dataPreparer.prepareFunc = func(ctx context.Context, data ...any) (context.Context, error) {
-		return ctx, errors.New("preparation error")
-	}
+	errorPreparer := &mockDataPreparer{}
+	errorPreparer.On("PrepareContext", ctx, []any{"test"}).
+		Return(ctx, errors.New("preparation error"))
 
-	_, err = dataPreparer.PrepareContext(ctx, "test")
+	_, err = errorPreparer.PrepareContext(ctx, "test")
 	assert.Error(t, err, "Should return an error")
 	assert.Contains(t, err.Error(), "preparation error", "Error message should be preserved")
 }
@@ -246,31 +240,26 @@ func TestEvaluatorWithPrepInterface(t *testing.T) {
 	prepDataKey := prepKey("prepared-data")
 
 	// Create a mock combined implementation
-	combinedEvaluator := &mockEvaluatorWithPrepImplementation{
-		evalFunc: func(ctx context.Context) (engine.EvaluatorResponse, error) {
-			// Check if context has prepared data
-			value, ok := ctx.Value(prepDataKey).(string)
-			if !ok || value != "test-value" {
-				return nil, errors.New("context not properly prepared")
-			}
-			return mockResponse, nil
-		},
-		prepareFunc: func(ctx context.Context, data ...any) (context.Context, error) {
-			// Store the prepared data in context
-			return context.WithValue(ctx, prepDataKey, "test-value"), nil
-		},
-	}
+	combinedEvaluator := &mockEvaluatorWithPreparer{}
+
+	// Define context and test data
+	ctx := context.Background()
+	enrichedCtx := context.WithValue(ctx, prepDataKey, "test-value")
+
+	// Set up mock behaviors
+	combinedEvaluator.On("PrepareContext", ctx, []any{"test data"}).Return(enrichedCtx, nil)
+	combinedEvaluator.On("Eval", mock.MatchedBy(func(c context.Context) bool {
+		val, ok := c.Value(prepDataKey).(string)
+		return ok && val == "test-value"
+	})).Return(mockResponse, nil)
 
 	// Test the full workflow: prepare context then evaluate
-	ctx := context.Background()
-
-	// First prepare the context
-	enrichedCtx, err := combinedEvaluator.PrepareContext(ctx, "test data")
+	resultCtx, err := combinedEvaluator.PrepareContext(ctx, "test data")
 	require.NoError(t, err, "PrepareContext should not return an error")
-	require.NotNil(t, enrichedCtx, "Enriched context should not be nil")
+	require.NotNil(t, resultCtx, "Enriched context should not be nil")
 
 	// Then evaluate with the enriched context
-	response, err := combinedEvaluator.Eval(enrichedCtx)
+	response, err := combinedEvaluator.Eval(resultCtx)
 	require.NoError(t, err, "Eval should not return an error when context is prepared")
 	require.NotNil(t, response, "Response should not be nil")
 
@@ -283,24 +272,22 @@ func TestEvaluatorWithPrepInterface(t *testing.T) {
 	)
 
 	// Test error in preparation
-	combinedEvaluator.prepareFunc = func(ctx context.Context, data ...any) (context.Context, error) {
-		return ctx, errors.New("preparation error")
-	}
+	prepErrorEvaluator := &mockEvaluatorWithPreparer{}
+	prepErrorEvaluator.On("PrepareContext", ctx, []any{"test data"}).
+		Return(ctx, errors.New("preparation error"))
 
-	_, err = combinedEvaluator.PrepareContext(ctx, "test data")
+	_, err = prepErrorEvaluator.PrepareContext(ctx, "test data")
 	assert.Error(t, err, "Should return an error when preparation fails")
 
 	// Test error in evaluation
-	combinedEvaluator.prepareFunc = func(ctx context.Context, data ...any) (context.Context, error) {
-		return context.WithValue(ctx, prepDataKey, "test-value"), nil
-	}
-	combinedEvaluator.evalFunc = func(ctx context.Context) (engine.EvaluatorResponse, error) {
-		return nil, errors.New("evaluation error")
-	}
+	evalErrorEvaluator := &mockEvaluatorWithPreparer{}
+	evalErrorEvaluator.On("PrepareContext", ctx, []any{"test data"}).Return(enrichedCtx, nil)
+	evalErrorEvaluator.On("Eval", mock.Anything).
+		Return((*mocks.EvaluatorResponse)(nil), errors.New("evaluation error"))
 
-	enrichedCtx, prepErr := combinedEvaluator.PrepareContext(ctx, "test data")
+	evalCtx, prepErr := evalErrorEvaluator.PrepareContext(ctx, "test data")
 	require.NoError(t, prepErr, "PrepareContext should not return an error")
-	_, err = combinedEvaluator.Eval(enrichedCtx)
+	_, err = evalErrorEvaluator.Eval(evalCtx)
 	assert.Error(t, err, "Should return an error when evaluation fails")
 }
 
