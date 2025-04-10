@@ -41,10 +41,7 @@ func TestStaticProvider_Creation(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
 			provider := NewStaticProvider(tt.inputData)
 			require.NotNil(t, provider, "Provider should never be nil")
 
@@ -94,7 +91,6 @@ func TestStaticProvider_GetData(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 

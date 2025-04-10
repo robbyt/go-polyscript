@@ -82,7 +82,6 @@ func TestLoadInputData(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			handler := slog.NewTextHandler(os.Stdout, nil)
 
@@ -380,7 +379,6 @@ func TestPrepareContext(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			handler := slog.NewTextHandler(os.Stdout, nil)
 			exe := tt.setupExe(t)
@@ -545,7 +543,6 @@ func TestExecHelper(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			mockInstance, ctx, cancel := tt.setup()
 			defer cancel()

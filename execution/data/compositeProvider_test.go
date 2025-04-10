@@ -49,7 +49,6 @@ func TestCompositeProvider_Creation(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			composite := NewCompositeProvider(tt.providers...)
 			require.NotNil(t, composite, "CompositeProvider should never be nil")
@@ -229,7 +228,6 @@ func TestCompositeProvider_GetData(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			provider := tt.setupProvider()
 			require.NotNil(t, provider, "Provider should never be nil")
@@ -518,7 +516,6 @@ func TestCompositeProvider_NestedStructures(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			composite := tt.setupProviders()
 			ctx := tt.setupContext()
@@ -648,7 +645,6 @@ func TestCompositeProvider_DeepMerge(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			result := deepMerge(tt.src, tt.dst)
 			assert.Equal(t, tt.expected, result, tt.description)
