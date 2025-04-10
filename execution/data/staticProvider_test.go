@@ -127,7 +127,7 @@ func TestStaticProvider_GetData(t *testing.T) {
 			}
 
 			// Verify data consistency
-			verifyDataConsistency(t, provider, ctx)
+			getDataCheckHelper(t, provider, ctx)
 		})
 	}
 }
@@ -175,7 +175,7 @@ func TestStaticProvider_AddDataToContext(t *testing.T) {
 		provider := NewStaticProvider(simpleData)
 		ctx := context.Background()
 
-		newCtx, err := provider.AddDataToContext(ctx, createTestRequest())
+		newCtx, err := provider.AddDataToContext(ctx, createTestRequestHelper())
 
 		assert.Error(t, err, "StaticProvider should reject all attempts to add data")
 		assert.Equal(t, ctx, newCtx, "Context should remain unchanged")

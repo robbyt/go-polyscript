@@ -51,8 +51,6 @@ func TestCompositeProvider_Creation(t *testing.T) {
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
 			composite := NewCompositeProvider(tt.providers...)
 			require.NotNil(t, composite, "CompositeProvider should never be nil")
 			assert.Len(
@@ -233,8 +231,6 @@ func TestCompositeProvider_GetData(t *testing.T) {
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
 			provider := tt.setupProvider()
 			require.NotNil(t, provider, "Provider should never be nil")
 
@@ -247,10 +243,10 @@ func TestCompositeProvider_GetData(t *testing.T) {
 			}
 
 			assert.NoError(t, err, "Should not return error for valid providers")
-			assertMapContainsExpected(t, tt.expectedData, result)
+			assertMapContainsExpectedHelper(t, tt.expectedData, result)
 
 			// Verify data consistency across calls
-			verifyDataConsistency(t, provider, ctx)
+			getDataCheckHelper(t, provider, ctx)
 		})
 	}
 }
@@ -260,8 +256,6 @@ func TestCompositeProvider_AddDataToContext(t *testing.T) {
 	t.Parallel()
 
 	t.Run("empty providers list", func(t *testing.T) {
-		t.Parallel()
-
 		provider := NewCompositeProvider()
 		require.NotNil(t, provider)
 
@@ -275,8 +269,6 @@ func TestCompositeProvider_AddDataToContext(t *testing.T) {
 	})
 
 	t.Run("single context provider succeeds", func(t *testing.T) {
-		t.Parallel()
-
 		provider := NewCompositeProvider(NewContextProvider(constants.EvalData))
 		require.NotNil(t, provider)
 
@@ -299,8 +291,6 @@ func TestCompositeProvider_AddDataToContext(t *testing.T) {
 	})
 
 	t.Run("single static provider always errors", func(t *testing.T) {
-		t.Parallel()
-
 		provider := NewCompositeProvider(NewStaticProvider(simpleData))
 		require.NotNil(t, provider)
 
@@ -320,8 +310,6 @@ func TestCompositeProvider_AddDataToContext(t *testing.T) {
 	})
 
 	t.Run("mixed providers (static fails, context succeeds)", func(t *testing.T) {
-		t.Parallel()
-
 		provider := NewCompositeProvider(
 			NewStaticProvider(simpleData),
 			NewContextProvider(constants.EvalData),
@@ -351,8 +339,6 @@ func TestCompositeProvider_AddDataToContext(t *testing.T) {
 	})
 
 	t.Run("all providers fail", func(t *testing.T) {
-		t.Parallel()
-
 		provider := NewCompositeProvider(
 			NewStaticProvider(simpleData),
 			newMockErrorProvider(),
@@ -369,8 +355,6 @@ func TestCompositeProvider_AddDataToContext(t *testing.T) {
 	})
 
 	t.Run("nil providers are skipped", func(t *testing.T) {
-		t.Parallel()
-
 		provider := NewCompositeProvider(
 			nil,
 			NewContextProvider(constants.EvalData),
@@ -393,8 +377,6 @@ func TestCompositeProvider_AddDataToContext(t *testing.T) {
 	})
 
 	t.Run("composite with only static providers", func(t *testing.T) {
-		t.Parallel()
-
 		provider := NewCompositeProvider(
 			NewStaticProvider(map[string]any{"key1": "value1"}),
 			NewStaticProvider(map[string]any{"key2": "value2"}),
@@ -538,8 +520,6 @@ func TestCompositeProvider_NestedStructures(t *testing.T) {
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
 			composite := tt.setupProviders()
 			ctx := tt.setupContext()
 
@@ -548,7 +528,7 @@ func TestCompositeProvider_NestedStructures(t *testing.T) {
 			require.NoError(t, err, "GetData should not error with valid providers")
 
 			// Verify all expected values are present
-			assertMapContainsExpected(t, tt.expectedResult, result)
+			assertMapContainsExpectedHelper(t, tt.expectedResult, result)
 		})
 	}
 }
@@ -670,8 +650,6 @@ func TestCompositeProvider_DeepMerge(t *testing.T) {
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
 			result := deepMerge(tt.src, tt.dst)
 			assert.Equal(t, tt.expected, result, tt.description)
 

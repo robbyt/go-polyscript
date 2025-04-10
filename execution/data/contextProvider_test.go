@@ -14,8 +14,6 @@ func TestContextProvider_Creation(t *testing.T) {
 	t.Parallel()
 
 	t.Run("standard context key", func(t *testing.T) {
-		t.Parallel()
-
 		provider := NewContextProvider(constants.EvalData)
 
 		assert.Equal(t, constants.EvalData, provider.contextKey,
@@ -29,8 +27,6 @@ func TestContextProvider_Creation(t *testing.T) {
 	})
 
 	t.Run("custom context key", func(t *testing.T) {
-		t.Parallel()
-
 		provider := NewContextProvider("custom_key")
 
 		assert.Equal(t, constants.ContextKey("custom_key"), provider.contextKey,
@@ -40,8 +36,6 @@ func TestContextProvider_Creation(t *testing.T) {
 	})
 
 	t.Run("empty context key", func(t *testing.T) {
-		t.Parallel()
-
 		provider := NewContextProvider("")
 
 		assert.Equal(t, constants.ContextKey(""), provider.contextKey,
@@ -56,8 +50,6 @@ func TestContextProvider_GetData(t *testing.T) {
 	t.Parallel()
 
 	t.Run("empty context key", func(t *testing.T) {
-		t.Parallel()
-
 		provider := NewContextProvider("")
 		ctx := context.Background()
 
@@ -68,8 +60,6 @@ func TestContextProvider_GetData(t *testing.T) {
 	})
 
 	t.Run("nil context value", func(t *testing.T) {
-		t.Parallel()
-
 		provider := NewContextProvider(constants.EvalData)
 		ctx := context.Background()
 
@@ -80,12 +70,10 @@ func TestContextProvider_GetData(t *testing.T) {
 		assert.Empty(t, result, "Result map should be empty")
 
 		// Verify data consistency
-		verifyDataConsistency(t, provider, ctx)
+		getDataCheckHelper(t, provider, ctx)
 	})
 
 	t.Run("valid simple data", func(t *testing.T) {
-		t.Parallel()
-
 		provider := NewContextProvider(constants.EvalData)
 		ctx := context.WithValue(context.Background(), constants.EvalData, simpleData)
 
@@ -95,12 +83,10 @@ func TestContextProvider_GetData(t *testing.T) {
 		assert.Equal(t, simpleData, result, "Result should match expected data")
 
 		// Verify data consistency
-		verifyDataConsistency(t, provider, ctx)
+		getDataCheckHelper(t, provider, ctx)
 	})
 
 	t.Run("valid complex data", func(t *testing.T) {
-		t.Parallel()
-
 		provider := NewContextProvider(constants.EvalData)
 		ctx := context.WithValue(context.Background(), constants.EvalData, complexData)
 
@@ -110,12 +96,10 @@ func TestContextProvider_GetData(t *testing.T) {
 		assert.Equal(t, complexData, result, "Result should match expected data")
 
 		// Verify data consistency
-		verifyDataConsistency(t, provider, ctx)
+		getDataCheckHelper(t, provider, ctx)
 	})
 
 	t.Run("invalid data type (string)", func(t *testing.T) {
-		t.Parallel()
-
 		provider := NewContextProvider(constants.EvalData)
 		ctx := context.WithValue(context.Background(), constants.EvalData, "not a map")
 
@@ -126,8 +110,6 @@ func TestContextProvider_GetData(t *testing.T) {
 	})
 
 	t.Run("invalid data type (int)", func(t *testing.T) {
-		t.Parallel()
-
 		provider := NewContextProvider(constants.EvalData)
 		ctx := context.WithValue(context.Background(), constants.EvalData, 42)
 
@@ -143,8 +125,6 @@ func TestContextProvider_AddDataToContext(t *testing.T) {
 	t.Parallel()
 
 	t.Run("empty context key", func(t *testing.T) {
-		t.Parallel()
-
 		provider := NewContextProvider("")
 		ctx := context.Background()
 
@@ -155,8 +135,6 @@ func TestContextProvider_AddDataToContext(t *testing.T) {
 	})
 
 	t.Run("nil input data", func(t *testing.T) {
-		t.Parallel()
-
 		provider := NewContextProvider(constants.EvalData)
 		ctx := context.Background()
 
@@ -171,8 +149,6 @@ func TestContextProvider_AddDataToContext(t *testing.T) {
 	})
 
 	t.Run("simple map data", func(t *testing.T) {
-		t.Parallel()
-
 		provider := NewContextProvider(constants.EvalData)
 		ctx := context.Background()
 
@@ -192,8 +168,6 @@ func TestContextProvider_AddDataToContext(t *testing.T) {
 	})
 
 	t.Run("multiple map data items", func(t *testing.T) {
-		t.Parallel()
-
 		provider := NewContextProvider(constants.EvalData)
 		ctx := context.Background()
 
@@ -215,12 +189,10 @@ func TestContextProvider_AddDataToContext(t *testing.T) {
 	})
 
 	t.Run("HTTP request data", func(t *testing.T) {
-		t.Parallel()
-
 		provider := NewContextProvider(constants.EvalData)
 		ctx := context.Background()
 
-		newCtx, err := provider.AddDataToContext(ctx, createTestRequest())
+		newCtx, err := provider.AddDataToContext(ctx, createTestRequestHelper())
 
 		assert.NoError(t, err, "Should not return error with HTTP request")
 		assert.NotEqual(t, ctx, newCtx, "Context should be modified")
@@ -236,8 +208,6 @@ func TestContextProvider_AddDataToContext(t *testing.T) {
 	})
 
 	t.Run("unsupported data type", func(t *testing.T) {
-		t.Parallel()
-
 		provider := NewContextProvider(constants.EvalData)
 		ctx := context.Background()
 
@@ -254,8 +224,6 @@ func TestContextProvider_AddDataToContext(t *testing.T) {
 	})
 
 	t.Run("mixed supported and unsupported", func(t *testing.T) {
-		t.Parallel()
-
 		provider := NewContextProvider(constants.EvalData)
 		ctx := context.Background()
 
@@ -283,8 +251,6 @@ func TestContextProvider_DataIntegration(t *testing.T) {
 	t.Parallel()
 
 	t.Run("single map data item", func(t *testing.T) {
-		t.Parallel()
-
 		provider := NewContextProvider(constants.EvalData)
 		ctx := context.Background()
 
@@ -306,8 +272,6 @@ func TestContextProvider_DataIntegration(t *testing.T) {
 	})
 
 	t.Run("should preserve context data across calls", func(t *testing.T) {
-		t.Parallel()
-
 		provider := NewContextProvider(constants.EvalData)
 
 		// Create a context directly with data already in it

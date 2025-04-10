@@ -14,8 +14,6 @@ func TestNewFromDisk(t *testing.T) {
 	t.Parallel()
 
 	t.Run("valid paths", func(t *testing.T) {
-		t.Parallel()
-
 		tempDir := t.TempDir()
 		absPath := filepath.Join(tempDir, "test.js")
 
@@ -39,8 +37,6 @@ func TestNewFromDisk(t *testing.T) {
 		for _, tc := range tests {
 			tc := tc // Capture range variable
 			t.Run(tc.name, func(t *testing.T) {
-				t.Parallel()
-
 				loader, err := NewFromDisk(tc.path)
 				require.NoError(t, err)
 				require.NotNil(t, loader)
@@ -54,8 +50,6 @@ func TestNewFromDisk(t *testing.T) {
 	})
 
 	t.Run("invalid schemes", func(t *testing.T) {
-		t.Parallel()
-
 		tests := []struct {
 			name string
 			path string
@@ -73,8 +67,6 @@ func TestNewFromDisk(t *testing.T) {
 		for _, tc := range tests {
 			tc := tc // Capture range variable
 			t.Run(tc.name, func(t *testing.T) {
-				t.Parallel()
-
 				loader, err := NewFromDisk(tc.path)
 				require.Error(t, err)
 				require.ErrorIs(t, err, ErrSchemeUnsupported)
@@ -84,8 +76,6 @@ func TestNewFromDisk(t *testing.T) {
 	})
 
 	t.Run("relative paths", func(t *testing.T) {
-		t.Parallel()
-
 		tests := []struct {
 			name string
 			path string
@@ -98,8 +88,6 @@ func TestNewFromDisk(t *testing.T) {
 		for _, tc := range tests {
 			tc := tc // Capture range variable
 			t.Run(tc.name, func(t *testing.T) {
-				t.Parallel()
-
 				loader, err := NewFromDisk(tc.path)
 				require.Error(t, err)
 				require.ErrorIs(t, err, ErrScriptNotAvailable)
@@ -109,8 +97,6 @@ func TestNewFromDisk(t *testing.T) {
 	})
 
 	t.Run("empty or invalid paths", func(t *testing.T) {
-		t.Parallel()
-
 		tests := []struct {
 			name string
 			path string
@@ -125,8 +111,6 @@ func TestNewFromDisk(t *testing.T) {
 		for _, tc := range tests {
 			tc := tc // Capture range variable
 			t.Run(tc.name, func(t *testing.T) {
-				t.Parallel()
-
 				if tc.path == "\\" && runtime.GOOS != "windows" {
 					t.Skip("Skipping Windows-specific test on non-Windows platform")
 				}
@@ -139,8 +123,6 @@ func TestNewFromDisk(t *testing.T) {
 	})
 
 	t.Run("url parsing errors", func(t *testing.T) {
-		t.Parallel()
-
 		loader, err := NewFromDisk("file://[invalid-url")
 		require.Error(t, err)
 		require.ErrorContains(t, err, "relative paths are not supported")
@@ -148,8 +130,6 @@ func TestNewFromDisk(t *testing.T) {
 	})
 
 	t.Run("non-file scheme", func(t *testing.T) {
-		t.Parallel()
-
 		tempDir := t.TempDir()
 		absPath := filepath.Join(tempDir, "test.js")
 		loader, err := NewFromDisk("http://" + absPath)
@@ -163,8 +143,6 @@ func TestFromDisk_GetReader(t *testing.T) {
 	t.Parallel()
 
 	t.Run("read file contents", func(t *testing.T) {
-		t.Parallel()
-
 		// Setup test file
 		tempDir := t.TempDir()
 		testContent := "test content\nwith multiple lines"
@@ -185,8 +163,6 @@ func TestFromDisk_GetReader(t *testing.T) {
 	})
 
 	t.Run("multiple reads from same loader", func(t *testing.T) {
-		t.Parallel()
-
 		// Setup test file
 		tempDir := t.TempDir()
 		testContent := FunctionContent
@@ -203,8 +179,6 @@ func TestFromDisk_GetReader(t *testing.T) {
 	})
 
 	t.Run("file not found", func(t *testing.T) {
-		t.Parallel()
-
 		tempDir := t.TempDir()
 		nonExistingFile := filepath.Join(tempDir, "nonexisting.js")
 
@@ -222,8 +196,6 @@ func TestFromDisk_GetSourceURL(t *testing.T) {
 	t.Parallel()
 
 	t.Run("valid source URL", func(t *testing.T) {
-		t.Parallel()
-
 		// Setup test file
 		tempDir := t.TempDir()
 		testFile := filepath.Join(tempDir, "test.risor")
@@ -244,8 +216,6 @@ func TestFromDisk_String(t *testing.T) {
 	t.Parallel()
 
 	t.Run("string representation with content", func(t *testing.T) {
-		t.Parallel()
-
 		// Setup test file
 		tempDir := t.TempDir()
 		testContent := "test content for string method"
@@ -270,8 +240,6 @@ func TestFromDisk_String(t *testing.T) {
 	})
 
 	t.Run("string representation with non-existent file", func(t *testing.T) {
-		t.Parallel()
-
 		tempDir := t.TempDir()
 		nonExistingFile := filepath.Join(tempDir, "nonexisting.js")
 

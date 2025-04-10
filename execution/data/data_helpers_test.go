@@ -33,8 +33,8 @@ var (
 	}
 )
 
-// createTestRequest creates a standard HTTP request for testing
-func createTestRequest() *http.Request {
+// createTestRequestHelper creates a standard HTTP request for testing
+func createTestRequestHelper() *http.Request {
 	return &http.Request{
 		Method: "GET",
 		URL:    &url.URL{Path: "/test", RawQuery: "param=value"},
@@ -68,8 +68,8 @@ func newMockErrorProvider() *MockProvider {
 	return provider
 }
 
-// assertMapContainsExpected asserts that a map contains all expected key/value pairs
-func assertMapContainsExpected(t *testing.T, expected, actual map[string]any) {
+// assertMapContainsExpectedHelper recursively asserts that a map contains all expected key/value pairs
+func assertMapContainsExpectedHelper(t *testing.T, expected, actual map[string]any) {
 	t.Helper()
 	for key, expectedValue := range expected {
 		assert.Contains(t, actual, key, "Result should contain key: %s", key)
@@ -82,15 +82,15 @@ func assertMapContainsExpected(t *testing.T, expected, actual map[string]any) {
 		actualMap, actualIsMap := actualValue.(map[string]any)
 
 		if expectedIsMap && actualIsMap {
-			assertMapContainsExpected(t, expectedMap, actualMap)
+			assertMapContainsExpectedHelper(t, expectedMap, actualMap)
 		} else {
 			assert.Equal(t, expectedValue, actualValue, "Value should match for key: %s", key)
 		}
 	}
 }
 
-// verifyDataConsistency checks if multiple calls to GetData return consistent results
-func verifyDataConsistency(t *testing.T, provider Provider, ctx context.Context) {
+// getDataCheckHelper checks if multiple calls to GetData return consistent results
+func getDataCheckHelper(t *testing.T, provider Provider, ctx context.Context) {
 	t.Helper()
 	result1, err1 := provider.GetData(ctx)
 	require.NoError(t, err1)

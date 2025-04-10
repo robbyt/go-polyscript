@@ -176,8 +176,6 @@ func TestMachineEvaluators(t *testing.T) {
 	for _, tc := range tests {
 		tc := tc // Capture for parallel execution
 		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-
 			// Create a loader
 			l, err := loader.NewFromString(tc.content)
 			require.NoError(t, err)
@@ -277,8 +275,6 @@ func TestNewEvaluator(t *testing.T) {
 	for _, tc := range tests {
 		tc := tc // Capture for parallel execution
 		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-
 			var evaluator engine.EvaluatorWithPrep
 			var err error
 
@@ -350,8 +346,6 @@ func TestFromStringLoaders(t *testing.T) {
 	for _, tc := range tests {
 		tc := tc // Capture for parallel execution
 		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-
 			evaluator, err := tc.creator(tc.content, tc.options...)
 
 			if tc.expectError {
@@ -368,8 +362,6 @@ func TestFromStringLoaders(t *testing.T) {
 
 	// Test invalid option in string loader
 	t.Run("FromRisorString - Invalid Option", func(t *testing.T) {
-		t.Parallel()
-
 		_, err := FromRisorString(
 			"print('test')",
 			func(cfg *options.Config) error {
@@ -471,8 +463,6 @@ _ = result`
 	for _, tc := range tests {
 		tc := tc // Capture for parallel execution
 		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-
 			evaluator, err := tc.loaderFunc(tc.filePath, tc.options...)
 
 			if tc.expectError {
@@ -497,8 +487,6 @@ func TestDataProviders(t *testing.T) {
 	t.Parallel()
 
 	t.Run("withCompositeProvider", func(t *testing.T) {
-		t.Parallel()
-
 		// Create a simple script that uses composite data
 		script := `print(ctx["static_key"], ", ", ctx["input_data"]["dynamic_key"])`
 
@@ -532,8 +520,6 @@ func TestEvalHelpers(t *testing.T) {
 	t.Parallel()
 
 	t.Run("PrepareAndEval", func(t *testing.T) {
-		t.Parallel()
-
 		// Create a simple Risor evaluator
 		script := `
 			name := ctx["input_data"]["name"]
@@ -646,8 +632,6 @@ func TestEvalHelpers(t *testing.T) {
 	})
 
 	t.Run("EvalAndExtractMap", func(t *testing.T) {
-		t.Parallel()
-
 		// Create a simple Risor evaluator
 		script := `
 			{
@@ -770,8 +754,6 @@ _ = result`
 	}
 
 	t.Run("FromRisorStringWithData", func(t *testing.T) {
-		t.Parallel()
-
 		// Test script
 		risorScript := `
 			// Access static data
@@ -818,8 +800,6 @@ _ = result`
 	})
 
 	t.Run("FromStarlarkStringWithData", func(t *testing.T) {
-		t.Parallel()
-
 		// Create evaluator
 		starlarkEval, err := FromStarlarkStringWithData(
 			starlarkFileContent,
@@ -847,23 +827,7 @@ _ = result`
 		assert.Equal(t, int64(30), starlarkTimeout, "timeout should be 30")
 	})
 
-	t.Run("FromRisorFileWithData", func(t *testing.T) {
-		t.Parallel()
-
-		// Skip this test and mark as passing - will be tested separately
-		t.Skip("Test refactored to use simpler test approach")
-	})
-
-	t.Run("FromStarlarkFileWithData", func(t *testing.T) {
-		t.Parallel()
-
-		// Skip this test and mark as passing - will be tested separately
-		t.Skip("Test refactored to use simpler test approach")
-	})
-
 	t.Run("FromExtismFileWithData", func(t *testing.T) {
-		t.Parallel()
-
 		// Create evaluator with static data that includes input
 		extismEval, err := FromExtismFileWithData(
 			wasmPath,
@@ -1049,8 +1013,6 @@ func TestCreateEvaluatorEdgeCases(t *testing.T) {
 
 	// Test validation error in newEvaluator
 	t.Run("Configuration Validation Error", func(t *testing.T) {
-		t.Parallel()
-
 		// Try to create an evaluator without a loader
 		_, err := NewRisorEvaluator()
 		require.Error(t, err)
@@ -1059,8 +1021,6 @@ func TestCreateEvaluatorEdgeCases(t *testing.T) {
 
 	// Test option application error
 	t.Run("Option Error", func(t *testing.T) {
-		t.Parallel()
-
 		// Create an invalid option that returns an error
 		invalidOption := func(cfg *options.Config) error {
 			return errors.New("custom invalid option error")

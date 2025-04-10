@@ -84,8 +84,6 @@ func TestLoadInputData(t *testing.T) {
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
 			handler := slog.NewTextHandler(os.Stdout, nil)
 
 			// Create a context provider
@@ -139,8 +137,6 @@ func TestBytecodeEvaluatorInvalidInputs(t *testing.T) {
 
 	// Test case: nil bytecode
 	t.Run("nil bytecode", func(t *testing.T) {
-		t.Parallel()
-
 		mockContent := &mockExecutableContent{
 			machineType: machineTypes.Extism,
 			source:      "invalid wasm",
@@ -159,8 +155,6 @@ func TestBytecodeEvaluatorInvalidInputs(t *testing.T) {
 
 	// Test case: invalid content type
 	t.Run("invalid content type", func(t *testing.T) {
-		t.Parallel()
-
 		mockContent := &mockExecutableContent{
 			machineType: machineTypes.Extism,
 			source:      "invalid wasm",
@@ -388,8 +382,6 @@ func TestPrepareContext(t *testing.T) {
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
 			handler := slog.NewTextHandler(os.Stdout, nil)
 			exe := tt.setupExe(t)
 			evaluator := NewBytecodeEvaluator(handler, exe)
@@ -555,8 +547,6 @@ func TestExecHelper(t *testing.T) {
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
 			mockInstance, ctx, cancel := tt.setup()
 			defer cancel()
 
