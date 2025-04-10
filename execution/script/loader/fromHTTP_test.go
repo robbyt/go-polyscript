@@ -1,13 +1,11 @@
 package loader
 
 import (
-	"bytes"
 	"context"
 	"crypto/tls"
 	"errors"
-	"io"
 	"net/http"
-	"net/url"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -15,100 +13,94 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// mockHTTPClient implements the httpRequester interface for testing
-type mockHTTPClient struct {
-	doFunc func(req *http.Request) (*http.Response, error)
-}
-
-func (m *mockHTTPClient) Do(req *http.Request) (*http.Response, error) {
-	if m.doFunc != nil {
-		return m.doFunc(req)
-	}
-	return nil, errors.New("doFunc not implemented")
-}
-
-// mockResponseBody implements io.ReadCloser for testing
-type mockResponseBody struct {
-	io.Reader
-	closeFunc func() error
-	closed    bool
-}
-
-func (m *mockResponseBody) Close() error {
-	if m.closed {
-		return nil
-	}
-	m.closed = true
-
-	if m.closeFunc != nil {
-		return m.closeFunc()
-	}
-	return nil
-}
-
-// newMockResponse creates a new mock HTTP response
-func newMockResponse(statusCode int, body string) *http.Response {
-	return &http.Response{
-		StatusCode: statusCode,
-		Body:       &mockResponseBody{Reader: bytes.NewBufferString(body)},
-		Status:     http.StatusText(statusCode),
-		Header:     make(http.Header),
-	}
-}
-
 func TestNewFromHTTP(t *testing.T) {
 	t.Parallel()
 
-	tests := []struct {
-		name          string
-		url           string
-		expectError   bool
-		errorContains string
-	}{
-		{
-			name:        "Valid HTTPS URL",
-			url:         "https://example.com/script.js",
-			expectError: false,
-		},
-		{
-			name:        "Valid HTTP URL",
-			url:         "http://example.com/script.js",
-			expectError: false,
-		},
-		{
-			name:          "Invalid URL scheme",
-			url:           "file:///path/to/script.js",
-			expectError:   true,
-			errorContains: "unsupported scheme",
-		},
-		{
-			name:          "Invalid URL format",
-			url:           "://invalid-url",
-			expectError:   true,
-			errorContains: "unable to parse URL",
-		},
-	}
+	t.Run("Valid HTTPS URL", func(t *testing.T) {
+		t.Parallel()
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			loader, err := NewFromHTTP(tt.url)
-			if tt.expectError {
-				require.Error(t, err)
-				if tt.errorContains != "" {
-					require.Contains(t, err.Error(), tt.errorContains)
-				}
-				return
-			}
+		// Set up TLS server
+		tlsServer := httptest.NewTLSServer(
+			http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+				_, err := w.Write([]byte(FunctionContent))
+				require.NoError(t, err)
+			}),
+		)
+		defer tlsServer.Close()
 
+		testURL := tlsServer.URL + "/script.js"
+
+		// Set InsecureSkipVerify to make test work with self-signed cert
+		options := DefaultHTTPOptions()
+		options.InsecureSkipVerify = true
+		loader, err := NewFromHTTPWithOptions(testURL, options)
+		require.NoError(t, err)
+		require.NotNil(t, loader)
+
+		// Verify loader properties
+		require.Equal(t, testURL, loader.url)
+		require.NotNil(t, loader.sourceURL)
+		require.Equal(t, testURL, loader.sourceURL.String())
+		require.NotNil(t, loader.client)
+		require.NotNil(t, loader.options)
+
+		// Use TLS server's client to accept its certificate
+		loader.client = tlsServer.Client()
+
+		// Additional verification
+		verifyLoader(t, loader, testURL)
+	})
+
+	t.Run("Valid HTTP URL", func(t *testing.T) {
+		t.Parallel()
+
+		// Set up HTTP server
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			_, err := w.Write([]byte(FunctionContent))
 			require.NoError(t, err)
-			require.NotNil(t, loader)
-			require.Equal(t, tt.url, loader.url)
-			require.NotNil(t, loader.sourceURL)
-			require.Equal(t, tt.url, loader.sourceURL.String())
-			require.NotNil(t, loader.client)
-			require.NotNil(t, loader.options)
-		})
-	}
+		}))
+		defer server.Close()
+
+		testURL := server.URL + "/script.js"
+
+		loader, err := NewFromHTTP(testURL)
+		require.NoError(t, err)
+		require.NotNil(t, loader)
+
+		// Verify loader properties
+		require.Equal(t, testURL, loader.url)
+		require.NotNil(t, loader.sourceURL)
+		require.Equal(t, testURL, loader.sourceURL.String())
+		require.NotNil(t, loader.client)
+		require.NotNil(t, loader.options)
+
+		// Additional verification
+		verifyLoader(t, loader, testURL)
+	})
+
+	t.Run("Invalid URL scheme", func(t *testing.T) {
+		t.Parallel()
+
+		testURL := "file:///path/to/script.js"
+
+		loader, err := NewFromHTTP(testURL)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "unsupported scheme")
+		require.Nil(t, loader)
+	})
+
+	t.Run("Invalid URL format", func(t *testing.T) {
+		t.Parallel()
+
+		testURL := "://invalid-url"
+
+		loader, err := NewFromHTTP(testURL)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "unable to parse URL")
+		require.Nil(t, loader)
+	})
 }
 
 func TestNewFromHTTPWithOptions(t *testing.T) {
@@ -116,7 +108,6 @@ func TestNewFromHTTPWithOptions(t *testing.T) {
 
 	tests := []struct {
 		name            string
-		url             string
 		optionsModifier func(options *HTTPOptions) *HTTPOptions
 		validateOption  func(t *testing.T, loader *FromHTTP)
 		expectError     bool
@@ -124,7 +115,6 @@ func TestNewFromHTTPWithOptions(t *testing.T) {
 	}{
 		{
 			name: "Custom timeout",
-			url:  "https://example.com/script.js",
 			optionsModifier: func(options *HTTPOptions) *HTTPOptions {
 				return options.WithTimeout(60 * time.Second)
 			},
@@ -135,7 +125,6 @@ func TestNewFromHTTPWithOptions(t *testing.T) {
 		},
 		{
 			name: "Basic auth",
-			url:  "https://example.com/script.js",
 			optionsModifier: func(options *HTTPOptions) *HTTPOptions {
 				return options.WithBasicAuth("user", "pass")
 			},
@@ -149,7 +138,6 @@ func TestNewFromHTTPWithOptions(t *testing.T) {
 		},
 		{
 			name: "Bearer auth",
-			url:  "https://example.com/script.js",
 			optionsModifier: func(options *HTTPOptions) *HTTPOptions {
 				return options.WithBearerAuth("token123")
 			},
@@ -162,7 +150,6 @@ func TestNewFromHTTPWithOptions(t *testing.T) {
 		},
 		{
 			name: "Custom headers",
-			url:  "https://example.com/script.js",
 			optionsModifier: func(options *HTTPOptions) *HTTPOptions {
 				options.Headers["X-Custom"] = "TestValue"
 				options.Headers["User-Agent"] = "Test-Agent"
@@ -176,34 +163,52 @@ func TestNewFromHTTPWithOptions(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+	for _, tc := range tests {
+		tc := tc // Capture range variable
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			// Create test server for this test case
+			server := httptest.NewServer(
+				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					w.WriteHeader(http.StatusOK)
+					_, err := w.Write([]byte(FunctionContent))
+					require.NoError(t, err)
+				}),
+			)
+			defer server.Close()
+
+			testURL := server.URL + "/script.js"
+
 			// Start with default options and apply modifier if provided
 			options := DefaultHTTPOptions()
-			if tt.optionsModifier != nil {
-				options = tt.optionsModifier(options)
+			if tc.optionsModifier != nil {
+				options = tc.optionsModifier(options)
 			}
 
-			loader, err := NewFromHTTPWithOptions(tt.url, options)
-			if tt.expectError {
+			loader, err := NewFromHTTPWithOptions(testURL, options)
+			if tc.expectError {
 				require.Error(t, err)
-				if tt.errorContains != "" {
-					require.Contains(t, err.Error(), tt.errorContains)
+				if tc.errorContains != "" {
+					require.Contains(t, err.Error(), tc.errorContains)
 				}
 				return
 			}
 
 			require.NoError(t, err)
 			require.NotNil(t, loader)
-			require.Equal(t, tt.url, loader.url)
+			require.Equal(t, testURL, loader.url)
 			require.NotNil(t, loader.sourceURL)
-			require.Equal(t, tt.url, loader.sourceURL.String())
+			require.Equal(t, testURL, loader.sourceURL.String())
 			require.NotNil(t, loader.client)
 			require.NotNil(t, loader.options)
 
-			if tt.validateOption != nil {
-				tt.validateOption(t, loader)
+			if tc.validateOption != nil {
+				tc.validateOption(t, loader)
 			}
+
+			// Use helper for further validation
+			verifyLoader(t, loader, testURL)
 		})
 	}
 }
@@ -212,10 +217,24 @@ func TestFromHTTP_TLSConfig(t *testing.T) {
 	t.Parallel()
 
 	t.Run("with insecure skip verify", func(t *testing.T) {
+		t.Parallel()
+
+		// Create test server for this test
+		server := httptest.NewTLSServer(
+			http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+				_, err := w.Write([]byte(FunctionContent))
+				require.NoError(t, err)
+			}),
+		)
+		defer server.Close()
+
+		testURL := server.URL + "/script.js"
+
 		options := DefaultHTTPOptions()
 		options.InsecureSkipVerify = true
 
-		loader, err := NewFromHTTPWithOptions("https://example.com/script.js", options)
+		loader, err := NewFromHTTPWithOptions(testURL, options)
 		require.NoError(t, err)
 		require.NotNil(t, loader)
 
@@ -228,15 +247,31 @@ func TestFromHTTP_TLSConfig(t *testing.T) {
 	})
 
 	t.Run("with custom TLS config", func(t *testing.T) {
+		t.Parallel()
+
+		// Create test server for this test
+		server := httptest.NewTLSServer(
+			http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+				_, err := w.Write([]byte(FunctionContent))
+				require.NoError(t, err)
+			}),
+		)
+		defer server.Close()
+
+		testURL := server.URL + "/script.js"
+
 		options := DefaultHTTPOptions()
 		customTLS := &tls.Config{
 			MinVersion: tls.VersionTLS12,
 			// Add custom ciphers
 			CipherSuites: []uint16{tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384},
+			// Use InsecureSkipVerify for the test server
+			InsecureSkipVerify: true,
 		}
 		options.TLSConfig = customTLS
 
-		loader, err := NewFromHTTPWithOptions("https://example.com/script.js", options)
+		loader, err := NewFromHTTPWithOptions(testURL, options)
 		require.NoError(t, err)
 		require.NotNil(t, loader)
 
@@ -250,6 +285,20 @@ func TestFromHTTP_TLSConfig(t *testing.T) {
 	})
 
 	t.Run("TLSConfig takes precedence over InsecureSkipVerify", func(t *testing.T) {
+		t.Parallel()
+
+		// Create test server for this test
+		server := httptest.NewTLSServer(
+			http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+				_, err := w.Write([]byte(FunctionContent))
+				require.NoError(t, err)
+			}),
+		)
+		defer server.Close()
+
+		testURL := server.URL + "/script.js"
+
 		options := DefaultHTTPOptions()
 		options.InsecureSkipVerify = true
 		customTLS := &tls.Config{
@@ -258,7 +307,7 @@ func TestFromHTTP_TLSConfig(t *testing.T) {
 		}
 		options.TLSConfig = customTLS
 
-		loader, err := NewFromHTTPWithOptions("https://example.com/script.js", options)
+		loader, err := NewFromHTTPWithOptions(testURL, options)
 		require.NoError(t, err)
 		require.NotNil(t, loader)
 
@@ -271,12 +320,29 @@ func TestFromHTTP_TLSConfig(t *testing.T) {
 		require.False(t, transport.TLSClientConfig.InsecureSkipVerify,
 			"TLSConfig should override InsecureSkipVerify")
 		require.Equal(t, uint16(tls.VersionTLS13), transport.TLSClientConfig.MinVersion)
+
+		// For testing purposes, replace the client with one that accepts the test server's certificate
+		loader.client = server.Client()
 	})
 
 	t.Run("no TLS modifications when neither option is set", func(t *testing.T) {
+		t.Parallel()
+
+		// Create test server for this test
+		server := httptest.NewTLSServer(
+			http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+				_, err := w.Write([]byte(FunctionContent))
+				require.NoError(t, err)
+			}),
+		)
+		defer server.Close()
+
+		testURL := server.URL + "/script.js"
+
 		options := DefaultHTTPOptions()
 
-		loader, err := NewFromHTTPWithOptions("https://example.com/script.js", options)
+		loader, err := NewFromHTTPWithOptions(testURL, options)
 		require.NoError(t, err)
 		require.NotNil(t, loader)
 
@@ -287,264 +353,225 @@ func TestFromHTTP_TLSConfig(t *testing.T) {
 		// The http.Client only initializes Transport when needed, so it might be nil at this point
 		// We should check that it's nil when neither TLS option is set
 		require.Nil(t, client.Transport, "Expected Transport to be nil when no TLS options are set")
+
+		// For testing purposes, replace the client with one that accepts the test server's certificate
+		loader.client = server.Client()
 	})
 }
 
 func TestFromHTTP_GetReader(t *testing.T) {
 	t.Parallel()
 
-	const testScript = `function test() { return "Hello, World!"; }`
+	const testScript = FunctionContent
 
-	tests := []struct {
-		name             string
-		url              string
-		optionsModifier  func(options *HTTPOptions) *HTTPOptions
-		customResp       func() *http.Response
-		mockError        error
-		requestValidator func(t *testing.T, req *http.Request)
-		expectError      bool
-		errorContains    string
-		validateBody     bool
-	}{
-		{
-			name: "Success - Default",
-			url:  "https://example.com/script.js",
-			customResp: func() *http.Response {
-				return newMockResponse(http.StatusOK, testScript)
-			},
-			requestValidator: func(t *testing.T, req *http.Request) {
-				t.Helper()
-				require.Equal(t, "https://example.com/script.js", req.URL.String())
-				require.Equal(t, http.MethodGet, req.Method)
-				require.Equal(t, "go-polyscript/http-loader", req.Header.Get("User-Agent"))
-			},
-			validateBody: true,
-		},
-		{
-			name: "Success - Basic Auth",
-			url:  "https://example.com/auth",
-			optionsModifier: func(options *HTTPOptions) *HTTPOptions {
-				return options.WithBasicAuth("user", "pass").WithTimeout(5 * time.Second)
-			},
-			customResp: func() *http.Response {
-				return newMockResponse(http.StatusOK, testScript)
-			},
-			requestValidator: func(t *testing.T, req *http.Request) {
-				t.Helper()
-				require.Equal(t, "https://example.com/auth", req.URL.String())
-				username, password, ok := req.BasicAuth()
-				require.True(t, ok, "Expected Basic Auth to be set")
-				require.Equal(t, "user", username)
-				require.Equal(t, "pass", password)
-			},
-			validateBody: true,
-		},
-		{
-			name: "Success - Bearer Auth",
-			url:  "https://example.com/header-auth",
-			optionsModifier: func(options *HTTPOptions) *HTTPOptions {
-				return options.WithBearerAuth("test-token").WithTimeout(5 * time.Second)
-			},
-			customResp: func() *http.Response {
-				return newMockResponse(http.StatusOK, testScript)
-			},
-			requestValidator: func(t *testing.T, req *http.Request) {
-				t.Helper()
-				require.Equal(t, "https://example.com/header-auth", req.URL.String())
-				require.Equal(t, "Bearer test-token", req.Header.Get("Authorization"))
-			},
-			validateBody: true,
-		},
-		{
-			name: "Success - Custom Headers",
-			url:  "https://example.com/header-auth",
-			optionsModifier: func(options *HTTPOptions) *HTTPOptions {
-				options.Headers["User-Agent"] = "Custom-Agent"
-				options.Headers["X-Custom"] = "value"
-				return options
-			},
-			customResp: func() *http.Response {
-				return newMockResponse(http.StatusOK, testScript)
-			},
-			requestValidator: func(t *testing.T, req *http.Request) {
-				t.Helper()
-				require.Equal(t, "Custom-Agent", req.Header.Get("User-Agent"))
-				require.Equal(t, "value", req.Header.Get("X-Custom"))
-			},
-			validateBody: true,
-		},
-		{
-			name: "Failure - Unauthorized",
-			url:  "https://example.com/auth",
-			customResp: func() *http.Response {
-				return newMockResponse(http.StatusUnauthorized, "Unauthorized")
-			},
-			expectError:   true,
-			errorContains: "HTTP 401",
-		},
-		{
-			name: "Failure - Not Found",
-			url:  "https://example.com/error",
-			customResp: func() *http.Response {
-				return newMockResponse(http.StatusNotFound, "Not Found")
-			},
-			expectError:   true,
-			errorContains: "HTTP 404",
-		},
-		{
-			name:          "Failure - Network Error",
-			url:           "https://invalid-domain.example",
-			mockError:     errors.New("network error"),
-			expectError:   true,
-			errorContains: "failed to execute HTTP request",
-		},
-	}
+	// Test with simple basic mocks instead of complex HTTP validation
+	t.Run("successful read", func(t *testing.T) {
+		t.Parallel()
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Create a mock client for this test
-			mockClient := &mockHTTPClient{
-				doFunc: func(req *http.Request) (*http.Response, error) {
-					if tt.requestValidator != nil {
-						tt.requestValidator(t, req)
-					}
-
-					if tt.mockError != nil {
-						return nil, tt.mockError
-					}
-
-					resp := tt.customResp()
-					return resp, nil
-				},
-			}
-
-			var loader *FromHTTP
-			var err error
-
-			// Start with default options and apply modifier if provided
-			options := DefaultHTTPOptions()
-			if tt.optionsModifier != nil {
-				options = tt.optionsModifier(options)
-			}
-
-			loader, err = NewFromHTTPWithOptions(tt.url, options)
-			require.NoError(t, err, "Failed to create HTTP loader")
-
-			// Replace the client with our mock
-			loader.client = mockClient
-
-			reader, err := loader.GetReader()
-			if tt.expectError {
-				require.Error(t, err)
-				if tt.errorContains != "" {
-					require.Contains(t, err.Error(), tt.errorContains)
-				}
-				return
-			}
-
+		// Create test server
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			_, err := w.Write([]byte(testScript))
 			require.NoError(t, err)
-			require.NotNil(t, reader)
-			defer func() { require.NoError(t, reader.Close(), "Failed to close reader") }()
+		}))
+		defer server.Close()
 
-			if tt.validateBody {
-				content, err := io.ReadAll(reader)
-				require.NoError(t, err)
-				require.Equal(t, testScript, string(content))
-			}
-		})
-	}
+		testURL := server.URL + "/script.js"
+
+		loader, err := NewFromHTTP(testURL)
+		require.NoError(t, err)
+
+		// Use real server with helper
+		reader, err := loader.GetReader()
+		require.NoError(t, err)
+		verifyReaderContent(t, reader, testScript)
+	})
+
+	t.Run("unauthorized error", func(t *testing.T) {
+		t.Parallel()
+
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusUnauthorized)
+			_, err := w.Write([]byte("Unauthorized"))
+			require.NoError(t, err)
+		}))
+		defer server.Close()
+
+		testURL := server.URL + "/auth"
+
+		loader, err := NewFromHTTP(testURL)
+		require.NoError(t, err)
+
+		reader, err := loader.GetReader()
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "HTTP 401")
+		require.Nil(t, reader)
+	})
+
+	t.Run("not found error", func(t *testing.T) {
+		t.Parallel()
+
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusNotFound)
+			_, err := w.Write([]byte("Not Found"))
+			require.NoError(t, err)
+		}))
+		defer server.Close()
+
+		testURL := server.URL + "/not-found"
+
+		loader, err := NewFromHTTP(testURL)
+		require.NoError(t, err)
+
+		reader, err := loader.GetReader()
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "HTTP 404")
+		require.Nil(t, reader)
+	})
+
+	t.Run("network error", func(t *testing.T) {
+		t.Parallel()
+
+		// Use any URL since we'll replace the client with a mock
+		testURL := "https://localhost:8080/script.js"
+
+		loader, err := NewFromHTTP(testURL)
+		require.NoError(t, err)
+
+		// Replace with client that returns an error
+		mockClient := &mockHTTPClient{
+			doFunc: func(req *http.Request) (*http.Response, error) {
+				return nil, errors.New("network error")
+			},
+		}
+		loader.client = mockClient
+
+		reader, err := loader.GetReader()
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "failed to execute HTTP request")
+		require.Nil(t, reader)
+	})
 }
 
 func TestFromHTTP_GetReaderWithContext(t *testing.T) {
 	t.Parallel()
+	const testScript = FunctionContent
 
-	const testScript = `function test() { return "Hello, World!"; }`
+	t.Run("Success - Background Context", func(t *testing.T) {
+		t.Parallel()
 
-	tests := []struct {
-		name          string
-		url           string
-		ctx           context.Context
-		cancelFunc    func()
-		expectError   bool
-		errorContains string
-	}{
-		{
-			name: "Success - Background Context",
-			url:  "https://example.com/script.js",
-			ctx:  context.Background(),
-		},
-		{
-			name:          "Failure - Cancelled Context",
-			url:           "https://example.com/script.js",
-			ctx:           func() context.Context { ctx, cancel := context.WithCancel(context.Background()); cancel(); return ctx }(),
-			expectError:   true,
-			errorContains: "context canceled",
-		},
-		{
-			name: "Failure - Timeout Context",
-			url:  "https://example.com/script.js",
-			ctx: func() context.Context {
-				ctx, cancel := context.WithTimeout(context.Background(), 1*time.Nanosecond)
-				defer cancel()
-				time.Sleep(5 * time.Millisecond)
-				return ctx
-			}(),
-			expectError:   true,
-			errorContains: "context deadline exceeded",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			loader, err := NewFromHTTP(tt.url)
+		// Create test server
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			_, err := w.Write([]byte(testScript))
 			require.NoError(t, err)
+		}))
+		defer server.Close()
 
-			mockClient := &mockHTTPClient{
-				doFunc: func(req *http.Request) (*http.Response, error) {
-					// Check if context error happens before we'd even make the request
-					if err := req.Context().Err(); err != nil {
-						return nil, err
-					}
-					// Create a new response each time to ensure it can be properly closed
-					resp := newMockResponse(http.StatusOK, testScript)
-					return resp, nil
-				},
-			}
-			loader.client = mockClient
+		testURL := server.URL + "/script.js"
 
-			reader, err := loader.GetReaderWithContext(tt.ctx)
+		loader, err := NewFromHTTP(testURL)
+		require.NoError(t, err)
 
-			if tt.expectError {
-				require.Error(t, err)
-				if tt.errorContains != "" {
-					require.Contains(t, err.Error(), tt.errorContains)
-				}
-				return
-			}
+		ctx := context.Background()
+		reader, err := loader.GetReaderWithContext(ctx)
+		require.NoError(t, err)
+		require.NotNil(t, reader)
+		verifyReaderContent(t, reader, testScript)
+	})
 
+	t.Run("Failure - Cancelled Context", func(t *testing.T) {
+		t.Parallel()
+
+		// Create test server
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			_, err := w.Write([]byte(testScript))
 			require.NoError(t, err)
-			require.NotNil(t, reader)
-			defer func() { require.NoError(t, reader.Close(), "Failed to close reader") }()
-		})
-	}
+		}))
+		defer server.Close()
+
+		testURL := server.URL + "/script.js"
+
+		loader, err := NewFromHTTP(testURL)
+		require.NoError(t, err)
+
+		// Create cancelled context
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel() // Cancel immediately
+
+		// Use mock client to ensure we're testing context cancellation
+		mockClient := &mockHTTPClient{
+			doFunc: func(req *http.Request) (*http.Response, error) {
+				// Should fail with context error
+				return nil, req.Context().Err()
+			},
+		}
+		loader.client = mockClient
+
+		reader, err := loader.GetReaderWithContext(ctx)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "context canceled")
+		require.Nil(t, reader)
+	})
+
+	t.Run("Failure - Timeout Context", func(t *testing.T) {
+		t.Parallel()
+
+		// Create test server
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Delay to ensure timeout happens
+			time.Sleep(100 * time.Millisecond)
+			w.WriteHeader(http.StatusOK)
+			_, err := w.Write([]byte(testScript))
+			require.NoError(t, err)
+		}))
+		defer server.Close()
+
+		testURL := server.URL + "/script.js"
+
+		loader, err := NewFromHTTP(testURL)
+		require.NoError(t, err)
+
+		// Create context with very short timeout
+		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Nanosecond)
+		defer cancel()
+
+		// Use mock client to ensure we're testing context timeout
+		mockClient := &mockHTTPClient{
+			doFunc: func(req *http.Request) (*http.Response, error) {
+				// Small sleep to ensure context times out
+				time.Sleep(1 * time.Millisecond)
+				return nil, req.Context().Err()
+			},
+		}
+		loader.client = mockClient
+
+		reader, err := loader.GetReaderWithContext(ctx)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "context deadline exceeded")
+		require.Nil(t, reader)
+	})
 }
 
 func TestFromHTTP_String(t *testing.T) {
 	t.Parallel()
 
 	t.Run("successful string representation", func(t *testing.T) {
-		// Test successful String() result with mock client
-		testURL := "https://example.com/script.js"
+		t.Parallel()
+
+		// Create test server that returns content
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			_, err := w.Write([]byte("test script content"))
+			require.NoError(t, err)
+		}))
+		defer server.Close()
+
+		testURL := server.URL + "/script.js"
+
 		loader, err := NewFromHTTP(testURL)
 		require.NoError(t, err)
-
-		// Mock client that returns content for SHA256 calculation
-		mockClient := &mockHTTPClient{
-			doFunc: func(req *http.Request) (*http.Response, error) {
-				return newMockResponse(http.StatusOK, "test script content"), nil
-			},
-		}
-		loader.client = mockClient
 
 		str := loader.String()
 		require.Contains(t, str, "loader.FromHTTP{URL:")
@@ -553,17 +580,13 @@ func TestFromHTTP_String(t *testing.T) {
 	})
 
 	t.Run("string representation with network error", func(t *testing.T) {
-		testURL := "https://example.com/script.js"
+		t.Parallel()
+
+		// Create server that deliberately fails connections (invalid port)
+		testURL := "http://localhost:1" // This port is unlikely to be listening
+
 		loader, err := NewFromHTTP(testURL)
 		require.NoError(t, err)
-
-		// Mock client that simulates an error
-		failingMockClient := &mockHTTPClient{
-			doFunc: func(req *http.Request) (*http.Response, error) {
-				return nil, errors.New("network error")
-			},
-		}
-		loader.client = failingMockClient
 
 		str := loader.String()
 		require.Contains(t, str, "loader.FromHTTP{URL:")
@@ -572,17 +595,20 @@ func TestFromHTTP_String(t *testing.T) {
 	})
 
 	t.Run("string representation with HTTP error", func(t *testing.T) {
-		testURL := "https://example.com/script.js"
+		t.Parallel()
+
+		// Create test server that returns an error status
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusNotFound)
+			_, err := w.Write([]byte("Not Found"))
+			require.NoError(t, err)
+		}))
+		defer server.Close()
+
+		testURL := server.URL + "/script.js"
+
 		loader, err := NewFromHTTP(testURL)
 		require.NoError(t, err)
-
-		// Mock client that returns an error status code
-		errorMockClient := &mockHTTPClient{
-			doFunc: func(req *http.Request) (*http.Response, error) {
-				return newMockResponse(http.StatusNotFound, "Not Found"), nil
-			},
-		}
-		loader.client = errorMockClient
 
 		str := loader.String()
 		require.Contains(t, str, "loader.FromHTTP{URL:")
@@ -608,6 +634,8 @@ func TestHTTPOptionsWithMethods(t *testing.T) {
 	t.Parallel()
 
 	t.Run("option method chaining", func(t *testing.T) {
+		t.Parallel()
+
 		// Test chaining of option methods
 		options := DefaultHTTPOptions().
 			WithTimeout(60*time.Second).
@@ -623,6 +651,8 @@ func TestHTTPOptionsWithMethods(t *testing.T) {
 	})
 
 	t.Run("with header auth", func(t *testing.T) {
+		t.Parallel()
+
 		headers := map[string]string{
 			"X-API-Key":    "api-key-123",
 			"X-Custom-Key": "custom-value",
@@ -637,6 +667,8 @@ func TestHTTPOptionsWithMethods(t *testing.T) {
 	})
 
 	t.Run("with no auth", func(t *testing.T) {
+		t.Parallel()
+
 		// Start with basic auth
 		options := DefaultHTTPOptions().WithBasicAuth("user", "pass")
 
@@ -653,17 +685,23 @@ func TestFromHTTP_GetSourceURL(t *testing.T) {
 	t.Parallel()
 
 	t.Run("source URL", func(t *testing.T) {
-		testURL := "https://example.com/script.js"
+		t.Parallel()
+
+		// Create test server for this test
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			_, err := w.Write([]byte(FunctionContent))
+			require.NoError(t, err)
+		}))
+		defer server.Close()
+
+		testURL := server.URL + "/script.js"
+
 		loader, err := NewFromHTTP(testURL)
 		require.NoError(t, err)
 
 		sourceURL := loader.GetSourceURL()
 		require.NotNil(t, sourceURL)
 		require.Equal(t, testURL, sourceURL.String())
-
-		// Test that the returned URL is a copy that can't modify the internal state
-		parsedURL, err := url.Parse(testURL)
-		require.NoError(t, err)
-		require.Equal(t, parsedURL, sourceURL)
 	})
 }

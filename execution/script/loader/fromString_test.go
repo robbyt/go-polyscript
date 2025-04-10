@@ -12,15 +12,17 @@ func TestNewFromString(t *testing.T) {
 	t.Parallel()
 
 	t.Run("valid content", func(t *testing.T) {
-		cases := []struct {
+		t.Parallel()
+
+		tests := []struct {
 			name    string
 			content string
 			want    string
 		}{
 			{
 				name:    "simple content",
-				content: "test content",
-				want:    "test content",
+				content: SimpleContent,
+				want:    SimpleContent,
 			},
 			{
 				name:    "trim whitespace",
@@ -29,8 +31,8 @@ func TestNewFromString(t *testing.T) {
 			},
 			{
 				name:    "multiline content",
-				content: "line1\nline2\nline3",
-				want:    "line1\nline2\nline3",
+				content: MultilineContent,
+				want:    MultilineContent,
 			},
 			{
 				name:    "mixed line endings",
@@ -44,8 +46,11 @@ func TestNewFromString(t *testing.T) {
 			},
 		}
 
-		for _, tc := range cases {
+		for _, tc := range tests {
+			tc := tc // Capture range variable
 			t.Run(tc.name, func(t *testing.T) {
+				t.Parallel()
+
 				loader, err := NewFromString(tc.content)
 				require.NoError(t, err)
 				require.NotNil(t, loader)
@@ -54,12 +59,17 @@ func TestNewFromString(t *testing.T) {
 				// Verify the URL includes the hash of the content
 				expectedHash := helpers.SHA256(tc.want)[:8]
 				require.Contains(t, loader.GetSourceURL().String(), expectedHash)
+
+				// Use helper for further validation
+				verifyLoader(t, loader, "string://inline/"+expectedHash)
 			})
 		}
 	})
 
 	t.Run("invalid content", func(t *testing.T) {
-		cases := []struct {
+		t.Parallel()
+
+		tests := []struct {
 			name    string
 			content string
 		}{
@@ -73,8 +83,11 @@ func TestNewFromString(t *testing.T) {
 			},
 		}
 
-		for _, tc := range cases {
+		for _, tc := range tests {
+			tc := tc // Capture range variable
 			t.Run(tc.name, func(t *testing.T) {
+				t.Parallel()
+
 				loader, err := NewFromString(tc.content)
 				require.Error(t, err)
 				require.ErrorIs(t, err, ErrScriptNotAvailable)
@@ -82,21 +95,14 @@ func TestNewFromString(t *testing.T) {
 			})
 		}
 	})
-
-	t.Run("URL parsing error simulation", func(t *testing.T) {
-		// For this test we'll just verify normal operation
-		// since mocking url.Parse is complicated
-		content := "valid content"
-		loader, err := NewFromString(content)
-		require.NoError(t, err)
-		require.NotNil(t, loader)
-	})
 }
 
 func TestFromString_GetReader(t *testing.T) {
 	t.Parallel()
 
 	t.Run("read content", func(t *testing.T) {
+		t.Parallel()
+
 		content := "test content\nwith multiple lines"
 		loader, err := NewFromString(content)
 		require.NoError(t, err)
@@ -104,42 +110,22 @@ func TestFromString_GetReader(t *testing.T) {
 		reader, err := loader.GetReader()
 		require.NoError(t, err)
 
-		t.Cleanup(func() {
-			require.NoError(t, reader.Close(), "Failed to close reader")
-		})
-
-		got, err := io.ReadAll(reader)
-		require.NoError(t, err)
-		require.Equal(t, content, string(got))
+		verifyReaderContent(t, reader, content)
 	})
 
 	t.Run("multiple reads from same loader", func(t *testing.T) {
-		content := "function calculate(x) { return x * 2; }"
+		t.Parallel()
+
+		content := FunctionContent
 		loader, err := NewFromString(content)
 		require.NoError(t, err)
 
-		// First read
-		reader1, err := loader.GetReader()
-		require.NoError(t, err)
-		t.Cleanup(func() {
-			require.NoError(t, reader1.Close(), "Failed to close first reader")
-		})
-		got1, err := io.ReadAll(reader1)
-		require.NoError(t, err)
-		require.Equal(t, content, string(got1))
-
-		// Second read should return a new reader with the same content
-		reader2, err := loader.GetReader()
-		require.NoError(t, err)
-		t.Cleanup(func() {
-			require.NoError(t, reader2.Close(), "Failed to close second reader")
-		})
-		got2, err := io.ReadAll(reader2)
-		require.NoError(t, err)
-		require.Equal(t, content, string(got2))
+		verifyMultipleReads(t, loader, content)
 	})
 
 	t.Run("partial reads", func(t *testing.T) {
+		t.Parallel()
+
 		content := "line1\nline2\nline3\nline4\nline5"
 		loader, err := NewFromString(content)
 		require.NoError(t, err)
@@ -168,7 +154,9 @@ func TestFromString_GetSourceURL(t *testing.T) {
 	t.Parallel()
 
 	t.Run("source url", func(t *testing.T) {
-		content := "test content"
+		t.Parallel()
+
+		content := SimpleContent
 		loader, err := NewFromString(content)
 		require.NoError(t, err)
 
@@ -184,6 +172,8 @@ func TestFromString_GetSourceURL(t *testing.T) {
 	})
 
 	t.Run("unique urls for different content", func(t *testing.T) {
+		t.Parallel()
+
 		loader1, err := NewFromString("content one")
 		require.NoError(t, err)
 
@@ -199,8 +189,10 @@ func TestFromString_String(t *testing.T) {
 	t.Parallel()
 
 	t.Run("string representation", func(t *testing.T) {
+		t.Parallel()
+
 		// Test with different content lengths
-		testCases := []struct {
+		tests := []struct {
 			name        string
 			content     string
 			shouldMatch string
@@ -217,8 +209,11 @@ func TestFromString_String(t *testing.T) {
 			},
 		}
 
-		for _, tc := range testCases {
+		for _, tc := range tests {
+			tc := tc // Capture range variable
 			t.Run(tc.name, func(t *testing.T) {
+				t.Parallel()
+
 				loader, err := NewFromString(tc.content)
 				require.NoError(t, err)
 

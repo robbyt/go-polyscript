@@ -22,7 +22,7 @@ func TestHeaderAuth(t *testing.T) {
 		})
 		require.Equal(t, "Header", auth.Name())
 
-		req, err := http.NewRequest(http.MethodGet, "https://example.com", nil)
+		req, err := http.NewRequest(http.MethodGet, "http://localhost/test", nil)
 		require.NoError(t, err)
 
 		err = auth.Authenticate(req)
@@ -39,7 +39,7 @@ func TestHeaderAuth(t *testing.T) {
 		auth := NewHeaderAuth(map[string]string{})
 		require.Equal(t, "Header", auth.Name())
 
-		req, err := http.NewRequest(http.MethodGet, "https://example.com", nil)
+		req, err := http.NewRequest(http.MethodGet, "http://localhost/test", nil)
 		require.NoError(t, err)
 
 		err = auth.Authenticate(req)
@@ -54,7 +54,7 @@ func TestHeaderAuth(t *testing.T) {
 		auth := NewHeaderAuth(nil)
 		require.Equal(t, "Header", auth.Name())
 
-		req, err := http.NewRequest(http.MethodGet, "https://example.com", nil)
+		req, err := http.NewRequest(http.MethodGet, "http://localhost/test", nil)
 		require.NoError(t, err)
 
 		err = auth.Authenticate(req)
@@ -69,7 +69,7 @@ func TestHeaderAuth(t *testing.T) {
 		auth := NewBearerAuth("my-test-token")
 		require.Equal(t, "Header", auth.Name())
 
-		req, err := http.NewRequest(http.MethodGet, "https://example.com", nil)
+		req, err := http.NewRequest(http.MethodGet, "http://localhost/test", nil)
 		require.NoError(t, err)
 
 		err = auth.Authenticate(req)
@@ -86,7 +86,7 @@ func TestHeaderAuth(t *testing.T) {
 		})
 		require.Equal(t, "Header", auth.Name())
 
-		req, err := http.NewRequest(http.MethodGet, "https://example.com", nil)
+		req, err := http.NewRequest(http.MethodGet, "http://localhost/test", nil)
 		require.NoError(t, err)
 		ctx := context.Background()
 
@@ -104,7 +104,7 @@ func TestHeaderAuth(t *testing.T) {
 		})
 		require.Equal(t, "Header", auth.Name())
 
-		req, err := http.NewRequest(http.MethodGet, "https://example.com", nil)
+		req, err := http.NewRequest(http.MethodGet, "http://localhost/test", nil)
 		require.NoError(t, err)
 
 		ctx, cancel := context.WithCancel(context.Background())
@@ -123,7 +123,7 @@ func TestHeaderAuth(t *testing.T) {
 		})
 		require.Equal(t, "Header", auth.Name())
 
-		req, err := http.NewRequest(http.MethodGet, "https://example.com", nil)
+		req, err := http.NewRequest(http.MethodGet, "http://localhost/test", nil)
 		require.NoError(t, err)
 
 		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Nanosecond)
@@ -152,7 +152,7 @@ func TestHeaderAuthCloning(t *testing.T) {
 	originalHeaders["X-New"] = "added"
 
 	// Create a request
-	req, err := http.NewRequest(http.MethodGet, "https://example.com", nil)
+	req, err := http.NewRequest(http.MethodGet, "http://localhost/test", nil)
 	require.NoError(t, err)
 
 	// Apply auth

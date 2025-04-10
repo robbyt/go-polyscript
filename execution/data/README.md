@@ -29,15 +29,15 @@ Both types of data are made available to scripts as part of the top-level `ctx` 
 ┌───────────────────┐    ┌───────────────────┐    ┌───────────────────┐
 │   Static Data     │    │   Dynamic Data    │    │     Provider      │
 │                   │    │                   │    │                   │
-│                   │    │                   │    │  GetData()        │
-│ - Config values   │    │ - Request params  │    │  AddDataToContext()│
+│                   │    │                   │    │ GetData()         │
+│ - Config values   │    │ - Request params  │    │ AddDataToContext()│
 │ - Constants       │    │ - User inputs     │    │                   │
 └─────────┬─────────┘    └─────────┬─────────┘    └─────────┬─────────┘
           │                        │                        │
           │                        │                        │
           ▼                        ▼                        ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│                          Context                                     │
+│                          Context                                    │
 │                                                                     │
 │  Data stored under constants.EvalData key with structure:           │
 │  {                                                                  │
@@ -55,7 +55,7 @@ Both types of data are made available to scripts as part of the top-level `ctx` 
                                       │
                                       ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│                        VM Execution                                  │
+│                        VM Execution                                 │
 │                                                                     │
 │  - VM implementations access data through the Provider interface    │
 │  - Each VM makes the data available as a global `ctx` variable      │

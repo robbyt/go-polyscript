@@ -17,7 +17,7 @@ func TestBasicAuth(t *testing.T) {
 		username := "testuser"
 		password := "testpass"
 
-		req, err := http.NewRequest(http.MethodGet, "https://example.com", nil)
+		req, err := http.NewRequest(http.MethodGet, "http://localhost/test", nil)
 		require.NoError(t, err)
 
 		auth := NewBasicAuth(username, password)
@@ -37,7 +37,7 @@ func TestBasicAuth(t *testing.T) {
 		username := ""
 		password := "testpass"
 
-		req, err := http.NewRequest(http.MethodGet, "https://example.com", nil)
+		req, err := http.NewRequest(http.MethodGet, "http://localhost/test", nil)
 		require.NoError(t, err)
 
 		auth := NewBasicAuth(username, password)
@@ -56,7 +56,7 @@ func TestBasicAuth(t *testing.T) {
 		username := "testuser"
 		password := "testpass"
 
-		req, err := http.NewRequest(http.MethodGet, "https://example.com", nil)
+		req, err := http.NewRequest(http.MethodGet, "http://localhost/test", nil)
 		require.NoError(t, err)
 		ctx := context.Background()
 
@@ -77,7 +77,7 @@ func TestBasicAuth(t *testing.T) {
 		username := "testuser"
 		password := "testpass"
 
-		req, err := http.NewRequest(http.MethodGet, "https://example.com", nil)
+		req, err := http.NewRequest(http.MethodGet, "http://localhost/test", nil)
 		require.NoError(t, err)
 
 		ctx, cancel := context.WithCancel(context.Background())
@@ -96,7 +96,7 @@ func TestBasicAuth(t *testing.T) {
 		username := "testuser"
 		password := "testpass"
 
-		req, err := http.NewRequest(http.MethodGet, "https://example.com", nil)
+		req, err := http.NewRequest(http.MethodGet, "http://localhost/test", nil)
 		require.NoError(t, err)
 
 		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Nanosecond)

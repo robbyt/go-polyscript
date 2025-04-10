@@ -7,14 +7,48 @@ import (
 	"os"
 	"testing"
 
+	extismSDK "github.com/extism/go-sdk"
 	"github.com/robbyt/go-polyscript/execution/constants"
 	"github.com/robbyt/go-polyscript/execution/data"
 	"github.com/robbyt/go-polyscript/execution/script"
+	"github.com/robbyt/go-polyscript/machines/extism/adapters"
+	"github.com/robbyt/go-polyscript/machines/extism/compiler"
 	"github.com/robbyt/go-polyscript/machines/extism/internal"
 	machineTypes "github.com/robbyt/go-polyscript/machines/types"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
+
+// MockCompiledPlugin is a mock implementation of adapters.CompiledPlugin
+type MockCompiledPlugin struct {
+	mock.Mock
+}
+
+func (m *MockCompiledPlugin) Instance(
+	ctx context.Context,
+	cfg extismSDK.PluginInstanceConfig,
+) (adapters.PluginInstance, error) {
+	args := m.Called(ctx, cfg)
+	return args.Get(0).(adapters.PluginInstance), args.Error(1)
+}
+
+func (m *MockCompiledPlugin) Close(ctx context.Context) error {
+	args := m.Called(ctx)
+	return args.Error(0)
+}
+
+// createMockExecutable creates a real compiler.Executable with our mock plugin
+func createMockExecutable(
+	mockPlugin adapters.CompiledPlugin,
+	entryPoint string,
+) *compiler.Executable {
+	// Create some mock WASM bytes
+	wasmBytes := []byte{0x00, 0x61, 0x73, 0x6D, 0x01, 0x00, 0x00, 0x00}
+
+	// Use the real Executable type with our mock plugin
+	return compiler.NewExecutable(wasmBytes, mockPlugin, entryPoint)
+}
 
 func TestLoadInputData(t *testing.T) {
 	t.Parallel()
@@ -146,14 +180,18 @@ func TestBytecodeEvaluatorInvalidInputs(t *testing.T) {
 
 func TestNilHandlerFallback(t *testing.T) {
 	// Test that the evaluator handles nil handlers by creating a default
+
+	// Create mock plugin
+	mockPlugin := new(MockCompiledPlugin)
+	mockPlugin.On("Close", mock.Anything).Return(nil)
+
+	// Create a real compiler.Executable with our mock plugin
+	content := createMockExecutable(mockPlugin, "main")
+
 	exe := &script.ExecutableUnit{
 		ID:           "test-nil-handler",
 		DataProvider: data.NewContextProvider(constants.EvalData),
-		Content: &mockExecutableContent{
-			machineType: machineTypes.Extism,
-			source:      "test wasm",
-			bytecode:    []byte{0x00, 0x61, 0x73, 0x6D},
-		},
+		Content:      content,
 	}
 
 	// Create with nil handler
@@ -217,15 +255,23 @@ func TestBasicExecution(t *testing.T) {
 	// Create context provider
 	ctxProvider := data.NewContextProvider(constants.EvalData)
 
+	// Create mock plugin
+	mockPlugin := new(MockCompiledPlugin)
+	mockInstance := &mockPluginInstance{
+		exitCode: 1, // Will cause an error
+		output:   []byte(`{"error":"something went wrong"}`),
+	}
+	mockPlugin.On("Instance", mock.Anything, mock.Anything).Return(mockInstance, nil)
+	mockPlugin.On("Close", mock.Anything).Return(nil)
+
+	// Create a real compiler.Executable with our mock plugin
+	content := createMockExecutable(mockPlugin, "main")
+
 	// Create a mock executable
 	exe := &script.ExecutableUnit{
 		ID:           "test-basic",
 		DataProvider: ctxProvider,
-		Content: &mockExecutableContent{
-			machineType: machineTypes.Extism,
-			source:      "test wasm",
-			bytecode:    []byte{0x00, 0x61, 0x73, 0x6D}, // WASM magic bytes only
-		},
+		Content:      content,
 	}
 
 	evaluator := NewBytecodeEvaluator(handler, exe)
@@ -236,7 +282,7 @@ func TestBasicExecution(t *testing.T) {
 	ctx = context.WithValue(ctx, constants.EvalData, evalData)
 
 	_, err := evaluator.Eval(ctx)
-	// We expect an error since our mock WASM isn't valid
+	// We expect an error since our mock returns an error
 	assert.Error(t, err)
 }
 
@@ -254,14 +300,15 @@ func TestPrepareContext(t *testing.T) {
 			name: "nil data provider",
 			setupExe: func(t *testing.T) *script.ExecutableUnit {
 				t.Helper()
+
+				mockPlugin := new(MockCompiledPlugin)
+				mockPlugin.On("Close", mock.Anything).Return(nil)
+				content := createMockExecutable(mockPlugin, "main")
+
 				return &script.ExecutableUnit{
 					ID:           "test-nil-provider",
 					DataProvider: nil,
-					Content: &mockExecutableContent{
-						machineType: machineTypes.Extism,
-						source:      "test wasm",
-						bytecode:    []byte{0x00, 0x61, 0x73, 0x6D},
-					},
+					Content:      content,
 				}
 			},
 			inputs:      []any{map[string]any{"test": "data"}},
@@ -272,14 +319,15 @@ func TestPrepareContext(t *testing.T) {
 			name: "valid simple data",
 			setupExe: func(t *testing.T) *script.ExecutableUnit {
 				t.Helper()
+
+				mockPlugin := new(MockCompiledPlugin)
+				mockPlugin.On("Close", mock.Anything).Return(nil)
+				content := createMockExecutable(mockPlugin, "main")
+
 				return &script.ExecutableUnit{
 					ID:           "test-valid-data",
 					DataProvider: data.NewContextProvider(constants.EvalData),
-					Content: &mockExecutableContent{
-						machineType: machineTypes.Extism,
-						source:      "test wasm",
-						bytecode:    []byte{0x00, 0x61, 0x73, 0x6D},
-					},
+					Content:      content,
 				}
 			},
 			inputs:    []any{map[string]any{"test": "data"}},
@@ -289,14 +337,15 @@ func TestPrepareContext(t *testing.T) {
 			name: "empty input",
 			setupExe: func(t *testing.T) *script.ExecutableUnit {
 				t.Helper()
+
+				mockPlugin := new(MockCompiledPlugin)
+				mockPlugin.On("Close", mock.Anything).Return(nil)
+				content := createMockExecutable(mockPlugin, "main")
+
 				return &script.ExecutableUnit{
 					ID:           "test-empty-input",
 					DataProvider: data.NewContextProvider(constants.EvalData),
-					Content: &mockExecutableContent{
-						machineType: machineTypes.Extism,
-						source:      "test wasm",
-						bytecode:    []byte{0x00, 0x61, 0x73, 0x6D},
-					},
+					Content:      content,
 				}
 			},
 			inputs:    []any{},
@@ -316,17 +365,18 @@ func TestPrepareContext(t *testing.T) {
 			name: "with error throwing provider",
 			setupExe: func(t *testing.T) *script.ExecutableUnit {
 				t.Helper()
+
+				mockPlugin := new(MockCompiledPlugin)
+				mockPlugin.On("Close", mock.Anything).Return(nil)
+				content := createMockExecutable(mockPlugin, "main")
+
 				mockProvider := &mockErrProvider{
 					err: errors.New("provider error"),
 				}
 				return &script.ExecutableUnit{
 					ID:           "test-err-provider",
 					DataProvider: mockProvider,
-					Content: &mockExecutableContent{
-						machineType: machineTypes.Extism,
-						source:      "test wasm",
-						bytecode:    []byte{0x00, 0x61, 0x73, 0x6D},
-					},
+					Content:      content,
 				}
 			},
 			inputs:      []any{map[string]any{"test": "data"}},
@@ -379,7 +429,7 @@ func (m *mockErrProvider) AddDataToContext(
 	return ctx, m.err
 }
 
-// mockPluginInstance is a mock implementation of the testPluginInstance interface
+// mockPluginInstance is a mock implementation of the adapters.PluginInstance interface
 type mockPluginInstance struct {
 	exitCode   uint32
 	output     []byte
@@ -405,6 +455,15 @@ func (m *mockPluginInstance) CallWithContext(
 		return 0, nil, ctx.Err()
 	}
 	return m.exitCode, m.output, m.callErr
+}
+
+func (m *mockPluginInstance) Call(name string, data []byte) (uint32, []byte, error) {
+	m.wasCalled = true
+	return m.exitCode, m.output, m.callErr
+}
+
+func (m *mockPluginInstance) FunctionExists(name string) bool {
+	return true
 }
 
 func (m *mockPluginInstance) Close(ctx context.Context) error {
@@ -655,6 +714,218 @@ func TestStaticAndDynamicDataCombination(t *testing.T) {
 }
 */
 
+// TestBytecodeEvaluator_Cancel tests the behavior when a context is cancelled
+func TestBytecodeEvaluator_Cancel(t *testing.T) {
+	// Create a cancel context
+	ctx, cancel := context.WithCancel(context.Background())
+
+	// Create mock plugin that will check for cancellation
+	mockPlugin := new(MockCompiledPlugin)
+	mockInstance := &mockPluginInstance{
+		cancelFunc: func() {
+			// This will be called during execution to cancel the context
+			cancel()
+		},
+		callErr: context.Canceled,
+	}
+	mockPlugin.On("Instance", mock.Anything, mock.Anything).Return(mockInstance, nil)
+	mockPlugin.On("Close", mock.Anything).Return(nil)
+
+	// Create a real compiler.Executable with our mock plugin
+	content := createMockExecutable(mockPlugin, "main")
+
+	// Create executor unit
+	handler := slog.NewTextHandler(os.Stdout, nil)
+	execUnit := &script.ExecutableUnit{
+		ID:           "test-cancel",
+		Content:      content,
+		DataProvider: data.NewContextProvider(constants.EvalData),
+	}
+
+	evaluator := NewBytecodeEvaluator(handler, execUnit)
+
+	// Add test data to context
+	ctx = context.WithValue(ctx, constants.EvalData, map[string]any{"test": "data"})
+
+	// Call Eval, which should be cancelled during execution
+	result, err := evaluator.Eval(ctx)
+
+	// Should get a cancellation error
+	assert.Error(t, err)
+	assert.Nil(t, result)
+	assert.Contains(t, err.Error(), "execution")
+
+	// Instance should have been called
+	mockPlugin.AssertCalled(t, "Instance", mock.Anything, mock.Anything)
+
+	// Instance should have been closed
+	assert.True(t, mockInstance.wasClosed)
+}
+
+// TestBytecodeEvaluator_Exec tests the exec method directly
+func TestBytecodeEvaluator_Exec(t *testing.T) {
+	// Define test cases
+	tests := []struct {
+		name          string
+		setupMocks    func() (*MockCompiledPlugin, *mockPluginInstance)
+		entryPoint    string
+		inputData     map[string]any
+		expectedValue any
+		expectError   bool
+		errorContains string
+	}{
+		{
+			name: "successful execution",
+			setupMocks: func() (*MockCompiledPlugin, *mockPluginInstance) {
+				mockPlugin := new(MockCompiledPlugin)
+				mockInstance := &mockPluginInstance{
+					exitCode: 0,
+					output:   []byte(`{"result":"success"}`),
+				}
+				mockPlugin.On("Instance", mock.Anything, mock.Anything).Return(mockInstance, nil)
+				mockPlugin.On("Close", mock.Anything).Return(nil)
+				return mockPlugin, mockInstance
+			},
+			entryPoint:    "main",
+			inputData:     map[string]any{"test": "data"},
+			expectedValue: map[string]any{"result": "success"},
+			expectError:   false,
+		},
+		{
+			name: "error creating instance",
+			setupMocks: func() (*MockCompiledPlugin, *mockPluginInstance) {
+				mockPlugin := new(MockCompiledPlugin)
+				mockInstance := &mockPluginInstance{
+					wasClosed: true, // Mock as if it was closed since the exec method closes the instance on error
+				}
+				mockPlugin.On("Instance", mock.Anything, mock.Anything).
+					Return(mockInstance, errors.New("instance creation error"))
+				mockPlugin.On("Close", mock.Anything).Return(nil)
+				return mockPlugin, mockInstance
+			},
+			entryPoint:    "main",
+			inputData:     map[string]any{"test": "data"},
+			expectError:   true,
+			errorContains: "failed to create plugin instance",
+		},
+		{
+			name: "execution error",
+			setupMocks: func() (*MockCompiledPlugin, *mockPluginInstance) {
+				mockPlugin := new(MockCompiledPlugin)
+				mockInstance := &mockPluginInstance{
+					callErr: errors.New("execution error"),
+				}
+				mockPlugin.On("Instance", mock.Anything, mock.Anything).Return(mockInstance, nil)
+				mockPlugin.On("Close", mock.Anything).Return(nil)
+				return mockPlugin, mockInstance
+			},
+			entryPoint:    "main",
+			inputData:     map[string]any{"test": "data"},
+			expectError:   true,
+			errorContains: "execution error",
+		},
+		{
+			name: "non-zero exit code",
+			setupMocks: func() (*MockCompiledPlugin, *mockPluginInstance) {
+				mockPlugin := new(MockCompiledPlugin)
+				mockInstance := &mockPluginInstance{
+					exitCode: 1,
+					output:   []byte(`{"error":"something went wrong"}`),
+				}
+				mockPlugin.On("Instance", mock.Anything, mock.Anything).Return(mockInstance, nil)
+				mockPlugin.On("Close", mock.Anything).Return(nil)
+				return mockPlugin, mockInstance
+			},
+			entryPoint:    "main",
+			inputData:     map[string]any{"test": "data"},
+			expectError:   true,
+			errorContains: "non-zero exit code",
+		},
+		{
+			name: "context cancellation",
+			setupMocks: func() (*MockCompiledPlugin, *mockPluginInstance) {
+				mockPlugin := new(MockCompiledPlugin)
+				mockInstance := &mockPluginInstance{
+					callErr: context.Canceled,
+				}
+				mockPlugin.On("Instance", mock.Anything, mock.Anything).Return(mockInstance, nil)
+				mockPlugin.On("Close", mock.Anything).Return(nil)
+				return mockPlugin, mockInstance
+			},
+			entryPoint:    "main",
+			inputData:     map[string]any{"test": "data"},
+			expectError:   true,
+			errorContains: "execution",
+		},
+		{
+			name: "close error (should still succeed)",
+			setupMocks: func() (*MockCompiledPlugin, *mockPluginInstance) {
+				mockPlugin := new(MockCompiledPlugin)
+				mockInstance := &mockPluginInstance{
+					exitCode: 0,
+					output:   []byte(`{"result":"success"}`),
+					closeErr: errors.New("close error"),
+				}
+				mockPlugin.On("Instance", mock.Anything, mock.Anything).Return(mockInstance, nil)
+				mockPlugin.On("Close", mock.Anything).Return(nil)
+				return mockPlugin, mockInstance
+			},
+			entryPoint:    "main",
+			inputData:     map[string]any{"test": "data"},
+			expectedValue: map[string]any{"result": "success"},
+			expectError:   false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create mocks
+			mockPlugin, mockInstance := tt.setupMocks()
+
+			// Create handler and evaluator
+			handler := slog.NewTextHandler(os.Stdout, nil)
+
+			// Create the unit under test
+			evaluator := NewBytecodeEvaluator(handler, nil)
+
+			// Convert input data to JSON
+			inputJSON, err := mockLoadInputData(tt.inputData)
+			require.NoError(t, err)
+
+			// Call the exec method directly
+			result, err := evaluator.exec(
+				context.Background(),
+				mockPlugin,
+				tt.entryPoint,
+				adapters.NewPluginInstanceConfig(),
+				inputJSON,
+			)
+
+			// Verify instance was called
+			mockPlugin.AssertCalled(t, "Instance", mock.Anything, mock.Anything)
+
+			// Check for expected errors
+			if tt.expectError {
+				assert.Error(t, err)
+				if tt.errorContains != "" {
+					assert.Contains(t, err.Error(), tt.errorContains)
+				}
+				assert.Nil(t, result)
+			} else {
+				assert.NoError(t, err)
+				assert.NotNil(t, result)
+
+				// Check result
+				resultValue := result.Interface()
+				assert.Equal(t, tt.expectedValue, resultValue)
+			}
+
+			// Close should always be called
+			assert.True(t, mockInstance.wasClosed, "Instance should be closed")
+		})
+	}
+}
+
 // TestExtismDirectInputFormat tests how input data is formatted for Extism
 func TestExtismDirectInputFormat(t *testing.T) {
 	// Create a test map that simulates data from our providers
@@ -680,4 +951,12 @@ func TestExtismDirectInputFormat(t *testing.T) {
 	// Verify current behavior
 	expected := `{"initial":"top-level-value","input_data":{"input":"API User","request":{}}}`
 	assert.JSONEq(t, expected, string(jsonBytes))
+}
+
+// Helper function to create mock input data JSON
+func mockLoadInputData(data map[string]any) ([]byte, error) {
+	if data == nil {
+		return []byte("{}"), nil
+	}
+	return internal.ConvertToExtismFormat(data)
 }

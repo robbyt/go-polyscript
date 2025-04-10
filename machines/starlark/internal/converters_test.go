@@ -275,11 +275,11 @@ func TestConvertToStarlarkFormat(t *testing.T) {
 			{
 				name: "with URL",
 				input: map[string]any{
-					"url": &url.URL{Scheme: "https", Host: "example.com"},
+					"url": &url.URL{Scheme: "https", Host: "localhost:8080"},
 				},
 				expected: func() starlarkLib.StringDict {
 					d := starlarkLib.NewDict(1)
-					u := &url.URL{Scheme: "https", Host: "example.com"}
+					u := &url.URL{Scheme: "https", Host: "localhost:8080"}
 					require.NoError(
 						t,
 						d.SetKey(starlarkLib.String("url"), starlarkLib.String(u.String())),
@@ -462,19 +462,19 @@ func TestConvertToStarlarkValue(t *testing.T) {
 				name: "simple URL",
 				input: &url.URL{
 					Scheme: "https",
-					Host:   "example.com",
+					Host:   "localhost:8080",
 				},
-				expected: starlarkLib.String("https://example.com"),
+				expected: starlarkLib.String("https://localhost:8080"),
 			},
 			{
 				name: "complex URL",
 				input: &url.URL{
 					Scheme:   "https",
-					Host:     "example.com",
+					Host:     "localhost:8080",
 					Path:     "/path",
 					RawQuery: "q=search",
 				},
-				expected: starlarkLib.String("https://example.com/path?q=search"),
+				expected: starlarkLib.String("https://localhost:8080/path?q=search"),
 			},
 		}
 
