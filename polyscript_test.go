@@ -19,6 +19,7 @@ import (
 	"github.com/robbyt/go-polyscript/execution/data"
 	"github.com/robbyt/go-polyscript/execution/script/loader"
 	extismCompiler "github.com/robbyt/go-polyscript/machines/extism/compiler"
+	"github.com/robbyt/go-polyscript/machines/mocks"
 	risorCompiler "github.com/robbyt/go-polyscript/machines/risor/compiler"
 	starlarkCompiler "github.com/robbyt/go-polyscript/machines/starlark/compiler"
 	"github.com/robbyt/go-polyscript/machines/types"
@@ -41,44 +42,6 @@ func withCompositeProvider(staticData map[string]any) any {
 		data.NewStaticProvider(staticData),
 		data.NewContextProvider(constants.Ctx),
 	))
-}
-
-// Create a mock evaluator response
-type mockResponse struct {
-	value any
-}
-
-func (m mockResponse) Interface() any {
-	return m.value
-}
-
-func (m mockResponse) GetScriptExeID() string {
-	return "mock-script-id"
-}
-
-func (m mockResponse) GetExecTime() string {
-	return "1ms"
-}
-
-func (m mockResponse) Inspect() string {
-	return "mock-response"
-}
-
-func (m mockResponse) Type() data.Types {
-	return data.NONE
-}
-
-// mockEvaluator implements engine.Evaluator for testing
-type mockEvaluator struct {
-	mock.Mock
-}
-
-func (m *mockEvaluator) Eval(ctx context.Context) (engine.EvaluatorResponse, error) {
-	args := m.Called(ctx)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return mockResponse{value: args.Get(0)}, args.Error(1)
 }
 
 // mockPreparer implements engine.EvalDataPreparer for testing
@@ -570,7 +533,7 @@ func TestEvalHelpers(t *testing.T) {
 		t.Run("PrepareContext error", func(t *testing.T) {
 			// Create mocks for testing error cases
 			mockPrepCtx := &mockPreparer{}
-			mockEval := &mockEvaluator{}
+			mockEval := &mocks.Evaluator{}
 
 			// Create context and data
 			ctx := context.Background()
@@ -599,7 +562,7 @@ func TestEvalHelpers(t *testing.T) {
 		t.Run("Eval error", func(t *testing.T) {
 			// Create mocks for testing error cases
 			mockPrepCtx := &mockPreparer{}
-			mockEval := &mockEvaluator{}
+			mockEval := &mocks.Evaluator{}
 
 			// Create context and data
 			ctx := context.Background()
@@ -611,7 +574,8 @@ func TestEvalHelpers(t *testing.T) {
 			mockPrepCtx.On("PrepareContext", ctx, []any{data}).Return(enrichedCtx, nil)
 
 			// Mock Eval to fail
-			mockEval.On("Eval", enrichedCtx).Return(nil, errors.New("eval error"))
+			mockEval.On("Eval", enrichedCtx).
+				Return((*mocks.EvaluatorResponse)(nil), errors.New("eval error"))
 
 			// Create a mock evaluator that implements both interfaces
 			mockEvalWithPrep := struct {
@@ -698,11 +662,12 @@ func TestEvalHelpers(t *testing.T) {
 
 		// Test with evaluation error
 		t.Run("Eval error", func(t *testing.T) {
-			mockEval := &mockEvaluator{}
+			mockEval := &mocks.Evaluator{}
 			ctx := context.Background()
 
 			// Mock Eval to return an error
-			mockEval.On("Eval", ctx).Return(nil, errors.New("eval error"))
+			mockEval.On("Eval", ctx).
+				Return((*mocks.EvaluatorResponse)(nil), errors.New("eval error"))
 
 			// EvalAndExtractMap should return the error
 			_, err = evalAndExtractMap(t, ctx, mockEval)
