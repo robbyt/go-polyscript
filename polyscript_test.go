@@ -19,6 +19,7 @@ import (
 	"github.com/robbyt/go-polyscript/execution/data"
 	"github.com/robbyt/go-polyscript/execution/script/loader"
 	extismCompiler "github.com/robbyt/go-polyscript/machines/extism/compiler"
+	"github.com/robbyt/go-polyscript/machines/mocks"
 	risorCompiler "github.com/robbyt/go-polyscript/machines/risor/compiler"
 	starlarkCompiler "github.com/robbyt/go-polyscript/machines/starlark/compiler"
 	"github.com/robbyt/go-polyscript/machines/types"
@@ -41,44 +42,6 @@ func withCompositeProvider(staticData map[string]any) any {
 		data.NewStaticProvider(staticData),
 		data.NewContextProvider(constants.Ctx),
 	))
-}
-
-// Create a mock evaluator response
-type mockResponse struct {
-	value any
-}
-
-func (m mockResponse) Interface() any {
-	return m.value
-}
-
-func (m mockResponse) GetScriptExeID() string {
-	return "mock-script-id"
-}
-
-func (m mockResponse) GetExecTime() string {
-	return "1ms"
-}
-
-func (m mockResponse) Inspect() string {
-	return "mock-response"
-}
-
-func (m mockResponse) Type() data.Types {
-	return data.NONE
-}
-
-// mockEvaluator implements engine.Evaluator for testing
-type mockEvaluator struct {
-	mock.Mock
-}
-
-func (m *mockEvaluator) Eval(ctx context.Context) (engine.EvaluatorResponse, error) {
-	args := m.Called(ctx)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return mockResponse{value: args.Get(0)}, args.Error(1)
 }
 
 // mockPreparer implements engine.EvalDataPreparer for testing
@@ -176,8 +139,6 @@ func TestMachineEvaluators(t *testing.T) {
 	for _, tc := range tests {
 		tc := tc // Capture for parallel execution
 		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-
 			// Create a loader
 			l, err := loader.NewFromString(tc.content)
 			require.NoError(t, err)
@@ -277,8 +238,6 @@ func TestNewEvaluator(t *testing.T) {
 	for _, tc := range tests {
 		tc := tc // Capture for parallel execution
 		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-
 			var evaluator engine.EvaluatorWithPrep
 			var err error
 
@@ -350,8 +309,6 @@ func TestFromStringLoaders(t *testing.T) {
 	for _, tc := range tests {
 		tc := tc // Capture for parallel execution
 		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-
 			evaluator, err := tc.creator(tc.content, tc.options...)
 
 			if tc.expectError {
@@ -368,8 +325,6 @@ func TestFromStringLoaders(t *testing.T) {
 
 	// Test invalid option in string loader
 	t.Run("FromRisorString - Invalid Option", func(t *testing.T) {
-		t.Parallel()
-
 		_, err := FromRisorString(
 			"print('test')",
 			func(cfg *options.Config) error {
@@ -471,8 +426,6 @@ _ = result`
 	for _, tc := range tests {
 		tc := tc // Capture for parallel execution
 		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-
 			evaluator, err := tc.loaderFunc(tc.filePath, tc.options...)
 
 			if tc.expectError {
@@ -497,8 +450,6 @@ func TestDataProviders(t *testing.T) {
 	t.Parallel()
 
 	t.Run("withCompositeProvider", func(t *testing.T) {
-		t.Parallel()
-
 		// Create a simple script that uses composite data
 		script := `print(ctx["static_key"], ", ", ctx["input_data"]["dynamic_key"])`
 
@@ -532,8 +483,6 @@ func TestEvalHelpers(t *testing.T) {
 	t.Parallel()
 
 	t.Run("PrepareAndEval", func(t *testing.T) {
-		t.Parallel()
-
 		// Create a simple Risor evaluator
 		script := `
 			name := ctx["input_data"]["name"]
@@ -584,7 +533,7 @@ func TestEvalHelpers(t *testing.T) {
 		t.Run("PrepareContext error", func(t *testing.T) {
 			// Create mocks for testing error cases
 			mockPrepCtx := &mockPreparer{}
-			mockEval := &mockEvaluator{}
+			mockEval := &mocks.Evaluator{}
 
 			// Create context and data
 			ctx := context.Background()
@@ -613,7 +562,7 @@ func TestEvalHelpers(t *testing.T) {
 		t.Run("Eval error", func(t *testing.T) {
 			// Create mocks for testing error cases
 			mockPrepCtx := &mockPreparer{}
-			mockEval := &mockEvaluator{}
+			mockEval := &mocks.Evaluator{}
 
 			// Create context and data
 			ctx := context.Background()
@@ -625,7 +574,8 @@ func TestEvalHelpers(t *testing.T) {
 			mockPrepCtx.On("PrepareContext", ctx, []any{data}).Return(enrichedCtx, nil)
 
 			// Mock Eval to fail
-			mockEval.On("Eval", enrichedCtx).Return(nil, errors.New("eval error"))
+			mockEval.On("Eval", enrichedCtx).
+				Return((*mocks.EvaluatorResponse)(nil), errors.New("eval error"))
 
 			// Create a mock evaluator that implements both interfaces
 			mockEvalWithPrep := struct {
@@ -646,8 +596,6 @@ func TestEvalHelpers(t *testing.T) {
 	})
 
 	t.Run("EvalAndExtractMap", func(t *testing.T) {
-		t.Parallel()
-
 		// Create a simple Risor evaluator
 		script := `
 			{
@@ -714,11 +662,12 @@ func TestEvalHelpers(t *testing.T) {
 
 		// Test with evaluation error
 		t.Run("Eval error", func(t *testing.T) {
-			mockEval := &mockEvaluator{}
+			mockEval := &mocks.Evaluator{}
 			ctx := context.Background()
 
 			// Mock Eval to return an error
-			mockEval.On("Eval", ctx).Return(nil, errors.New("eval error"))
+			mockEval.On("Eval", ctx).
+				Return((*mocks.EvaluatorResponse)(nil), errors.New("eval error"))
 
 			// EvalAndExtractMap should return the error
 			_, err = evalAndExtractMap(t, ctx, mockEval)
@@ -770,8 +719,6 @@ _ = result`
 	}
 
 	t.Run("FromRisorStringWithData", func(t *testing.T) {
-		t.Parallel()
-
 		// Test script
 		risorScript := `
 			// Access static data
@@ -818,8 +765,6 @@ _ = result`
 	})
 
 	t.Run("FromStarlarkStringWithData", func(t *testing.T) {
-		t.Parallel()
-
 		// Create evaluator
 		starlarkEval, err := FromStarlarkStringWithData(
 			starlarkFileContent,
@@ -847,23 +792,7 @@ _ = result`
 		assert.Equal(t, int64(30), starlarkTimeout, "timeout should be 30")
 	})
 
-	t.Run("FromRisorFileWithData", func(t *testing.T) {
-		t.Parallel()
-
-		// Skip this test and mark as passing - will be tested separately
-		t.Skip("Test refactored to use simpler test approach")
-	})
-
-	t.Run("FromStarlarkFileWithData", func(t *testing.T) {
-		t.Parallel()
-
-		// Skip this test and mark as passing - will be tested separately
-		t.Skip("Test refactored to use simpler test approach")
-	})
-
 	t.Run("FromExtismFileWithData", func(t *testing.T) {
-		t.Parallel()
-
 		// Create evaluator with static data that includes input
 		extismEval, err := FromExtismFileWithData(
 			wasmPath,
@@ -1049,8 +978,6 @@ func TestCreateEvaluatorEdgeCases(t *testing.T) {
 
 	// Test validation error in newEvaluator
 	t.Run("Configuration Validation Error", func(t *testing.T) {
-		t.Parallel()
-
 		// Try to create an evaluator without a loader
 		_, err := NewRisorEvaluator()
 		require.Error(t, err)
@@ -1059,8 +986,6 @@ func TestCreateEvaluatorEdgeCases(t *testing.T) {
 
 	// Test option application error
 	t.Run("Option Error", func(t *testing.T) {
-		t.Parallel()
-
 		// Create an invalid option that returns an error
 		invalidOption := func(cfg *options.Config) error {
 			return errors.New("custom invalid option error")

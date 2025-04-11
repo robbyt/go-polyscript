@@ -18,8 +18,6 @@ func TestPrepareContextHelper(t *testing.T) {
 	logger := slog.Default()
 
 	t.Run("nil provider returns error", func(t *testing.T) {
-		t.Parallel()
-
 		baseCtx := context.Background()
 		enrichedCtx, err := PrepareContextHelper(
 			baseCtx,
@@ -33,8 +31,6 @@ func TestPrepareContextHelper(t *testing.T) {
 	})
 
 	t.Run("static provider always returns error", func(t *testing.T) {
-		t.Parallel()
-
 		provider := NewStaticProvider(simpleData)
 		baseCtx := context.Background()
 
@@ -51,8 +47,6 @@ func TestPrepareContextHelper(t *testing.T) {
 	})
 
 	t.Run("context provider with valid data", func(t *testing.T) {
-		t.Parallel()
-
 		provider := NewContextProvider(constants.EvalData)
 		baseCtx := context.Background()
 
@@ -81,11 +75,9 @@ func TestPrepareContextHelper(t *testing.T) {
 	})
 
 	t.Run("context provider with HTTP request", func(t *testing.T) {
-		t.Parallel()
-
 		provider := NewContextProvider(constants.EvalData)
 		baseCtx := context.Background()
-		req := createTestRequest()
+		req := createTestRequestHelper()
 
 		enrichedCtx, err := PrepareContextHelper(baseCtx, logger, provider, req)
 
@@ -108,11 +100,9 @@ func TestPrepareContextHelper(t *testing.T) {
 	})
 
 	t.Run("context provider with mixed data", func(t *testing.T) {
-		t.Parallel()
-
 		provider := NewContextProvider(constants.EvalData)
 		baseCtx := context.Background()
-		req := createTestRequest()
+		req := createTestRequestHelper()
 
 		enrichedCtx, err := PrepareContextHelper(baseCtx, logger, provider,
 			map[string]any{"key": "value"}, req)
@@ -142,8 +132,6 @@ func TestPrepareContextHelper(t *testing.T) {
 	})
 
 	t.Run("context provider with unsupported data", func(t *testing.T) {
-		t.Parallel()
-
 		provider := NewContextProvider(constants.EvalData)
 		baseCtx := context.Background()
 
@@ -163,8 +151,6 @@ func TestPrepareContextHelper(t *testing.T) {
 	})
 
 	t.Run("composite provider with mixed success", func(t *testing.T) {
-		t.Parallel()
-
 		provider := NewCompositeProvider(
 			NewStaticProvider(simpleData),
 			NewContextProvider(constants.EvalData),
@@ -197,8 +183,6 @@ func TestPrepareContextWithErrorHandling(t *testing.T) {
 	logger := slog.Default()
 
 	t.Run("provider returns error and keeps original context", func(t *testing.T) {
-		t.Parallel()
-
 		// Create a context provider
 		provider := NewContextProvider(constants.EvalData)
 		baseCtx := context.Background()

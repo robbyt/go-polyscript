@@ -18,6 +18,7 @@ import (
 var testWasmBytes []byte
 
 func TestExtismWasmIntegration(t *testing.T) {
+	t.Parallel()
 	// Create manifest from wasm bytes
 	manifest := extismSDK.Manifest{
 		Wasm: []extismSDK.Wasm{

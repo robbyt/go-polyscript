@@ -11,12 +11,14 @@ import (
 // TestEvaluatorResponseImplementsInterface verifies at compile time
 // that our mock EvaluatorResponse implements the engine.EvaluatorResponse interface.
 func TestEvaluatorResponseImplementsInterface(t *testing.T) {
+	t.Parallel()
 	// This is a compile-time check - if it doesn't compile, the test fails
 	var _ engine.EvaluatorResponse = (*EvaluatorResponse)(nil)
 }
 
 // TestEvaluatorResponseType tests the Type method for different value types
 func TestEvaluatorResponseType(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		mockVal  any
@@ -71,6 +73,7 @@ func TestEvaluatorResponseType(t *testing.T) {
 
 // TestEvaluatorResponseInspect tests the Inspect method
 func TestEvaluatorResponseInspect(t *testing.T) {
+	t.Parallel()
 	mockResp := new(EvaluatorResponse)
 	expected := "test string representation"
 
@@ -89,6 +92,7 @@ func TestEvaluatorResponseInspect(t *testing.T) {
 
 // TestEvaluatorResponseInterface tests the Interface method
 func TestEvaluatorResponseInterface(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		mockVal  any
@@ -138,6 +142,7 @@ func TestEvaluatorResponseInterface(t *testing.T) {
 
 // TestEvaluatorResponseScriptExeID tests the GetScriptExeID method
 func TestEvaluatorResponseScriptExeID(t *testing.T) {
+	t.Parallel()
 	mockResp := new(EvaluatorResponse)
 	expected := "script-v1.0.0"
 
@@ -156,6 +161,7 @@ func TestEvaluatorResponseScriptExeID(t *testing.T) {
 
 // TestEvaluatorResponseExecTime tests the GetExecTime method
 func TestEvaluatorResponseExecTime(t *testing.T) {
+	t.Parallel()
 	mockResp := new(EvaluatorResponse)
 	expected := "100ms"
 
@@ -174,6 +180,7 @@ func TestEvaluatorResponseExecTime(t *testing.T) {
 
 // TestEvaluatorResponsePanicOnInvalidType tests the Type method when an invalid type is provided
 func TestEvaluatorResponsePanicOnInvalidType(t *testing.T) {
+	t.Parallel()
 	// Create the mock
 	mockResp := new(EvaluatorResponse)
 
@@ -188,6 +195,7 @@ func TestEvaluatorResponsePanicOnInvalidType(t *testing.T) {
 
 // TestEvaluatorResponseFullUsage tests all methods together in a realistic usage scenario
 func TestEvaluatorResponseFullUsage(t *testing.T) {
+	t.Parallel()
 	// Create the mock
 	mockResp := new(EvaluatorResponse)
 

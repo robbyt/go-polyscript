@@ -4,7 +4,6 @@ import (
 	"context"
 	_ "embed"
 	"encoding/json"
-	"errors"
 	"io"
 	"log/slog"
 	"os"
@@ -30,7 +29,7 @@ func createTestCompiler(t *testing.T, entryPoint string) *Compiler {
 
 	comp, err := NewCompiler(
 		WithEntryPoint(entryPoint),
-		WithLogHandler(slog.NewTextHandler(os.Stdout, nil)),
+		WithLogHandler(slog.NewTextHandler(io.Discard, nil)),
 	)
 	require.NoError(t, err)
 	require.NotNil(t, comp)
@@ -65,248 +64,238 @@ func (m *mockScriptReaderCloser) Close() error {
 	return args.Error(0)
 }
 
-func TestCompiler(t *testing.T) {
+func TestNewCompiler(t *testing.T) {
 	t.Parallel()
 
-	t.Run("valid wasm binary with existing function", func(t *testing.T) {
-		t.Parallel()
-		wasmBytes := readTestWasm(t)
-		entryPoint := "greet"
-
-		// Create compiler using functional options
-		comp := createTestCompiler(t, entryPoint)
-
-		// Create mock reader with content
-		reader := newMockScriptReaderCloser(wasmBytes)
-		reader.On("Close").Return(nil)
-
-		// Compile
-		execContent, err := comp.Compile(reader)
-		require.NoError(t, err)
-		require.NotNil(t, execContent)
-
-		// Type assertion
-		executable, ok := execContent.(*Executable)
-		require.True(t, ok, "Expected *Executable type")
-
-		// Validate source matches
-		assert.Equal(t, wasmBytes, []byte(executable.GetSource()))
-
-		// Validate the executable
-		assert.NotNil(t, executable.GetExtismByteCode())
-		plugin := executable.GetExtismByteCode()
-		require.NotNil(t, plugin)
-
-		// Create instance to check function existence
-		instance, err := plugin.Instance(
-			context.Background(),
-			extismSDK.PluginInstanceConfig{},
-		)
-		require.NoError(t, err)
-		defer func() { require.NoError(t, instance.Close(context.Background()), "Failed to close instance") }()
-
-		assert.True(t, instance.FunctionExists("greet"), "Function 'greet' should exist")
-
-		// Test function execution
-		exit, output, err := instance.Call("greet", []byte(`{"input":"Test"}`))
-		require.NoError(t, err)
-		assert.Equal(t, uint32(0), exit)
-
-		var result struct {
-			Greeting string `json:"greeting"`
-		}
-		require.NoError(t, json.Unmarshal(output, &result))
-		assert.Equal(t, "Hello, Test!", result.Greeting)
-
-		// Test Close functionality
-		ctx := context.Background()
-		require.NoError(t, executable.Close(ctx))
-
-		// Verify mock expectations
-		reader.AssertExpectations(t)
-	})
-
-	t.Run("custom entry point function exists", func(t *testing.T) {
-		t.Parallel()
-		wasmBytes := readTestWasm(t)
-		entryPoint := "process_complex"
-
-		// Create compiler using functional options
-		comp := createTestCompiler(t, entryPoint)
-
-		// Create mock reader with content
-		reader := newMockScriptReaderCloser(wasmBytes)
-		reader.On("Close").Return(nil)
-
-		// Compile
-		execContent, err := comp.Compile(reader)
-		require.NoError(t, err)
-		require.NotNil(t, execContent)
-
-		// Type assertion
-		executable, ok := execContent.(*Executable)
-		require.True(t, ok, "Expected *Executable type")
-
-		// Validate source matches
-		assert.Equal(t, wasmBytes, []byte(executable.GetSource()))
-
-		// Validate entry point
-		assert.Equal(t, "process_complex", executable.GetEntryPoint())
-		plugin := executable.GetExtismByteCode()
-		require.NotNil(t, plugin)
-
-		// Create instance to check function existence
-		instance, err := plugin.Instance(
-			context.Background(),
-			extismSDK.PluginInstanceConfig{},
-		)
-		require.NoError(t, err)
-		defer func() { require.NoError(t, instance.Close(context.Background()), "Failed to close instance") }()
-
-		assert.True(t, instance.FunctionExists("process_complex"),
-			"Function 'process_complex' should exist")
-
-		// Test Close functionality
-		ctx := context.Background()
-		require.NoError(t, executable.Close(ctx))
-
-		// Verify mock expectations
-		reader.AssertExpectations(t)
-	})
-
-	t.Run("custom compilation options", func(t *testing.T) {
-		t.Parallel()
-		wasmBytes := readTestWasm(t)
-		entryPoint := "greet"
-
-		// Create compiler with custom runtime config
+	t.Run("basic creation", func(t *testing.T) {
 		comp, err := NewCompiler(
-			WithEntryPoint(entryPoint),
-			WithLogHandler(slog.NewTextHandler(os.Stdout, nil)),
+			WithEntryPoint("main"),
+			WithLogHandler(slog.NewTextHandler(io.Discard, nil)),
+		)
+		require.NoError(t, err)
+		require.NotNil(t, comp)
+
+		// Test String method
+		result := comp.String()
+		require.NotEmpty(t, result)
+		require.Contains(t, result, "Compiler")
+	})
+
+	t.Run("with entry point", func(t *testing.T) {
+		comp, err := NewCompiler(
+			WithEntryPoint("custom_function"),
+			WithLogHandler(slog.NewTextHandler(io.Discard, nil)),
+		)
+		require.NoError(t, err)
+		require.NotNil(t, comp)
+	})
+
+	t.Run("with custom runtime config", func(t *testing.T) {
+		comp, err := NewCompiler(
+			WithEntryPoint("main"),
+			WithLogHandler(slog.NewTextHandler(io.Discard, nil)),
 			WithRuntimeConfig(wazero.NewRuntimeConfig()),
 		)
 		require.NoError(t, err)
 		require.NotNil(t, comp)
-
-		// Create mock reader with content
-		reader := newMockScriptReaderCloser(wasmBytes)
-		reader.On("Close").Return(nil)
-
-		// Compile
-		execContent, err := comp.Compile(reader)
-		require.NoError(t, err)
-		require.NotNil(t, execContent)
-
-		// Type assertion
-		executable, ok := execContent.(*Executable)
-		require.True(t, ok, "Expected *Executable type")
-
-		// Validate source matches
-		assert.Equal(t, wasmBytes, []byte(executable.GetSource()))
-
-		// Test Close functionality
-		ctx := context.Background()
-		require.NoError(t, executable.Close(ctx))
-
-		// Verify mock expectations
-		reader.AssertExpectations(t)
 	})
 
-	t.Run("nil content", func(t *testing.T) {
-		t.Parallel()
-
-		// Create compiler using functional options
+	t.Run("with custom logger", func(t *testing.T) {
+		handler := slog.NewTextHandler(io.Discard, nil)
+		logger := slog.New(handler)
 		comp, err := NewCompiler(
 			WithEntryPoint("main"),
-			WithLogHandler(slog.NewTextHandler(os.Stdout, nil)),
+			WithLogger(logger),
 		)
 		require.NoError(t, err)
 		require.NotNil(t, comp)
+	})
+}
 
-		// Compile with nil reader
-		execContent, err := comp.Compile(nil)
-		require.Error(t, err)
-		require.Nil(t, execContent)
-		require.True(t, errors.Is(err, ErrContentNil),
-			"Expected error %v, got %v", ErrContentNil, err)
+func TestCompiler_Compile(t *testing.T) {
+	t.Parallel()
+
+	t.Run("success cases", func(t *testing.T) {
+		t.Run("valid wasm binary with existing function", func(t *testing.T) {
+			wasmBytes := readTestWasm(t)
+			entryPoint := "greet"
+			comp := createTestCompiler(t, entryPoint)
+			reader := newMockScriptReaderCloser(wasmBytes)
+			reader.On("Close").Return(nil)
+
+			execContent, err := comp.Compile(reader)
+			require.NoError(t, err)
+			require.NotNil(t, execContent)
+
+			executable, ok := execContent.(*Executable)
+			require.True(t, ok, "Expected *Executable type")
+			assert.Equal(t, wasmBytes, []byte(executable.GetSource()))
+
+			plugin := executable.GetExtismByteCode()
+			require.NotNil(t, plugin)
+
+			instance, err := plugin.Instance(
+				context.Background(),
+				extismSDK.PluginInstanceConfig{},
+			)
+			require.NoError(t, err)
+			defer func() {
+				require.NoError(t, instance.Close(context.Background()), "Failed to close instance")
+			}()
+
+			assert.True(t, instance.FunctionExists("greet"), "Function 'greet' should exist")
+
+			exit, output, err := instance.Call("greet", []byte(`{"input":"Test"}`))
+			require.NoError(t, err)
+			assert.Equal(t, uint32(0), exit)
+
+			var result struct {
+				Greeting string `json:"greeting"`
+			}
+			require.NoError(t, json.Unmarshal(output, &result))
+			assert.Equal(t, "Hello, Test!", result.Greeting)
+
+			ctx := context.Background()
+			require.NoError(t, executable.Close(ctx))
+			reader.AssertExpectations(t)
+		})
+
+		t.Run("custom entry point function exists", func(t *testing.T) {
+			wasmBytes := readTestWasm(t)
+			entryPoint := "process_complex"
+			comp := createTestCompiler(t, entryPoint)
+			reader := newMockScriptReaderCloser(wasmBytes)
+			reader.On("Close").Return(nil)
+
+			execContent, err := comp.Compile(reader)
+			require.NoError(t, err)
+			require.NotNil(t, execContent)
+
+			executable, ok := execContent.(*Executable)
+			require.True(t, ok, "Expected *Executable type")
+			assert.Equal(t, wasmBytes, []byte(executable.GetSource()))
+			assert.Equal(t, "process_complex", executable.GetEntryPoint())
+
+			plugin := executable.GetExtismByteCode()
+			require.NotNil(t, plugin)
+
+			instance, err := plugin.Instance(
+				context.Background(),
+				extismSDK.PluginInstanceConfig{},
+			)
+			require.NoError(t, err)
+			defer func() {
+				require.NoError(t, instance.Close(context.Background()), "Failed to close instance")
+			}()
+
+			assert.True(t, instance.FunctionExists("process_complex"),
+				"Function 'process_complex' should exist")
+
+			ctx := context.Background()
+			require.NoError(t, executable.Close(ctx))
+			reader.AssertExpectations(t)
+		})
+
+		t.Run("custom compilation options", func(t *testing.T) {
+			wasmBytes := readTestWasm(t)
+			entryPoint := "greet"
+
+			comp, err := NewCompiler(
+				WithEntryPoint(entryPoint),
+				WithLogHandler(slog.NewTextHandler(io.Discard, nil)),
+				WithRuntimeConfig(wazero.NewRuntimeConfig()),
+			)
+			require.NoError(t, err)
+			require.NotNil(t, comp)
+
+			reader := newMockScriptReaderCloser(wasmBytes)
+			reader.On("Close").Return(nil)
+
+			execContent, err := comp.Compile(reader)
+			require.NoError(t, err)
+			require.NotNil(t, execContent)
+
+			executable, ok := execContent.(*Executable)
+			require.True(t, ok, "Expected *Executable type")
+			assert.Equal(t, wasmBytes, []byte(executable.GetSource()))
+
+			ctx := context.Background()
+			require.NoError(t, executable.Close(ctx))
+			reader.AssertExpectations(t)
+		})
 	})
 
-	t.Run("empty content", func(t *testing.T) {
-		t.Parallel()
+	t.Run("error cases", func(t *testing.T) {
+		t.Run("nil content", func(t *testing.T) {
+			comp, err := NewCompiler(
+				WithEntryPoint("main"),
+				WithLogHandler(slog.NewTextHandler(io.Discard, nil)),
+			)
+			require.NoError(t, err)
+			require.NotNil(t, comp)
 
-		// Create compiler using functional options
-		comp, err := NewCompiler(
-			WithEntryPoint("main"),
-			WithLogHandler(slog.NewTextHandler(os.Stdout, nil)),
-		)
-		require.NoError(t, err)
-		require.NotNil(t, comp)
+			execContent, err := comp.Compile(nil)
+			require.Error(t, err)
+			require.Nil(t, execContent)
+			require.ErrorIs(t, err, ErrContentNil)
+		})
 
-		// Create empty reader
-		reader := newMockScriptReaderCloser([]byte{})
-		reader.On("Close").Return(nil)
+		t.Run("empty content", func(t *testing.T) {
+			comp, err := NewCompiler(
+				WithEntryPoint("main"),
+				WithLogHandler(slog.NewTextHandler(io.Discard, nil)),
+			)
+			require.NoError(t, err)
+			require.NotNil(t, comp)
 
-		// Compile
-		execContent, err := comp.Compile(reader)
-		require.Error(t, err)
-		require.Nil(t, execContent)
-		require.True(t, errors.Is(err, ErrContentNil),
-			"Expected error %v, got %v", ErrContentNil, err)
+			reader := newMockScriptReaderCloser([]byte{})
+			reader.On("Close").Return(nil)
 
-		// Verify mock expectations
-		reader.AssertExpectations(t)
-	})
+			execContent, err := comp.Compile(reader)
+			require.Error(t, err)
+			require.Nil(t, execContent)
+			require.ErrorIs(t, err, ErrContentNil)
 
-	t.Run("invalid wasm binary", func(t *testing.T) {
-		t.Parallel()
+			reader.AssertExpectations(t)
+		})
 
-		// Create compiler using functional options
-		comp, err := NewCompiler(
-			WithEntryPoint("main"),
-			WithLogHandler(slog.NewTextHandler(os.Stdout, nil)),
-		)
-		require.NoError(t, err)
-		require.NotNil(t, comp)
+		t.Run("invalid wasm binary", func(t *testing.T) {
+			comp, err := NewCompiler(
+				WithEntryPoint("main"),
+				WithLogHandler(slog.NewTextHandler(io.Discard, nil)),
+			)
+			require.NoError(t, err)
+			require.NotNil(t, comp)
 
-		// Create reader with invalid content
-		reader := newMockScriptReaderCloser([]byte("not-wasm"))
-		reader.On("Close").Return(nil)
+			reader := newMockScriptReaderCloser([]byte("not-wasm"))
+			reader.On("Close").Return(nil)
 
-		// Compile
-		execContent, err := comp.Compile(reader)
-		require.Error(t, err)
-		require.Nil(t, execContent)
-		require.True(t, errors.Is(err, ErrValidationFailed),
-			"Expected error %v, got %v", ErrValidationFailed, err)
+			execContent, err := comp.Compile(reader)
+			require.Error(t, err)
+			require.Nil(t, execContent)
+			require.ErrorIs(t, err, ErrValidationFailed)
 
-		// Verify mock expectations
-		reader.AssertExpectations(t)
-	})
+			reader.AssertExpectations(t)
+		})
 
-	t.Run("missing function", func(t *testing.T) {
-		t.Parallel()
-		wasmBytes := readTestWasm(t)
+		t.Run("missing function", func(t *testing.T) {
+			wasmBytes := readTestWasm(t)
+			comp, err := NewCompiler(
+				WithEntryPoint("nonexistent_function"),
+				WithLogHandler(slog.NewTextHandler(io.Discard, nil)),
+			)
+			require.NoError(t, err)
+			require.NotNil(t, comp)
 
-		// Create compiler with non-existent function
-		comp, err := NewCompiler(
-			WithEntryPoint("nonexistent_function"),
-			WithLogHandler(slog.NewTextHandler(os.Stdout, nil)),
-		)
-		require.NoError(t, err)
-		require.NotNil(t, comp)
+			reader := newMockScriptReaderCloser(wasmBytes)
+			reader.On("Close").Return(nil)
 
-		// Create mock reader with content
-		reader := newMockScriptReaderCloser(wasmBytes)
-		reader.On("Close").Return(nil)
+			execContent, err := comp.Compile(reader)
+			require.Error(t, err)
+			require.Nil(t, execContent)
+			require.ErrorIs(t, err, ErrValidationFailed)
 
-		// Compile
-		execContent, err := comp.Compile(reader)
-		require.Error(t, err)
-		require.Nil(t, execContent)
-		require.True(t, errors.Is(err, ErrValidationFailed),
-			"Expected error %v, got %v", ErrValidationFailed, err)
-
-		// Verify mock expectations
-		reader.AssertExpectations(t)
+			reader.AssertExpectations(t)
+		})
 	})
 }

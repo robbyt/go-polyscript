@@ -123,7 +123,7 @@ type FromHTTP struct {
 //
 // Example:
 //
-//	loader, err := loader.NewFromHTTP("https://example.com/script.js")
+//	loader, err := loader.NewFromHTTP("https://localhost:8080/script.js")
 //	if err != nil {
 //	    return err
 //	}
@@ -140,15 +140,15 @@ func NewFromHTTP(rawURL string) (*FromHTTP, error) {
 //
 //	// With basic auth
 //	options := loader.DefaultHTTPOptions().WithBasicAuth("user", "pass")
-//	loader, err := loader.NewFromHTTPWithOptions("https://example.com/script.js", options)
+//	loader, err := loader.NewFromHTTPWithOptions("https://localhost:8080/script.js", options)
 //
 //	// With bearer token
 //	options := loader.DefaultHTTPOptions().WithBearerAuth("token123")
-//	loader, err := loader.NewFromHTTPWithOptions("https://example.com/script.js", options)
+//	loader, err := loader.NewFromHTTPWithOptions("https://localhost:8080/script.js", options)
 //
 //	// With custom timeout
 //	options := loader.DefaultHTTPOptions().WithTimeout(10 * time.Second)
-//	loader, err := loader.NewFromHTTPWithOptions("https://example.com/script.js", options)
+//	loader, err := loader.NewFromHTTPWithOptions("https://localhost:8080/script.js", options)
 func NewFromHTTPWithOptions(rawURL string, options *HTTPOptions) (*FromHTTP, error) {
 	sourceURL, err := url.Parse(rawURL)
 	if err != nil {

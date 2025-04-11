@@ -3,71 +3,11 @@ package data
 import (
 	"context"
 	"errors"
-	"net/http"
-	"net/url"
 	"testing"
 
 	"github.com/robbyt/go-polyscript/execution/constants"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 )
-
-// Standard test data sets used across all provider tests
-var (
-	// Simple data for testing basic functionality
-	simpleData = map[string]any{
-		"string": "value",
-		"int":    42,
-		"bool":   true,
-	}
-
-	// Complex data for testing nested structures
-	complexData = map[string]any{
-		"string": "value",
-		"int":    42,
-		"bool":   true,
-		"nested": map[string]any{
-			"key":   "nested value",
-			"inner": map[string]any{"deep": "very deep"},
-		},
-		"array": []string{"one", "two", "three"},
-	}
-)
-
-// createTestRequest creates a standard HTTP request for testing
-func createTestRequest() *http.Request {
-	return &http.Request{
-		Method: "GET",
-		URL:    &url.URL{Path: "/test", RawQuery: "param=value"},
-		Header: http.Header{"Content-Type": []string{"application/json"}},
-	}
-}
-
-// MockProvider is a testify mock implementation of Provider
-type MockProvider struct {
-	mock.Mock
-}
-
-func (m *MockProvider) GetData(ctx context.Context) (map[string]any, error) {
-	args := m.Called(ctx)
-	data, _ := args.Get(0).(map[string]any)
-	return data, args.Error(1)
-}
-
-func (m *MockProvider) AddDataToContext(ctx context.Context, data ...any) (context.Context, error) {
-	args := m.Called(append([]any{ctx}, data...))
-	newCtx, _ := args.Get(0).(context.Context)
-	return newCtx, args.Error(1)
-}
-
-// newMockErrorProvider creates a mock provider that returns errors
-func newMockErrorProvider() *MockProvider {
-	provider := new(MockProvider)
-	provider.On("GetData", mock.Anything).Return(nil, assert.AnError)
-	provider.On("AddDataToContext", mock.Anything, mock.Anything).
-		Return(mock.Anything, assert.AnError)
-	return provider
-}
 
 // TestProvider_Interface ensures that all provider implementations comply with the Provider interface
 func TestProvider_Interface(t *testing.T) {
@@ -96,7 +36,6 @@ func TestProvider_GetData(t *testing.T) {
 
 	// Test static provider
 	t.Run("static provider with simple data", func(t *testing.T) {
-		t.Parallel()
 		provider := NewStaticProvider(simpleData)
 		ctx := context.Background()
 
@@ -111,7 +50,6 @@ func TestProvider_GetData(t *testing.T) {
 	})
 
 	t.Run("static provider with empty data", func(t *testing.T) {
-		t.Parallel()
 		provider := NewStaticProvider(nil)
 		ctx := context.Background()
 
@@ -122,7 +60,6 @@ func TestProvider_GetData(t *testing.T) {
 
 	// Test context provider
 	t.Run("context provider with valid data", func(t *testing.T) {
-		t.Parallel()
 		provider := NewContextProvider(constants.EvalData)
 		ctx := context.WithValue(context.Background(), constants.EvalData, simpleData)
 
@@ -137,7 +74,6 @@ func TestProvider_GetData(t *testing.T) {
 	})
 
 	t.Run("context provider with empty key", func(t *testing.T) {
-		t.Parallel()
 		provider := NewContextProvider("")
 		ctx := context.Background()
 
@@ -147,7 +83,6 @@ func TestProvider_GetData(t *testing.T) {
 	})
 
 	t.Run("context provider with invalid value type", func(t *testing.T) {
-		t.Parallel()
 		provider := NewContextProvider(constants.EvalData)
 		ctx := context.WithValue(context.Background(), constants.EvalData, "not a map")
 
@@ -158,7 +93,6 @@ func TestProvider_GetData(t *testing.T) {
 
 	// Test composite provider
 	t.Run("composite provider with multiple sources", func(t *testing.T) {
-		t.Parallel()
 		provider := NewCompositeProvider(
 			NewStaticProvider(map[string]any{"static": "value", "shared": "static"}),
 			NewContextProvider(constants.EvalData),
@@ -190,7 +124,6 @@ func TestProvider_GetData(t *testing.T) {
 	})
 
 	t.Run("empty composite provider", func(t *testing.T) {
-		t.Parallel()
 		provider := NewCompositeProvider()
 		ctx := context.Background()
 
@@ -200,7 +133,6 @@ func TestProvider_GetData(t *testing.T) {
 	})
 
 	t.Run("composite provider with error", func(t *testing.T) {
-		t.Parallel()
 		provider := NewCompositeProvider(
 			NewStaticProvider(simpleData),
 			newMockErrorProvider(),
@@ -219,7 +151,6 @@ func TestProvider_AddDataToContext(t *testing.T) {
 
 	// Test with static provider
 	t.Run("static provider should reject all data", func(t *testing.T) {
-		t.Parallel()
 		provider := NewStaticProvider(simpleData)
 		ctx := context.Background()
 
@@ -237,7 +168,6 @@ func TestProvider_AddDataToContext(t *testing.T) {
 
 	// Test with context provider
 	t.Run("context provider with valid map data", func(t *testing.T) {
-		t.Parallel()
 		provider := NewContextProvider(constants.EvalData)
 		ctx := context.Background()
 
@@ -257,10 +187,9 @@ func TestProvider_AddDataToContext(t *testing.T) {
 	})
 
 	t.Run("context provider with HTTP request", func(t *testing.T) {
-		t.Parallel()
 		provider := NewContextProvider(constants.EvalData)
 		ctx := context.Background()
-		req := createTestRequest()
+		req := createTestRequestHelper()
 
 		newCtx, err := provider.AddDataToContext(ctx, req)
 
@@ -278,7 +207,6 @@ func TestProvider_AddDataToContext(t *testing.T) {
 	})
 
 	t.Run("context provider with empty key", func(t *testing.T) {
-		t.Parallel()
 		provider := NewContextProvider("")
 		ctx := context.Background()
 
@@ -290,7 +218,6 @@ func TestProvider_AddDataToContext(t *testing.T) {
 
 	// Test with composite provider
 	t.Run("composite provider with mixed providers", func(t *testing.T) {
-		t.Parallel()
 		provider := NewCompositeProvider(
 			NewStaticProvider(simpleData),
 			NewContextProvider(constants.EvalData),
@@ -320,7 +247,6 @@ func TestProvider_AddDataToContext(t *testing.T) {
 	})
 
 	t.Run("composite provider with all failures", func(t *testing.T) {
-		t.Parallel()
 		provider := NewCompositeProvider(
 			NewStaticProvider(simpleData),
 			newMockErrorProvider(),
@@ -335,7 +261,6 @@ func TestProvider_AddDataToContext(t *testing.T) {
 
 	// Test with multiple data items
 	t.Run("context provider with multiple data items", func(t *testing.T) {
-		t.Parallel()
 		provider := NewContextProvider(constants.EvalData)
 		ctx := context.Background()
 
@@ -362,7 +287,6 @@ func TestProvider_DeepMerge(t *testing.T) {
 	t.Parallel()
 
 	t.Run("simple merge with no overlaps", func(t *testing.T) {
-		t.Parallel()
 		src := map[string]any{"src_key": "src_value"}
 		dst := map[string]any{"dst_key": "dst_value"}
 		expected := map[string]any{
@@ -379,7 +303,6 @@ func TestProvider_DeepMerge(t *testing.T) {
 	})
 
 	t.Run("overlapping keys (dst wins)", func(t *testing.T) {
-		t.Parallel()
 		src := map[string]any{
 			"shared_key": "src_value",
 			"src_key":    "src_value",
@@ -399,7 +322,6 @@ func TestProvider_DeepMerge(t *testing.T) {
 	})
 
 	t.Run("nested maps are merged properly", func(t *testing.T) {
-		t.Parallel()
 		src := map[string]any{
 			"nested": map[string]any{
 				"key1": "src_value1",
@@ -425,7 +347,6 @@ func TestProvider_DeepMerge(t *testing.T) {
 	})
 
 	t.Run("arrays are replaced not merged", func(t *testing.T) {
-		t.Parallel()
 		src := map[string]any{"array": []string{"one", "two", "three"}}
 		dst := map[string]any{"array": []string{"four", "five"}}
 		expected := map[string]any{"array": []string{"four", "five"}}
@@ -435,7 +356,6 @@ func TestProvider_DeepMerge(t *testing.T) {
 	})
 
 	t.Run("empty maps", func(t *testing.T) {
-		t.Parallel()
 		result1 := deepMerge(map[string]any{}, map[string]any{"key": "value"})
 		assert.Equal(t, map[string]any{"key": "value"}, result1)
 
@@ -444,7 +364,6 @@ func TestProvider_DeepMerge(t *testing.T) {
 	})
 
 	t.Run("original maps should not be modified", func(t *testing.T) {
-		t.Parallel()
 		src := map[string]any{
 			"key": "value",
 			"nested": map[string]any{

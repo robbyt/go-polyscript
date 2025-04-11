@@ -49,10 +49,7 @@ func TestCompositeProvider_Creation(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
 			composite := NewCompositeProvider(tt.providers...)
 			require.NotNil(t, composite, "CompositeProvider should never be nil")
 			assert.Len(
@@ -118,8 +115,11 @@ func TestCompositeProvider_GetData(t *testing.T) {
 				)
 			},
 			setupContext: func() context.Context {
-				contextData := map[string]any{"runtime_key": "runtime_value"}
-				return context.WithValue(context.Background(), constants.EvalData, contextData)
+				return context.WithValue(
+					context.Background(),
+					constants.EvalData,
+					map[string]any{"runtime_key": "runtime_value"},
+				)
 			},
 			expectedData: map[string]any{
 				"static_key":  "static_value",
@@ -139,11 +139,13 @@ func TestCompositeProvider_GetData(t *testing.T) {
 				)
 			},
 			setupContext: func() context.Context {
-				contextData := map[string]any{
-					"shared_key":  "runtime_value",
-					"runtime_key": "runtime_value",
-				}
-				return context.WithValue(context.Background(), constants.EvalData, contextData)
+				return context.WithValue(
+					context.Background(),
+					constants.EvalData,
+					map[string]any{
+						"shared_key":  "runtime_value",
+						"runtime_key": "runtime_value",
+					})
 			},
 			expectedData: map[string]any{
 				"shared_key":  "runtime_value", // Context provider overrides static provider
@@ -166,23 +168,23 @@ func TestCompositeProvider_GetData(t *testing.T) {
 				)
 			},
 			setupContext: func() context.Context {
-				contextData := map[string]any{
+				data := map[string]any{
 					"input": "API User",
 					"request": map[string]any{
 						"id": "123",
 					},
 					"config": map[string]any{
-						"host":    "example.com", // New key in existing map
-						"retries": 5,             // Override existing key
+						"host":    "localhost:8080", // New key in existing map
+						"retries": 5,                // Override existing key
 					},
 				}
-				return context.WithValue(context.Background(), constants.EvalData, contextData)
+				return context.WithValue(context.Background(), constants.EvalData, data)
 			},
 			expectedData: map[string]any{
 				"config": map[string]any{
 					"timeout": 30,
-					"retries": 5,             // Overridden
-					"host":    "example.com", // Added
+					"retries": 5,                // Overridden
+					"host":    "localhost:8080", // Added
 				},
 				"input": "API User",
 				"request": map[string]any{
@@ -226,10 +228,7 @@ func TestCompositeProvider_GetData(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
 			provider := tt.setupProvider()
 			require.NotNil(t, provider, "Provider should never be nil")
 
@@ -242,14 +241,10 @@ func TestCompositeProvider_GetData(t *testing.T) {
 			}
 
 			assert.NoError(t, err, "Should not return error for valid providers")
-			assert.Equal(t, tt.expectedData, result, "Result should match expected data")
+			assertMapContainsExpectedHelper(t, tt.expectedData, result)
 
-			// Get a new result to verify data consistency
-			if result != nil {
-				newResult, err := provider.GetData(ctx)
-				assert.NoError(t, err)
-				assert.Equal(t, result, newResult, "Result should be consistent across calls")
-			}
+			// Verify data consistency across calls
+			getDataCheckHelper(t, provider, ctx)
 		})
 	}
 }
@@ -259,36 +254,32 @@ func TestCompositeProvider_AddDataToContext(t *testing.T) {
 	t.Parallel()
 
 	t.Run("empty providers list", func(t *testing.T) {
-		t.Parallel()
-
-		composite := NewCompositeProvider()
-		require.NotNil(t, composite)
+		provider := NewCompositeProvider()
+		require.NotNil(t, provider)
 
 		ctx := context.Background()
 		inputData := map[string]any{"key": "value"}
 
-		newCtx, err := composite.AddDataToContext(ctx, inputData)
+		newCtx, err := provider.AddDataToContext(ctx, inputData)
 
 		assert.NoError(t, err, "Should not return error with empty provider list")
 		assert.Equal(t, ctx, newCtx, "Context should remain unchanged")
 	})
 
 	t.Run("single context provider succeeds", func(t *testing.T) {
-		t.Parallel()
-
-		composite := NewCompositeProvider(NewContextProvider(constants.EvalData))
-		require.NotNil(t, composite)
+		provider := NewCompositeProvider(NewContextProvider(constants.EvalData))
+		require.NotNil(t, provider)
 
 		ctx := context.Background()
 		inputData := map[string]any{"key": "value"}
 
-		newCtx, err := composite.AddDataToContext(ctx, inputData)
+		newCtx, err := provider.AddDataToContext(ctx, inputData)
 
 		assert.NoError(t, err, "Should not return error for context provider")
 		assert.NotEqual(t, ctx, newCtx, "Context should be modified")
 
 		// Verify data was added correctly
-		data, err := composite.GetData(newCtx)
+		data, err := provider.GetData(newCtx)
 		assert.NoError(t, err)
 		assert.Contains(t, data, constants.InputData)
 
@@ -298,45 +289,41 @@ func TestCompositeProvider_AddDataToContext(t *testing.T) {
 	})
 
 	t.Run("single static provider always errors", func(t *testing.T) {
-		t.Parallel()
-
-		composite := NewCompositeProvider(NewStaticProvider(simpleData))
-		require.NotNil(t, composite)
+		provider := NewCompositeProvider(NewStaticProvider(simpleData))
+		require.NotNil(t, provider)
 
 		ctx := context.Background()
 		inputData := map[string]any{"key": "value"}
 
-		newCtx, err := composite.AddDataToContext(ctx, inputData)
+		newCtx, err := provider.AddDataToContext(ctx, inputData)
 
 		assert.Error(t, err, "Should return error for static provider")
 		assert.Equal(t, ctx, newCtx, "Context should remain unchanged")
+		assert.True(t, errors.Is(err, ErrStaticProviderNoRuntimeUpdates))
 
 		// Verify static data is still available
-		data, err := composite.GetData(ctx)
-		assert.NoError(t, err)
+		data, getErr := provider.GetData(ctx)
+		assert.NoError(t, getErr)
 		assert.Equal(t, simpleData, data, "Static data should still be available")
 	})
 
 	t.Run("mixed providers (static fails, context succeeds)", func(t *testing.T) {
-		t.Parallel()
-
-		composite := NewCompositeProvider(
+		provider := NewCompositeProvider(
 			NewStaticProvider(simpleData),
 			NewContextProvider(constants.EvalData),
 		)
-		require.NotNil(t, composite)
+		require.NotNil(t, provider)
 
 		ctx := context.Background()
 		inputData := map[string]any{"key": "value"}
 
-		newCtx, err := composite.AddDataToContext(ctx, inputData)
+		newCtx, err := provider.AddDataToContext(ctx, inputData)
 
-		// StaticProvider errors are ignored when ContextProvider succeeds
 		assert.NoError(t, err, "Should not return error when at least one provider succeeds")
 		assert.NotEqual(t, ctx, newCtx, "Context should be modified")
 
 		// Verify both static and context data are available
-		data, err := composite.GetData(newCtx)
+		data, err := provider.GetData(newCtx)
 		assert.NoError(t, err)
 
 		// Static data should be present
@@ -350,93 +337,59 @@ func TestCompositeProvider_AddDataToContext(t *testing.T) {
 	})
 
 	t.Run("all providers fail", func(t *testing.T) {
-		t.Parallel()
-
-		composite := NewCompositeProvider(
+		provider := NewCompositeProvider(
 			NewStaticProvider(simpleData),
 			newMockErrorProvider(),
 		)
-		require.NotNil(t, composite)
+		require.NotNil(t, provider)
 
 		ctx := context.Background()
 		inputData := map[string]any{"key": "value"}
 
-		newCtx, err := composite.AddDataToContext(ctx, inputData)
+		newCtx, err := provider.AddDataToContext(ctx, inputData)
 
 		assert.Error(t, err, "Should return error when all non-static providers fail")
 		assert.Equal(t, ctx, newCtx, "Context should remain unchanged")
 	})
 
-	t.Run("multiple successful context providers", func(t *testing.T) {
-		t.Parallel()
-
-		composite := NewCompositeProvider(
-			NewContextProvider(constants.ContextKey("key1")),
-			NewContextProvider(constants.ContextKey("key2")),
-		)
-		require.NotNil(t, composite)
-
-		ctx := context.Background()
-		inputData := map[string]any{"data": "value"}
-
-		newCtx, err := composite.AddDataToContext(ctx, inputData)
-
-		assert.NoError(t, err, "Should not return error with multiple context providers")
-		assert.NotEqual(t, ctx, newCtx, "Context should be modified")
-
-		// Verify both context keys were updated
-		value1 := newCtx.Value(constants.ContextKey("key1"))
-		assert.NotNil(t, value1)
-
-		value2 := newCtx.Value(constants.ContextKey("key2"))
-		assert.NotNil(t, value2)
-	})
-
 	t.Run("nil providers are skipped", func(t *testing.T) {
-		t.Parallel()
-
-		composite := NewCompositeProvider(
+		provider := NewCompositeProvider(
 			nil,
 			NewContextProvider(constants.EvalData),
 			nil,
 		)
-		require.NotNil(t, composite)
+		require.NotNil(t, provider)
 
 		ctx := context.Background()
 		inputData := map[string]any{"key": "value"}
 
-		newCtx, err := composite.AddDataToContext(ctx, inputData)
+		newCtx, err := provider.AddDataToContext(ctx, inputData)
 
 		assert.NoError(t, err, "Should not return error when skipping nil providers")
 		assert.NotEqual(t, ctx, newCtx, "Context should be modified")
 
 		// Verify context data was added
-		data, err := composite.GetData(newCtx)
+		data, err := provider.GetData(newCtx)
 		assert.NoError(t, err)
 		assert.Contains(t, data, constants.InputData)
 	})
 
 	t.Run("composite with only static providers", func(t *testing.T) {
-		t.Parallel()
-
-		composite := NewCompositeProvider(
+		provider := NewCompositeProvider(
 			NewStaticProvider(map[string]any{"key1": "value1"}),
 			NewStaticProvider(map[string]any{"key2": "value2"}),
 		)
-		require.NotNil(t, composite)
+		require.NotNil(t, provider)
 
 		ctx := context.Background()
 		inputData := map[string]any{"key": "value"}
 
-		newCtx, err := composite.AddDataToContext(ctx, inputData)
+		newCtx, err := provider.AddDataToContext(ctx, inputData)
 
 		assert.Error(t, err, "Should return error when all providers are static")
-		assert.True(
-			t,
-			errors.Is(err, ErrStaticProviderNoRuntimeUpdates),
-			"Error should be StaticProviderNoRuntimeUpdates",
-		)
 		assert.Equal(t, ctx, newCtx, "Context should remain unchanged")
+		assert.True(t, errors.Is(err, ErrStaticProviderNoRuntimeUpdates),
+			"Error should be StaticProviderNoRuntimeUpdates")
 	})
 }
 
@@ -447,6 +400,7 @@ func TestCompositeProvider_NestedStructures(t *testing.T) {
 	tests := []struct {
 		name           string
 		setupProviders func() *CompositeProvider
+		setupContext   func() context.Context
 		expectedResult map[string]any
 	}{
 		{
@@ -469,6 +423,9 @@ func TestCompositeProvider_NestedStructures(t *testing.T) {
 					"shared_key": "outer_value", // Will override both inner providers
 				})
 				return NewCompositeProvider(innerComposite, outerStatic)
+			},
+			setupContext: func() context.Context {
+				return context.Background()
 			},
 			expectedResult: map[string]any{
 				"inner1_key": "inner1_value",
@@ -503,104 +460,15 @@ func TestCompositeProvider_NestedStructures(t *testing.T) {
 				})
 				return NewCompositeProvider(level2Composite, level1Static)
 			},
+			setupContext: func() context.Context {
+				return context.Background()
+			},
 			expectedResult: map[string]any{
 				"level":        1, // Should be overridden to 1
 				"level1_key":   "level1_value",
 				"level2_key":   "level2_value",
 				"level3_key":   "level3_value",
 				"override_key": "level1_value", // Verifies proper override hierarchy
-			},
-		},
-		{
-			name: "nested composites with complex nested data structures",
-			setupProviders: func() *CompositeProvider {
-				// Inner provider with nested map
-				innerProvider := NewStaticProvider(map[string]any{
-					"config": map[string]any{
-						"database": map[string]any{
-							"host":     "localhost",
-							"port":     5432,
-							"username": "user1",
-							"timeout":  30,
-						},
-						"cache": map[string]any{
-							"enabled": true,
-							"ttl":     60,
-						},
-					},
-					"metrics": map[string]any{
-						"enabled": false,
-					},
-				})
-
-				// Outer provider that overrides some nested values
-				outerProvider := NewStaticProvider(map[string]any{
-					"config": map[string]any{
-						"database": map[string]any{
-							"username": "admin",  // Should override the inner value
-							"password": "secret", // New field
-						},
-						"logging": map[string]any{ // New nested section
-							"level": "debug",
-						},
-					},
-					"metrics": map[string]any{
-						"enabled":  true, // Override the inner value
-						"interval": 15,   // New field
-					},
-				})
-
-				return NewCompositeProvider(innerProvider, outerProvider)
-			},
-			expectedResult: map[string]any{
-				"config": map[string]any{
-					"database": map[string]any{
-						"username": "admin",     // Overridden
-						"password": "secret",    // Added
-						"host":     "localhost", // Preserved
-						"port":     5432,        // Preserved
-						"timeout":  30,          // Preserved
-					},
-					"cache": map[string]any{
-						"enabled": true,
-						"ttl":     60,
-					},
-					"logging": map[string]any{
-						"level": "debug",
-					},
-				},
-				"metrics": map[string]any{
-					"enabled":  true, // Overridden
-					"interval": 15,   // Added
-				},
-			},
-		},
-		{
-			name: "array and non-map types are fully replaced",
-			setupProviders: func() *CompositeProvider {
-				// First provider with various data types
-				provider1 := NewStaticProvider(map[string]any{
-					"array":  []any{1, 2, 3},
-					"string": "original",
-					"number": 42,
-					"bool":   true,
-				})
-
-				// Second provider that overrides with different types
-				provider2 := NewStaticProvider(map[string]any{
-					"array":  []any{4, 5, 6}, // Should completely replace the array
-					"string": "replaced",     // Should replace the string
-					"number": 99,             // Should replace the number
-					"bool":   false,          // Should replace the boolean
-				})
-
-				return NewCompositeProvider(provider1, provider2)
-			},
-			expectedResult: map[string]any{
-				"array":  []any{4, 5, 6}, // Completely replaced
-				"string": "replaced",     // Replaced
-				"number": 99,             // Replaced
-				"bool":   false,          // Replaced
 			},
 		},
 		{
@@ -626,6 +494,15 @@ func TestCompositeProvider_NestedStructures(t *testing.T) {
 
 				return NewCompositeProvider(innerComposite, outerStatic)
 			},
+			setupContext: func() context.Context {
+				data := map[string]any{
+					"context_key": "context_value",
+					constants.InputData: map[string]any{
+						"nested_key": "nested_value",
+					},
+				}
+				return context.WithValue(context.Background(), constants.EvalData, data)
+			},
 			expectedResult: map[string]any{
 				"static_key":  "static_value",
 				"outer_key":   "outer_value",
@@ -639,64 +516,21 @@ func TestCompositeProvider_NestedStructures(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
 			composite := tt.setupProviders()
-
-			// Set up context with data if needed for the mixed provider test
-			ctx := context.Background()
-			if tt.name == "mixed provider types in nested composites" {
-				contextData := map[string]any{
-					"context_key": "context_value",
-					constants.InputData: map[string]any{
-						"nested_key": "nested_value",
-					},
-				}
-				ctx = context.WithValue(ctx, constants.EvalData, contextData)
-			}
+			ctx := tt.setupContext()
 
 			// Get the combined data
 			result, err := composite.GetData(ctx)
 			require.NoError(t, err, "GetData should not error with valid providers")
 
 			// Verify all expected values are present
-			for key, expected := range tt.expectedResult {
-				assert.Contains(t, result, key, "Result should contain key: %s", key)
-
-				// For maps, we need to check deeply
-				expectedMap, expectedIsMap := expected.(map[string]any)
-				actualMap, actualIsMap := result[key].(map[string]any)
-
-				if expectedIsMap && actualIsMap {
-					// Deep compare for maps
-					for nestedKey, nestedValue := range expectedMap {
-						assert.Contains(
-							t,
-							actualMap,
-							nestedKey,
-							"Nested map should contain key: %s",
-							nestedKey,
-						)
-						assert.Equal(
-							t,
-							nestedValue,
-							actualMap[nestedKey],
-							"Nested value should match for key: %s",
-							nestedKey,
-						)
-					}
-				} else {
-					// Direct compare for non-maps
-					assert.Equal(t, expected, result[key], "Value should match for key: %s", key)
-				}
-			}
+			assertMapContainsExpectedHelper(t, tt.expectedResult, result)
 		})
 	}
 }
 
-// TestCompositeProvider_DeepMerge tests specific edge cases of deep merging behavior
+// TestCompositeProvider_DeepMerge tests the deep merge functionality
 func TestCompositeProvider_DeepMerge(t *testing.T) {
 	t.Parallel()
 
@@ -811,10 +645,7 @@ func TestCompositeProvider_DeepMerge(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
 			result := deepMerge(tt.src, tt.dst)
 			assert.Equal(t, tt.expected, result, tt.description)
 

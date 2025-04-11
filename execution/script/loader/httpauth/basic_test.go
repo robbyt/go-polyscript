@@ -13,11 +13,10 @@ func TestBasicAuth(t *testing.T) {
 	t.Parallel()
 
 	t.Run("Valid credentials", func(t *testing.T) {
-		t.Parallel()
 		username := "testuser"
 		password := "testpass"
 
-		req, err := http.NewRequest(http.MethodGet, "https://example.com", nil)
+		req, err := http.NewRequest(http.MethodGet, "http://localhost/test", nil)
 		require.NoError(t, err)
 
 		auth := NewBasicAuth(username, password)
@@ -33,11 +32,10 @@ func TestBasicAuth(t *testing.T) {
 	})
 
 	t.Run("Empty username (no auth applied)", func(t *testing.T) {
-		t.Parallel()
 		username := ""
 		password := "testpass"
 
-		req, err := http.NewRequest(http.MethodGet, "https://example.com", nil)
+		req, err := http.NewRequest(http.MethodGet, "http://localhost/test", nil)
 		require.NoError(t, err)
 
 		auth := NewBasicAuth(username, password)
@@ -52,11 +50,10 @@ func TestBasicAuth(t *testing.T) {
 	})
 
 	t.Run("With context", func(t *testing.T) {
-		t.Parallel()
 		username := "testuser"
 		password := "testpass"
 
-		req, err := http.NewRequest(http.MethodGet, "https://example.com", nil)
+		req, err := http.NewRequest(http.MethodGet, "http://localhost/test", nil)
 		require.NoError(t, err)
 		ctx := context.Background()
 
@@ -73,11 +70,10 @@ func TestBasicAuth(t *testing.T) {
 	})
 
 	t.Run("With cancelled context", func(t *testing.T) {
-		t.Parallel()
 		username := "testuser"
 		password := "testpass"
 
-		req, err := http.NewRequest(http.MethodGet, "https://example.com", nil)
+		req, err := http.NewRequest(http.MethodGet, "http://localhost/test", nil)
 		require.NoError(t, err)
 
 		ctx, cancel := context.WithCancel(context.Background())
@@ -92,11 +88,10 @@ func TestBasicAuth(t *testing.T) {
 	})
 
 	t.Run("With timeout context", func(t *testing.T) {
-		t.Parallel()
 		username := "testuser"
 		password := "testpass"
 
-		req, err := http.NewRequest(http.MethodGet, "https://example.com", nil)
+		req, err := http.NewRequest(http.MethodGet, "http://localhost/test", nil)
 		require.NoError(t, err)
 
 		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Nanosecond)

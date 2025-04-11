@@ -18,6 +18,7 @@ import (
 	"github.com/robbyt/go-polyscript/internal/helpers"
 	"github.com/robbyt/go-polyscript/machines/risor/compiler"
 	"github.com/robbyt/go-polyscript/machines/types"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
@@ -74,409 +75,6 @@ func (m *MockContent) GetMachineType() types.Type {
 	return types.Risor
 }
 
-// TestValidScript tests evaluating valid Risor scripts
-func TestValidScript(t *testing.T) {
-	t.Parallel()
-	handler := slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
-		Level: slog.LevelDebug,
-	})
-	slog.SetDefault(slog.New(handler))
-
-	// Define the test script
-	scriptContent := `
-func handle(request) {
-	if request == nil {
-		return error("request is nil")
-	}
-	if request["Method"] == "POST" {
-		return "post"
-	}
-	if request["URL_Path"] == "/hello" {
-		return true
-	}
-	return false
-}
-print(ctx)
-handle(ctx["request"])
-`
-	ld, err := loader.NewFromString(scriptContent)
-	require.NoError(t, err)
-
-	// Create a context provider to use with our test context
-	ctxProvider := data.NewContextProvider(constants.EvalData)
-
-	exe, err := createTestExecutable(handler, ld, []string{constants.Ctx}, ctxProvider)
-	require.NoError(t, err)
-
-	evaluator := NewBytecodeEvaluator(handler, exe)
-	require.NotNil(t, evaluator)
-
-	t.Run("get request", func(t *testing.T) {
-		// Create the HttpRequest data object
-		req := httptest.NewRequest("GET", "/hello", nil)
-		rMap, err := helpers.RequestToMap(req)
-		require.NoError(t, err)
-		require.NotNil(t, rMap)
-		require.Equal(t, "/hello", rMap["URL_Path"])
-
-		evalData := map[string]any{
-			constants.Request: rMap,
-		}
-
-		ctx := context.WithValue(context.Background(), constants.EvalData, evalData)
-
-		// Evaluate the script with the provided HttpRequest
-		response, err := evaluator.Eval(ctx)
-		require.NoError(t, err)
-		require.NotNil(t, response)
-
-		// Assert the response
-		require.Equal(t, data.Types("bool"), response.Type())
-		require.Equal(t, "true", response.Inspect())
-
-		// Check the value
-		boolValue, ok := response.Interface().(bool)
-		require.True(t, ok)
-		require.True(t, boolValue)
-	})
-
-	t.Run("post request", func(t *testing.T) {
-		// Create the HttpRequest data object
-		req := httptest.NewRequest("POST", "/hello", nil)
-		rMap, err := helpers.RequestToMap(req)
-		require.NoError(t, err)
-		require.NotNil(t, rMap)
-		require.Equal(t, "/hello", rMap["URL_Path"])
-
-		evalData := map[string]any{
-			constants.Request: rMap,
-		}
-
-		ctx := context.WithValue(context.Background(), constants.EvalData, evalData)
-
-		// Evaluate the script with the provided HttpRequest
-		response, err := evaluator.Eval(ctx)
-		require.NoError(t, err)
-		require.NotNil(t, response)
-
-		// Assert the response
-		require.Equal(t, data.Types("string"), response.Type())
-		require.Equal(t, "\"post\"", response.Inspect())
-
-		// Check the value
-		strValue, ok := response.Interface().(string)
-		require.True(t, ok)
-		require.Equal(t, "post", strValue)
-	})
-}
-
-// TestString tests the String method
-func TestString(t *testing.T) {
-	t.Parallel()
-	evaluator := &BytecodeEvaluator{}
-	require.Equal(t, "risor.BytecodeEvaluator", evaluator.String())
-}
-
-// TestPrepareContext tests the PrepareContext method
-func TestPrepareContext(t *testing.T) {
-	t.Parallel()
-	handler := slog.NewTextHandler(os.Stderr, nil)
-
-	t.Run("with provider", func(t *testing.T) {
-		// Setup the mock provider
-		mockProvider := &MockProvider{}
-		enrichedCtx := context.WithValue(context.Background(), constants.EvalData, "enriched")
-		mockProvider.On("AddDataToContext", mock.Anything, mock.Anything).Return(enrichedCtx, nil)
-
-		// Create an executable unit
-		exe := &script.ExecutableUnit{DataProvider: mockProvider}
-
-		// Create the evaluator
-		evaluator := &BytecodeEvaluator{
-			ctxKey:     constants.Ctx,
-			execUnit:   exe,
-			logHandler: handler,
-			logger:     slog.New(handler),
-		}
-
-		// Call PrepareContext
-		ctx := context.Background()
-		data := map[string]any{"test": "data"}
-		result, err := evaluator.PrepareContext(ctx, data)
-
-		// Verify results
-		require.NoError(t, err)
-		require.Equal(t, enrichedCtx, result)
-		mockProvider.AssertExpectations(t)
-	})
-
-	t.Run("with provider error", func(t *testing.T) {
-		// Setup the mock provider
-		mockProvider := &MockProvider{}
-		expectedErr := fmt.Errorf("provider error")
-		mockProvider.On("AddDataToContext", mock.Anything, mock.Anything).Return(nil, expectedErr)
-
-		// Create an executable unit
-		exe := &script.ExecutableUnit{DataProvider: mockProvider}
-
-		// Create the evaluator
-		evaluator := &BytecodeEvaluator{
-			ctxKey:     constants.Ctx,
-			execUnit:   exe,
-			logHandler: handler,
-			logger:     slog.New(handler),
-		}
-
-		// Call PrepareContext
-		ctx := context.Background()
-		data := map[string]any{"test": "data"}
-		_, err := evaluator.PrepareContext(ctx, data)
-
-		// Verify error is returned
-		require.Error(t, err)
-		require.ErrorIs(t, err, expectedErr)
-		mockProvider.AssertExpectations(t)
-	})
-
-	t.Run("nil provider", func(t *testing.T) {
-		// Create an executable unit without a provider
-		exe := &script.ExecutableUnit{DataProvider: nil}
-
-		// Create the evaluator
-		evaluator := &BytecodeEvaluator{
-			ctxKey:     constants.Ctx,
-			execUnit:   exe,
-			logHandler: handler,
-			logger:     slog.New(handler),
-		}
-
-		// Call PrepareContext
-		ctx := context.Background()
-		data := map[string]any{"test": "data"}
-		_, err := evaluator.PrepareContext(ctx, data)
-
-		// Verify error is returned
-		require.Error(t, err)
-		require.Contains(t, err.Error(), "no data provider available")
-	})
-
-	t.Run("nil executable unit", func(t *testing.T) {
-		// Create the evaluator without an executable unit
-		evaluator := &BytecodeEvaluator{
-			ctxKey:     constants.Ctx,
-			execUnit:   nil,
-			logHandler: handler,
-			logger:     slog.New(handler),
-		}
-
-		// Call PrepareContext
-		ctx := context.Background()
-		data := map[string]any{"test": "data"}
-		_, err := evaluator.PrepareContext(ctx, data)
-
-		// Verify error is returned
-		require.Error(t, err)
-		require.Contains(t, err.Error(), "no data provider available")
-	})
-}
-
-// TestEval tests edge cases for the Eval method
-func TestEval(t *testing.T) {
-	t.Parallel()
-	handler := slog.NewTextHandler(os.Stderr, nil)
-
-	t.Run("nil executable unit", func(t *testing.T) {
-		evaluator := &BytecodeEvaluator{
-			ctxKey:     constants.Ctx,
-			execUnit:   nil,
-			logHandler: handler,
-			logger:     slog.New(handler),
-		}
-
-		ctx := context.Background()
-		result, err := evaluator.Eval(ctx)
-
-		require.Error(t, err)
-		require.Nil(t, result)
-		require.Contains(t, err.Error(), "executable unit is nil")
-	})
-
-	t.Run("nil bytecode", func(t *testing.T) {
-		// Create an executable unit with nil bytecode
-		exe := &script.ExecutableUnit{
-			ID: "test-id",
-			Content: &MockContent{
-				Content: nil,
-			},
-		}
-
-		evaluator := &BytecodeEvaluator{
-			ctxKey:     constants.Ctx,
-			execUnit:   exe,
-			logHandler: handler,
-			logger:     slog.New(handler),
-		}
-
-		ctx := context.Background()
-		result, err := evaluator.Eval(ctx)
-
-		require.Error(t, err)
-		require.Nil(t, result)
-		require.Contains(t, err.Error(), "bytecode is nil")
-	})
-
-	t.Run("empty execution id", func(t *testing.T) {
-		// Create an executable unit with empty ID
-		exe := &script.ExecutableUnit{
-			ID: "",
-			Content: &MockContent{
-				Content: &risorCompiler.Code{},
-			},
-		}
-
-		evaluator := &BytecodeEvaluator{
-			ctxKey:     constants.Ctx,
-			execUnit:   exe,
-			logHandler: handler,
-			logger:     slog.New(handler),
-		}
-
-		ctx := context.Background()
-		result, err := evaluator.Eval(ctx)
-
-		require.Error(t, err)
-		require.Nil(t, result)
-		require.Contains(t, err.Error(), "exeID is empty")
-	})
-
-	t.Run("wrong bytecode type", func(t *testing.T) {
-		// Create an executable unit with wrong bytecode type
-		exe := &script.ExecutableUnit{
-			ID: "test-id",
-			Content: &MockContent{
-				Content: "not a risor bytecode",
-			},
-		}
-
-		evaluator := &BytecodeEvaluator{
-			ctxKey:     constants.Ctx,
-			execUnit:   exe,
-			logHandler: handler,
-			logger:     slog.New(handler),
-		}
-
-		ctx := context.Background()
-		result, err := evaluator.Eval(ctx)
-
-		require.Error(t, err)
-		require.Nil(t, result)
-		require.Contains(t, err.Error(), "unable to type assert bytecode")
-	})
-}
-
-// TestLoadInputData tests the loadInputData method
-func TestLoadInputData(t *testing.T) {
-	t.Parallel()
-	handler := slog.NewTextHandler(os.Stderr, nil)
-
-	t.Run("nil provider", func(t *testing.T) {
-		evaluator := &BytecodeEvaluator{
-			ctxKey:     constants.Ctx,
-			execUnit:   nil,
-			logHandler: handler,
-			logger:     slog.New(handler),
-		}
-
-		ctx := context.Background()
-		data, err := evaluator.loadInputData(ctx)
-
-		require.NoError(t, err)
-		require.NotNil(t, data)
-		require.Empty(t, data)
-	})
-
-	t.Run("with provider error", func(t *testing.T) {
-		// Setup the mock provider
-		mockProvider := &MockProvider{}
-		expectedErr := fmt.Errorf("provider error")
-		mockProvider.On("GetData", mock.Anything).Return(nil, expectedErr)
-
-		// Create an executable unit
-		exe := &script.ExecutableUnit{
-			DataProvider: mockProvider,
-		}
-
-		evaluator := &BytecodeEvaluator{
-			ctxKey:     constants.Ctx,
-			execUnit:   exe,
-			logHandler: handler,
-			logger:     slog.New(handler),
-		}
-
-		ctx := context.Background()
-		data, err := evaluator.loadInputData(ctx)
-
-		require.Error(t, err)
-		require.Equal(t, expectedErr, err)
-		require.Nil(t, data)
-		mockProvider.AssertExpectations(t)
-	})
-
-	t.Run("with empty data", func(t *testing.T) {
-		// Setup the mock provider
-		mockProvider := &MockProvider{}
-		emptyData := map[string]any{}
-		mockProvider.On("GetData", mock.Anything).Return(emptyData, nil)
-
-		// Create an executable unit
-		exe := &script.ExecutableUnit{
-			DataProvider: mockProvider,
-		}
-
-		evaluator := &BytecodeEvaluator{
-			ctxKey:     constants.Ctx,
-			execUnit:   exe,
-			logHandler: handler,
-			logger:     slog.New(handler),
-		}
-
-		ctx := context.Background()
-		data, err := evaluator.loadInputData(ctx)
-
-		require.NoError(t, err)
-		require.Empty(t, data)
-		mockProvider.AssertExpectations(t)
-	})
-}
-
-// TestNewBytecodeEvaluator tests creating a new BytecodeEvaluator
-func TestNewBytecodeEvaluator(t *testing.T) {
-	t.Parallel()
-
-	t.Run("with handler", func(t *testing.T) {
-		handler := slog.NewTextHandler(os.Stderr, nil)
-		exe := &script.ExecutableUnit{}
-
-		evaluator := NewBytecodeEvaluator(handler, exe)
-
-		require.NotNil(t, evaluator)
-		require.Equal(t, constants.Ctx, evaluator.ctxKey)
-		require.NotNil(t, evaluator.logger)
-		require.Equal(t, handler, evaluator.logHandler)
-	})
-
-	t.Run("with nil handler", func(t *testing.T) {
-		exe := &script.ExecutableUnit{}
-
-		evaluator := NewBytecodeEvaluator(nil, exe)
-
-		require.NotNil(t, evaluator)
-		require.Equal(t, constants.Ctx, evaluator.ctxKey)
-		require.NotNil(t, evaluator.logger)
-		require.NotNil(t, evaluator.logHandler)
-	})
-}
-
 // Helper function to create a test executable unit
 func createTestExecutable(
 	handler slog.Handler,
@@ -507,4 +105,458 @@ func createTestExecutable(
 		Content:      content,
 		DataProvider: provider,
 	}, nil
+}
+
+// TestBytecodeEvaluator_Evaluate tests evaluating Risor scripts
+func TestBytecodeEvaluator_Evaluate(t *testing.T) {
+	t.Parallel()
+
+	// Define a test script that handles HTTP requests
+	testScript := `
+	func handle(request) {
+		if request == nil {
+			return error("request is nil")
+		}
+		if request["Method"] == "POST" {
+			return "post"
+		}
+		if request["URL_Path"] == "/hello" {
+			return true
+		}
+		return false
+	}
+	print(ctx)
+	handle(ctx["request"])
+	`
+
+	t.Run("success cases", func(t *testing.T) {
+		tests := []struct {
+			name           string
+			script         string
+			requestMethod  string
+			urlPath        string
+			expectedType   data.Types
+			expectedResult string
+			expectedValue  any
+		}{
+			{
+				name:           "GET request to /hello",
+				script:         testScript,
+				requestMethod:  "GET",
+				urlPath:        "/hello",
+				expectedType:   data.Types("bool"),
+				expectedResult: "true",
+				expectedValue:  true,
+			},
+			{
+				name:           "POST request",
+				script:         testScript,
+				requestMethod:  "POST",
+				urlPath:        "/hello",
+				expectedType:   data.Types("string"),
+				expectedResult: "\"post\"",
+				expectedValue:  "post",
+			},
+			{
+				name:           "GET request to unknown path",
+				script:         testScript,
+				requestMethod:  "GET",
+				urlPath:        "/unknown",
+				expectedType:   data.Types("bool"),
+				expectedResult: "false",
+				expectedValue:  false,
+			},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				// Set up the environment
+				handler := slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
+					Level: slog.LevelDebug,
+				})
+
+				// Create the loader and provider
+				ld, err := loader.NewFromString(tt.script)
+				require.NoError(t, err)
+				ctxProvider := data.NewContextProvider(constants.EvalData)
+
+				// Create executable unit and evaluator
+				exe, err := createTestExecutable(handler, ld, []string{constants.Ctx}, ctxProvider)
+				require.NoError(t, err)
+				evaluator := NewBytecodeEvaluator(handler, exe)
+				require.NotNil(t, evaluator)
+
+				// Create the request data
+				req := httptest.NewRequest(tt.requestMethod, tt.urlPath, nil)
+				rMap, err := helpers.RequestToMap(req)
+				require.NoError(t, err)
+				require.NotNil(t, rMap)
+
+				// Create the context with eval data
+				evalData := map[string]any{
+					constants.Request: rMap,
+				}
+				ctx := context.WithValue(context.Background(), constants.EvalData, evalData)
+
+				// Execute the script
+				response, err := evaluator.Eval(ctx)
+				require.NoError(t, err)
+				require.NotNil(t, response)
+
+				// Verify the results
+				require.Equal(t, tt.expectedType, response.Type())
+				require.Equal(t, tt.expectedResult, response.Inspect())
+
+				// Type-specific verification
+				switch actualValue := response.Interface().(type) {
+				case bool:
+					expected, ok := tt.expectedValue.(bool)
+					require.True(t, ok)
+					require.Equal(t, expected, actualValue)
+				case string:
+					expected, ok := tt.expectedValue.(string)
+					require.True(t, ok)
+					require.Equal(t, expected, actualValue)
+				default:
+					require.Equal(t, tt.expectedValue, actualValue)
+				}
+			})
+		}
+	})
+
+	t.Run("error cases", func(t *testing.T) {
+		tests := []struct {
+			name         string
+			setupExe     func() *script.ExecutableUnit
+			errorMessage string
+		}{
+			{
+				name: "nil executable unit",
+				setupExe: func() *script.ExecutableUnit {
+					return nil
+				},
+				errorMessage: "executable unit is nil",
+			},
+			{
+				name: "nil bytecode",
+				setupExe: func() *script.ExecutableUnit {
+					return &script.ExecutableUnit{
+						ID: "test-id",
+						Content: &MockContent{
+							Content: nil,
+						},
+					}
+				},
+				errorMessage: "bytecode is nil",
+			},
+			{
+				name: "empty execution id",
+				setupExe: func() *script.ExecutableUnit {
+					return &script.ExecutableUnit{
+						ID: "",
+						Content: &MockContent{
+							Content: &risorCompiler.Code{},
+						},
+					}
+				},
+				errorMessage: "exeID is empty",
+			},
+			{
+				name: "wrong bytecode type",
+				setupExe: func() *script.ExecutableUnit {
+					return &script.ExecutableUnit{
+						ID: "test-id",
+						Content: &MockContent{
+							Content: "not a risor bytecode",
+						},
+					}
+				},
+				errorMessage: "unable to type assert bytecode",
+			},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				handler := slog.NewTextHandler(os.Stderr, nil)
+				exe := tt.setupExe()
+
+				evaluator := &BytecodeEvaluator{
+					ctxKey:     constants.Ctx,
+					execUnit:   exe,
+					logHandler: handler,
+					logger:     slog.New(handler),
+				}
+
+				ctx := context.Background()
+				result, err := evaluator.Eval(ctx)
+
+				require.Error(t, err)
+				require.Nil(t, result)
+				require.Contains(t, err.Error(), tt.errorMessage)
+			})
+		}
+	})
+
+	t.Run("load input data tests", func(t *testing.T) {
+		tests := []struct {
+			name         string
+			setupExe     func() *script.ExecutableUnit
+			setupCtx     func() context.Context
+			expectError  bool
+			errorMessage string
+			expectEmpty  bool
+		}{
+			{
+				name: "nil provider",
+				setupExe: func() *script.ExecutableUnit {
+					return nil
+				},
+				setupCtx: func() context.Context {
+					return context.Background()
+				},
+				expectError: false,
+				expectEmpty: true,
+			},
+			{
+				name: "with provider error",
+				setupExe: func() *script.ExecutableUnit {
+					mockProvider := &MockProvider{}
+					expectedErr := fmt.Errorf("provider error")
+					mockProvider.On("GetData", mock.Anything).Return(nil, expectedErr)
+
+					return &script.ExecutableUnit{
+						DataProvider: mockProvider,
+					}
+				},
+				setupCtx: func() context.Context {
+					return context.Background()
+				},
+				expectError:  true,
+				errorMessage: "provider error",
+				expectEmpty:  true,
+			},
+			{
+				name: "with empty data",
+				setupExe: func() *script.ExecutableUnit {
+					mockProvider := &MockProvider{}
+					emptyData := map[string]any{}
+					mockProvider.On("GetData", mock.Anything).Return(emptyData, nil)
+
+					return &script.ExecutableUnit{
+						DataProvider: mockProvider,
+					}
+				},
+				setupCtx: func() context.Context {
+					return context.Background()
+				},
+				expectError: false,
+				expectEmpty: true,
+			},
+			{
+				name: "with valid data",
+				setupExe: func() *script.ExecutableUnit {
+					mockProvider := &MockProvider{}
+					validData := map[string]any{"test": "data"}
+					mockProvider.On("GetData", mock.Anything).Return(validData, nil)
+
+					return &script.ExecutableUnit{
+						DataProvider: mockProvider,
+					}
+				},
+				setupCtx: func() context.Context {
+					return context.Background()
+				},
+				expectError: false,
+				expectEmpty: false,
+			},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				handler := slog.NewTextHandler(os.Stderr, nil)
+				exe := tt.setupExe()
+				ctx := tt.setupCtx()
+
+				evaluator := &BytecodeEvaluator{
+					ctxKey:     constants.Ctx,
+					execUnit:   exe,
+					logHandler: handler,
+					logger:     slog.New(handler),
+				}
+
+				data, err := evaluator.loadInputData(ctx)
+
+				if tt.expectError {
+					require.Error(t, err)
+					if tt.errorMessage != "" {
+						require.Contains(t, err.Error(), tt.errorMessage)
+					}
+					require.Nil(t, data)
+				} else {
+					require.NoError(t, err)
+					if tt.expectEmpty {
+						assert.Empty(t, data)
+					} else {
+						assert.NotEmpty(t, data)
+					}
+				}
+
+				// Verify mock expectations if we have a mockProvider
+				if exe != nil && exe.DataProvider != nil {
+					if mockProvider, ok := exe.DataProvider.(*MockProvider); ok {
+						mockProvider.AssertExpectations(t)
+					}
+				}
+			})
+		}
+	})
+
+	t.Run("metadata tests", func(t *testing.T) {
+		// Test String method
+		t.Run("String method", func(t *testing.T) {
+			evaluator := &BytecodeEvaluator{}
+			require.Equal(t, "risor.BytecodeEvaluator", evaluator.String())
+		})
+
+		// Test constructor with various options
+		t.Run("constructor options", func(t *testing.T) {
+			tests := []struct {
+				name        string
+				handler     slog.Handler
+				checkLogger bool
+			}{
+				{
+					name:        "with handler",
+					handler:     slog.NewTextHandler(os.Stderr, nil),
+					checkLogger: true,
+				},
+				{
+					name:        "with nil handler",
+					handler:     nil,
+					checkLogger: false,
+				},
+			}
+
+			for _, tt := range tests {
+				t.Run(tt.name, func(t *testing.T) {
+					exe := &script.ExecutableUnit{}
+					evaluator := NewBytecodeEvaluator(tt.handler, exe)
+
+					require.NotNil(t, evaluator)
+					require.Equal(t, constants.Ctx, evaluator.ctxKey)
+					require.NotNil(t, evaluator.logger)
+					require.NotNil(t, evaluator.logHandler)
+
+					if tt.checkLogger && tt.handler != nil {
+						require.Equal(t, tt.handler, evaluator.logHandler)
+					}
+				})
+			}
+		})
+	})
+}
+
+// TestBytecodeEvaluator_PrepareContext tests the PrepareContext method with various scenarios
+func TestBytecodeEvaluator_PrepareContext(t *testing.T) {
+	t.Parallel()
+
+	// The test cases
+	tests := []struct {
+		name         string
+		setupExe     func(t *testing.T) *script.ExecutableUnit
+		inputs       []any
+		wantError    bool
+		errorMessage string
+	}{
+		{
+			name: "with successful provider",
+			setupExe: func(t *testing.T) *script.ExecutableUnit {
+				t.Helper()
+
+				mockProvider := &MockProvider{}
+				enrichedCtx := context.WithValue(
+					context.Background(),
+					constants.EvalData,
+					"enriched",
+				)
+				mockProvider.On("AddDataToContext", mock.Anything, mock.Anything).
+					Return(enrichedCtx, nil)
+
+				return &script.ExecutableUnit{DataProvider: mockProvider}
+			},
+			inputs:    []any{map[string]any{"test": "data"}},
+			wantError: false,
+		},
+		{
+			name: "with provider error",
+			setupExe: func(t *testing.T) *script.ExecutableUnit {
+				t.Helper()
+
+				mockProvider := &MockProvider{}
+				expectedErr := fmt.Errorf("provider error")
+				mockProvider.On("AddDataToContext", mock.Anything, mock.Anything).
+					Return(nil, expectedErr)
+
+				return &script.ExecutableUnit{DataProvider: mockProvider}
+			},
+			inputs:       []any{map[string]any{"test": "data"}},
+			wantError:    true,
+			errorMessage: "provider error",
+		},
+		{
+			name: "nil provider",
+			setupExe: func(t *testing.T) *script.ExecutableUnit {
+				t.Helper()
+				return &script.ExecutableUnit{DataProvider: nil}
+			},
+			inputs:       []any{map[string]any{"test": "data"}},
+			wantError:    true,
+			errorMessage: "no data provider available",
+		},
+		{
+			name: "nil executable unit",
+			setupExe: func(t *testing.T) *script.ExecutableUnit {
+				t.Helper()
+				return nil
+			},
+			inputs:       []any{map[string]any{"test": "data"}},
+			wantError:    true,
+			errorMessage: "no data provider available",
+		},
+	}
+
+	// Run the test cases
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			handler := slog.NewTextHandler(os.Stderr, nil)
+			exe := tt.setupExe(t)
+
+			evaluator := &BytecodeEvaluator{
+				ctxKey:     constants.Ctx,
+				execUnit:   exe,
+				logHandler: handler,
+				logger:     slog.New(handler),
+			}
+
+			ctx := context.Background()
+			result, err := evaluator.PrepareContext(ctx, tt.inputs...)
+
+			if tt.wantError {
+				require.Error(t, err)
+				if tt.errorMessage != "" {
+					require.Contains(t, err.Error(), tt.errorMessage)
+				}
+			} else {
+				require.NoError(t, err)
+				require.NotNil(t, result)
+			}
+
+			// If using mocks, verify expectations
+			if exe != nil && exe.DataProvider != nil {
+				if mockProvider, ok := exe.DataProvider.(*MockProvider); ok {
+					mockProvider.AssertExpectations(t)
+				}
+			}
+		})
+	}
 }

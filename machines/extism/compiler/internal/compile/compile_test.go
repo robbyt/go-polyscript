@@ -38,7 +38,6 @@ func TestCompileSuccess(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("default options", func(t *testing.T) {
-		t.Parallel()
 		plugin, err := CompileBytes(ctx, wasmBytes, nil)
 		require.NoError(t, err)
 		require.NotNil(t, plugin)
@@ -55,7 +54,6 @@ func TestCompileSuccess(t *testing.T) {
 	})
 
 	t.Run("custom options", func(t *testing.T) {
-		t.Parallel()
 		opts := &Settings{
 			EnableWASI: true,
 			RuntimeConfig: wazero.NewRuntimeConfig().
@@ -78,7 +76,6 @@ func TestCompileSuccess(t *testing.T) {
 	})
 
 	t.Run("base64 input default options", func(t *testing.T) {
-		t.Parallel()
 		wasmBase64 := base64.StdEncoding.EncodeToString(wasmBytes)
 		plugin, err := CompileBase64(ctx, wasmBase64, nil)
 		require.NoError(t, err)
@@ -96,7 +93,6 @@ func TestCompileSuccess(t *testing.T) {
 	})
 
 	t.Run("base64 input custom options", func(t *testing.T) {
-		t.Parallel()
 		opts := &Settings{
 			EnableWASI:    true,
 			RuntimeConfig: wazero.NewRuntimeConfig(),
@@ -121,90 +117,111 @@ func TestCompileSuccess(t *testing.T) {
 
 func testFunctions(t *testing.T, instance adapters.PluginInstance) {
 	t.Helper()
-	t.Run("greet function", func(t *testing.T) {
-		input := []byte(`{"input":"World"}`)
-		exit, output, err := instance.Call("greet", input)
-		require.NoError(t, err)
-		assert.Equal(t, uint32(0), exit, "Function should execute successfully")
 
-		var result struct {
-			Greeting string `json:"greeting"`
-		}
-		require.NoError(t, json.Unmarshal(output, &result))
-		assert.Equal(t, "Hello, World!", result.Greeting)
-	})
-
-	t.Run("reverse_string function", func(t *testing.T) {
-		input := []byte(`{"input":"Hello"}`)
-		exit, output, err := instance.Call("reverse_string", input)
-		require.NoError(t, err)
-		assert.Equal(t, uint32(0), exit, "Function should execute successfully")
-
-		var result struct {
-			Reversed string `json:"reversed"`
-		}
-		require.NoError(t, json.Unmarshal(output, &result))
-		assert.Equal(t, "olleH", result.Reversed)
-	})
-
-	t.Run("count_vowels function", func(t *testing.T) {
-		input := []byte(`{"input":"Hello World"}`)
-		exit, output, err := instance.Call("count_vowels", input)
-		require.NoError(t, err)
-		assert.Equal(t, uint32(0), exit, "Function should execute successfully")
-
-		var result struct {
-			Count  int    `json:"count"`
-			Vowels string `json:"vowels"`
-			Input  string `json:"input"`
-		}
-		require.NoError(t, json.Unmarshal(output, &result))
-		assert.Equal(t, 3, result.Count) // "e", "o", "o" in "Hello World"
-		assert.Equal(t, "Hello World", result.Input)
-	})
-
-	t.Run("process_complex function", func(t *testing.T) {
-		req := TestRequest{
-			ID:        "test-123",
-			Timestamp: time.Now().Unix(),
-			Data: map[string]any{
-				"key1": "value1",
-				"key2": 42,
+	// Test different Wasm functions
+	tests := []struct {
+		name       string
+		funcName   string
+		input      any
+		assertFunc func(t *testing.T, output []byte)
+	}{
+		{
+			name:     "greet function",
+			funcName: "greet",
+			input:    map[string]string{"input": "World"},
+			assertFunc: func(t *testing.T, output []byte) {
+				t.Helper()
+				var result struct {
+					Greeting string `json:"greeting"`
+				}
+				require.NoError(t, json.Unmarshal(output, &result))
+				assert.Equal(t, "Hello, World!", result.Greeting)
 			},
-			Tags: []string{"test", "example"},
-			Metadata: map[string]string{
-				"source":  "unit-test",
-				"version": "1.0",
+		},
+		{
+			name:     "reverse_string function",
+			funcName: "reverse_string",
+			input:    map[string]string{"input": "Hello"},
+			assertFunc: func(t *testing.T, output []byte) {
+				t.Helper()
+				var result struct {
+					Reversed string `json:"reversed"`
+				}
+				require.NoError(t, json.Unmarshal(output, &result))
+				assert.Equal(t, "olleH", result.Reversed)
 			},
-			Count:  42,
-			Active: true,
-		}
-		input, err := json.Marshal(req)
-		require.NoError(t, err)
+		},
+		{
+			name:     "count_vowels function",
+			funcName: "count_vowels",
+			input:    map[string]string{"input": "Hello World"},
+			assertFunc: func(t *testing.T, output []byte) {
+				t.Helper()
+				var result struct {
+					Count  int    `json:"count"`
+					Vowels string `json:"vowels"`
+					Input  string `json:"input"`
+				}
+				require.NoError(t, json.Unmarshal(output, &result))
+				assert.Equal(t, 3, result.Count) // "e", "o", "o" in "Hello World"
+				assert.Equal(t, "Hello World", result.Input)
+			},
+		},
+		{
+			name:     "process_complex function",
+			funcName: "process_complex",
+			input: TestRequest{
+				ID:        "test-123",
+				Timestamp: time.Now().Unix(),
+				Data: map[string]any{
+					"key1": "value1",
+					"key2": 42,
+				},
+				Tags: []string{"test", "example"},
+				Metadata: map[string]string{
+					"source":  "unit-test",
+					"version": "1.0",
+				},
+				Count:  42,
+				Active: true,
+			},
+			assertFunc: func(t *testing.T, output []byte) {
+				t.Helper()
+				var result struct {
+					RequestID   string         `json:"request_id"`
+					ProcessedAt string         `json:"processed_at"`
+					Results     map[string]any `json:"results"`
+					TagCount    int            `json:"tag_count"`
+					MetaCount   int            `json:"meta_count"`
+					IsActive    bool           `json:"is_active"`
+					Summary     string         `json:"summary"`
+				}
+				require.NoError(t, json.Unmarshal(output, &result))
+				assert.Equal(t, "test-123", result.RequestID)
+				assert.Equal(t, 2, result.TagCount)
+				assert.Equal(t, 2, result.MetaCount)
+				assert.True(t, result.IsActive)
+				assert.Contains(t, result.Summary, "test-123")
+			},
+		},
+	}
 
-		exit, output, err := instance.Call("process_complex", input)
-		require.NoError(t, err)
-		assert.Equal(t, uint32(0), exit, "Function should execute successfully")
+	for _, tt := range tests {
+		t.Run(tt.funcName, func(t *testing.T) {
+			inputJSON, err := json.Marshal(tt.input)
+			require.NoError(t, err)
 
-		var result struct {
-			RequestID   string         `json:"request_id"`
-			ProcessedAt string         `json:"processed_at"`
-			Results     map[string]any `json:"results"`
-			TagCount    int            `json:"tag_count"`
-			MetaCount   int            `json:"meta_count"`
-			IsActive    bool           `json:"is_active"`
-			Summary     string         `json:"summary"`
-		}
-		require.NoError(t, json.Unmarshal(output, &result))
-		assert.Equal(t, "test-123", result.RequestID)
-		assert.Equal(t, 2, result.TagCount)
-		assert.Equal(t, 2, result.MetaCount)
-		assert.True(t, result.IsActive)
-		assert.Contains(t, result.Summary, "test-123")
-	})
+			exit, output, err := instance.Call(tt.funcName, inputJSON)
+			require.NoError(t, err)
+			assert.Equal(t, uint32(0), exit, "Function should execute successfully")
+
+			tt.assertFunc(t, output)
+		})
+	}
 }
 
 func TestCompileErrors(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	tests := []struct {
@@ -238,6 +255,11 @@ func TestCompileErrors(t *testing.T) {
 				[]byte{0x00, 0x61, 0x73, 0x6D, 0x01, 0x00, 0x00, 0x00},
 				[]byte("corrupted")...),
 			wantErr: ErrCompileFailed,
+		},
+		{
+			name:    "empty bytes",
+			input:   []byte{},
+			wantErr: ErrContentNil,
 		},
 	}
 

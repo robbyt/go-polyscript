@@ -71,9 +71,9 @@ func prepareRuntimeData(
 	requestData := map[string]any{
 		"Method":     "GET",
 		"URL_Path":   "/api/users",
-		"URL_Host":   "example.com",
-		"Host":       "example.com",
-		"RemoteAddr": "192.168.1.1:12345",
+		"URL_Host":   "localhost:8080",
+		"Host":       "localhost:8080",
+		"RemoteAddr": "127.0.0.1:8080",
 	}
 
 	// General request metadata

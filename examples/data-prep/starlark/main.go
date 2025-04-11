@@ -62,8 +62,8 @@ func prepareRuntimeData(
 ) (context.Context, error) {
 	logger.Info("Preparing runtime data")
 
-	// Create an HTTP request object
-	reqURL, err := url.Parse("https://example.com/api/users?limit=10&offset=0")
+	// Create an HTTP request object (will not make a real request!)
+	reqURL, err := url.Parse("http://localhost:8080/api/users?limit=10&offset=0")
 	if err != nil {
 		logger.Error("Failed to parse URL", "error", err)
 		return nil, err
@@ -76,8 +76,8 @@ func prepareRuntimeData(
 			"Content-Type": []string{"application/json"},
 			"User-Agent":   []string{"Example Client/1.0"},
 		},
-		Host:       "example.com",
-		RemoteAddr: "192.168.1.1:12345",
+		Host:       "localhost",
+		RemoteAddr: "127.0.1:8080",
 	}
 
 	// Create user data

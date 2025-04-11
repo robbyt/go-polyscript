@@ -19,9 +19,7 @@ func TestNoAuth(t *testing.T) {
 	require.Equal(t, "None", auth.Name())
 
 	t.Run("Basic authentication", func(t *testing.T) {
-		t.Parallel()
-
-		req, err := http.NewRequest(http.MethodGet, "https://example.com", nil)
+		req, err := http.NewRequest(http.MethodGet, "http://localhost/test", nil)
 		require.NoError(t, err)
 
 		err = auth.Authenticate(req)
@@ -32,9 +30,7 @@ func TestNoAuth(t *testing.T) {
 	})
 
 	t.Run("With context authentication", func(t *testing.T) {
-		t.Parallel()
-
-		req, err := http.NewRequest(http.MethodGet, "https://example.com", nil)
+		req, err := http.NewRequest(http.MethodGet, "http://localhost/test", nil)
 		require.NoError(t, err)
 		ctx := context.Background()
 
@@ -45,9 +41,7 @@ func TestNoAuth(t *testing.T) {
 	})
 
 	t.Run("With cancelled context", func(t *testing.T) {
-		t.Parallel()
-
-		req, err := http.NewRequest(http.MethodGet, "https://example.com", nil)
+		req, err := http.NewRequest(http.MethodGet, "http://localhost/test", nil)
 		require.NoError(t, err)
 
 		ctx, cancel := context.WithCancel(context.Background())
@@ -59,9 +53,7 @@ func TestNoAuth(t *testing.T) {
 	})
 
 	t.Run("With timeout context", func(t *testing.T) {
-		t.Parallel()
-
-		req, err := http.NewRequest(http.MethodGet, "https://example.com", nil)
+		req, err := http.NewRequest(http.MethodGet, "http://localhost/test", nil)
 		require.NoError(t, err)
 
 		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Nanosecond)

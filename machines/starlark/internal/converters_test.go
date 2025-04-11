@@ -10,622 +10,606 @@ import (
 )
 
 func TestConvertStarlarkValueToInterface(t *testing.T) {
-	t.Run("primitive types", func(t *testing.T) {
-		tests := []struct {
-			name     string
-			input    starlarkLib.Value
-			expected any
-		}{
-			{
-				name:     "nil value",
-				input:    nil,
-				expected: nil,
-			},
-			{
-				name:     "bool true",
-				input:    starlarkLib.Bool(true),
-				expected: true,
-			},
-			{
-				name:     "bool false",
-				input:    starlarkLib.Bool(false),
-				expected: false,
-			},
-			{
-				name:     "int",
-				input:    starlarkLib.MakeInt(42),
-				expected: int64(42),
-			},
-			{
-				name:     "float",
-				input:    starlarkLib.Float(3.14),
-				expected: float64(3.14),
-			},
-			{
-				name:     "string",
-				input:    starlarkLib.String("hello"),
-				expected: "hello",
-			},
-		}
+	t.Parallel()
 
-		for _, tt := range tests {
-			t.Run(tt.name, func(t *testing.T) {
-				result, err := ConvertStarlarkValueToInterface(tt.input)
-				require.NoError(t, err)
-				require.Equal(t, tt.expected, result)
-			})
-		}
-	})
+	tests := []struct {
+		name     string
+		input    starlarkLib.Value
+		expected any
+		wantErr  bool
+	}{
+		// Primitive types
+		{
+			name:     "nil value",
+			input:    nil,
+			expected: nil,
+			wantErr:  false,
+		},
+		{
+			name:     "bool true",
+			input:    starlarkLib.Bool(true),
+			expected: true,
+			wantErr:  false,
+		},
+		{
+			name:     "bool false",
+			input:    starlarkLib.Bool(false),
+			expected: false,
+			wantErr:  false,
+		},
+		{
+			name:     "int",
+			input:    starlarkLib.MakeInt(42),
+			expected: int64(42),
+			wantErr:  false,
+		},
+		{
+			name:     "float",
+			input:    starlarkLib.Float(3.14),
+			expected: float64(3.14),
+			wantErr:  false,
+		},
+		{
+			name:     "string",
+			input:    starlarkLib.String("hello"),
+			expected: "hello",
+			wantErr:  false,
+		},
 
-	t.Run("list types", func(t *testing.T) {
-		tests := []struct {
-			name     string
-			input    *starlarkLib.List
-			expected []any
-		}{
-			{
-				name:     "empty list",
-				input:    starlarkLib.NewList(nil),
-				expected: []any{},
-			},
-			{
-				name: "mixed type list",
-				input: func() *starlarkLib.List {
-					l := starlarkLib.NewList([]starlarkLib.Value{
-						starlarkLib.MakeInt(1),
-						starlarkLib.String("two"),
-						starlarkLib.Bool(true),
-					})
-					return l
-				}(),
-				expected: []any{int64(1), "two", true},
-			},
-			{
-				name: "nested list",
-				input: func() *starlarkLib.List {
-					inner := starlarkLib.NewList([]starlarkLib.Value{
-						starlarkLib.MakeInt(1),
-						starlarkLib.MakeInt(2),
-					})
-					outer := starlarkLib.NewList([]starlarkLib.Value{inner})
-					return outer
-				}(),
-				expected: []any{[]any{int64(1), int64(2)}},
-			},
-		}
+		// List types
+		{
+			name:     "empty list",
+			input:    starlarkLib.NewList(nil),
+			expected: []any{},
+			wantErr:  false,
+		},
+		{
+			name: "mixed type list",
+			input: starlarkLib.NewList([]starlarkLib.Value{
+				starlarkLib.MakeInt(1),
+				starlarkLib.String("two"),
+				starlarkLib.Bool(true),
+			}),
+			expected: []any{int64(1), "two", true},
+			wantErr:  false,
+		},
+		{
+			name: "nested list",
+			input: func() *starlarkLib.List {
+				inner := starlarkLib.NewList([]starlarkLib.Value{
+					starlarkLib.MakeInt(1),
+					starlarkLib.MakeInt(2),
+				})
+				outer := starlarkLib.NewList([]starlarkLib.Value{inner})
+				return outer
+			}(),
+			expected: []any{[]any{int64(1), int64(2)}},
+			wantErr:  false,
+		},
 
-		for _, tt := range tests {
-			t.Run(tt.name, func(t *testing.T) {
-				result, err := ConvertStarlarkValueToInterface(tt.input)
-				require.NoError(t, err)
-				require.Equal(t, tt.expected, result)
-			})
-		}
-	})
-
-	t.Run("dict types", func(t *testing.T) {
-		tests := []struct {
-			name     string
-			input    *starlarkLib.Dict
-			expected map[string]any
-		}{
-			{
-				name:     "empty dict",
-				input:    starlarkLib.NewDict(0),
-				expected: map[string]any{},
-			},
-			{
-				name: "string keys dict",
-				input: func() *starlarkLib.Dict {
-					d := starlarkLib.NewDict(1)
-					require.NoError(t, d.SetKey(starlarkLib.String("key"), starlarkLib.MakeInt(42)))
-					return d
-				}(),
-				expected: map[string]any{"key": int64(42)},
-			},
-			{
-				name: "nested dict",
-				input: func() *starlarkLib.Dict {
-					inner := starlarkLib.NewDict(1)
-					require.NoError(
-						t,
-						inner.SetKey(starlarkLib.String("inner"), starlarkLib.MakeInt(1)),
-					)
-
-					outer := starlarkLib.NewDict(1)
-					require.NoError(t, outer.SetKey(starlarkLib.String("outer"), inner))
-					return outer
-				}(),
-				expected: map[string]any{
-					"outer": map[string]any{
-						"inner": int64(1),
-					},
+		// Dict types
+		{
+			name:     "empty dict",
+			input:    starlarkLib.NewDict(0),
+			expected: map[string]any{},
+			wantErr:  false,
+		},
+		{
+			name: "string keys dict",
+			input: func() *starlarkLib.Dict {
+				d := starlarkLib.NewDict(1)
+				if err := d.SetKey(starlarkLib.String("key"), starlarkLib.MakeInt(42)); err != nil {
+					t.Fatalf("Failed to set key: %v", err)
+				}
+				return d
+			}(),
+			expected: map[string]any{"key": int64(42)},
+			wantErr:  false,
+		},
+		{
+			name: "nested dict",
+			input: func() *starlarkLib.Dict {
+				inner := starlarkLib.NewDict(1)
+				if err := inner.SetKey(starlarkLib.String("inner"), starlarkLib.MakeInt(1)); err != nil {
+					t.Fatalf("Failed to set key: %v", err)
+				}
+				outer := starlarkLib.NewDict(1)
+				if err := outer.SetKey(starlarkLib.String("outer"), inner); err != nil {
+					t.Fatalf("Failed to set key: %v", err)
+				}
+				return outer
+			}(),
+			expected: map[string]any{
+				"outer": map[string]any{
+					"inner": int64(1),
 				},
 			},
-		}
+			wantErr: false,
+		},
 
-		for _, tt := range tests {
-			t.Run(tt.name, func(t *testing.T) {
-				result, err := ConvertStarlarkValueToInterface(tt.input)
-				require.NoError(t, err)
-				require.Equal(t, tt.expected, result)
-			})
-		}
-	})
+		// Error cases
+		{
+			name: "dict with invalid entry",
+			input: func() *starlarkLib.Dict {
+				d := starlarkLib.NewDict(1)
+				// Create an invalid entry that will fail Get()
+				err := d.Clear() // This creates an inconsistent state
+				if err != nil {
+					t.Fatalf("Failed to clear dict: %v", err)
+				}
+				return d
+			}(),
+			expected: map[string]any{},
+			wantErr:  false, // Note: Current implementation doesn't return an error for this case
+		},
+	}
 
-	t.Run("error cases", func(t *testing.T) {
-		tests := []struct {
-			name  string
-			input func() *starlarkLib.Dict
-		}{
-			{
-				name: "dict with invalid entry",
-				input: func() *starlarkLib.Dict {
-					d := starlarkLib.NewDict(1)
-					// Create an invalid entry that will fail Get()
-					err := d.Clear() // This creates an inconsistent state
-					require.NoError(t, err)
-					return d
-				},
-			},
-		}
+	for _, tt := range tests {
+		tt := tt // Capture range variable
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := ConvertStarlarkValueToInterface(tt.input)
 
-		for _, tt := range tests {
-			t.Run(tt.name, func(t *testing.T) {
-				result, err := ConvertStarlarkValueToInterface(tt.input())
-				require.NoError(t, err)
-				require.NotNil(t, result)
-				require.Empty(t, result.(map[string]any))
-			})
-		}
-	})
+			if tt.wantErr {
+				require.Error(t, err)
+				return
+			}
+
+			require.NoError(t, err)
+			require.Equal(t, tt.expected, result)
+		})
+	}
 }
 
 func TestConvertToStarlarkFormat(t *testing.T) {
-	t.Run("basic types", func(t *testing.T) {
-		tests := []struct {
-			name     string
-			input    map[string]any
-			expected starlarkLib.StringDict
-			wantErr  bool
-		}{
-			{
-				name:  "empty map",
-				input: map[string]any{},
-				expected: starlarkLib.StringDict{
-					constants.Ctx: starlarkLib.NewDict(0),
-				},
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		input    map[string]any
+		expected starlarkLib.StringDict
+		wantErr  bool
+	}{
+		// Basic types
+		{
+			name:  "empty map",
+			input: map[string]any{},
+			expected: starlarkLib.StringDict{
+				constants.Ctx: starlarkLib.NewDict(0),
 			},
-			{
-				name: "simple types",
-				input: map[string]any{
-					"bool":   true,
-					"int":    42,
-					"float":  3.14,
-					"string": "hello",
-				},
-				expected: func() starlarkLib.StringDict {
+			wantErr: false,
+		},
+		{
+			name: "simple types",
+			input: map[string]any{
+				"bool":   true,
+				"int":    42,
+				"float":  3.14,
+				"string": "hello",
+			},
+			expected: starlarkLib.StringDict{
+				constants.Ctx: func() *starlarkLib.Dict {
 					d := starlarkLib.NewDict(4)
-					require.NoError(t, d.SetKey(starlarkLib.String("bool"), starlarkLib.Bool(true)))
-					require.NoError(t, d.SetKey(starlarkLib.String("int"), starlarkLib.MakeInt(42)))
-					require.NoError(
-						t,
-						d.SetKey(starlarkLib.String("float"), starlarkLib.Float(3.14)),
-					)
-					require.NoError(
-						t,
-						d.SetKey(starlarkLib.String("string"), starlarkLib.String("hello")),
-					)
-					return starlarkLib.StringDict{constants.Ctx: d}
+					if err := d.SetKey(starlarkLib.String("bool"), starlarkLib.Bool(true)); err != nil {
+						t.Fatalf("Failed to set key: %v", err)
+					}
+					if err := d.SetKey(starlarkLib.String("int"), starlarkLib.MakeInt(42)); err != nil {
+						t.Fatalf("Failed to set key: %v", err)
+					}
+					if err := d.SetKey(starlarkLib.String("float"), starlarkLib.Float(3.14)); err != nil {
+						t.Fatalf("Failed to set key: %v", err)
+					}
+					if err := d.SetKey(starlarkLib.String("string"), starlarkLib.String("hello")); err != nil {
+						t.Fatalf("Failed to set key: %v", err)
+					}
+					return d
 				}(),
 			},
-			{
-				name: "with nil value",
-				input: map[string]any{
-					"nil": nil,
-				},
-				expected: starlarkLib.StringDict{
-					constants.Ctx: func() *starlarkLib.Dict {
-						d := starlarkLib.NewDict(1)
-						require.NoError(t, d.SetKey(starlarkLib.String("nil"), starlarkLib.None))
-						return d
-					}(),
-				},
+			wantErr: false,
+		},
+		{
+			name: "with nil value",
+			input: map[string]any{
+				"nil": nil,
 			},
-		}
-
-		for _, tt := range tests {
-			t.Run(tt.name, func(t *testing.T) {
-				result, err := ConvertToStarlarkFormat(tt.input)
-				if tt.wantErr {
-					require.Error(t, err)
-					return
-				}
-				require.NoError(t, err)
-				require.Equal(t, len(tt.expected), len(result))
-
-				// Get ctx value and verify it's a dict
-				ctxVal, ok := result[constants.Ctx].(*starlarkLib.Dict)
-				require.True(t, ok)
-
-				// Compare the dict contents
-				expectedCtx := tt.expected[constants.Ctx].(*starlarkLib.Dict)
-				require.Equal(t, expectedCtx.Len(), ctxVal.Len())
-
-				for _, k := range expectedCtx.Keys() {
-					expectedVal, found, err := expectedCtx.Get(k)
-					require.NoError(t, err)
-					require.True(t, found)
-					actualVal, found, err := ctxVal.Get(k)
-					require.NoError(t, err)
-					require.True(t, found)
-					require.Equal(t, expectedVal.String(), actualVal.String())
-				}
-			})
-		}
-	})
-
-	t.Run("complex types", func(t *testing.T) {
-		tests := []struct {
-			name     string
-			input    map[string]any
-			expected starlarkLib.StringDict
-			wantErr  bool
-		}{
-			{
-				name: "with URL",
-				input: map[string]any{
-					"url": &url.URL{Scheme: "https", Host: "example.com"},
-				},
-				expected: func() starlarkLib.StringDict {
+			expected: starlarkLib.StringDict{
+				constants.Ctx: func() *starlarkLib.Dict {
 					d := starlarkLib.NewDict(1)
-					u := &url.URL{Scheme: "https", Host: "example.com"}
-					require.NoError(
-						t,
-						d.SetKey(starlarkLib.String("url"), starlarkLib.String(u.String())),
-					)
-					return starlarkLib.StringDict{constants.Ctx: d}
+					if err := d.SetKey(starlarkLib.String("nil"), starlarkLib.None); err != nil {
+						t.Fatalf("Failed to set nil key: %v", err)
+					}
+					return d
 				}(),
 			},
-			{
-				name: "with headers",
-				input: map[string]any{
-					"headers": map[string][]string{
-						"Accept": {"text/plain", "application/json"},
-					},
-				},
-				expected: func() starlarkLib.StringDict {
+			wantErr: false,
+		},
+
+		// Complex types
+		{
+			name: "with URL",
+			input: map[string]any{
+				"url": &url.URL{Scheme: "https", Host: "localhost:8080"},
+			},
+			expected: starlarkLib.StringDict{
+				constants.Ctx: func() *starlarkLib.Dict {
 					d := starlarkLib.NewDict(1)
-					// Create inner dict for headers
+					u := &url.URL{Scheme: "https", Host: "localhost:8080"}
+					if err := d.SetKey(starlarkLib.String("url"), starlarkLib.String(u.String())); err != nil {
+						t.Fatalf("Failed to set url key: %v", err)
+					}
+					return d
+				}(),
+			},
+			wantErr: false,
+		},
+		{
+			name: "with headers",
+			input: map[string]any{
+				"headers": map[string][]string{
+					"Accept": {"text/plain", "application/json"},
+				},
+			},
+			expected: starlarkLib.StringDict{
+				constants.Ctx: func() *starlarkLib.Dict {
+					d := starlarkLib.NewDict(1)
 					headers := starlarkLib.NewDict(1)
-					// Create list for Accept values
 					acceptList := starlarkLib.NewList([]starlarkLib.Value{
 						starlarkLib.String("text/plain"),
 						starlarkLib.String("application/json"),
 					})
-					// Set Accept list in headers dict
-					require.NoError(t, headers.SetKey(starlarkLib.String("Accept"), acceptList))
-					// Set headers dict in outer dict
-					require.NoError(t, d.SetKey(starlarkLib.String("headers"), headers))
-					return starlarkLib.StringDict{constants.Ctx: d}
+					if err := headers.SetKey(starlarkLib.String("Accept"), acceptList); err != nil {
+						t.Fatalf("Failed to set Accept key: %v", err)
+					}
+					if err := d.SetKey(starlarkLib.String("headers"), headers); err != nil {
+						t.Fatalf("Failed to set headers key: %v", err)
+					}
+					return d
 				}(),
 			},
-			{
-				name: "nested structures",
-				input: map[string]any{
-					"nested": map[string]any{
-						"list": []any{1, "two", true},
-					},
+			wantErr: false,
+		},
+		{
+			name: "nested structures",
+			input: map[string]any{
+				"nested": map[string]any{
+					"list": []any{1, "two", true},
 				},
-				expected: func() starlarkLib.StringDict {
+			},
+			expected: starlarkLib.StringDict{
+				constants.Ctx: func() *starlarkLib.Dict {
 					inner := starlarkLib.NewDict(1)
 					l := starlarkLib.NewList([]starlarkLib.Value{
 						starlarkLib.MakeInt(1),
 						starlarkLib.String("two"),
 						starlarkLib.Bool(true),
 					})
-					require.NoError(t, inner.SetKey(starlarkLib.String("list"), l))
+					if err := inner.SetKey(starlarkLib.String("list"), l); err != nil {
+						t.Fatalf("Failed to set list key: %v", err)
+					}
 					d := starlarkLib.NewDict(1)
-					require.NoError(t, d.SetKey(starlarkLib.String("nested"), inner))
-					return starlarkLib.StringDict{constants.Ctx: d}
+					if err := d.SetKey(starlarkLib.String("nested"), inner); err != nil {
+						t.Fatalf("Failed to set nested key: %v", err)
+					}
+					return d
 				}(),
 			},
-		}
+			wantErr: false,
+		},
 
-		for _, tt := range tests {
-			t.Run(tt.name, func(t *testing.T) {
-				result, err := ConvertToStarlarkFormat(tt.input)
-				if tt.wantErr {
-					require.Error(t, err)
-					return
-				}
-				require.NoError(t, err)
-				require.Equal(t, len(tt.expected), len(result))
-
-				// Get ctx value and verify it's a dict
-				ctxVal, ok := result[constants.Ctx].(*starlarkLib.Dict)
-				require.True(t, ok, "Expected ctx value to be a dict")
-
-				// Compare the dict contents
-				expectedCtx := tt.expected[constants.Ctx].(*starlarkLib.Dict)
-				require.Equal(t, expectedCtx.Len(), ctxVal.Len(), "Dict lengths should match")
-
-				for _, k := range expectedCtx.Keys() {
-					expectedVal, found, err := expectedCtx.Get(k)
-					require.NoError(t, err)
-					require.True(t, found)
-
-					actualVal, found, err := ctxVal.Get(k)
-					require.NoError(t, err)
-					require.True(t, found)
-
-					require.Equal(t, expectedVal.String(), actualVal.String())
-				}
-			})
-		}
-	})
-
-	t.Run("error cases", func(t *testing.T) {
-		tests := []struct {
-			name    string
-			input   map[string]any
-			wantErr bool
-		}{
-			{
-				name: "unsupported type",
-				input: map[string]any{
-					"chan": make(chan int),
-				},
-				wantErr: true,
+		// Error cases
+		{
+			name: "unsupported type",
+			input: map[string]any{
+				"chan": make(chan int),
 			},
-			{
-				name: "mixed valid and invalid",
-				input: map[string]any{
-					"valid":   "value",
-					"invalid": make(chan int),
-				},
-				wantErr: true,
+			wantErr: true,
+		},
+		{
+			name: "mixed valid and invalid",
+			input: map[string]any{
+				"valid":   "value",
+				"invalid": make(chan int),
 			},
-		}
+			wantErr: true,
+		},
+	}
 
-		for _, tt := range tests {
-			t.Run(tt.name, func(t *testing.T) {
-				_, err := ConvertToStarlarkFormat(tt.input)
+	for _, tt := range tests {
+		tt := tt // Capture range variable
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := ConvertToStarlarkFormat(tt.input)
+
+			if tt.wantErr {
 				require.Error(t, err)
+				// Without defined error sentinel values, we can directly check the message
+				// In a more ideal harmonization, we would define and use error sentinels
 				require.Contains(t, err.Error(), "failed to convert input value")
-			})
-		}
-	})
+				return
+			}
+
+			require.NoError(t, err)
+			require.Equal(t, len(tt.expected), len(result))
+
+			// Get ctx value and verify it's a dict
+			ctxVal, ok := result[constants.Ctx].(*starlarkLib.Dict)
+			require.True(t, ok)
+
+			// Compare the dict contents
+			expectedCtx := tt.expected[constants.Ctx].(*starlarkLib.Dict)
+			require.Equal(t, expectedCtx.Len(), ctxVal.Len())
+
+			for _, k := range expectedCtx.Keys() {
+				expectedVal, found, err := expectedCtx.Get(k)
+				require.NoError(t, err)
+				require.True(t, found)
+
+				actualVal, found, err := ctxVal.Get(k)
+				require.NoError(t, err)
+				require.True(t, found)
+
+				require.Equal(t, expectedVal.String(), actualVal.String())
+			}
+		})
+	}
 }
 
 func TestConvertToStarlarkValue(t *testing.T) {
-	t.Run("primitive types", func(t *testing.T) {
-		tests := []struct {
-			name     string
-			input    any
-			expected starlarkLib.Value
-		}{
-			{
-				name:     "nil",
-				input:    nil,
-				expected: starlarkLib.None,
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		input    any
+		expected starlarkLib.Value
+		checkFn  func(t *testing.T, expected, actual starlarkLib.Value)
+		wantErr  bool
+		errMsg   string
+	}{
+		// Primitive types
+		{
+			name:     "nil",
+			input:    nil,
+			expected: starlarkLib.None,
+			checkFn: func(t *testing.T, expected, actual starlarkLib.Value) {
+				t.Helper()
+				require.Equal(t, expected.String(), actual.String())
+				require.Equal(t, expected.Type(), actual.Type())
 			},
-			{
-				name:     "bool true",
-				input:    true,
-				expected: starlarkLib.Bool(true),
+		},
+		{
+			name:     "bool true",
+			input:    true,
+			expected: starlarkLib.Bool(true),
+			checkFn: func(t *testing.T, expected, actual starlarkLib.Value) {
+				t.Helper()
+				require.Equal(t, expected.String(), actual.String())
+				require.Equal(t, expected.Type(), actual.Type())
 			},
-			{
-				name:     "bool false",
-				input:    false,
-				expected: starlarkLib.Bool(false),
+		},
+		{
+			name:     "bool false",
+			input:    false,
+			expected: starlarkLib.Bool(false),
+			checkFn: func(t *testing.T, expected, actual starlarkLib.Value) {
+				t.Helper()
+				require.Equal(t, expected.String(), actual.String())
+				require.Equal(t, expected.Type(), actual.Type())
 			},
-			{
-				name:     "int",
-				input:    42,
-				expected: starlarkLib.MakeInt(42),
+		},
+		{
+			name:     "int",
+			input:    42,
+			expected: starlarkLib.MakeInt(42),
+			checkFn: func(t *testing.T, expected, actual starlarkLib.Value) {
+				t.Helper()
+				require.Equal(t, expected.String(), actual.String())
+				require.Equal(t, expected.Type(), actual.Type())
 			},
-			{
-				name:     "int64",
-				input:    int64(42),
-				expected: starlarkLib.MakeInt64(42),
+		},
+		{
+			name:     "int64",
+			input:    int64(42),
+			expected: starlarkLib.MakeInt64(42),
+			checkFn: func(t *testing.T, expected, actual starlarkLib.Value) {
+				t.Helper()
+				require.Equal(t, expected.String(), actual.String())
+				require.Equal(t, expected.Type(), actual.Type())
 			},
-			{
-				name:     "float64",
-				input:    3.14,
-				expected: starlarkLib.Float(3.14),
+		},
+		{
+			name:     "float64",
+			input:    3.14,
+			expected: starlarkLib.Float(3.14),
+			checkFn: func(t *testing.T, expected, actual starlarkLib.Value) {
+				t.Helper()
+				require.Equal(t, expected.String(), actual.String())
+				require.Equal(t, expected.Type(), actual.Type())
 			},
-			{
-				name:     "string",
-				input:    "hello",
-				expected: starlarkLib.String("hello"),
+		},
+		{
+			name:     "string",
+			input:    "hello",
+			expected: starlarkLib.String("hello"),
+			checkFn: func(t *testing.T, expected, actual starlarkLib.Value) {
+				t.Helper()
+				require.Equal(t, expected.String(), actual.String())
+				require.Equal(t, expected.Type(), actual.Type())
 			},
-		}
+		},
 
-		for _, tt := range tests {
-			t.Run(tt.name, func(t *testing.T) {
-				result, err := ConvertToStarlarkValue(tt.input)
-				require.NoError(t, err)
-				require.Equal(t, tt.expected.String(), result.String())
-				require.Equal(t, tt.expected.Type(), result.Type())
-			})
-		}
-	})
-
-	t.Run("URL type", func(t *testing.T) {
-		tests := []struct {
-			name     string
-			input    *url.URL
-			expected starlarkLib.Value
-		}{
-			{
-				name: "simple URL",
-				input: &url.URL{
-					Scheme: "https",
-					Host:   "example.com",
-				},
-				expected: starlarkLib.String("https://example.com"),
+		// URL types
+		{
+			name: "simple URL",
+			input: &url.URL{
+				Scheme: "https",
+				Host:   "localhost:8080",
 			},
-			{
-				name: "complex URL",
-				input: &url.URL{
-					Scheme:   "https",
-					Host:     "example.com",
-					Path:     "/path",
-					RawQuery: "q=search",
-				},
-				expected: starlarkLib.String("https://example.com/path?q=search"),
+			expected: starlarkLib.String("https://localhost:8080"),
+			checkFn: func(t *testing.T, expected, actual starlarkLib.Value) {
+				t.Helper()
+				require.Equal(t, expected.String(), actual.String())
+				require.Equal(t, expected.Type(), actual.Type())
 			},
-		}
-
-		for _, tt := range tests {
-			t.Run(tt.name, func(t *testing.T) {
-				result, err := ConvertToStarlarkValue(tt.input)
-				require.NoError(t, err)
-				require.Equal(t, tt.expected.String(), result.String())
-				require.Equal(t, tt.expected.Type(), result.Type())
-			})
-		}
-	})
-
-	t.Run("slice types", func(t *testing.T) {
-		tests := []struct {
-			name     string
-			input    []any
-			expected func() *starlarkLib.List
-		}{
-			{
-				name:  "empty slice",
-				input: []any{},
-				expected: func() *starlarkLib.List {
-					return starlarkLib.NewList([]starlarkLib.Value{})
-				},
+		},
+		{
+			name: "complex URL",
+			input: &url.URL{
+				Scheme:   "https",
+				Host:     "localhost:8080",
+				Path:     "/path",
+				RawQuery: "q=search",
 			},
-			{
-				name:  "mixed types",
-				input: []any{42, "hello", true},
-				expected: func() *starlarkLib.List {
-					return starlarkLib.NewList([]starlarkLib.Value{
-						starlarkLib.MakeInt(42),
-						starlarkLib.String("hello"),
-						starlarkLib.Bool(true),
-					})
-				},
+			expected: starlarkLib.String("https://localhost:8080/path?q=search"),
+			checkFn: func(t *testing.T, expected, actual starlarkLib.Value) {
+				t.Helper()
+				require.Equal(t, expected.String(), actual.String())
+				require.Equal(t, expected.Type(), actual.Type())
 			},
-		}
+		},
 
-		for _, tt := range tests {
-			t.Run(tt.name, func(t *testing.T) {
-				result, err := ConvertToStarlarkValue(tt.input)
-				require.NoError(t, err)
-				expected := tt.expected()
-				require.Equal(t, expected.String(), result.String())
-				require.Equal(t, expected.Len(), result.(*starlarkLib.List).Len())
-			})
-		}
-	})
-
-	t.Run("map types", func(t *testing.T) {
-		t.Run("map[string][]string type", func(t *testing.T) {
-			input := map[string][]string{
-				"headers": {"value1", "value2"},
-				"empty":   {},
-			}
-			result, err := ConvertToStarlarkValue(input)
-			require.NoError(t, err)
-			dict := result.(*starlarkLib.Dict)
-
-			// Check headers
-			headersVal, found, err := dict.Get(starlarkLib.String("headers"))
-			require.NoError(t, err)
-			require.True(t, found)
-			headersList := headersVal.(*starlarkLib.List)
-			require.Equal(t, 2, headersList.Len())
-			val1 := starlarkLib.String("value1")
-			val2 := starlarkLib.String("value2")
-			require.Equal(t, val1, headersList.Index(0))
-			require.Equal(t, val2, headersList.Index(1))
-
-			// Check empty
-			emptyVal, found, err := dict.Get(starlarkLib.String("empty"))
-			require.NoError(t, err)
-			require.True(t, found)
-			emptyList := emptyVal.(*starlarkLib.List)
-			require.Equal(t, 0, emptyList.Len())
-		})
-
-		t.Run("map[string]any type", func(t *testing.T) {
-			input := map[string]any{
-				"int":    42,
-				"str":    "hello",
-				"nested": map[string]any{"key": "value"},
-			}
-
-			result, err := ConvertToStarlarkValue(input)
-			require.NoError(t, err)
-			dict := result.(*starlarkLib.Dict)
-
-			// Check int value
-			intVal, found, err := dict.Get(starlarkLib.String("int"))
-			require.NoError(t, err)
-			require.True(t, found)
-			expectedInt := starlarkLib.MakeInt(42)
-			require.Equal(t, expectedInt, intVal)
-
-			// Check string value
-			strVal, found, err := dict.Get(starlarkLib.String("str"))
-			require.NoError(t, err)
-			require.True(t, found)
-			expectedStr := starlarkLib.String("hello")
-			require.Equal(t, expectedStr, strVal)
-
-			// Check nested dict
-			nestedVal, found, err := dict.Get(starlarkLib.String("nested"))
-			require.NoError(t, err)
-			require.True(t, found)
-			nestedDict := nestedVal.(*starlarkLib.Dict)
-
-			keyVal, found, err := nestedDict.Get(starlarkLib.String("key"))
-			require.NoError(t, err)
-			require.True(t, found)
-			expectedKeyVal := starlarkLib.String("value")
-			require.Equal(t, expectedKeyVal, keyVal)
-		})
-	})
-
-	t.Run("error cases", func(t *testing.T) {
-		tests := []struct {
-			name     string
-			input    any
-			errorMsg string
-		}{
-			{
-				name:     "unsupported type",
-				input:    make(chan int),
-				errorMsg: "unsupported type chan int",
+		// Slice types
+		{
+			name:     "empty slice",
+			input:    []any{},
+			expected: starlarkLib.NewList([]starlarkLib.Value{}),
+			checkFn: func(t *testing.T, expected, actual starlarkLib.Value) {
+				t.Helper()
+				require.Equal(t, expected.String(), actual.String())
+				require.Equal(
+					t,
+					expected.(*starlarkLib.List).Len(),
+					actual.(*starlarkLib.List).Len(),
+				)
 			},
-			{
-				name: "invalid nested type",
-				input: []any{
-					make(chan int),
-				},
-				errorMsg: "failed to convert list element",
+		},
+		{
+			name:  "mixed type slice",
+			input: []any{42, "hello", true},
+			expected: starlarkLib.NewList([]starlarkLib.Value{
+				starlarkLib.MakeInt(42),
+				starlarkLib.String("hello"),
+				starlarkLib.Bool(true),
+			}),
+			checkFn: func(t *testing.T, expected, actual starlarkLib.Value) {
+				t.Helper()
+				require.Equal(t, expected.String(), actual.String())
+				require.Equal(
+					t,
+					expected.(*starlarkLib.List).Len(),
+					actual.(*starlarkLib.List).Len(),
+				)
 			},
-			{
-				name: "invalid map value",
-				input: map[string]any{
-					"chan": make(chan int),
-				},
-				errorMsg: "failed to convert dict value",
-			},
-		}
+		},
 
-		for _, tt := range tests {
-			t.Run(tt.name, func(t *testing.T) {
-				_, err := ConvertToStarlarkValue(tt.input)
+		// Map types - We'll test these separately as they need special verification
+
+		// Error cases
+		{
+			name:    "unsupported type",
+			input:   make(chan int),
+			wantErr: true,
+			errMsg:  "unsupported type chan int",
+		},
+		{
+			name: "invalid nested type",
+			input: []any{
+				make(chan int),
+			},
+			wantErr: true,
+			errMsg:  "failed to convert list element",
+		},
+		{
+			name: "invalid map value",
+			input: map[string]any{
+				"chan": make(chan int),
+			},
+			wantErr: true,
+			errMsg:  "failed to convert dict value",
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt // Capture range variable
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := ConvertToStarlarkValue(tt.input)
+
+			if tt.wantErr {
 				require.Error(t, err)
-				require.Contains(t, err.Error(), tt.errorMsg)
-			})
+				if tt.errMsg != "" {
+					require.Contains(t, err.Error(), tt.errMsg)
+				}
+				return
+			}
+
+			require.NoError(t, err)
+			if tt.checkFn != nil {
+				tt.checkFn(t, tt.expected, result)
+			}
+		})
+	}
+
+	// Test map types separately as they need more detailed verification
+	t.Run("map[string][]string type", func(t *testing.T) {
+		input := map[string][]string{
+			"headers": {"value1", "value2"},
+			"empty":   {},
 		}
+		result, err := ConvertToStarlarkValue(input)
+		require.NoError(t, err)
+		dict := result.(*starlarkLib.Dict)
+
+		// Check headers
+		headersVal, found, err := dict.Get(starlarkLib.String("headers"))
+		require.NoError(t, err)
+		require.True(t, found)
+		headersList := headersVal.(*starlarkLib.List)
+		require.Equal(t, 2, headersList.Len())
+		val1 := starlarkLib.String("value1")
+		val2 := starlarkLib.String("value2")
+		require.Equal(t, val1, headersList.Index(0))
+		require.Equal(t, val2, headersList.Index(1))
+
+		// Check empty
+		emptyVal, found, err := dict.Get(starlarkLib.String("empty"))
+		require.NoError(t, err)
+		require.True(t, found)
+		emptyList := emptyVal.(*starlarkLib.List)
+		require.Equal(t, 0, emptyList.Len())
+	})
+
+	t.Run("map[string]any type", func(t *testing.T) {
+		input := map[string]any{
+			"int":    42,
+			"str":    "hello",
+			"nested": map[string]any{"key": "value"},
+		}
+
+		result, err := ConvertToStarlarkValue(input)
+		require.NoError(t, err)
+		dict := result.(*starlarkLib.Dict)
+
+		// Check int value
+		intVal, found, err := dict.Get(starlarkLib.String("int"))
+		require.NoError(t, err)
+		require.True(t, found)
+		expectedInt := starlarkLib.MakeInt(42)
+		require.Equal(t, expectedInt, intVal)
+
+		// Check string value
+		strVal, found, err := dict.Get(starlarkLib.String("str"))
+		require.NoError(t, err)
+		require.True(t, found)
+		expectedStr := starlarkLib.String("hello")
+		require.Equal(t, expectedStr, strVal)
+
+		// Check nested dict
+		nestedVal, found, err := dict.Get(starlarkLib.String("nested"))
+		require.NoError(t, err)
+		require.True(t, found)
+		nestedDict := nestedVal.(*starlarkLib.Dict)
+
+		keyVal, found, err := nestedDict.Get(starlarkLib.String("key"))
+		require.NoError(t, err)
+		require.True(t, found)
+		expectedKeyVal := starlarkLib.String("value")
+		require.Equal(t, expectedKeyVal, keyVal)
 	})
 }
