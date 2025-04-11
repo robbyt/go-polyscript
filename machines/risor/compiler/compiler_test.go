@@ -40,7 +40,7 @@ func (m *mockScriptReaderCloser) Close() error {
 	return args.Error(0)
 }
 
-func TestNewCompiler(t *testing.T) {
+func TestNew(t *testing.T) {
 	t.Parallel()
 
 	t.Run("basic creation", func(t *testing.T) {

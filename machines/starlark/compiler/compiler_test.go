@@ -51,7 +51,7 @@ func (m *mockErrorReader) Close() error {
 	return nil
 }
 
-func TestNewCompiler(t *testing.T) {
+func TestNew(t *testing.T) {
 	t.Parallel()
 
 	t.Run("basic creation", func(t *testing.T) {
