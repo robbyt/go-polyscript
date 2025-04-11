@@ -71,6 +71,11 @@ func NewEvaluator(
 	ldr loader.Loader,
 	dataProvider data.Provider,
 ) (*evaluator.BytecodeEvaluator, error) {
+	// Validate provider is not nil
+	if dataProvider == nil {
+		return nil, fmt.Errorf("provider is nil")
+	}
+
 	// Create compiler with the context global option
 	compiler, err := NewCompiler(compiler.WithCtxGlobal())
 	if err != nil {

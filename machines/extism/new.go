@@ -78,6 +78,11 @@ func NewEvaluator(
 	dataProvider data.Provider,
 	entryPoint string,
 ) (*evaluator.BytecodeEvaluator, error) {
+	// Validate provider is not nil
+	if dataProvider == nil {
+		return nil, fmt.Errorf("provider is nil")
+	}
+
 	// Create compiler with the entry point option
 	compiler, err := NewCompiler(compiler.WithEntryPoint(entryPoint))
 	if err != nil {
