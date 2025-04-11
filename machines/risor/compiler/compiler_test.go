@@ -44,7 +44,7 @@ func TestNewCompiler(t *testing.T) {
 	t.Parallel()
 
 	t.Run("basic creation", func(t *testing.T) {
-		comp, err := NewCompiler(
+		comp, err := New(
 			WithLogHandler(slog.NewTextHandler(os.Stdout, nil)),
 		)
 		require.NoError(t, err)
@@ -54,7 +54,7 @@ func TestNewCompiler(t *testing.T) {
 
 	t.Run("with globals", func(t *testing.T) {
 		globals := []string{"request", "response"}
-		comp, err := NewCompiler(
+		comp, err := New(
 			WithLogHandler(slog.NewTextHandler(os.Stdout, nil)),
 			WithGlobals(globals),
 		)
@@ -66,13 +66,13 @@ func TestNewCompiler(t *testing.T) {
 		var buf bytes.Buffer
 		handler := slog.NewTextHandler(&buf, nil)
 		logger := slog.New(handler)
-		comp, err := NewCompiler(WithLogger(logger))
+		comp, err := New(WithLogger(logger))
 		require.NoError(t, err)
 		require.NotNil(t, comp)
 	})
 
 	t.Run("defaults", func(t *testing.T) {
-		comp, err := NewCompiler()
+		comp, err := New()
 		require.NoError(t, err)
 		require.NotNil(t, comp)
 	})
@@ -131,7 +131,7 @@ main()
 		for _, tt := range successTests {
 			t.Run(tt.name, func(t *testing.T) {
 				// Create compiler with options
-				comp, err := NewCompiler(
+				comp, err := New(
 					WithLogHandler(slog.NewTextHandler(os.Stdout, nil)),
 					WithGlobals(tt.globals),
 				)
@@ -204,7 +204,7 @@ main()
 		for _, tt := range errorTests {
 			t.Run(tt.name, func(t *testing.T) {
 				// Create compiler with options
-				comp, err := NewCompiler(
+				comp, err := New(
 					WithLogHandler(slog.NewTextHandler(os.Stdout, nil)),
 					WithGlobals(tt.globals),
 				)
@@ -231,7 +231,7 @@ main()
 		}
 
 		t.Run("nil reader", func(t *testing.T) {
-			comp, err := NewCompiler(WithLogHandler(slog.NewTextHandler(os.Stdout, nil)))
+			comp, err := New(WithLogHandler(slog.NewTextHandler(os.Stdout, nil)))
 			require.NoError(t, err)
 			require.NotNil(t, comp, "Expected compiler to be non-nil")
 
@@ -242,7 +242,7 @@ main()
 		})
 
 		t.Run("io error", func(t *testing.T) {
-			comp, err := NewCompiler(
+			comp, err := New(
 				WithLogHandler(slog.NewTextHandler(os.Stdout, nil)),
 				WithGlobals([]string{"ctx"}),
 			)
@@ -263,7 +263,7 @@ main()
 		})
 
 		t.Run("close error", func(t *testing.T) {
-			comp, err := NewCompiler(
+			comp, err := New(
 				WithLogHandler(slog.NewTextHandler(os.Stdout, nil)),
 			)
 			require.NoError(t, err)
@@ -286,7 +286,7 @@ main()
 	})
 
 	t.Run("direct bytecode compilation", func(t *testing.T) {
-		comp, err := NewCompiler(
+		comp, err := New(
 			WithLogHandler(slog.NewTextHandler(os.Stdout, nil)),
 			WithGlobals([]string{"ctx"}),
 		)
@@ -316,7 +316,7 @@ func TestCompilerOptions(t *testing.T) {
 	t.Run("WithLogHandler option", func(t *testing.T) {
 		// Create a custom handler
 		handler := slog.NewTextHandler(os.Stdout, nil)
-		comp, err := NewCompiler(WithLogHandler(handler))
+		comp, err := New(WithLogHandler(handler))
 		require.NoError(t, err)
 		require.NotNil(t, comp)
 		require.Equal(t, "risor.Compiler", comp.String())
@@ -327,7 +327,7 @@ func TestCompilerOptions(t *testing.T) {
 		var buf bytes.Buffer
 		handler := slog.NewTextHandler(&buf, nil)
 		logger := slog.New(handler)
-		comp, err := NewCompiler(WithLogger(logger))
+		comp, err := New(WithLogger(logger))
 		require.NoError(t, err)
 		require.NotNil(t, comp)
 		require.Equal(t, "risor.Compiler", comp.String())
@@ -335,7 +335,7 @@ func TestCompilerOptions(t *testing.T) {
 
 	t.Run("WithGlobals option", func(t *testing.T) {
 		globals := []string{"request", "response"}
-		comp, err := NewCompiler(
+		comp, err := New(
 			WithLogHandler(slog.NewTextHandler(os.Stdout, nil)),
 			WithGlobals(globals),
 		)
@@ -356,7 +356,7 @@ func TestCompilerOptions(t *testing.T) {
 
 	t.Run("Default options", func(t *testing.T) {
 		// Test with no explicit options
-		comp, err := NewCompiler()
+		comp, err := New()
 		require.NoError(t, err)
 		require.NotNil(t, comp)
 
@@ -374,12 +374,12 @@ func TestCompilerOptions(t *testing.T) {
 
 	t.Run("Option error handling", func(t *testing.T) {
 		// Test with nil logger
-		_, err := NewCompiler(WithLogger(nil))
+		_, err := New(WithLogger(nil))
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "logger cannot be nil")
 
 		// Test with nil handler
-		_, err = NewCompiler(WithLogHandler(nil))
+		_, err = New(WithLogHandler(nil))
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "log handler cannot be nil")
 	})
@@ -387,7 +387,7 @@ func TestCompilerOptions(t *testing.T) {
 
 func TestCompileError(t *testing.T) {
 	// Test that the compiler returns the correct error when the script is nil
-	comp, err := NewCompiler(WithLogHandler(slog.NewTextHandler(os.Stdout, nil)))
+	comp, err := New(WithLogHandler(slog.NewTextHandler(os.Stdout, nil)))
 	require.NoError(t, err)
 	require.NotNil(t, comp, "Expected compiler to be non-nil")
 
@@ -399,7 +399,7 @@ func TestCompileError(t *testing.T) {
 }
 
 func TestCompileWithBytecode(t *testing.T) {
-	comp, err := NewCompiler(
+	comp, err := New(
 		WithLogHandler(slog.NewTextHandler(os.Stdout, nil)),
 		WithGlobals([]string{"ctx"}),
 	)
@@ -423,7 +423,7 @@ func TestCompileWithBytecode(t *testing.T) {
 
 func TestCompileIOError(t *testing.T) {
 	// Test that we return the correct error when there's an IO error
-	comp, err := NewCompiler(
+	comp, err := New(
 		WithLogHandler(slog.NewTextHandler(os.Stdout, nil)),
 		WithGlobals([]string{"ctx"}),
 	)
@@ -445,7 +445,7 @@ func TestCompileIOError(t *testing.T) {
 
 func TestCompileCloseError(t *testing.T) {
 	// Test that we return the correct error when there's an error closing the reader
-	comp, err := NewCompiler(
+	comp, err := New(
 		WithLogHandler(slog.NewTextHandler(os.Stdout, nil)),
 	)
 	require.NoError(t, err)
@@ -479,7 +479,7 @@ func (m *mockErrorReader) Close() error {
 
 // Test compiler string representation
 func TestCompilerString(t *testing.T) {
-	comp, err := NewCompiler(WithLogHandler(slog.NewTextHandler(os.Stdout, nil)))
+	comp, err := New(WithLogHandler(slog.NewTextHandler(os.Stdout, nil)))
 	require.NoError(t, err)
 	require.NotNil(t, comp, "Expected compiler to be non-nil")
 	require.Equal(t, "risor.Compiler", comp.String(), "Expected compiler name to be risor.Compiler")

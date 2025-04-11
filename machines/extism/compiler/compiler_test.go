@@ -27,7 +27,7 @@ func readTestWasm(t *testing.T) []byte {
 func createTestCompiler(t *testing.T, entryPoint string) *Compiler {
 	t.Helper()
 
-	comp, err := NewCompiler(
+	comp, err := New(
 		WithEntryPoint(entryPoint),
 		WithLogHandler(slog.NewTextHandler(io.Discard, nil)),
 	)
@@ -68,7 +68,7 @@ func TestNewCompiler(t *testing.T) {
 	t.Parallel()
 
 	t.Run("basic creation", func(t *testing.T) {
-		comp, err := NewCompiler(
+		comp, err := New(
 			WithEntryPoint("main"),
 			WithLogHandler(slog.NewTextHandler(io.Discard, nil)),
 		)
@@ -82,7 +82,7 @@ func TestNewCompiler(t *testing.T) {
 	})
 
 	t.Run("with entry point", func(t *testing.T) {
-		comp, err := NewCompiler(
+		comp, err := New(
 			WithEntryPoint("custom_function"),
 			WithLogHandler(slog.NewTextHandler(io.Discard, nil)),
 		)
@@ -91,7 +91,7 @@ func TestNewCompiler(t *testing.T) {
 	})
 
 	t.Run("with custom runtime config", func(t *testing.T) {
-		comp, err := NewCompiler(
+		comp, err := New(
 			WithEntryPoint("main"),
 			WithLogHandler(slog.NewTextHandler(io.Discard, nil)),
 			WithRuntimeConfig(wazero.NewRuntimeConfig()),
@@ -103,7 +103,7 @@ func TestNewCompiler(t *testing.T) {
 	t.Run("with custom logger", func(t *testing.T) {
 		handler := slog.NewTextHandler(io.Discard, nil)
 		logger := slog.New(handler)
-		comp, err := NewCompiler(
+		comp, err := New(
 			WithEntryPoint("main"),
 			WithLogger(logger),
 		)
@@ -200,7 +200,7 @@ func TestCompiler_Compile(t *testing.T) {
 			wasmBytes := readTestWasm(t)
 			entryPoint := "greet"
 
-			comp, err := NewCompiler(
+			comp, err := New(
 				WithEntryPoint(entryPoint),
 				WithLogHandler(slog.NewTextHandler(io.Discard, nil)),
 				WithRuntimeConfig(wazero.NewRuntimeConfig()),
@@ -227,7 +227,7 @@ func TestCompiler_Compile(t *testing.T) {
 
 	t.Run("error cases", func(t *testing.T) {
 		t.Run("nil content", func(t *testing.T) {
-			comp, err := NewCompiler(
+			comp, err := New(
 				WithEntryPoint("main"),
 				WithLogHandler(slog.NewTextHandler(io.Discard, nil)),
 			)
@@ -241,7 +241,7 @@ func TestCompiler_Compile(t *testing.T) {
 		})
 
 		t.Run("empty content", func(t *testing.T) {
-			comp, err := NewCompiler(
+			comp, err := New(
 				WithEntryPoint("main"),
 				WithLogHandler(slog.NewTextHandler(io.Discard, nil)),
 			)
@@ -260,7 +260,7 @@ func TestCompiler_Compile(t *testing.T) {
 		})
 
 		t.Run("invalid wasm binary", func(t *testing.T) {
-			comp, err := NewCompiler(
+			comp, err := New(
 				WithEntryPoint("main"),
 				WithLogHandler(slog.NewTextHandler(io.Discard, nil)),
 			)
@@ -280,7 +280,7 @@ func TestCompiler_Compile(t *testing.T) {
 
 		t.Run("missing function", func(t *testing.T) {
 			wasmBytes := readTestWasm(t)
-			comp, err := NewCompiler(
+			comp, err := New(
 				WithEntryPoint("nonexistent_function"),
 				WithLogHandler(slog.NewTextHandler(io.Discard, nil)),
 			)

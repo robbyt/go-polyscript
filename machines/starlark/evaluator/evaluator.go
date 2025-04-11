@@ -16,8 +16,8 @@ import (
 	starlarkLib "go.starlark.net/starlark"
 )
 
-// BytecodeEvaluator is an abstraction layer for evaluating code on the Starlark VM
-type BytecodeEvaluator struct {
+// Evaluator is an abstraction layer for evaluating code on the Starlark VM
+type Evaluator struct {
 	// universe is the global variable map for the Starlark VM
 	universe starlarkLib.StringDict
 
@@ -28,12 +28,12 @@ type BytecodeEvaluator struct {
 	logger     *slog.Logger
 }
 
-// NewBytecodeEvaluator creates a new BytecodeEvaluator object
-func NewBytecodeEvaluator(
+// New creates a new Evaluator object
+func New(
 	handler slog.Handler,
 	execUnit *script.ExecutableUnit,
-) *BytecodeEvaluator {
-	handler, logger := helpers.SetupLogger(handler, "starlark", "BytecodeEvaluator")
+) *Evaluator {
+	handler, logger := helpers.SetupLogger(handler, "starlark", "Evaluator")
 
 	// Get universe with standard modules
 	universe := internal.StarlarkModules()
@@ -42,7 +42,7 @@ func NewBytecodeEvaluator(
 	universe[constants.Ctx] = starlarkLib.None
 	universe[string(constants.EvalData)] = starlarkLib.None
 
-	return &BytecodeEvaluator{
+	return &Evaluator{
 		universe:   universe,
 		execUnit:   execUnit,
 		logHandler: handler,
@@ -50,13 +50,13 @@ func NewBytecodeEvaluator(
 	}
 }
 
-func (be *BytecodeEvaluator) String() string {
-	return "starlark.BytecodeEvaluator"
+func (be *Evaluator) String() string {
+	return "starlark.Evaluator"
 }
 
 // loadInputData retrieves input data using the data provider in the executable unit.
 // Returns a map that will be used as input for the Starlark VM.
-func (be *BytecodeEvaluator) loadInputData(ctx context.Context) (map[string]any, error) {
+func (be *Evaluator) loadInputData(ctx context.Context) (map[string]any, error) {
 	logger := be.logger.WithGroup("loadInputData")
 
 	// If no executable unit or data provider, return empty map
@@ -80,7 +80,7 @@ func (be *BytecodeEvaluator) loadInputData(ctx context.Context) (map[string]any,
 }
 
 // prepareGlobals merges the universe and input globals into a single Starlark dictionary
-func (be *BytecodeEvaluator) prepareGlobals(
+func (be *Evaluator) prepareGlobals(
 	inputGlobals starlarkLib.StringDict,
 ) starlarkLib.StringDict {
 	// Pre-allocate with exact capacity needed
@@ -96,7 +96,7 @@ func (be *BytecodeEvaluator) prepareGlobals(
 }
 
 // exec executes the bytecode with the provided globals
-func (be *BytecodeEvaluator) exec(
+func (be *Evaluator) exec(
 	ctx context.Context,
 	prog *starlarkLib.Program,
 	globals starlarkLib.StringDict,
@@ -147,7 +147,7 @@ func (be *BytecodeEvaluator) exec(
 }
 
 // Eval evaluates the loaded bytecode and passes the provided data into the Starlark VM
-func (be *BytecodeEvaluator) Eval(ctx context.Context) (engine.EvaluatorResponse, error) {
+func (be *Evaluator) Eval(ctx context.Context) (engine.EvaluatorResponse, error) {
 	logger := be.logger.WithGroup("Eval")
 	if be.execUnit == nil {
 		return nil, fmt.Errorf("executable unit is nil")
@@ -228,7 +228,7 @@ func (be *BytecodeEvaluator) Eval(ctx context.Context) (engine.EvaluatorResponse
 // PrepareContext implements the EvalDataPreparer interface for Starlark scripts.
 // It enriches the provided context with data for script evaluation, using the
 // ExecutableUnit's DataProvider to store the data.
-func (be *BytecodeEvaluator) PrepareContext(
+func (be *Evaluator) PrepareContext(
 	ctx context.Context,
 	d ...any,
 ) (context.Context, error) {

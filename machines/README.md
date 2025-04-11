@@ -32,7 +32,7 @@ This package contains virtual machine implementations for executing scripts in v
 
 4. **Data Preparation Stage**
    - This phase is optional, and must happen prior to evaluation when runtime input data is used
-   - The `BytecodeEvaluator` implements the `engine.EvaluatorWithPrep` interface, which has a `PrepareContext` method
+   - The `Evaluator` implements the `engine.EvaluatorWithPrep` interface, which has a `PrepareContext` method
    - The `PrepareContext` method takes a `context.Context` and a variadic list of `any`
    - `PrepareContext` calls the `data.Provider` to convert and store the data, somewhere accessible to the Evaluator
    - The conversion is fairly opinionated, and handled by the `data.Provider`

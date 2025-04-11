@@ -623,7 +623,7 @@ func TestCompilerOptions(t *testing.T) {
 
 	t.Run("Logger", func(t *testing.T) {
 		t.Run("default initialization", func(t *testing.T) {
-			c, err := NewCompiler()
+			c, err := New()
 			require.NoError(t, err)
 			require.NotNil(t, c.logHandler, "logHandler should be initialized")
 			require.NotNil(t, c.logger, "logger should be initialized")
@@ -633,7 +633,7 @@ func TestCompilerOptions(t *testing.T) {
 			var buf bytes.Buffer
 			customHandler := slog.NewTextHandler(&buf, nil)
 
-			c, err := NewCompiler(WithLogHandler(customHandler))
+			c, err := New(WithLogHandler(customHandler))
 			require.NoError(t, err)
 
 			require.Equal(t, customHandler, c.logHandler, "custom handler should be set")
@@ -648,7 +648,7 @@ func TestCompilerOptions(t *testing.T) {
 			customHandler := slog.NewTextHandler(&buf, nil)
 			customLogger := slog.New(customHandler)
 
-			c, err := NewCompiler(WithLogger(customLogger))
+			c, err := New(WithLogger(customLogger))
 			require.NoError(t, err)
 
 			require.Equal(t, customLogger, c.logger, "custom logger should be set")
@@ -664,7 +664,7 @@ func TestCompilerOptions(t *testing.T) {
 			customLogger := slog.New(slog.NewTextHandler(&loggerBuf, nil))
 
 			t.Run("handler then logger", func(t *testing.T) {
-				c1, err := NewCompiler(
+				c1, err := New(
 					WithLogHandler(customHandler),
 					WithLogger(customLogger),
 				)
@@ -685,7 +685,7 @@ func TestCompilerOptions(t *testing.T) {
 			loggerBuf.Reset()
 
 			t.Run("logger then handler", func(t *testing.T) {
-				c2, err := NewCompiler(
+				c2, err := New(
 					WithLogger(customLogger),
 					WithLogHandler(customHandler),
 				)

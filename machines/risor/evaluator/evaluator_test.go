@@ -82,7 +82,7 @@ func createTestExecutable(
 	globals []string,
 	provider data.Provider,
 ) (*script.ExecutableUnit, error) {
-	c, err := compiler.NewCompiler(
+	c, err := compiler.New(
 		compiler.WithLogHandler(handler),
 		compiler.WithGlobals(globals),
 	)
@@ -107,8 +107,8 @@ func createTestExecutable(
 	}, nil
 }
 
-// TestBytecodeEvaluator_Evaluate tests evaluating Risor scripts
-func TestBytecodeEvaluator_Evaluate(t *testing.T) {
+// TestEvaluator_Evaluate tests evaluating Risor scripts
+func TestEvaluator_Evaluate(t *testing.T) {
 	t.Parallel()
 
 	// Define a test script that handles HTTP requests
@@ -183,7 +183,7 @@ func TestBytecodeEvaluator_Evaluate(t *testing.T) {
 				// Create executable unit and evaluator
 				exe, err := createTestExecutable(handler, ld, []string{constants.Ctx}, ctxProvider)
 				require.NoError(t, err)
-				evaluator := NewBytecodeEvaluator(handler, exe)
+				evaluator := New(handler, exe)
 				require.NotNil(t, evaluator)
 
 				// Create the request data
@@ -280,7 +280,7 @@ func TestBytecodeEvaluator_Evaluate(t *testing.T) {
 				handler := slog.NewTextHandler(os.Stderr, nil)
 				exe := tt.setupExe()
 
-				evaluator := &BytecodeEvaluator{
+				evaluator := &Evaluator{
 					ctxKey:     constants.Ctx,
 					execUnit:   exe,
 					logHandler: handler,
@@ -377,7 +377,7 @@ func TestBytecodeEvaluator_Evaluate(t *testing.T) {
 				exe := tt.setupExe()
 				ctx := tt.setupCtx()
 
-				evaluator := &BytecodeEvaluator{
+				evaluator := &Evaluator{
 					ctxKey:     constants.Ctx,
 					execUnit:   exe,
 					logHandler: handler,
@@ -414,8 +414,8 @@ func TestBytecodeEvaluator_Evaluate(t *testing.T) {
 	t.Run("metadata tests", func(t *testing.T) {
 		// Test String method
 		t.Run("String method", func(t *testing.T) {
-			evaluator := &BytecodeEvaluator{}
-			require.Equal(t, "risor.BytecodeEvaluator", evaluator.String())
+			evaluator := &Evaluator{}
+			require.Equal(t, "risor.Evaluator", evaluator.String())
 		})
 
 		// Test constructor with various options
@@ -440,7 +440,7 @@ func TestBytecodeEvaluator_Evaluate(t *testing.T) {
 			for _, tt := range tests {
 				t.Run(tt.name, func(t *testing.T) {
 					exe := &script.ExecutableUnit{}
-					evaluator := NewBytecodeEvaluator(tt.handler, exe)
+					evaluator := New(tt.handler, exe)
 
 					require.NotNil(t, evaluator)
 					require.Equal(t, constants.Ctx, evaluator.ctxKey)
@@ -456,8 +456,8 @@ func TestBytecodeEvaluator_Evaluate(t *testing.T) {
 	})
 }
 
-// TestBytecodeEvaluator_PrepareContext tests the PrepareContext method with various scenarios
-func TestBytecodeEvaluator_PrepareContext(t *testing.T) {
+// TestEvaluator_PrepareContext tests the PrepareContext method with various scenarios
+func TestEvaluator_PrepareContext(t *testing.T) {
 	t.Parallel()
 
 	// The test cases
@@ -531,7 +531,7 @@ func TestBytecodeEvaluator_PrepareContext(t *testing.T) {
 			handler := slog.NewTextHandler(os.Stderr, nil)
 			exe := tt.setupExe(t)
 
-			evaluator := &BytecodeEvaluator{
+			evaluator := &Evaluator{
 				ctxKey:     constants.Ctx,
 				execUnit:   exe,
 				logHandler: handler,

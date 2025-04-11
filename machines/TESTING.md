@@ -21,8 +21,8 @@ Use these consistent naming patterns:
 | Compilation | `TestCompiler_Compile` |
 | Options | `TestCompilerOptions` or `TestCompilerOptionsDetailed` |
 | Executables | `TestExecutable` |
-| Evaluator execution | `TestBytecodeEvaluator_Evaluate` |
-| Context preparation | `TestBytecodeEvaluator_PrepareContext` |
+| Evaluator execution | `TestEvaluator_Evaluate` |
+| Context preparation | `TestEvaluator_PrepareContext` |
 | Response handling | `TestResponseMethods` |
 | Type conversion | `TestToGoType`/`TestToMachineType` |
 

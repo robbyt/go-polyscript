@@ -20,8 +20,8 @@ type Compiler struct {
 	logger         *slog.Logger
 }
 
-// NewCompiler creates a new Extism WASM Compiler instance with the provided options.
-func NewCompiler(opts ...FunctionalOption) (*Compiler, error) {
+// New creates a new Extism WASM Compiler instance with the provided options.
+func New(opts ...FunctionalOption) (*Compiler, error) {
 	// Initialize the compiler with an empty struct
 	c := &Compiler{}
 
