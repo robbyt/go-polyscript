@@ -8,10 +8,6 @@ import (
 	"os"
 
 	"github.com/robbyt/go-polyscript"
-	"github.com/robbyt/go-polyscript/engine/options"
-	"github.com/robbyt/go-polyscript/execution/constants"
-	"github.com/robbyt/go-polyscript/execution/data"
-	"github.com/robbyt/go-polyscript/machines/starlark/compiler"
 )
 
 //go:embed testdata/script.star
@@ -24,22 +20,16 @@ func runStarlarkExample(handler slog.Handler) (map[string]any, error) {
 	}
 	logger := slog.New(handler)
 
-	// Define globals that will be available to the script
-	globals := []string{constants.Ctx}
-
 	// Create input data
 	input := map[string]any{
 		"name": "World",
 	}
-	dataProvider := data.NewStaticProvider(input)
 
-	// Create evaluator using the functional options pattern
-	evaluator, err := polyscript.FromStarlarkString(
+	// Create evaluator using the new simplified interface
+	evaluator, err := polyscript.FromStarlarkStringWithData(
 		starlarkScript,
-		options.WithDefaults(),
-		options.WithLogHandler(handler),
-		options.WithDataProvider(dataProvider),
-		compiler.WithGlobals(globals),
+		input,
+		handler,
 	)
 	if err != nil {
 		logger.Error("Failed to create evaluator", "error", err)

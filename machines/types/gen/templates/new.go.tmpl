@@ -10,10 +10,10 @@ import (
 	"github.com/robbyt/go-polyscript/engine"
 	"github.com/robbyt/go-polyscript/execution/script"
 {{- range .Types}}
-	{{.Value}}Machine "github.com/robbyt/go-polyscript/machines/{{.Value}}"
+	{{.Value}}Evaluator "github.com/robbyt/go-polyscript/machines/{{.Value}}/evaluator"
 	{{.Value}}Compiler "github.com/robbyt/go-polyscript/machines/{{.Value}}/compiler"
 {{- end}}
-	
+
 	machineTypes "github.com/robbyt/go-polyscript/machines/types"
 )
 
@@ -29,7 +29,7 @@ func NewEvaluator(handler slog.Handler, ver *script.ExecutableUnit) (engine.Eval
 	{{- range .Types}}
 	case machineTypes.{{.Name}}:
 		// {{.Description}}
-		return {{.Value}}Machine.NewBytecodeEvaluator(handler, ver), nil
+		return {{.Value}}Evaluator.NewBytecodeEvaluator(handler, ver), nil
 	{{- end}}
 	default:
 		return nil, fmt.Errorf("%w: %s", machineTypes.ErrInvalidMachineType, ver.GetMachineType())
@@ -59,22 +59,14 @@ func NewCompiler(opts ...any) (script.Compiler, error) {
 		}
 
 		if allMatch && len({{.Value}}Opts) > 0 {
-			return New{{.Name}}Compiler({{.Value}}Opts...)
+			compiler, err := {{.Value}}Compiler.NewCompiler({{.Value}}Opts...)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create {{.Name}} compiler: %w", err)
+			}
+			return compiler, nil
 		}
 	}
 	{{end}}
 
 	return nil, fmt.Errorf("unable to determine compiler type from provided options")
 }
-
-{{range .Types}}
-// New{{.Name}}Compiler creates a new {{.Name}} compiler using the functional options pattern.
-// See the {{.Value}}Machine package for available compiler options.
-func New{{.Name}}Compiler(opts ...{{.Value}}Compiler.FunctionalOption) (script.Compiler, error) {
-	compiler, err := {{.Value}}Machine.NewCompiler(opts...)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create {{.Name}} compiler: %w", err)
-	}
-	return compiler, nil
-}
-{{end}}

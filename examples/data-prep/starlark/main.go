@@ -12,10 +12,6 @@ import (
 
 	"github.com/robbyt/go-polyscript"
 	"github.com/robbyt/go-polyscript/engine"
-	"github.com/robbyt/go-polyscript/engine/options"
-	"github.com/robbyt/go-polyscript/execution/constants"
-	"github.com/robbyt/go-polyscript/execution/data"
-	"github.com/robbyt/go-polyscript/machines/starlark/compiler"
 )
 
 // StarlarkEvaluator is a type alias to make testing cleaner
@@ -25,31 +21,18 @@ type StarlarkEvaluator = engine.EvaluatorWithPrep
 var starlarkScript string
 
 // createStarlarkEvaluator creates a new Starlark evaluator with the given script and logger.
-// Sets up a CompositeProvider that combines static and dynamic data providers.
+// Uses the simplified interface that automatically sets up static and dynamic data providers.
 func createStarlarkEvaluator(
 	logger *slog.Logger,
 	scriptContent string,
 	staticData map[string]any,
 ) (StarlarkEvaluator, error) {
-	// Define globals that will be available to the script
-	globals := []string{constants.Ctx}
-
-	// the static provider enables access to the static data map
-	staticProvider := data.NewStaticProvider(staticData)
-
-	// this context provider enables each request to add different dynamic data
-	dynamicProvider := data.NewContextProvider(constants.EvalData)
-
-	// Composite provider handles static data first, then dynamic data
-	compositeProvider := data.NewCompositeProvider(staticProvider, dynamicProvider)
-
-	// Create evaluator using the functional options pattern
-	return polyscript.FromStarlarkString(
+	// Create evaluator using the new simplified interface
+	// This automatically sets up a composite provider with both static and dynamic data
+	return polyscript.FromStarlarkStringWithData(
 		scriptContent,
-		options.WithDefaults(),
-		options.WithLogHandler(logger.Handler()),
-		options.WithDataProvider(compositeProvider),
-		compiler.WithGlobals(globals),
+		staticData,
+		logger.Handler(),
 	)
 }
 

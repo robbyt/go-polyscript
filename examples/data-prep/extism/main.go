@@ -11,39 +11,14 @@ import (
 
 	"github.com/robbyt/go-polyscript"
 	"github.com/robbyt/go-polyscript/engine"
-	"github.com/robbyt/go-polyscript/engine/options"
-	"github.com/robbyt/go-polyscript/execution/constants"
-	"github.com/robbyt/go-polyscript/execution/data"
-	"github.com/robbyt/go-polyscript/machines/extism/compiler"
 )
 
 // ExtismEvaluator is a type alias to make testing cleaner
 type ExtismEvaluator = engine.EvaluatorWithPrep
 
-// createExtismEvaluator creates a new Extism evaluator with the given WASM file and logger.
-// Sets up a CompositeProvider that combines static and dynamic data providers.
-func createExtismEvaluator(
-	logger *slog.Logger,
-	wasmFilePath string,
-	staticData map[string]any,
-) (ExtismEvaluator, error) {
-	// The static provider enables access to the static data map
-	staticProvider := data.NewStaticProvider(staticData)
-
-	// This context provider enables each request to add different dynamic data
-	dynamicProvider := data.NewContextProvider(constants.EvalData)
-
-	// Composite provider handles static data first, then dynamic data
-	compositeProvider := data.NewCompositeProvider(staticProvider, dynamicProvider)
-
-	// Create evaluator using the functional options pattern
-	return polyscript.FromExtismFile(
-		wasmFilePath,
-		options.WithLogHandler(logger.Handler()),
-		options.WithDataProvider(compositeProvider),
-		compiler.WithEntryPoint("greet"),
-	)
-}
+const (
+	EntryPointFuncName = "greet" // Entry point in the WASM module
+)
 
 // prepareRuntimeData adds dynamic runtime data to the context.
 // Returns the enriched context or an error.
@@ -198,7 +173,12 @@ func run() error {
 	}
 
 	// Create evaluator with static and dynamic data providers
-	evaluator, err := createExtismEvaluator(logger, wasmFilePath, staticData)
+	evaluator, err := polyscript.FromExtismFileWithData(
+		wasmFilePath,
+		staticData,
+		logger.Handler(),
+		EntryPointFuncName,
+	)
 	if err != nil {
 		return fmt.Errorf("failed to create evaluator: %w", err)
 	}

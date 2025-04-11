@@ -6,6 +6,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/robbyt/go-polyscript"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -46,7 +47,12 @@ func TestDemonstrateDataPrepAndEval(t *testing.T) {
 	staticData := getTestStaticData()
 
 	// Create evaluator
-	evaluator, err := createExtismEvaluator(logger, wasmFilePath, staticData)
+	evaluator, err := polyscript.FromExtismFileWithData(
+		wasmFilePath,
+		staticData,
+		logger.Handler(),
+		EntryPointFuncName,
+	)
 	if err != nil {
 		t.Errorf("Failed to create evaluator: %v", err)
 		return
@@ -77,7 +83,12 @@ func TestPrepareRuntimeData(t *testing.T) {
 	staticData := getTestStaticData()
 
 	// Create evaluator
-	evaluator, err := createExtismEvaluator(logger, wasmFilePath, staticData)
+	evaluator, err := polyscript.FromExtismFileWithData(
+		wasmFilePath,
+		staticData,
+		logger.Handler(),
+		EntryPointFuncName,
+	)
 	require.NoError(t, err, "Failed to create evaluator")
 	require.NotNil(t, evaluator, "Evaluator should not be nil")
 
@@ -106,7 +117,12 @@ func TestEvalAndExtractResult(t *testing.T) {
 	staticData := getTestStaticData()
 
 	// Create evaluator
-	evaluator, err := createExtismEvaluator(logger, wasmFilePath, staticData)
+	evaluator, err := polyscript.FromExtismFileWithData(
+		wasmFilePath,
+		staticData,
+		logger.Handler(),
+		EntryPointFuncName,
+	)
 	require.NoError(t, err, "Failed to create evaluator")
 	require.NotNil(t, evaluator, "Evaluator should not be nil")
 
@@ -121,7 +137,7 @@ func TestEvalAndExtractResult(t *testing.T) {
 	assert.NotNil(t, result, "Result should not be nil")
 }
 
-func TestCreateExtismEvaluator(t *testing.T) {
+func TestFromExtismFileWithData(t *testing.T) {
 	// Create a test logger
 	handler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
 		Level: slog.LevelInfo,
@@ -138,8 +154,13 @@ func TestCreateExtismEvaluator(t *testing.T) {
 	// Get static test data
 	staticData := getTestStaticData()
 
-	// Test createExtismEvaluator function
-	evaluator, err := createExtismEvaluator(logger, wasmFilePath, staticData)
+	// Test FromExtismFileWithData function
+	evaluator, err := polyscript.FromExtismFileWithData(
+		wasmFilePath,
+		staticData,
+		logger.Handler(),
+		EntryPointFuncName,
+	)
 	assert.NoError(t, err, "Should create evaluator without error")
 	assert.NotNil(t, evaluator, "Evaluator should not be nil")
 }

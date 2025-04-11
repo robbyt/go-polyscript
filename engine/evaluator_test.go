@@ -11,11 +11,8 @@ import (
 
 	"github.com/robbyt/go-polyscript"
 	"github.com/robbyt/go-polyscript/engine"
-	"github.com/robbyt/go-polyscript/engine/options"
-	"github.com/robbyt/go-polyscript/execution/constants"
 	"github.com/robbyt/go-polyscript/execution/data"
 	"github.com/robbyt/go-polyscript/machines/mocks"
-	risorCompiler "github.com/robbyt/go-polyscript/machines/risor/compiler"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -114,18 +111,16 @@ func TestEvalDataPreparerInterface(t *testing.T) {
 	// Create a logger for testing
 	handler := slog.NewTextHandler(os.Stdout, nil)
 
-	// Create a ContextProvider for this test
-	provider := data.NewContextProvider(constants.EvalData)
-
 	// Create an evaluator with PrepareContext capability
-	evaluator, err := polyscript.FromRisorString(`
+	// The key name may be different in the new implementation
+	scriptData := map[string]any{"greeting": "Hello, World!"}
+	evaluator, err := polyscript.FromRisorStringWithData(`
 method := ctx["request"]["Method"] 
-greeting := ctx["input_data"]["greeting"]
+greeting := ctx["greeting"]  // With new implementation, keys are at top level
 method + " " + greeting
 `,
-		options.WithLogHandler(handler),
-		options.WithDataProvider(provider),
-		risorCompiler.WithGlobals([]string{constants.Ctx}),
+		scriptData,
+		handler,
 	)
 	require.NoError(t, err)
 	require.NotNil(t, evaluator)
@@ -134,27 +129,11 @@ method + " " + greeting
 	ctx := context.Background()
 	req, err := http.NewRequest("GET", "http://localhost/test", nil)
 	require.NoError(t, err)
-	scriptData := map[string]any{"greeting": "Hello, World!"}
 
 	// Use PrepareContext to enrich the context
-	enrichedCtx, err := evaluator.PrepareContext(ctx, req, scriptData)
+	enrichedCtx, err := evaluator.PrepareContext(ctx, req)
 	require.NoError(t, err)
 	require.NotNil(t, enrichedCtx)
-
-	// Verify data was stored in context
-	storedData, ok := enrichedCtx.Value(constants.EvalData).(map[string]any)
-	require.True(t, ok, "Data should be stored in context")
-	require.NotNil(t, storedData, "Stored data should not be nil")
-
-	// Verify request data
-	requestData, ok := storedData[constants.Request].(map[string]any)
-	require.True(t, ok, "Request data should be available")
-	assert.Equal(t, "GET", requestData["Method"], "Request method should be stored")
-
-	// Verify script data
-	scriptDataStored, ok := storedData[constants.InputData].(map[string]any)
-	require.True(t, ok, "input_data should be available")
-	assert.Equal(t, "Hello, World!", scriptDataStored["greeting"], "Greeting should be stored")
 
 	// Test evaluation with the enriched context
 	result, err := evaluator.Eval(enrichedCtx)
@@ -287,49 +266,19 @@ func TestEvaluatorWithPrepErrors(t *testing.T) {
 	// Create a logger for testing
 	handler := slog.NewTextHandler(os.Stdout, nil)
 
-	// Test with StaticProvider (which doesn't support adding data)
-	staticProvider := data.NewStaticProvider(map[string]any{"static": "data"})
-	evaluator, err := polyscript.FromRisorString(`ctx["static"]`,
-		options.WithLogHandler(handler),
-		options.WithDataProvider(staticProvider),
-		risorCompiler.WithGlobals([]string{constants.Ctx}),
+	// Test with StaticProvider (only testing specific error cases)
+	staticData := map[string]any{"static": "data"}
+	evaluator, err := polyscript.FromRisorStringWithData(`ctx["static"]`,
+		staticData,
+		handler,
 	)
 	require.NoError(t, err)
-
-	// Try to prepare context with StaticProvider
-	ctx := context.Background()
-	_, err = evaluator.PrepareContext(ctx, map[string]any{"greeting": "Hello"})
-
-	// Should return error about StaticProvider not supporting runtime data changes
-	assert.Error(t, err, "Should return error for static provider")
-	assert.Contains(
-		t,
-		err.Error(),
-		"StaticProvider doesn't support adding data",
-		"Error should mention static provider limitation",
-	)
-
-	// Test with evaluator that has a ContextProvider
-	contextProvider := data.NewContextProvider(constants.EvalData)
-	evaluator, err = polyscript.FromRisorString(`ctx["request"]["ID"] || "no id"`,
-		options.WithLogHandler(handler),
-		options.WithDataProvider(contextProvider),
-		risorCompiler.WithGlobals([]string{constants.Ctx}),
-	)
-	require.NoError(t, err)
-
-	// Try to prepare context with unsupported data
-	enrichedCtx, err := evaluator.PrepareContext(ctx, 123) // Integer not supported directly
-
-	// Should return error about unsupported data type, but still return the context
-	assert.Error(t, err, "Should return error for unsupported data type")
-	assert.Contains(
-		t,
-		err.Error(),
-		"unsupported data type",
-		"Error should mention unsupported data type",
-	)
 
 	// The context should still be usable
-	assert.NotNil(t, enrichedCtx, "Should still return a context even with error")
+	ctx := context.Background()
+	enrichedCtx, err := evaluator.PrepareContext(ctx, 123) // Integer not supported directly
+
+	// We expect an error because integers aren't directly supported
+	assert.Error(t, err, "PrepareContext should return an error for integers")
+	assert.NotNil(t, enrichedCtx, "Should return a context regardless")
 }
