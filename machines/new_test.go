@@ -10,11 +10,8 @@ import (
 	"github.com/robbyt/go-polyscript/execution/data"
 	"github.com/robbyt/go-polyscript/execution/script"
 	_ "github.com/robbyt/go-polyscript/machines/extism"
-	extismCompiler "github.com/robbyt/go-polyscript/machines/extism/compiler"
 	_ "github.com/robbyt/go-polyscript/machines/risor"
-	risorCompiler "github.com/robbyt/go-polyscript/machines/risor/compiler"
 	_ "github.com/robbyt/go-polyscript/machines/starlark"
-	starlarkCompiler "github.com/robbyt/go-polyscript/machines/starlark/compiler"
 	machineTypes "github.com/robbyt/go-polyscript/machines/types"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -80,30 +77,6 @@ func TestNewEvaluator(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestNewRisorCompiler(t *testing.T) {
-	t.Run("success", func(t *testing.T) {
-		compiler, err := NewRisorCompiler(risorCompiler.WithLogHandler(slog.NewTextHandler(os.Stdout, nil)))
-		require.NoError(t, err)
-		require.NotNil(t, compiler)
-	})
-}
-
-func TestNewStarlarkCompiler(t *testing.T) {
-	t.Run("success", func(t *testing.T) {
-		compiler, err := NewStarlarkCompiler(starlarkCompiler.WithLogHandler(slog.NewTextHandler(os.Stdout, nil)))
-		require.NoError(t, err)
-		require.NotNil(t, compiler)
-	})
-}
-
-func TestNewExtismCompiler(t *testing.T) {
-	t.Run("success", func(t *testing.T) {
-		compiler, err := NewExtismCompiler(extismCompiler.WithLogHandler(slog.NewTextHandler(os.Stdout, nil)))
-		require.NoError(t, err)
-		require.NotNil(t, compiler)
-	})
 }
 
 type mockExecutableContent struct {

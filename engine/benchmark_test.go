@@ -31,11 +31,7 @@ import (
 	"testing"
 
 	"github.com/robbyt/go-polyscript"
-	"github.com/robbyt/go-polyscript/engine/options"
 	"github.com/robbyt/go-polyscript/execution/constants"
-	"github.com/robbyt/go-polyscript/execution/data"
-	risorCompiler "github.com/robbyt/go-polyscript/machines/risor/compiler"
-	starlarkCompiler "github.com/robbyt/go-polyscript/machines/starlark/compiler"
 )
 
 // quietHandler is a slog.Handler that discards all logs
@@ -63,15 +59,12 @@ func BenchmarkEvaluationPatterns(b *testing.B) {
 			inputData := map[string]any{
 				"name": "World",
 			}
-			dataProvider := data.NewStaticProvider(inputData)
 
 			// Create and evaluate in each iteration (simulating one-time use)
-			evaluator, err := polyscript.FromRisorString(
+			evaluator, err := polyscript.FromRisorStringWithData(
 				scriptContent,
-				options.WithDefaults(),
-				options.WithDataProvider(dataProvider),
-				options.WithLogHandler(quietHandler),
-				risorCompiler.WithGlobals([]string{constants.Ctx}),
+				inputData,
+				quietHandler,
 			)
 			if err != nil {
 				b.Fatalf("Failed to create evaluator: %v", err)
@@ -87,15 +80,13 @@ func BenchmarkEvaluationPatterns(b *testing.B) {
 
 	b.Run("CompileOnceRunMany", func(b *testing.B) {
 		// Create evaluator once, outside the loop
-		dataProvider := data.NewStaticProvider(map[string]any{
+		inputData := map[string]any{
 			"name": "World",
-		})
-		evaluator, err := polyscript.FromRisorString(
+		}
+		evaluator, err := polyscript.FromRisorStringWithData(
 			scriptContent,
-			options.WithDefaults(),
-			options.WithDataProvider(dataProvider),
-			options.WithLogHandler(quietHandler),
-			risorCompiler.WithGlobals([]string{constants.Ctx}),
+			inputData,
+			quietHandler,
 		)
 		if err != nil {
 			b.Fatalf("Failed to create evaluator: %v", err)
@@ -133,13 +124,11 @@ func BenchmarkDataProviders(b *testing.B) {
 	}
 
 	b.Run("StaticProvider", func(b *testing.B) {
-		dataProvider := data.NewStaticProvider(inputData)
-		evaluator, err := polyscript.FromRisorString(
+		// Using the *WithData version of the function which sets up a StaticProvider
+		evaluator, err := polyscript.FromRisorStringWithData(
 			scriptContent,
-			options.WithDefaults(),
-			options.WithDataProvider(dataProvider),
-			options.WithLogHandler(quietHandler),
-			risorCompiler.WithGlobals([]string{constants.Ctx}),
+			inputData,
+			quietHandler,
 		)
 		if err != nil {
 			b.Fatalf("Failed to create evaluator: %v", err)
@@ -155,13 +144,10 @@ func BenchmarkDataProviders(b *testing.B) {
 	})
 
 	b.Run("ContextProvider", func(b *testing.B) {
-		dataProvider := data.NewContextProvider(constants.EvalData)
+		// Using the standard version which uses a ContextProvider
 		evaluator, err := polyscript.FromRisorString(
 			scriptContent,
-			options.WithDefaults(),
-			options.WithDataProvider(dataProvider),
-			options.WithLogHandler(quietHandler),
-			risorCompiler.WithGlobals([]string{constants.Ctx}),
+			quietHandler,
 		)
 		if err != nil {
 			b.Fatalf("Failed to create evaluator: %v", err)
@@ -179,22 +165,23 @@ func BenchmarkDataProviders(b *testing.B) {
 	})
 
 	b.Run("CompositeProvider", func(b *testing.B) {
-		staticProvider := data.NewStaticProvider(map[string]any{"defaultKey": "value"})
-		contextProvider := data.NewContextProvider(constants.EvalData)
-		compositeProvider := data.NewCompositeProvider(contextProvider, staticProvider)
-
-		evaluator, err := polyscript.FromRisorString(
+		// For CompositeProvider use case, we can prepare the context separately
+		staticData := map[string]any{"defaultKey": "value"}
+		evaluator, err := polyscript.FromRisorStringWithData(
 			scriptContent,
-			options.WithDefaults(),
-			options.WithDataProvider(compositeProvider),
-			options.WithLogHandler(quietHandler),
-			risorCompiler.WithGlobals([]string{constants.Ctx}),
+			staticData, // Static part
+			quietHandler,
 		)
 		if err != nil {
 			b.Fatalf("Failed to create evaluator: %v", err)
 		}
 
-		ctx := context.WithValue(context.Background(), constants.EvalData, inputData)
+		ctx := context.Background()
+		// Use PrepareContext to add the dynamic part
+		ctx, err = evaluator.PrepareContext(ctx, inputData)
+		if err != nil {
+			b.Fatalf("Failed to prepare context: %v", err)
+		}
 
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
@@ -215,7 +202,6 @@ func BenchmarkVMComparison(b *testing.B) {
 	inputData := map[string]any{
 		"name": "World",
 	}
-	staticProvider := data.NewStaticProvider(inputData)
 
 	// Risor script
 	risorScript := `
@@ -240,12 +226,10 @@ message = "Hello, " + name + "!"
 	// which is more complex to set up in this benchmark template
 
 	b.Run("RisorVM", func(b *testing.B) {
-		evaluator, err := polyscript.FromRisorString(
+		evaluator, err := polyscript.FromRisorStringWithData(
 			risorScript,
-			options.WithDefaults(),
-			options.WithDataProvider(staticProvider),
-			options.WithLogHandler(quietHandler),
-			risorCompiler.WithGlobals([]string{constants.Ctx}),
+			inputData,
+			quietHandler,
 		)
 		if err != nil {
 			b.Fatalf("Failed to create Risor evaluator: %v", err)
@@ -261,12 +245,10 @@ message = "Hello, " + name + "!"
 	})
 
 	b.Run("StarlarkVM", func(b *testing.B) {
-		evaluator, err := polyscript.FromStarlarkString(
+		evaluator, err := polyscript.FromStarlarkStringWithData(
 			starlarkScript,
-			options.WithDefaults(),
-			options.WithDataProvider(staticProvider),
-			options.WithLogHandler(quietHandler),
-			starlarkCompiler.WithGlobals([]string{constants.Ctx}),
+			inputData,
+			quietHandler,
 		)
 		if err != nil {
 			b.Fatalf("Failed to create Starlark evaluator: %v", err)
