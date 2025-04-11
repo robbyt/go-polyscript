@@ -56,3 +56,4 @@ jobs:
             -Dsonar.test.inclusions=**/*_test.go
             -Dsonar.language=go
             -Dsonar.sourceEncoding=UTF-8
+            -Dsonar.cpd.exclusions=**/*

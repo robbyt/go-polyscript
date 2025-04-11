@@ -70,7 +70,7 @@ func TestFromExtismLoader(t *testing.T) {
 		// Verify
 		require.NoError(t, err)
 		require.NotNil(t, evaluator)
-		assert.Equal(t, "extism.BytecodeEvaluator", evaluator.String())
+		assert.Equal(t, "extism.Evaluator", evaluator.String())
 		mockLoader.AssertExpectations(t)
 	})
 
@@ -205,7 +205,7 @@ func TestNewEvaluator(t *testing.T) {
 		// Verify
 		require.NoError(t, err)
 		require.NotNil(t, evalInstance)
-		assert.Equal(t, "extism.BytecodeEvaluator", evalInstance.String())
+		assert.Equal(t, "extism.Evaluator", evalInstance.String())
 		mockLoader.AssertExpectations(t)
 	})
 
@@ -327,7 +327,7 @@ func TestDiskLoaderIntegration(t *testing.T) {
 		// Verify
 		require.NoError(t, err)
 		require.NotNil(t, evaluator)
-		assert.Equal(t, "extism.BytecodeEvaluator", evaluator.String())
+		assert.Equal(t, "extism.Evaluator", evaluator.String())
 
 		// Verify the disk loader has correct path
 		fileURL := diskLoader.GetSourceURL()

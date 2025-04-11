@@ -50,7 +50,7 @@ func TestFromStarlarkLoader(t *testing.T) {
 		// Verify
 		require.NoError(t, err)
 		require.NotNil(t, evalInstance)
-		assert.Equal(t, "starlark.BytecodeEvaluator", evalInstance.String())
+		assert.Equal(t, "starlark.Evaluator", evalInstance.String())
 	})
 
 	t.Run("error from loader", func(t *testing.T) {
@@ -95,7 +95,7 @@ func TestFromStarlarkLoaderWithData(t *testing.T) {
 		// Verify
 		require.NoError(t, err)
 		require.NotNil(t, evalInstance)
-		assert.Equal(t, "starlark.BytecodeEvaluator", evalInstance.String())
+		assert.Equal(t, "starlark.Evaluator", evalInstance.String())
 	})
 
 	t.Run("empty static data", func(t *testing.T) {
@@ -109,7 +109,7 @@ func TestFromStarlarkLoaderWithData(t *testing.T) {
 		// Verify
 		require.NoError(t, err)
 		require.NotNil(t, evalInstance)
-		assert.Equal(t, "starlark.BytecodeEvaluator", evalInstance.String())
+		assert.Equal(t, "starlark.Evaluator", evalInstance.String())
 	})
 
 	t.Run("error from loader", func(t *testing.T) {
@@ -175,7 +175,7 @@ func TestNewEvaluator(t *testing.T) {
 		// Verify
 		require.NoError(t, err)
 		require.NotNil(t, evalInstance)
-		assert.Equal(t, "starlark.BytecodeEvaluator", evalInstance.String())
+		assert.Equal(t, "starlark.Evaluator", evalInstance.String())
 	})
 
 	t.Run("with nil handler", func(t *testing.T) {
@@ -193,7 +193,7 @@ func TestNewEvaluator(t *testing.T) {
 		// Verify
 		require.NoError(t, err)
 		require.NotNil(t, evalInstance)
-		assert.Equal(t, "starlark.BytecodeEvaluator", evalInstance.String())
+		assert.Equal(t, "starlark.Evaluator", evalInstance.String())
 	})
 
 	t.Run("loader error", func(t *testing.T) {
@@ -289,7 +289,7 @@ func TestDiskLoaderIntegration(t *testing.T) {
 		// Verify
 		require.NoError(t, err)
 		require.NotNil(t, evalInstance)
-		assert.Equal(t, "starlark.BytecodeEvaluator", evalInstance.String())
+		assert.Equal(t, "starlark.Evaluator", evalInstance.String())
 
 		// Verify the disk loader has correct path
 		fileURL := diskLoader.GetSourceURL()

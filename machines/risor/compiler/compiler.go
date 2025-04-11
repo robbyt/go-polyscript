@@ -16,9 +16,9 @@ type Compiler struct {
 	logger     *slog.Logger
 }
 
-// NewCompiler creates a new Risor-specific Compiler instance with the provided options.
+// New creates a new Risor-specific Compiler instance with the provided options.
 // Global variables are used for initial script parsing while building the executable bytecode.
-func NewCompiler(opts ...FunctionalOption) (*Compiler, error) {
+func New(opts ...FunctionalOption) (*Compiler, error) {
 	// Initialize the compiler with an empty struct
 	c := &Compiler{}
 

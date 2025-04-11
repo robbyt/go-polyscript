@@ -22,7 +22,7 @@ import (
 func FromStarlarkLoader(
 	logHandler slog.Handler,
 	ldr loader.Loader,
-) (*evaluator.BytecodeEvaluator, error) {
+) (*evaluator.Evaluator, error) {
 	return NewEvaluator(
 		logHandler,
 		ldr,
@@ -43,7 +43,7 @@ func FromStarlarkLoaderWithData(
 	logHandler slog.Handler,
 	ldr loader.Loader,
 	staticData map[string]any,
-) (*evaluator.BytecodeEvaluator, error) {
+) (*evaluator.Evaluator, error) {
 	// Create a composite provider with the static, and dynamic data loader
 	staticProvider := data.NewStaticProvider(staticData)
 	dynamicProvider := data.NewContextProvider(constants.EvalData)
@@ -61,16 +61,16 @@ func FromStarlarkLoaderWithData(
 // See the starlarkMachine package for available compiler options. Returns a compiler,
 // which implements the script.Compiler interface.
 func NewCompiler(opts ...compiler.FunctionalOption) (*compiler.Compiler, error) {
-	return compiler.NewCompiler(opts...)
+	return compiler.New(opts...)
 }
 
 // NewEvaluator creates a full Starlark evaluator with bytecode loaded, and ready for execution.
-// Returns a BytecodeEvaluator, which implements the engine.EvaluatorWithPrep interface.
+// Returns a Evaluator, which implements the engine.EvaluatorWithPrep interface.
 func NewEvaluator(
 	logHandler slog.Handler,
 	ldr loader.Loader,
 	dataProvider data.Provider,
-) (*evaluator.BytecodeEvaluator, error) {
+) (*evaluator.Evaluator, error) {
 	// Validate provider is not nil
 	if dataProvider == nil {
 		return nil, fmt.Errorf("provider is nil")
@@ -101,6 +101,5 @@ func NewEvaluator(
 		return nil, err
 	}
 
-	// BytecodeEvaluator already implements the EvaluatorWithPrep interface
-	return evaluator.NewBytecodeEvaluator(logHandler, execUnit), nil
+	return evaluator.New(logHandler, execUnit), nil
 }

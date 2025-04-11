@@ -19,7 +19,7 @@ import (
 )
 
 // evalBuilder is a helper function to create a test executor and evaluator
-func evalBuilder(t *testing.T, scriptContent string) (*script.ExecutableUnit, *BytecodeEvaluator) {
+func evalBuilder(t *testing.T, scriptContent string) (*script.ExecutableUnit, *Evaluator) {
 	t.Helper()
 	loader, err := loader.NewFromString(scriptContent)
 	require.NoError(t, err, "Failed to create new loader")
@@ -31,7 +31,7 @@ func evalBuilder(t *testing.T, scriptContent string) (*script.ExecutableUnit, *B
 	ctxProvider := data.NewContextProvider(constants.EvalData)
 
 	// Create compiler with options
-	compiler, err := compiler.NewCompiler(
+	compiler, err := compiler.New(
 		compiler.WithLogHandler(handler),
 		compiler.WithCtxGlobal(),
 	)
@@ -46,8 +46,8 @@ func evalBuilder(t *testing.T, scriptContent string) (*script.ExecutableUnit, *B
 	)
 	require.NoError(t, err, "Failed to create new version")
 
-	evaluator := NewBytecodeEvaluator(handler, exe)
-	require.NotNil(t, evaluator, "BytecodeEvaluator should not be nil")
+	evaluator := New(handler, exe)
+	require.NotNil(t, evaluator, "Evaluator should not be nil")
 
 	return exe, evaluator
 }
@@ -73,8 +73,8 @@ func (m *MockProvider) AddDataToContext(ctx context.Context, data ...any) (conte
 	return ctx, args.Error(1)
 }
 
-// TestBytecodeEvaluator_Evaluate tests evaluating starlark scripts
-func TestBytecodeEvaluator_Evaluate(t *testing.T) {
+// TestEvaluator_Evaluate tests evaluating starlark scripts
+func TestEvaluator_Evaluate(t *testing.T) {
 	t.Parallel()
 
 	// Define a Starlark script that can handle HTTP requests
@@ -161,7 +161,7 @@ _ = request_handler(ctx.get("request"))
 		// Test nil executable unit
 		t.Run("nil executable unit", func(t *testing.T) {
 			handler := slog.NewTextHandler(os.Stdout, nil)
-			evaluator := NewBytecodeEvaluator(handler, nil)
+			evaluator := New(handler, nil)
 
 			response, err := evaluator.Eval(context.Background())
 			require.Error(t, err)
@@ -176,7 +176,7 @@ _ = request_handler(ctx.get("request"))
 				ID:      "test-nil-content",
 				Content: nil, // Deliberately nil content
 			}
-			evaluator := NewBytecodeEvaluator(handler, exe)
+			evaluator := New(handler, exe)
 
 			response, err := evaluator.Eval(context.Background())
 			require.Error(t, err)
@@ -206,14 +206,14 @@ invalid_func()
 		// Test String() representation
 		t.Run("String method", func(t *testing.T) {
 			handler := slog.NewTextHandler(os.Stdout, nil)
-			evaluator := NewBytecodeEvaluator(handler, nil)
-			require.Equal(t, "starlark.BytecodeEvaluator", evaluator.String())
+			evaluator := New(handler, nil)
+			require.Equal(t, "starlark.Evaluator", evaluator.String())
 		})
 	})
 }
 
-// TestBytecodeEvaluator_PrepareContext tests the PrepareContext method with various scenarios
-func TestBytecodeEvaluator_PrepareContext(t *testing.T) {
+// TestEvaluator_PrepareContext tests the PrepareContext method with various scenarios
+func TestEvaluator_PrepareContext(t *testing.T) {
 	t.Parallel()
 
 	// Test cases
@@ -287,7 +287,7 @@ func TestBytecodeEvaluator_PrepareContext(t *testing.T) {
 			handler := slog.NewTextHandler(os.Stderr, nil)
 			exe := tt.setupExe(t)
 
-			evaluator := NewBytecodeEvaluator(handler, exe)
+			evaluator := New(handler, exe)
 
 			ctx := context.Background()
 			result, err := evaluator.PrepareContext(ctx, tt.inputs...)

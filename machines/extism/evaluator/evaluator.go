@@ -18,33 +18,34 @@ import (
 	"github.com/robbyt/go-polyscript/machines/extism/internal"
 )
 
-// BytecodeEvaluator executes compiled WASM modules with provided runtime data
-type BytecodeEvaluator struct {
+// Evaluator executes compiled WASM modules with provided runtime data
+type Evaluator struct {
 	execUnit   *script.ExecutableUnit
 	logHandler slog.Handler
 	logger     *slog.Logger
 }
 
-func NewBytecodeEvaluator(
+// New creates a new Evaluator object
+func New(
 	handler slog.Handler,
 	execUnit *script.ExecutableUnit,
-) *BytecodeEvaluator {
-	handler, logger := helpers.SetupLogger(handler, "extism", "BytecodeEvaluator")
+) *Evaluator {
+	handler, logger := helpers.SetupLogger(handler, "extism", "Evaluator")
 
-	return &BytecodeEvaluator{
+	return &Evaluator{
 		execUnit:   execUnit,
 		logHandler: handler,
 		logger:     logger,
 	}
 }
 
-func (be *BytecodeEvaluator) String() string {
-	return "extism.BytecodeEvaluator"
+func (be *Evaluator) String() string {
+	return "extism.Evaluator"
 }
 
 // loadInputData retrieves input data using the data provider in the executable unit.
 // Returns a map that will be used as input for the WASM module.
-func (be *BytecodeEvaluator) loadInputData(ctx context.Context) (map[string]any, error) {
+func (be *Evaluator) loadInputData(ctx context.Context) (map[string]any, error) {
 	logger := be.logger.WithGroup("loadInputData")
 
 	// If no executable unit or data provider, return empty map
@@ -112,7 +113,7 @@ func execHelper(
 
 // exec handles WASM-specific execution details
 // Using the interface and helper function to improve testability
-func (be *BytecodeEvaluator) exec(
+func (be *Evaluator) exec(
 	ctx context.Context,
 	plugin adapters.CompiledPlugin,
 	entryPoint string,
@@ -144,7 +145,7 @@ func (be *BytecodeEvaluator) exec(
 // Eval implements engine.Evaluator
 // TODO: Some error paths in this method are hard to test with the current design
 // Consider adding more integration tests to cover these paths.
-func (be *BytecodeEvaluator) Eval(ctx context.Context) (engine.EvaluatorResponse, error) {
+func (be *Evaluator) Eval(ctx context.Context) (engine.EvaluatorResponse, error) {
 	logger := be.logger.WithGroup("Eval")
 	if be.execUnit == nil {
 		return nil, fmt.Errorf("executable unit is nil")
@@ -212,7 +213,7 @@ func (be *BytecodeEvaluator) Eval(ctx context.Context) (engine.EvaluatorResponse
 // PrepareContext implements the EvalDataPreparer interface for Extism WebAssembly modules.
 // It enriches the provided context with data for script evaluation, using the
 // ExecutableUnit's DataProvider to store the data.
-func (be *BytecodeEvaluator) PrepareContext(
+func (be *Evaluator) PrepareContext(
 	ctx context.Context,
 	d ...any,
 ) (context.Context, error) {

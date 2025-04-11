@@ -29,7 +29,7 @@ func NewEvaluator(handler slog.Handler, ver *script.ExecutableUnit) (engine.Eval
 	{{- range .Types}}
 	case machineTypes.{{.Name}}:
 		// {{.Description}}
-		return {{.Value}}Evaluator.NewBytecodeEvaluator(handler, ver), nil
+		return {{.Value}}Evaluator.New(handler, ver), nil
 	{{- end}}
 	default:
 		return nil, fmt.Errorf("%w: %s", machineTypes.ErrInvalidMachineType, ver.GetMachineType())
@@ -59,7 +59,7 @@ func NewCompiler(opts ...any) (script.Compiler, error) {
 		}
 
 		if allMatch && len({{.Value}}Opts) > 0 {
-			compiler, err := {{.Value}}Compiler.NewCompiler({{.Value}}Opts...)
+			compiler, err := {{.Value}}Compiler.New({{.Value}}Opts...)
 			if err != nil {
 				return nil, fmt.Errorf("failed to create {{.Name}} compiler: %w", err)
 			}

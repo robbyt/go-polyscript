@@ -126,8 +126,8 @@ func (m *mockExecutableContent) GetByteCode() any {
 	return m.bytecode
 }
 
-// TestBytecodeEvaluator_Evaluate tests evaluating WASM scripts with Extism
-func TestBytecodeEvaluator_Evaluate(t *testing.T) {
+// TestEvaluator_Evaluate tests evaluating WASM scripts with Extism
+func TestEvaluator_Evaluate(t *testing.T) {
 	t.Parallel()
 
 	t.Run("success cases", func(t *testing.T) {
@@ -162,7 +162,7 @@ func TestBytecodeEvaluator_Evaluate(t *testing.T) {
 				Content:      content,
 			}
 
-			evaluator := NewBytecodeEvaluator(handler, exe)
+			evaluator := New(handler, exe)
 
 			ctx := context.Background()
 			evalData := map[string]any{"test": "data"}
@@ -201,7 +201,7 @@ func TestBytecodeEvaluator_Evaluate(t *testing.T) {
 				Content:      content,
 			}
 
-			evaluator := NewBytecodeEvaluator(handler, exe)
+			evaluator := New(handler, exe)
 			ctx := context.Background()
 			evalData := map[string]any{"test": "data"}
 			ctx = context.WithValue(ctx, constants.EvalData, evalData)
@@ -252,7 +252,7 @@ func TestBytecodeEvaluator_Evaluate(t *testing.T) {
 						DataProvider: ctxProvider,
 					}
 
-					evaluator := NewBytecodeEvaluator(handler, dummyExe)
+					evaluator := New(handler, dummyExe)
 					ctx := context.Background()
 
 					if tt.ctxData != nil {
@@ -301,7 +301,7 @@ func TestBytecodeEvaluator_Evaluate(t *testing.T) {
 		// Test nil executable unit
 		t.Run("nil executable unit", func(t *testing.T) {
 			handler := slog.NewTextHandler(os.Stdout, nil)
-			evaluator := NewBytecodeEvaluator(handler, nil)
+			evaluator := New(handler, nil)
 
 			ctx := context.Background()
 			_, err := evaluator.Eval(ctx)
@@ -327,7 +327,7 @@ func TestBytecodeEvaluator_Evaluate(t *testing.T) {
 				DataProvider: ctxProvider,
 			}
 
-			evaluator := NewBytecodeEvaluator(handler, exe)
+			evaluator := New(handler, exe)
 
 			ctx := context.Background()
 			_, err := evaluator.Eval(ctx)
@@ -353,7 +353,7 @@ func TestBytecodeEvaluator_Evaluate(t *testing.T) {
 				DataProvider: ctxProvider,
 			}
 
-			evaluator := NewBytecodeEvaluator(handler, exe)
+			evaluator := New(handler, exe)
 
 			ctx := context.Background()
 			_, err := evaluator.Eval(ctx)
@@ -390,7 +390,7 @@ func TestBytecodeEvaluator_Evaluate(t *testing.T) {
 				DataProvider: data.NewContextProvider(constants.EvalData),
 			}
 
-			evaluator := NewBytecodeEvaluator(handler, execUnit)
+			evaluator := New(handler, execUnit)
 
 			// Add test data to context
 			ctx = context.WithValue(ctx, constants.EvalData, map[string]any{"test": "data"})
@@ -430,7 +430,7 @@ func TestBytecodeEvaluator_Evaluate(t *testing.T) {
 				Content:      content,
 			}
 
-			evaluator := NewBytecodeEvaluator(handler, exe)
+			evaluator := New(handler, exe)
 			ctx := context.Background()
 			evalData := map[string]any{"test": "data"}
 			ctx = context.WithValue(ctx, constants.EvalData, evalData)
@@ -456,7 +456,7 @@ func TestBytecodeEvaluator_Evaluate(t *testing.T) {
 				Content:      content,
 			}
 
-			evaluator := NewBytecodeEvaluator(handler, exe)
+			evaluator := New(handler, exe)
 			ctx := context.Background()
 
 			_, err := evaluator.Eval(ctx)
@@ -482,7 +482,7 @@ func TestBytecodeEvaluator_Evaluate(t *testing.T) {
 			}
 
 			// Create with nil handler
-			evaluator := NewBytecodeEvaluator(nil, exe)
+			evaluator := New(nil, exe)
 
 			// Shouldn't panic
 			require.NotNil(t, evaluator)
@@ -493,11 +493,11 @@ func TestBytecodeEvaluator_Evaluate(t *testing.T) {
 		// Test String method
 		t.Run("String method", func(t *testing.T) {
 			handler := slog.NewTextHandler(os.Stdout, nil)
-			evaluator := NewBytecodeEvaluator(handler, nil)
+			evaluator := New(handler, nil)
 
 			// Test the string representation
 			strRep := evaluator.String()
-			require.Equal(t, "extism.BytecodeEvaluator", strRep)
+			require.Equal(t, "extism.Evaluator", strRep)
 		})
 
 		// Test the exec helper function
@@ -607,8 +607,8 @@ func TestBytecodeEvaluator_Evaluate(t *testing.T) {
 	})
 }
 
-// TestBytecodeEvaluator_PrepareContext tests the PrepareContext method with various scenarios
-func TestBytecodeEvaluator_PrepareContext(t *testing.T) {
+// TestEvaluator_PrepareContext tests the PrepareContext method with various scenarios
+func TestEvaluator_PrepareContext(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -711,7 +711,7 @@ func TestBytecodeEvaluator_PrepareContext(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			handler := slog.NewTextHandler(os.Stdout, nil)
 			exe := tt.setupExe(t)
-			evaluator := NewBytecodeEvaluator(handler, exe)
+			evaluator := New(handler, exe)
 
 			ctx := context.Background()
 			enrichedCtx, err := evaluator.PrepareContext(ctx, tt.inputs...)

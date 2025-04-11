@@ -16,8 +16,8 @@ import (
 	"github.com/robbyt/go-polyscript/machines/risor/internal"
 )
 
-// BytecodeEvaluator is an abstraction layer for evaluating bytecode on the Risor VM
-type BytecodeEvaluator struct {
+// Evaluator is an abstraction layer for evaluating bytecode on the Risor VM
+type Evaluator struct {
 	// ctxKey is the variable name used to access input data inside the vm (ctx)
 	ctxKey string
 
@@ -28,14 +28,14 @@ type BytecodeEvaluator struct {
 	logger     *slog.Logger
 }
 
-// NewBytecodeEvaluator creates a new BytecodeEvaluator object
-func NewBytecodeEvaluator(
+// New creates a new Evaluator object
+func New(
 	handler slog.Handler,
 	execUnit *script.ExecutableUnit,
-) *BytecodeEvaluator {
-	handler, logger := helpers.SetupLogger(handler, "risor", "BytecodeEvaluator")
+) *Evaluator {
+	handler, logger := helpers.SetupLogger(handler, "risor", "Evaluator")
 
-	return &BytecodeEvaluator{
+	return &Evaluator{
 		ctxKey:     constants.Ctx,
 		execUnit:   execUnit,
 		logHandler: handler,
@@ -43,13 +43,13 @@ func NewBytecodeEvaluator(
 	}
 }
 
-func (be *BytecodeEvaluator) String() string {
-	return "risor.BytecodeEvaluator"
+func (be *Evaluator) String() string {
+	return "risor.Evaluator"
 }
 
 // loadInputData retrieves input data using the data provider in the executable unit.
 // Returns a map that will be used as input for the Risor VM.
-func (be *BytecodeEvaluator) loadInputData(ctx context.Context) (map[string]any, error) {
+func (be *Evaluator) loadInputData(ctx context.Context) (map[string]any, error) {
 	logger := be.logger.WithGroup("loadInputData")
 
 	// If no executable unit or data provider, return empty map
@@ -73,7 +73,7 @@ func (be *BytecodeEvaluator) loadInputData(ctx context.Context) (map[string]any,
 }
 
 // exec pulls the latest bytecode, and runs it with some input from options
-func (be *BytecodeEvaluator) exec(
+func (be *Evaluator) exec(
 	ctx context.Context,
 	bytecode *risorCompiler.Code,
 	options ...risorLib.Option,
@@ -92,7 +92,7 @@ func (be *BytecodeEvaluator) exec(
 }
 
 // Eval evaluates the loaded bytecode and uses the provided EvalData to pass data in to the Risor VM execution
-func (be *BytecodeEvaluator) Eval(ctx context.Context) (engine.EvaluatorResponse, error) {
+func (be *Evaluator) Eval(ctx context.Context) (engine.EvaluatorResponse, error) {
 	logger := be.logger.WithGroup("Eval")
 	if be.execUnit == nil {
 		return nil, fmt.Errorf("executable unit is nil")
@@ -162,7 +162,7 @@ func (be *BytecodeEvaluator) Eval(ctx context.Context) (engine.EvaluatorResponse
 // PrepareContext implements the EvalDataPreparer interface for Risor scripts.
 // It enriches the provided context with data for script evaluation, using the
 // ExecutableUnit's DataProvider to store the data.
-func (be *BytecodeEvaluator) PrepareContext(
+func (be *Evaluator) PrepareContext(
 	ctx context.Context,
 	d ...any,
 ) (context.Context, error) {

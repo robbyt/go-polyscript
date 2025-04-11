@@ -30,13 +30,13 @@ func NewEvaluator(handler slog.Handler, ver *script.ExecutableUnit) (engine.Eval
 	switch ver.GetMachineType() {
 	case machineTypes.Risor:
 		// Risor VM: https://github.com/risor-io/risor
-		return risorEvaluator.NewBytecodeEvaluator(handler, ver), nil
+		return risorEvaluator.New(handler, ver), nil
 	case machineTypes.Starlark:
 		// Starlark VM: https://github.com/google/starlark-go
-		return starlarkEvaluator.NewBytecodeEvaluator(handler, ver), nil
+		return starlarkEvaluator.New(handler, ver), nil
 	case machineTypes.Extism:
 		// Extism WASM VM: https://extism.org/
-		return extismEvaluator.NewBytecodeEvaluator(handler, ver), nil
+		return extismEvaluator.New(handler, ver), nil
 	default:
 		return nil, fmt.Errorf("%w: %s", machineTypes.ErrInvalidMachineType, ver.GetMachineType())
 	}
@@ -64,7 +64,7 @@ func NewCompiler(opts ...any) (script.Compiler, error) {
 		}
 
 		if allMatch && len(risorOpts) > 0 {
-			compiler, err := risorCompiler.NewCompiler(risorOpts...)
+			compiler, err := risorCompiler.New(risorOpts...)
 			if err != nil {
 				return nil, fmt.Errorf("failed to create Risor compiler: %w", err)
 			}
@@ -87,7 +87,7 @@ func NewCompiler(opts ...any) (script.Compiler, error) {
 		}
 
 		if allMatch && len(starlarkOpts) > 0 {
-			compiler, err := starlarkCompiler.NewCompiler(starlarkOpts...)
+			compiler, err := starlarkCompiler.New(starlarkOpts...)
 			if err != nil {
 				return nil, fmt.Errorf("failed to create Starlark compiler: %w", err)
 			}
@@ -110,7 +110,7 @@ func NewCompiler(opts ...any) (script.Compiler, error) {
 		}
 
 		if allMatch && len(extismOpts) > 0 {
-			compiler, err := extismCompiler.NewCompiler(extismOpts...)
+			compiler, err := extismCompiler.New(extismOpts...)
 			if err != nil {
 				return nil, fmt.Errorf("failed to create Extism compiler: %w", err)
 			}
