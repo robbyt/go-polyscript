@@ -10,12 +10,46 @@ import (
 	"github.com/robbyt/go-polyscript/execution/data"
 	"github.com/robbyt/go-polyscript/execution/script"
 {{- range .Types}}
-	_ "github.com/robbyt/go-polyscript/machines/{{.Value}}"
+	{{.Value}}Compiler "github.com/robbyt/go-polyscript/machines/{{.Value}}/compiler"
 {{- end}}
 	machineTypes "github.com/robbyt/go-polyscript/machines/types"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
+
+type mockExecutableContent struct {
+	mock.Mock
+}
+
+func (m *mockExecutableContent) GetMachineType() machineTypes.Type {
+	args := m.Called()
+	return args.Get(0).(machineTypes.Type)
+}
+
+func (m *mockExecutableContent) GetSource() string {
+	args := m.Called()
+	return args.String(0)
+}
+
+func (m *mockExecutableContent) GetByteCode() any {
+	args := m.Called()
+	return args.Get(0)
+}
+
+// mockRisorOption is a mock option satisfying risorCompiler.FunctionalOption.
+var mockRisorOption risorCompiler.FunctionalOption = func(c *risorCompiler.Compiler) error {
+	return nil
+}
+
+// mockStarlarkOption is a mock option satisfying starlarkCompiler.FunctionalOption.
+var mockStarlarkOption starlarkCompiler.FunctionalOption = func(c *starlarkCompiler.Compiler) error {
+	return nil
+}
+
+// mockExtismOption is a mock option satisfying extismCompiler.FunctionalOption.
+var mockExtismOption extismCompiler.FunctionalOption = func(c *extismCompiler.Compiler) error {
+	return nil
+}
 
 func TestNewEvaluator(t *testing.T) {
 	tests := []struct {
@@ -69,21 +103,55 @@ func TestNewEvaluator(t *testing.T) {
 	}
 }
 
-type mockExecutableContent struct {
-	mock.Mock
+func TestNewCompiler(t *testing.T) {
+	tests := []struct {
+		name         string
+		options      []any
+		expectError  bool
+		expectedErr  string
+	}{
+		{
+			name:         "No options provided",
+			options:      []any{},
+			expectError:  true,
+			expectedErr:  "no options provided",
+		},
+		{
+			name:         "Valid Risor options",
+			options:      []any{mockRisorOption},
+			expectError:  false,
+		},
+		{
+			name:         "Valid Starlark options",
+			options:      []any{mockStarlarkOption},
+			expectError:  false,
+		},
+		{
+			name:         "Valid Extism options",
+			options:      []any{mockExtismOption},
+			expectError:  false,
+		},
+		{
+			name:         "Mixed options",
+			options:      []any{mockRisorOption, mockStarlarkOption},
+			expectError:  true,
+			expectedErr:  "unable to determine compiler type",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			comp, err := NewCompiler(tt.options...)
+			if tt.expectError {
+				require.Error(t, err)
+				require.Nil(t, comp)
+				require.Contains(t, err.Error(), tt.expectedErr)
+			} else {
+				require.NoError(t, err)
+				require.NotNil(t, comp)
+			}
+		})
+	}
 }
 
-func (m *mockExecutableContent) GetMachineType() machineTypes.Type {
-	args := m.Called()
-	return args.Get(0).(machineTypes.Type)
-}
 
-func (m *mockExecutableContent) GetSource() string {
-	args := m.Called()
-	return args.String(0)
-}
-
-func (m *mockExecutableContent) GetByteCode() any {
-	args := m.Called()
-	return args.Get(0)
-}
