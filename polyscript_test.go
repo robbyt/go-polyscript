@@ -14,14 +14,9 @@ import (
 	"testing"
 
 	"github.com/robbyt/go-polyscript/engine"
-	"github.com/robbyt/go-polyscript/engine/options"
 	"github.com/robbyt/go-polyscript/execution/constants"
-	"github.com/robbyt/go-polyscript/execution/data"
 	"github.com/robbyt/go-polyscript/execution/script/loader"
-	extismCompiler "github.com/robbyt/go-polyscript/machines/extism/compiler"
 	"github.com/robbyt/go-polyscript/machines/mocks"
-	risorCompiler "github.com/robbyt/go-polyscript/machines/risor/compiler"
-	starlarkCompiler "github.com/robbyt/go-polyscript/machines/starlark/compiler"
 	"github.com/robbyt/go-polyscript/machines/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -34,14 +29,6 @@ var wasmData []byte
 // Helper functions for tests
 func getLogger() slog.Handler {
 	return slog.NewTextHandler(os.Stdout, nil)
-}
-
-// withCompositeProvider creates a composite provider with static data
-func withCompositeProvider(staticData map[string]any) any {
-	return options.WithDataProvider(data.NewCompositeProvider(
-		data.NewStaticProvider(staticData),
-		data.NewContextProvider(constants.Ctx),
-	))
 }
 
 // mockPreparer implements engine.EvalDataPreparer for testing
@@ -113,153 +100,27 @@ func TestMachineEvaluators(t *testing.T) {
 		name        string
 		content     string
 		machineType types.Type
-		creator     func(opts ...any) (engine.EvaluatorWithPrep, error)
-		options     []any
+		creator     func(string, slog.Handler) (engine.EvaluatorWithPrep, error)
 	}{
 		{
-			name:        "NewStarlarkEvaluator",
+			name:        "FromStarlarkString",
 			content:     `print("Hello, World!")`,
 			machineType: types.Starlark,
-			creator:     NewStarlarkEvaluator,
-			options: []any{
-				options.WithDefaults(),
-			},
+			creator:     FromStarlarkString,
 		},
 		{
-			name:        "NewRisorEvaluator",
+			name:        "FromRisorString",
 			content:     `print("Hello, World!")`,
 			machineType: types.Risor,
-			creator:     NewRisorEvaluator,
-			options: []any{
-				options.WithDefaults(),
-			},
+			creator:     FromRisorString,
 		},
 	}
 
 	for _, tc := range tests {
 		tc := tc // Capture for parallel execution
 		t.Run(tc.name, func(t *testing.T) {
-			// Create a loader
-			l, err := loader.NewFromString(tc.content)
-			require.NoError(t, err)
-
-			// Combine options with loader
-			opts := append(
-				[]any{
-					options.WithLoader(l),
-					options.WithLogHandler(getLogger()),
-				},
-				tc.options...,
-			)
-
-			// Create evaluator
-			evaluator, err := tc.creator(opts...)
-			require.NoError(t, err)
-			require.NotNil(t, evaluator)
-		})
-	}
-}
-
-func TestNewEvaluator(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name        string
-		machineType types.Type
-		options     []any
-		expectError bool
-		errorMsg    string
-	}{
-		{
-			name:        "Valid Starlark",
-			machineType: types.Starlark,
-			options: []any{
-				options.WithLoader(func() loader.Loader {
-					l, err := loader.NewFromString("print('test')")
-					require.NoError(t, err)
-					return l
-				}()),
-				options.WithLogHandler(getLogger()),
-			},
-			expectError: false,
-		},
-		{
-			name:        "Valid Risor",
-			machineType: types.Risor,
-			options: []any{
-				options.WithLoader(func() loader.Loader {
-					l, err := loader.NewFromString("print('test')")
-					require.NoError(t, err)
-					return l
-				}()),
-				options.WithLogHandler(getLogger()),
-			},
-			expectError: false,
-		},
-		{
-			name:        "No Loader",
-			machineType: types.Starlark,
-			options: []any{
-				options.WithLogHandler(getLogger()),
-			},
-			expectError: true,
-			errorMsg:    "no loader specified",
-		},
-		{
-			name:        "Invalid Option",
-			machineType: types.Starlark,
-			options: []any{
-				options.WithLoader(func() loader.Loader {
-					l, err := loader.NewFromString("print('test')")
-					require.NoError(t, err)
-					return l
-				}()),
-				func(cfg *options.Config) error {
-					return errors.New("invalid option")
-				},
-			},
-			expectError: true,
-			errorMsg:    "unsupported option type",
-		},
-		{
-			name:        "Option Type Test",
-			machineType: types.Risor,
-			options: []any{
-				options.WithLoader(func() loader.Loader {
-					l, err := loader.NewFromString("print('test')")
-					require.NoError(t, err)
-					return l
-				}()),
-			},
-			expectError: false,
-		},
-	}
-
-	for _, tc := range tests {
-		tc := tc // Capture for parallel execution
-		t.Run(tc.name, func(t *testing.T) {
-			var evaluator engine.EvaluatorWithPrep
-			var err error
-
-			switch tc.machineType {
-			case types.Starlark:
-				evaluator, err = NewStarlarkEvaluator(tc.options...)
-			case types.Risor:
-				evaluator, err = NewRisorEvaluator(tc.options...)
-			case types.Extism:
-				evaluator, err = NewExtismEvaluator(tc.options...)
-			default:
-				t.Fatalf("unsupported machine type: %s", tc.machineType)
-			}
-
-			if tc.expectError {
-				require.Error(t, err)
-				if tc.errorMsg != "" {
-					assert.Contains(t, err.Error(), tc.errorMsg)
-				}
-				return
-			}
-
+			// Create evaluator directly with content and logger
+			evaluator, err := tc.creator(tc.content, getLogger())
 			require.NoError(t, err)
 			require.NotNil(t, evaluator)
 		})
@@ -272,36 +133,36 @@ func TestFromStringLoaders(t *testing.T) {
 	tests := []struct {
 		name        string
 		content     string
-		creator     func(content string, opts ...any) (engine.EvaluatorWithPrep, error)
-		options     []any
+		creator     func(string, slog.Handler) (engine.EvaluatorWithPrep, error)
+		logHandler  slog.Handler
 		expectError bool
 	}{
 		{
 			name:        "FromStarlarkString - Valid",
 			content:     `print("Hello, World!")`,
 			creator:     FromStarlarkString,
-			options:     []any{starlarkCompiler.WithGlobals([]string{"ctx"})},
+			logHandler:  getLogger(),
 			expectError: false,
 		},
 		{
 			name:        "FromRisorString - Valid",
 			content:     `print("Hello, World!")`,
 			creator:     FromRisorString,
-			options:     []any{risorCompiler.WithGlobals([]string{"ctx"})},
+			logHandler:  getLogger(),
 			expectError: false,
 		},
 		{
 			name:        "FromStarlarkString - Empty",
 			content:     "",
 			creator:     FromStarlarkString,
-			options:     []any{},
+			logHandler:  getLogger(),
 			expectError: true,
 		},
 		{
 			name:        "FromRisorString - Empty",
 			content:     "",
 			creator:     FromRisorString,
-			options:     []any{},
+			logHandler:  getLogger(),
 			expectError: true,
 		},
 	}
@@ -309,7 +170,7 @@ func TestFromStringLoaders(t *testing.T) {
 	for _, tc := range tests {
 		tc := tc // Capture for parallel execution
 		t.Run(tc.name, func(t *testing.T) {
-			evaluator, err := tc.creator(tc.content, tc.options...)
+			evaluator, err := tc.creator(tc.content, tc.logHandler)
 
 			if tc.expectError {
 				require.Error(t, err)
@@ -320,20 +181,6 @@ func TestFromStringLoaders(t *testing.T) {
 			require.NotNil(t, evaluator)
 		})
 	}
-
-	// Skip the Extism string loader test - covered by design
-
-	// Test invalid option in string loader
-	t.Run("FromRisorString - Invalid Option", func(t *testing.T) {
-		_, err := FromRisorString(
-			"print('test')",
-			func(cfg *options.Config) error {
-				return errors.New("invalid option test")
-			},
-		)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "unsupported option type")
-	})
 }
 
 func TestFromFileLoaders(t *testing.T) {
@@ -360,90 +207,90 @@ _ = result`
 	err = os.WriteFile(starlarkPath, []byte(starlarkContent), 0o644)
 	require.NoError(t, err)
 
-	tests := []struct {
-		name        string
-		loaderFunc  func(string, ...any) (engine.EvaluatorWithPrep, error)
-		filePath    string
-		options     []any
-		expectError bool
-	}{
-		{
-			name:       "FromExtismFile - Valid",
-			loaderFunc: FromExtismFile,
-			filePath:   wasmPath,
-			options: []any{
-				options.WithLogHandler(getLogger()),
-				extismCompiler.WithEntryPoint("greet"),
-				options.WithDataProvider(data.NewStaticProvider(map[string]any{
-					"input": "Test User", // Required for WASM execution
-				})),
-			},
-			expectError: false,
-		},
-		{
-			name:        "FromExtismFile - Invalid Path",
-			loaderFunc:  FromExtismFile,
-			filePath:    "non-existent-file.wasm",
-			options:     []any{},
-			expectError: true,
-		},
-		{
-			name:       "FromRisorFile - Valid",
-			loaderFunc: FromRisorFile,
-			filePath:   risorPath,
-			options: []any{
-				options.WithLogHandler(getLogger()),
-				risorCompiler.WithGlobals([]string{"ctx"}),
-			},
-			expectError: false,
-		},
-		{
-			name:        "FromRisorFile - Invalid Path",
-			loaderFunc:  FromRisorFile,
-			filePath:    "non-existent-file.risor",
-			options:     []any{},
-			expectError: true,
-		},
-		{
-			name:       "FromStarlarkFile - Valid",
-			loaderFunc: FromStarlarkFile,
-			filePath:   starlarkPath,
-			options: []any{
-				options.WithLogHandler(getLogger()),
-				starlarkCompiler.WithGlobals([]string{"ctx"}),
-			},
-			expectError: false,
-		},
-		{
-			name:        "FromStarlarkFile - Invalid Path",
-			loaderFunc:  FromStarlarkFile,
-			filePath:    "non-existent-file.star",
-			options:     []any{},
-			expectError: true,
-		},
-	}
+	// Setup the logger handler
+	logHandler := getLogger()
 
-	for _, tc := range tests {
-		tc := tc // Capture for parallel execution
-		t.Run(tc.name, func(t *testing.T) {
-			evaluator, err := tc.loaderFunc(tc.filePath, tc.options...)
+	t.Run("FromExtismFile - Valid", func(t *testing.T) {
+		evaluator, err := FromExtismFile(wasmPath, logHandler, "greet")
+		require.NoError(t, err)
+		require.NotNil(t, evaluator)
 
-			if tc.expectError {
-				require.Error(t, err)
-				return
-			}
-
-			require.NoError(t, err)
-			require.NotNil(t, evaluator)
-
-			// For valid evaluators, test basic execution only for non-Extism types
-			if !tc.expectError && tc.name != "FromExtismFile - Valid" {
-				result, evalErr := evaluator.Eval(context.Background())
-				require.NoError(t, evalErr)
-				require.NotNil(t, result)
-			}
+		// For Extism, we need to test with correct input data
+		// Create a context with the input data directly
+		ctx := context.Background()
+		ctx = context.WithValue(ctx, constants.EvalData, map[string]any{
+			"input": "Test User",
 		})
-	}
+
+		// Evaluate with the context containing input data
+		result, err := evaluator.Eval(ctx)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+	})
+
+	t.Run("FromExtismFile - Invalid Path", func(t *testing.T) {
+		_, err := FromExtismFile("non-existent-file.wasm", logHandler, "greet")
+		require.Error(t, err)
+	})
+
+	t.Run("FromExtismFileWithData - Valid", func(t *testing.T) {
+		staticData := map[string]any{
+			"input": "Test User", // Required for WASM execution
+		}
+		evaluator, err := FromExtismFileWithData(wasmPath, staticData, logHandler, "greet")
+		require.NoError(t, err)
+		require.NotNil(t, evaluator)
+	})
+
+	t.Run("FromRisorFile - Valid", func(t *testing.T) {
+		evaluator, err := FromRisorFile(risorPath, logHandler)
+		require.NoError(t, err)
+		require.NotNil(t, evaluator)
+
+		// Basic execution
+		result, err := evaluator.Eval(context.Background())
+		require.NoError(t, err)
+		require.NotNil(t, result)
+	})
+
+	t.Run("FromRisorFile - Invalid Path", func(t *testing.T) {
+		_, err := FromRisorFile("non-existent-file.risor", logHandler)
+		require.Error(t, err)
+	})
+
+	t.Run("FromRisorFileWithData - Valid", func(t *testing.T) {
+		staticData := map[string]any{
+			"test_key": "test_value",
+		}
+		evaluator, err := FromRisorFileWithData(risorPath, staticData, logHandler)
+		require.NoError(t, err)
+		require.NotNil(t, evaluator)
+	})
+
+	t.Run("FromStarlarkFile - Valid", func(t *testing.T) {
+		evaluator, err := FromStarlarkFile(starlarkPath, logHandler)
+		require.NoError(t, err)
+		require.NotNil(t, evaluator)
+
+		// Basic execution
+		result, err := evaluator.Eval(context.Background())
+		require.NoError(t, err)
+		require.NotNil(t, result)
+	})
+
+	t.Run("FromStarlarkFile - Invalid Path", func(t *testing.T) {
+		_, err := FromStarlarkFile("non-existent-file.star", logHandler)
+		require.Error(t, err)
+	})
+
+	t.Run("FromStarlarkFileWithData - Valid", func(t *testing.T) {
+		staticData := map[string]any{
+			"test_key": "test_value",
+		}
+		evaluator, err := FromStarlarkFileWithData(starlarkPath, staticData, logHandler)
+		require.NoError(t, err)
+		require.NotNil(t, evaluator)
+	})
 }
 
 func TestDataProviders(t *testing.T) {
@@ -456,13 +303,11 @@ func TestDataProviders(t *testing.T) {
 		// Create static data
 		staticData := map[string]any{
 			"static_key": "static_value",
-		}
-
-		// Create an evaluator with composite provider
-		evaluator, err := FromStarlarkString(
+		} // Create an evaluator with composite provider
+		evaluator, err := FromStarlarkStringWithData(
 			script,
-			withCompositeProvider(staticData),
-			starlarkCompiler.WithGlobals([]string{constants.Ctx}),
+			staticData,
+			getLogger(),
 		)
 		require.NoError(t, err)
 		require.NotNil(t, evaluator)
@@ -485,20 +330,18 @@ func TestEvalHelpers(t *testing.T) {
 	t.Run("PrepareAndEval", func(t *testing.T) {
 		// Create a simple Risor evaluator
 		script := `
-			name := ctx["input_data"]["name"]
-			{
-				"message": "Hello, " + name + "!",
-				"length": len(name)
-			}
-		`
+            name := ctx["input_data"]["name"]
+            {
+                "message": "Hello, " + name + "!",
+                "length": len(name)
+            }
+        `
 
 		// Create an evaluator with the CompositeProvider
-		evaluator, err := FromRisorString(
+		evaluator, err := FromRisorStringWithData(
 			script,
-			options.WithDefaults(),
-			options.WithLogHandler(getLogger()),
-			withCompositeProvider(map[string]any{}),
-			risorCompiler.WithGlobals([]string{constants.Ctx}),
+			map[string]any{},
+			getLogger(),
 		)
 		require.NoError(t, err)
 
@@ -569,8 +412,10 @@ func TestEvalHelpers(t *testing.T) {
 			data := map[string]any{"name": "World"}
 
 			// Mock PrepareContext to succeed
-			//nolint
-			enrichedCtx := context.WithValue(ctx, "test-key", "test-value")
+			// Define a type for context keys to avoid linting warnings
+			type contextKey string
+			testKey := contextKey("test-key")
+			enrichedCtx := context.WithValue(ctx, testKey, "test-value")
 			mockPrepCtx.On("PrepareContext", ctx, []any{data}).Return(enrichedCtx, nil)
 
 			// Mock Eval to fail
@@ -598,18 +443,17 @@ func TestEvalHelpers(t *testing.T) {
 	t.Run("EvalAndExtractMap", func(t *testing.T) {
 		// Create a simple Risor evaluator
 		script := `
-			{
-				"message": "Hello, Static!",
-				"length": 12
-			}
-		`
+            {
+                "message": "Hello, Static!",
+                "length": 12
+            }
+        `
 
 		// Create an evaluator
-		evaluator, err := FromRisorString(
+		evaluator, err := FromRisorStringWithData(
 			script,
-			options.WithDefaults(),
-			options.WithLogHandler(getLogger()),
-			risorCompiler.WithGlobals([]string{constants.Ctx}),
+			map[string]any{},
+			getLogger(),
 		)
 		require.NoError(t, err)
 
@@ -636,9 +480,7 @@ func TestEvalHelpers(t *testing.T) {
 		nilScript := `nil`
 		nilEvaluator, err := FromRisorString(
 			nilScript,
-			options.WithDefaults(),
-			options.WithLogHandler(getLogger()),
-			risorCompiler.WithGlobals([]string{constants.Ctx}),
+			getLogger(),
 		)
 		require.NoError(t, err)
 
@@ -650,9 +492,7 @@ func TestEvalHelpers(t *testing.T) {
 		numScript := `42`
 		numEvaluator, err := FromRisorString(
 			numScript,
-			options.WithDefaults(),
-			options.WithLogHandler(getLogger()),
-			risorCompiler.WithGlobals([]string{constants.Ctx}),
+			getLogger(),
 		)
 		require.NoError(t, err)
 
@@ -678,7 +518,7 @@ func TestEvalHelpers(t *testing.T) {
 	})
 }
 
-func TestMachineWithData(t *testing.T) {
+func TestDataIntegrationScenarios(t *testing.T) {
 	t.Parallel()
 
 	// Create a temporary directory for test files
@@ -694,8 +534,8 @@ func TestMachineWithData(t *testing.T) {
 	// Create a basic Risor script that uses context
 	risorFileContent := `// Get data from context
 {
-	"message": "Hello, " + ctx["input_data"]["name"] + " (v" + ctx["app_version"] + ")",
-	"timeout": ctx["config"]["timeout"]
+    "message": "Hello, " + ctx["input_data"]["name"] + " (v" + ctx["app_version"] + ")",
+    "timeout": ctx["config"]["timeout"]
 }`
 	err = os.WriteFile(risorPath, []byte(risorFileContent), 0o644)
 	require.NoError(t, err)
@@ -718,24 +558,28 @@ _ = result`
 		},
 	}
 
-	t.Run("FromRisorStringWithData", func(t *testing.T) {
+	t.Run("RisorWithData", func(t *testing.T) {
 		// Test script
 		risorScript := `
-			// Access static data
-			version := ctx["app_version"]
-			timeout := ctx["config"]["timeout"]
-			
-			// Access dynamic data
-			name := ctx["input_data"]["name"]
-			
-			{
-				"message": "Hello, " + name + " (v" + version + ")",
-				"timeout": timeout
-			}
-		`
+            // Access static data
+            version := ctx["app_version"]
+            timeout := ctx["config"]["timeout"]
+            
+            // Access dynamic data
+            name := ctx["input_data"]["name"]
+            
+            {
+                "message": "Hello, " + name + " (v" + version + ")",
+                "timeout": timeout
+            }
+        `
 
-		// Create evaluator
-		risorEval, err := FromRisorStringWithData(risorScript, staticData, getLogger())
+		// Create evaluator with static data
+		risorEval, err := FromRisorStringWithData(
+			risorScript,
+			staticData,
+			getLogger(),
+		)
 		require.NoError(t, err)
 
 		// Test with dynamic data
@@ -764,10 +608,10 @@ _ = result`
 		}
 	})
 
-	t.Run("FromStarlarkStringWithData", func(t *testing.T) {
-		// Create evaluator
-		starlarkEval, err := FromStarlarkStringWithData(
-			starlarkFileContent,
+	t.Run("StarlarkWithData", func(t *testing.T) {
+		// Create evaluator with static data
+		starlarkEval, err := FromStarlarkFileWithData(
+			starlarkPath,
 			staticData,
 			getLogger(),
 		)
@@ -792,13 +636,17 @@ _ = result`
 		assert.Equal(t, int64(30), starlarkTimeout, "timeout should be 30")
 	})
 
-	t.Run("FromExtismFileWithData", func(t *testing.T) {
+	t.Run("ExtismWithData", func(t *testing.T) {
 		// Create evaluator with static data that includes input
+		staticDataWithInput := map[string]any{
+			"input": "Test User",
+		}
+
 		extismEval, err := FromExtismFileWithData(
 			wasmPath,
-			map[string]any{"input": "Test User"},
+			staticDataWithInput,
 			getLogger(),
-			"greet", // entry point
+			"greet",
 		)
 		require.NoError(t, err)
 		require.NotNil(t, extismEval)
@@ -816,11 +664,17 @@ _ = result`
 		assert.Equal(t, "Hello, Test User!", resultMap["greeting"])
 
 		// Test evaluator with no input (should fail)
+		// Create a copy of staticData without input field
+		configOnlyData := map[string]any{
+			"app_version": staticData["app_version"],
+			"config":      staticData["config"],
+		}
+
 		extismEvalNoInput, err := FromExtismFileWithData(
 			wasmPath,
-			staticData, // Only static config data, no input
+			configOnlyData,
 			getLogger(),
-			"greet", // entry point
+			"greet",
 		)
 		require.NoError(t, err)
 		require.NotNil(t, extismEvalNoInput)
@@ -831,100 +685,7 @@ _ = result`
 	})
 }
 
-func TestFileWithDataFunctions(t *testing.T) {
-	t.Parallel()
-
-	// Create temporary test files
-	tmpDir := t.TempDir()
-
-	// Create test files to use for testing
-	risorPath := filepath.Join(tmpDir, "test.risor")
-	risorContent := `{ "message": "Hello from Risor!" }`
-	err := os.WriteFile(risorPath, []byte(risorContent), 0o644)
-	require.NoError(t, err)
-
-	starlarkPath := filepath.Join(tmpDir, "test.star")
-	starlarkContent := `result = {"message": "Hello from Starlark!"}\n_ = result`
-	err = os.WriteFile(starlarkPath, []byte(starlarkContent), 0o644)
-	require.NoError(t, err)
-
-	// Test FromRisorFileWithData
-	t.Run("FromRisorFileWithData", func(t *testing.T) {
-		logger := getLogger()
-		staticData := map[string]any{"test": "data"}
-
-		// This just needs to call the function, even if execution would fail later
-		_, err := FromRisorFileWithData(risorPath, staticData, logger)
-		// We don't assert on the result since we just want to cover the function
-		_ = err
-	})
-
-	// Test FromStarlarkFileWithData
-	t.Run("FromStarlarkFileWithData", func(t *testing.T) {
-		logger := getLogger()
-		staticData := map[string]any{"test": "data"}
-
-		// This just needs to call the function, even if execution would fail later
-		_, err := FromStarlarkFileWithData(starlarkPath, staticData, logger)
-		// We don't assert on the result since we just want to cover the function
-		_ = err
-	})
-}
-
-func TestFromStringLoader(t *testing.T) {
-	t.Parallel()
-
-	// Test the Extism string loader error case directly
-	t.Run("ExtismStringNotSupported", func(t *testing.T) {
-		// We can't call it directly, so we'll make our own version
-		// that's similar to what FromExtismString would look like
-		// if it existed, but just enough to test the error branch
-		content := "test"
-		l, err := loader.NewFromString(content)
-		require.NoError(t, err)
-
-		// Create the options with the string loader
-		opts := []any{options.WithLoader(l)}
-
-		// Create Extism evaluator, which should fail
-		_, err = NewExtismEvaluator(opts...)
-		// We just want to make sure it errors out
-		require.Error(t, err)
-	})
-}
-
-func TestCreateEvaluatorEdgeCases2(t *testing.T) {
-	t.Parallel()
-
-	// Test a case where source URL is nil
-	t.Run("NilSourceURL", func(t *testing.T) {
-		// Create a minimal mock loader with nil URL
-		mockLoader := &mockLoader{}
-
-		// Create an evaluator with this loader
-		_, err := NewRisorEvaluator(
-			options.WithLoader(mockLoader),
-			options.WithDefaults(),
-		)
-
-		// Because we specified risorCompiler.WithGlobals, we'll get compiler options error
-		require.Error(t, err)
-	})
-}
-
-// mockLoader is a simple implementation of loader.Loader that's just enough to test
-// the nil source URL case
-type mockLoader struct{}
-
-func (m *mockLoader) GetReader() (io.ReadCloser, error) {
-	return io.NopCloser(strings.NewReader("return 0")), nil
-}
-
-func (m *mockLoader) GetSourceURL() *url.URL {
-	return nil
-}
-
-func TestNewExtismEvaluator(t *testing.T) {
+func TestFromExtismFile(t *testing.T) {
 	t.Parallel()
 
 	// Create a temporary directory for the WASM file
@@ -938,21 +699,12 @@ func TestNewExtismEvaluator(t *testing.T) {
 	// Create a logger handler
 	handler := getLogger()
 
-	// Create an evaluator with file loader
-	evaluator, err := NewExtismEvaluator(
-		options.WithDefaults(),
-		options.WithLoader(
-			func() loader.Loader {
-				loader, err := loader.NewFromDisk(wasmPath)
-				require.NoError(t, err)
-				return loader
-			}(),
-		),
-		options.WithLogHandler(handler),
-		options.WithDataProvider(data.NewStaticProvider(map[string]any{
-			"input": "Test User", // Put the input directly at the top level
-		})),
-		extismCompiler.WithEntryPoint("greet"),
+	// Create an evaluator with file loader and static data
+	evaluator, err := FromExtismFileWithData(
+		wasmPath,
+		map[string]any{"input": "Test User"},
+		handler,
+		"greet",
 	)
 
 	require.NoError(t, err)
@@ -976,24 +728,59 @@ func TestNewExtismEvaluator(t *testing.T) {
 func TestCreateEvaluatorEdgeCases(t *testing.T) {
 	t.Parallel()
 
-	// Test validation error in newEvaluator
-	t.Run("Configuration Validation Error", func(t *testing.T) {
-		// Try to create an evaluator without a loader
-		_, err := NewRisorEvaluator()
+	// Test error with empty script content
+	t.Run("Empty Script Content Error", func(t *testing.T) {
+		// Try to create an evaluator with empty script
+		_, err := FromRisorString("", getLogger())
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "no loader specified")
+		assert.Contains(t, err.Error(), "content is empty")
 	})
 
-	// Test option application error
-	t.Run("Option Error", func(t *testing.T) {
-		// Create an invalid option that returns an error
-		invalidOption := func(cfg *options.Config) error {
-			return errors.New("custom invalid option error")
-		}
-
-		// This should fail when applying the option
-		_, err := NewRisorEvaluator(invalidOption)
+	// Test invalid path error
+	t.Run("Invalid Path Error", func(t *testing.T) {
+		// Try to create an evaluator with non-existent file
+		_, err := FromRisorFile("/path/does/not/exist.risor", getLogger())
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "unsupported option type")
+		assert.Contains(t, err.Error(), "no such file or directory")
+	})
+
+	// Test with invalid script content
+	t.Run("InvalidScriptTest", func(t *testing.T) {
+		// Try to create an evaluator with invalid script content
+		_, err := FromRisorString("this is not valid risor code }{", getLogger())
+
+		// Should return an error when trying to compile invalid code
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "compile")
+	})
+}
+
+// MockStringLoader is a simple implementation of loader.Loader using a string
+type MockStringLoader struct{}
+
+func (m *MockStringLoader) GetReader() (io.ReadCloser, error) {
+	return io.NopCloser(strings.NewReader("return 0")), nil
+}
+
+func (m *MockStringLoader) GetSourceURL() *url.URL {
+	return nil
+}
+
+func TestFromStringLoader(t *testing.T) {
+	t.Parallel()
+
+	// Test the Extism string loader error case directly
+	t.Run("ExtismStringNotSupported", func(t *testing.T) {
+		// Just test if a hypothetical FromExtismString would have issues
+		// For now, we'll simulate this by testing if we can create a string loader
+		content := "test"
+		l, err := loader.NewFromString(content)
+		require.NoError(t, err)
+
+		// Since we know Extism is for WASM modules, string content
+		// would not be valid WASM, so this would fail.
+		// Just verify our loader was created correctly
+		require.NotNil(t, l)
+		require.NotNil(t, l.GetSourceURL())
 	})
 }

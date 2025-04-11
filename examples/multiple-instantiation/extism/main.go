@@ -10,10 +10,7 @@ import (
 
 	"github.com/robbyt/go-polyscript"
 	"github.com/robbyt/go-polyscript/engine"
-	"github.com/robbyt/go-polyscript/engine/options"
 	"github.com/robbyt/go-polyscript/execution/constants"
-	"github.com/robbyt/go-polyscript/execution/data"
-	"github.com/robbyt/go-polyscript/machines/extism/compiler"
 )
 
 // ExtismEvaluator is a type alias to make testing cleaner
@@ -59,15 +56,12 @@ func createEvaluator(handler slog.Handler) (ExtismEvaluator, error) {
 		return nil, err
 	}
 
-	// Create the context provider for runtime data
-	dataProvider := data.NewContextProvider(constants.EvalData)
-
 	// Create the evaluator
+	// Uses the simpler interface with dynamic data only via context
 	evaluator, err := polyscript.FromExtismFile(
 		wasmFilePath,
-		options.WithLogHandler(handler),
-		options.WithDataProvider(dataProvider),
-		compiler.WithEntryPoint("greet"),
+		handler,
+		"greet", // entry point
 	)
 	if err != nil {
 		logger.Error("Failed to create evaluator", "error", err)

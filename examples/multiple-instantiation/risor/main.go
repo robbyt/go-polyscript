@@ -9,10 +9,7 @@ import (
 
 	"github.com/robbyt/go-polyscript"
 	"github.com/robbyt/go-polyscript/engine"
-	"github.com/robbyt/go-polyscript/engine/options"
 	"github.com/robbyt/go-polyscript/execution/constants"
-	"github.com/robbyt/go-polyscript/execution/data"
-	"github.com/robbyt/go-polyscript/machines/risor/compiler"
 )
 
 // RisorEvaluator is a type alias to make testing cleaner
@@ -28,19 +25,11 @@ func createEvaluator(handler slog.Handler) (RisorEvaluator, error) {
 	}
 	logger := slog.New(handler)
 
-	// Define globals that will be available to the script
-	globals := []string{constants.Ctx}
-
-	// Create a context provider for runtime data
-	ctxProvider := data.NewContextProvider(constants.EvalData)
-
-	// Create evaluator using the functional options pattern
+	// Create evaluator using the new simplified interface
+	// This provides a dynamic context provider automatically
 	evaluator, err := polyscript.FromRisorString(
 		risorScript,
-		options.WithDefaults(),
-		options.WithLogHandler(handler),
-		options.WithDataProvider(ctxProvider),
-		compiler.WithGlobals(globals),
+		handler,
 	)
 	if err != nil {
 		logger.Error("Failed to create evaluator", "error", err)

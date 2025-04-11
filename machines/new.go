@@ -9,12 +9,12 @@ import (
 
 	"github.com/robbyt/go-polyscript/engine"
 	"github.com/robbyt/go-polyscript/execution/script"
-	extismMachine "github.com/robbyt/go-polyscript/machines/extism"
 	extismCompiler "github.com/robbyt/go-polyscript/machines/extism/compiler"
-	risorMachine "github.com/robbyt/go-polyscript/machines/risor"
+	extismEvaluator "github.com/robbyt/go-polyscript/machines/extism/evaluator"
 	risorCompiler "github.com/robbyt/go-polyscript/machines/risor/compiler"
-	starlarkMachine "github.com/robbyt/go-polyscript/machines/starlark"
+	risorEvaluator "github.com/robbyt/go-polyscript/machines/risor/evaluator"
 	starlarkCompiler "github.com/robbyt/go-polyscript/machines/starlark/compiler"
+	starlarkEvaluator "github.com/robbyt/go-polyscript/machines/starlark/evaluator"
 
 	machineTypes "github.com/robbyt/go-polyscript/machines/types"
 )
@@ -30,13 +30,13 @@ func NewEvaluator(handler slog.Handler, ver *script.ExecutableUnit) (engine.Eval
 	switch ver.GetMachineType() {
 	case machineTypes.Risor:
 		// Risor VM: https://github.com/risor-io/risor
-		return risorMachine.NewBytecodeEvaluator(handler, ver), nil
+		return risorEvaluator.NewBytecodeEvaluator(handler, ver), nil
 	case machineTypes.Starlark:
 		// Starlark VM: https://github.com/google/starlark-go
-		return starlarkMachine.NewBytecodeEvaluator(handler, ver), nil
+		return starlarkEvaluator.NewBytecodeEvaluator(handler, ver), nil
 	case machineTypes.Extism:
 		// Extism WASM VM: https://extism.org/
-		return extismMachine.NewBytecodeEvaluator(handler, ver), nil
+		return extismEvaluator.NewBytecodeEvaluator(handler, ver), nil
 	default:
 		return nil, fmt.Errorf("%w: %s", machineTypes.ErrInvalidMachineType, ver.GetMachineType())
 	}
@@ -64,7 +64,11 @@ func NewCompiler(opts ...any) (script.Compiler, error) {
 		}
 
 		if allMatch && len(risorOpts) > 0 {
-			return NewRisorCompiler(risorOpts...)
+			compiler, err := risorCompiler.NewCompiler(risorOpts...)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create Risor compiler: %w", err)
+			}
+			return compiler, nil
 		}
 	}
 
@@ -83,7 +87,11 @@ func NewCompiler(opts ...any) (script.Compiler, error) {
 		}
 
 		if allMatch && len(starlarkOpts) > 0 {
-			return NewStarlarkCompiler(starlarkOpts...)
+			compiler, err := starlarkCompiler.NewCompiler(starlarkOpts...)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create Starlark compiler: %w", err)
+			}
+			return compiler, nil
 		}
 	}
 
@@ -102,39 +110,13 @@ func NewCompiler(opts ...any) (script.Compiler, error) {
 		}
 
 		if allMatch && len(extismOpts) > 0 {
-			return NewExtismCompiler(extismOpts...)
+			compiler, err := extismCompiler.NewCompiler(extismOpts...)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create Extism compiler: %w", err)
+			}
+			return compiler, nil
 		}
 	}
 
 	return nil, fmt.Errorf("unable to determine compiler type from provided options")
-}
-
-// NewRisorCompiler creates a new Risor compiler using the functional options pattern.
-// See the risorMachine package for available compiler options.
-func NewRisorCompiler(opts ...risorCompiler.FunctionalOption) (script.Compiler, error) {
-	compiler, err := risorMachine.NewCompiler(opts...)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create Risor compiler: %w", err)
-	}
-	return compiler, nil
-}
-
-// NewStarlarkCompiler creates a new Starlark compiler using the functional options pattern.
-// See the starlarkMachine package for available compiler options.
-func NewStarlarkCompiler(opts ...starlarkCompiler.FunctionalOption) (script.Compiler, error) {
-	compiler, err := starlarkMachine.NewCompiler(opts...)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create Starlark compiler: %w", err)
-	}
-	return compiler, nil
-}
-
-// NewExtismCompiler creates a new Extism compiler using the functional options pattern.
-// See the extismMachine package for available compiler options.
-func NewExtismCompiler(opts ...extismCompiler.FunctionalOption) (script.Compiler, error) {
-	compiler, err := extismMachine.NewCompiler(opts...)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create Extism compiler: %w", err)
-	}
-	return compiler, nil
 }
