@@ -178,12 +178,11 @@ go-polyscript is structured around a few key concepts:
 1. **Loader**: Loads script content from various sources (files, strings, http, etc.)
 2. **Compiler**: Validates and compiles scripts into internal "bytecode"
 3. **ExecutableUnit**: Represents a compiled script ready for execution
-4. **ExecutionPackage**: Contains an **ExecutableUnit** and other metadata
-5. **Evaluator**: Executes compiled scripts with provided input data
-6. **EvalDataPreparer**: Prepares data for evaluation (can be separated from evaluation)
-7. **Provider**: Supplies data to scripts during evaluation
-8. **Machine**: A specific implementation of a scripting engine (Risor, Starlark, Extism)
-9. **EvaluatorResponse**: The response object returned from all **Machine**s
+4. **Evaluator**: Executes compiled scripts with provided input data
+5. **EvalDataPreparer**: Prepares data for evaluation (can be separated from evaluation)
+6. **Provider**: Supplies data to scripts during evaluation
+7. **Machine**: A specific implementation of a scripting engine (Risor, Starlark, Extism)
+8. **EvaluatorResponse**: The response object returned from all **Machine**s
 
 ### Note on Data Access Patterns
 
