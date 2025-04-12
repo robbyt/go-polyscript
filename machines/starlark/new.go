@@ -58,8 +58,7 @@ func FromStarlarkLoaderWithData(
 }
 
 // NewCompiler creates a new Starlark compiler using the functional options pattern.
-// See the starlarkMachine package for available compiler options. Returns a compiler,
-// which implements the script.Compiler interface.
+// Returns a compiler implementing the script.Compiler interface.
 func NewCompiler(opts ...compiler.FunctionalOption) (*compiler.Compiler, error) {
 	return compiler.New(opts...)
 }

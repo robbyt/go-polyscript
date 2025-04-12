@@ -64,8 +64,7 @@ func FromExtismLoaderWithData(
 }
 
 // NewCompiler creates a new Extism compiler using the functional options pattern.
-// See the extismMachine package for available compiler options. Returns a compiler,
-// which implements the script.Compiler interface.
+// Returns a compiler implementing the script.Compiler interface.
 func NewCompiler(opts ...compiler.FunctionalOption) (*compiler.Compiler, error) {
 	return compiler.New(opts...)
 }
