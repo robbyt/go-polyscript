@@ -141,8 +141,6 @@ func (be *Evaluator) exec(
 			mainVal = resultVal
 		}
 	}
-
-	logger.InfoContext(ctx, "execution complete", "result", mainVal)
 	return newEvalResult(be.logHandler, mainVal, execTime, ""), nil
 }
 
@@ -196,9 +194,9 @@ func (be *Evaluator) Eval(ctx context.Context) (engine.EvaluatorResponse, error)
 	// 4. Execute the program
 	result, err := be.exec(ctx, prog, runtimeData)
 	if err != nil {
-		return nil, fmt.Errorf("execution error: %w", err)
+		return nil, fmt.Errorf("exec error: %w", err)
 	}
-	logger.Debug("script execution complete", "result", result)
+	logger.DebugContext(ctx, "exec complete", "result", result)
 
 	// 5. Collect results
 	result.scriptExeID = exeID
@@ -218,7 +216,6 @@ func (be *Evaluator) Eval(ctx context.Context) (engine.EvaluatorResponse, error)
 		}
 		// "Freeze" the value to prevent any further modifications
 		val.Freeze()
-		logger.DebugContext(ctx, "execution complete")
 		return newEvalResult(be.logHandler, val, result.execTime, exeID), nil
 	}
 

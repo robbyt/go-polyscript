@@ -9,9 +9,9 @@ A Go package providing a unified interface for loading and running various scrip
 
 ## Overview
 
-go-polyscript provides a consistent API across different scripting engines, allowing for easy interchangeability and minimizing lock-in to a specific scripting language. This is achieved through a low-overhead abstraction of "machines," "executables," and the final "result". The input/output and runtime features provided by the scripting engines are standardized, which simplifies combining or swapping scripting engines in your application.
+go-polyscript provides a consistent API across different scripting engines, allowing for easy interchangeability and minimizing lock-in to a specific scripting language. This package provides low-overhead abstractions of "machines," "executables," and the final "result". The API for the input/output and runtime are all standardized, which simplifies combining or swapping scripting engines in your application.
 
-Currently supported scripting engines ("machines"):
+Currently supported scripting engines "machines":
 
 - **Risor**: A simple scripting language specifically designed for embedding in Go applications
 - **Starlark**: Google's configuration language (a Python dialect) used in Bazel and many other tools
@@ -21,11 +21,10 @@ Currently supported scripting engines ("machines"):
 
 - **Unified API**: Common interfaces for all supported scripting languages
 - **Flexible Engine Selection**: Easily switch between different script engines
-- **Powerful Data Passing**: Multiple ways to provide input data to scripts
-- **Comprehensive Logging**: Structured logging with `slog` support
-- **Error Handling**: Robust error handling and reporting from script execution
+- **Thread-safe Data Management**: Multiple ways to provide input data to scripts
 - **Compilation and Evaluation Separation**: Compile once, run multiple times with different inputs
 - **Data Preparation and Evaluation Separation**: Prepare data in one step/system, evaluate in another
+- **Slog Logging**: Customizable structured logging with `slog`
 
 ## Installation
 
@@ -35,7 +34,7 @@ go get github.com/robbyt/go-polyscript@latest
 
 ## Quick Start
 
-Here's a simple example of using go-polyscript with the Risor scripting engine:
+Using go-polyscript with the Risor scripting engine:
 
 ```go
 package main
@@ -47,10 +46,6 @@ import (
 	"os"
 
 	"github.com/robbyt/go-polyscript"
-	"github.com/robbyt/go-polyscript/execution/constants"
-	"github.com/robbyt/go-polyscript/execution/data"
-	"github.com/robbyt/go-polyscript/machines/risor"
-	"github.com/robbyt/go-polyscript/engine/options"
 )
 
 func main() {
@@ -73,15 +68,12 @@ func main() {
 	
 	// Input data
 	inputData := map[string]any{"name": "World"}
-	dataProvider := data.NewStaticProvider(inputData)
 	
-	// Create evaluator with functional options
-	evaluator, err := polyscript.FromRisorString(
+	// Create evaluator from string with static data
+	evaluator, err := polyscript.FromRisorStringWithData(
 		scriptContent,
-		options.WithDefaults(),
-		options.WithLogHandler(handler),
-		options.WithDataProvider(dataProvider),
-		risor.WithGlobals([]string{"ctx"}),
+		inputData,
+		handler,
 	)
 	if err != nil {
 		logger.Error("Failed to create evaluator", "error", err)
@@ -110,12 +102,11 @@ go-polyscript uses data providers to supply information to scripts during evalua
 The `StaticProvider` supplies fixed data for all evaluations. This is ideal for scenarios where the input data remains constant across evaluations:
 
 ```go
-// Create a static provider with predefined data
+// Create static data for configuration
 configData := map[string]any{"name": "World", "timeout": 30}
-provider := data.NewStaticProvider(configData)
 
-// Create evaluator with the provider
-evaluator, err := polyscript.FromRisorString(script, options.WithDataProvider(provider))
+// Create evaluator with static data
+evaluator, err := polyscript.FromRisorStringWithData(script, configData, logHandler)
 
 // In scripts, static data is accessed directly:
 // name := ctx["name"]  // "World"
@@ -128,45 +119,57 @@ However, when using `StaticProvider`, each evaluation will always use the same i
 The `ContextProvider` retrieves dynamic data from the context and makes it available to scripts. This is useful for scenarios where input data changes at runtime:
 
 ```go
-// Create a context provider for dynamic data
-provider := data.NewContextProvider(constants.EvalData)
+// Create evaluator with dynamic data capability
+evaluator, err := polyscript.FromRisorString(script, logHandler)
 
-// Prepare context with runtime data
+// Prepare context with runtime data for each request
 ctx := context.Background()
-userData := map[string]any{"userId": 123, "preferences": {"theme": "dark"}}
-enrichedCtx, _ := provider.AddDataToContext(ctx, userData)
+userData := map[string]any{"userId": 123, "preferences": map[string]string{"theme": "dark"}}
+enrichedCtx, err := evaluator.PrepareContext(ctx, userData)
+if err != nil {
+    // handle error
+}
 
-// Create evaluator with the provider
-evaluator, err := polyscript.FromRisorString(script, options.WithDataProvider(provider))
+// Execute with the enriched context
+result, err := evaluator.Eval(enrichedCtx)
 
 // In scripts, dynamic data is accessed via input_data:
 // userId := ctx["input_data"]["userId"]  // 123
 ```
 
-### CompositeProvider
+### Combining Static and Dynamic Data
 
-To combine static data with dynamic runtime data, you can use the `CompositeProvider`. This allows you to stack a `StaticProvider` with a `ContextProvider`, enabling both fixed and variable data to be available during evaluation:
+go-polyscript makes it easy to combine static configuration data with dynamic request data. This is a common pattern where you want both fixed configuration values and per-request variable data to be available during evaluation:
 
 ```go
-// Create providers for static and dynamic data
-staticProvider := data.NewStaticProvider(map[string]any{
+// Create static configuration data
+staticData := map[string]any{
     "appName": "MyApp",
     "version": "1.0",
-})
-ctxProvider := data.NewContextProvider(constants.EvalData)
+}
 
-// Combine them using CompositeProvider
-provider := data.NewCompositeProvider(staticProvider, ctxProvider)
+// Create evaluator with the static data
+evaluator, err := polyscript.FromRisorStringWithData(script, staticData, logHandler)
+if err != nil {
+    // handle error
+}
 
-// Create evaluator with the composite provider
-evaluator, err := polyscript.FromRisorString(script, options.WithDataProvider(provider))
+// For each request, prepare dynamic data
+requestData := map[string]any{"userId": 123, "preferences": map[string]string{"theme": "dark"}}
+enrichedCtx, err := evaluator.PrepareContext(context.Background(), requestData)
+if err != nil {
+    // handle error
+}
+
+// Execute with both static and dynamic data available
+result, err := evaluator.Eval(enrichedCtx)
 
 // In scripts, data can be accessed from both locations:
 // appName := ctx["appName"]  // Static data: "MyApp"
 // userId := ctx["input_data"]["userId"]  // Dynamic data: 123
 ```
 
-By using the `CompositeProvider`, you can ensure that your scripts have access to both constant configuration values and per-evaluation runtime data, making your evaluations more flexible and powerful.
+This pattern ensures that your scripts have access to both constant configuration values and per-evaluation runtime data, making your evaluations more flexible and powerful.
 
 ## Architecture
 
@@ -198,7 +201,7 @@ go-polyscript provides the `EvalDataPreparer` interface to separate data prepara
 
 ```go
 // Create an evaluator (implements EvaluatorWithPrep interface)
-evaluator, err := polyscript.FromRisorString(script, options...)
+evaluator, err := polyscript.FromRisorString(script, logHandler)
 if err != nil {
     // handle error
 }
@@ -224,22 +227,24 @@ For more detailed examples of this pattern, see the [data-prep examples](example
 ### Using Starlark
 
 ```go
-// Create a Starlark evaluator with options
-evaluator, err := polyscript.FromStarlarkString(
-    `
-    # Starlark has access to ctx variable
-    name = ctx["name"]
-    message = "Hello, " + name + "!"
-    
-    # Create the result dictionary
-    result = {"greeting": message, "length": len(message)}
-    
-    # Assign to _ to return the value
-    _ = result
-    `,
-    options.WithDefaults(),
-    options.WithDataProvider(data.NewStaticProvider(map[string]any{"name": "World"})),
-    starlark.WithGlobals([]string{constants.Ctx}),
+// Create a Starlark evaluator with static data
+scriptContent := `
+# Starlark has access to ctx variable
+name = ctx["name"]
+message = "Hello, " + name + "!"
+
+# Create the result dictionary
+result = {"greeting": message, "length": len(message)}
+
+# Assign to _ to return the value
+_ = result
+`
+
+staticData := map[string]any{"name": "World"}
+evaluator, err := polyscript.FromStarlarkStringWithData(
+    scriptContent,
+    staticData,
+    logHandler,
 )
 
 // Execute with a context
@@ -249,12 +254,13 @@ result, err := evaluator.Eval(context.Background())
 ### Using WebAssembly with Extism
 
 ```go
-// Create an Extism evaluator
-evaluator, err := polyscript.FromExtismFile(
+// Create an Extism evaluator with static data
+staticData := map[string]any{"input": "World"}
+evaluator, err := polyscript.FromExtismFileWithData(
     "/path/to/module.wasm",
-    options.WithDefaults(),
-    options.WithDataProvider(data.NewStaticProvider(map[string]any{"input": "World"})),
-    extism.WithEntryPoint("greet"),
+    staticData,
+    logHandler,
+    "greet",  // entryPoint
 )
 
 // Execute with a context

@@ -1,9 +1,8 @@
-## Benchmarking VMs, and general optimization
+# Benchmark Documentation
 
-This directory contains benchmarking tools and historical benchmark records to track performance 
-characteristics of go-polyscript. These benchmarks serve as both documentation of optimization 
-effectiveness and protection against performance regressions. The data collected here demonstrates 
-the impact of various performance optimizations implemented throughout the package.
+This directory contains benchmarking tools and historical benchmark records for go-polyscript performance analysis. Benchmarks serve as documentation of optimization effectiveness and protection against performance regressions.
+
+## Performance Optimization Patterns
 
 ### 1. Compile Once, Run Many Times
 
@@ -31,23 +30,23 @@ enrichedCtx, _ := evaluator.PrepareContext(ctx, inputData)
 result, _ := evaluator.Eval(enrichedCtx)
 ```
 
-### 3. Provider Selection
+### 3. Provider Performance Comparison
 
-The benchmarks also show performance differences between `data.Provider` implementations:
+The benchmarks show performance differences between `data.Provider` implementations:
 
-- **StaticProvider**: Fastest overall - use when runtime data is not needed, and input data is static
-- **ContextProvider**: Needed for request-specific data that varies per execution, data stored in local memory
-- **CompositeProvider**: Meta-provider, enabling multiple `data.Provider` objects in a series
+- **StaticProvider**: Fastest overall (~5-10% faster than other providers) - use when input data is static
+- **ContextProvider**: Needed for request-specific data that varies per execution
+- **CompositeProvider**: Small overhead but enables both static configuration and dynamic request data
 
-### 4. VM Selection Trade-offs
+### 4. Script Engine Performance Characteristics
 
-Performance characteristics vary by VM implementation:
+Performance characteristics vary significantly by implementation:
 
-- **Risor**: Fast general-purpose scripting with broad Go compatibility
-- **Starlark**: Excellent for configuration processing with Python-like syntax
-- **Extism/WASM**: Best security isolation with pre-compiled modules
+- **Risor**: Generally fastest for general-purpose scripting with good Go interoperability
+- **Starlark**: Optimized for configuration processing with Python-like syntax
+- **Extism/WASM**: Best for security isolation with pre-compiled modules
 
-### Running Benchmarks
+## Running Benchmarks
 
 To benchmark go-polyscript performance in your environment:
 
@@ -56,7 +55,7 @@ To benchmark go-polyscript performance in your environment:
 make bench
 
 # Run specific benchmark pattern
-./benchmark.sh BenchmarkEvaluationPatterns
+./benchmarks/run.sh BenchmarkEvaluationPatterns
 
 # Quick benchmark without reports
 make bench-quick
@@ -64,3 +63,24 @@ make bench-quick
 # Benchmark with specific iterations
 go test -bench=BenchmarkVMComparison -benchmem -benchtime=10x ./engine
 ```
+
+## Historical Results
+
+Benchmark results are stored in the `results/` directory with timestamps. This allows tracking performance changes over time and identifying performance regressions:
+
+- `benchmark_YYYY-MM-DD_HH-MM-SS.json` - Raw benchmark data
+- `benchmark_YYYY-MM-DD_HH-MM-SS.txt` - Human-readable summary
+- `comparison.txt` - Comparison of current results with previous runs
+- `latest.txt` - Most recent benchmark summary
+
+## Benchmarking Infrastructure
+
+The benchmarking infrastructure in go-polyscript automatically:
+
+1. Runs comprehensive benchmarks across all script engines
+2. Compares execution patterns (one-time vs. compile-once-run-many)
+3. Measures data provider performance differences
+4. Records results for historical comparison
+5. Generates human-readable reports
+
+For more detailed examples of optimized script usage patterns, see the [examples directory](../examples/).

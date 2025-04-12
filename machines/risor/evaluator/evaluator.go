@@ -78,7 +78,6 @@ func (be *Evaluator) exec(
 	bytecode *risorCompiler.Code,
 	options ...risorLib.Option,
 ) (*execResult, error) {
-	logger := be.logger.WithGroup("exec")
 	startTime := time.Now()
 	result, err := risorLib.EvalCode(ctx, bytecode, options...)
 	execTime := time.Since(startTime)
@@ -86,8 +85,6 @@ func (be *Evaluator) exec(
 	if err != nil {
 		return nil, fmt.Errorf("risor execution error: %w", err)
 	}
-
-	logger.InfoContext(ctx, "execution complete", "result", result)
 	return newEvalResult(be.logHandler, result, execTime, ""), nil
 }
 
@@ -136,9 +133,9 @@ func (be *Evaluator) Eval(ctx context.Context) (engine.EvaluatorResponse, error)
 	// 4. Execute the program
 	result, err := be.exec(ctx, risorByteCode, runtimeData...)
 	if err != nil {
-		return nil, fmt.Errorf("error returned from script: %w", err)
+		return nil, fmt.Errorf("exec error: %w", err)
 	}
-	logger.Debug("script execution complete", "result", result)
+	logger.DebugContext(ctx, "exec complete", "result", result)
 
 	// 5. Collect results
 	result.scriptExeID = exeID
@@ -155,7 +152,6 @@ func (be *Evaluator) Eval(ctx context.Context) (engine.EvaluatorResponse, error)
 		return result, fmt.Errorf("function object returned from script: %s", result.Inspect())
 	}
 
-	logger.DebugContext(ctx, "execution complete")
 	return result, nil
 }
 

@@ -40,7 +40,7 @@ def process_data():
     
     return result
 
-# Call the function and store the result
 result = process_data()
-# The underscore variable is what gets returned to the VM
+
+# The underscore variable is returned to Go
 _ = result

@@ -137,8 +137,6 @@ func (be *Evaluator) exec(
 	if err != nil {
 		return nil, fmt.Errorf("extism execution error: %w", err)
 	}
-
-	logger.InfoContext(ctx, "execution complete", "result", result)
 	return newEvalResult(be.logHandler, result, execTime, ""), nil
 }
 
@@ -201,12 +199,12 @@ func (be *Evaluator) Eval(ctx context.Context) (engine.EvaluatorResponse, error)
 		runtimeData,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("execution error: %w", err)
+		return nil, fmt.Errorf("exec error: %w", err)
 	}
+	logger.DebugContext(ctx, "exec completed", "result", result)
 
 	// 5. Collect results
 	result.scriptExeID = exeID
-	logger.DebugContext(ctx, "execution complete")
 	return result, nil
 }
 
