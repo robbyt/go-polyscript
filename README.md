@@ -148,7 +148,7 @@ go-polyscript is structured around a few key concepts:
 1. **Loader**: Loads script content from various sources (disk, `io.Reader`, strings, http, etc.)
 2. **Compiler**: Validates and compiles scripts into internal "bytecode"
 3. **ExecutableUnit**: Compiled script bundle, ready for execution
-4. **Engine**: A specific implementation of a scripting machine (Risor, Starlark, Extism)
+4. **Engine**: A specific implementation of a scripting engine (Risor, Starlark, Extism)
 5. **Evaluator**: Executes compiled scripts with provided input data
 6. **DataProvider**: Sends data to the VM prior to evaluation
 7. **EvaluatorResponse**: The response object returned from all **Engine**s
