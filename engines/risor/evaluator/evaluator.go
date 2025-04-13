@@ -8,12 +8,12 @@ import (
 
 	risorLib "github.com/risor-io/risor"
 	risorCompiler "github.com/risor-io/risor/compiler"
-	"github.com/robbyt/go-polyscript/abstract/constants"
-	"github.com/robbyt/go-polyscript/abstract/data"
-	"github.com/robbyt/go-polyscript/abstract/evaluation"
-	"github.com/robbyt/go-polyscript/abstract/script"
 	"github.com/robbyt/go-polyscript/engines/risor/internal"
 	"github.com/robbyt/go-polyscript/internal/helpers"
+	"github.com/robbyt/go-polyscript/platform"
+	"github.com/robbyt/go-polyscript/platform/constants"
+	"github.com/robbyt/go-polyscript/platform/data"
+	"github.com/robbyt/go-polyscript/platform/script"
 )
 
 // Evaluator is an abstraction layer for evaluating bytecode on the Risor VM
@@ -89,7 +89,7 @@ func (be *Evaluator) exec(
 }
 
 // Eval evaluates the loaded bytecode and uses the provided EvalData to pass data in to the Risor VM execution
-func (be *Evaluator) Eval(ctx context.Context) (evaluation.EvaluatorResponse, error) {
+func (be *Evaluator) Eval(ctx context.Context) (platform.EvaluatorResponse, error) {
 	logger := be.logger.WithGroup("Eval")
 	if be.execUnit == nil {
 		return nil, fmt.Errorf("executable unit is nil")

@@ -7,12 +7,12 @@ import (
 	"os"
 	"testing"
 
-	"github.com/robbyt/go-polyscript/abstract/data"
-	"github.com/robbyt/go-polyscript/abstract/script"
 	extismCompiler "github.com/robbyt/go-polyscript/engines/extism/compiler"
 	risorCompiler "github.com/robbyt/go-polyscript/engines/risor/compiler"
 	starlarkCompiler "github.com/robbyt/go-polyscript/engines/starlark/compiler"
 	machineTypes "github.com/robbyt/go-polyscript/engines/types"
+	"github.com/robbyt/go-polyscript/platform/data"
+	"github.com/robbyt/go-polyscript/platform/script"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )

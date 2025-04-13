@@ -9,12 +9,12 @@ import (
 	"time"
 
 	"github.com/robbyt/go-polyscript"
-	"github.com/robbyt/go-polyscript/abstract/evaluation"
 	"github.com/robbyt/go-polyscript/internal/helpers"
+	"github.com/robbyt/go-polyscript/platform"
 )
 
 // ExtismEvaluator is a type alias to make testing cleaner
-type ExtismEvaluator = evaluation.Evaluator
+type ExtismEvaluator = platform.Evaluator
 
 const (
 	EntryPointFuncName = "greet" // Entry point in the WASM module

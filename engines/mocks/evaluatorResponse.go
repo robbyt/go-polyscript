@@ -1,7 +1,7 @@
 package mocks
 
 import (
-	"github.com/robbyt/go-polyscript/abstract/data"
+	"github.com/robbyt/go-polyscript/platform/data"
 	"github.com/stretchr/testify/mock"
 )
 

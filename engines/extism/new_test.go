@@ -10,9 +10,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/robbyt/go-polyscript/abstract/data"
-	"github.com/robbyt/go-polyscript/abstract/script/loader"
 	"github.com/robbyt/go-polyscript/engines/extism/compiler"
+	"github.com/robbyt/go-polyscript/platform/data"
+	"github.com/robbyt/go-polyscript/platform/script/loader"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

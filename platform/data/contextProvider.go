@@ -7,8 +7,8 @@ import (
 	"maps"
 	"net/http"
 
-	"github.com/robbyt/go-polyscript/abstract/constants"
 	"github.com/robbyt/go-polyscript/internal/helpers"
+	"github.com/robbyt/go-polyscript/platform/constants"
 )
 
 // ContextProvider retrieves and stores data in the context using a specified key.

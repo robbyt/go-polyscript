@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/robbyt/go-polyscript/abstract/constants"
+	"github.com/robbyt/go-polyscript/platform/constants"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

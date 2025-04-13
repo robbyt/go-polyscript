@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/robbyt/go-polyscript/abstract/script/loader/httpauth"
+	"github.com/robbyt/go-polyscript/platform/script/loader/httpauth"
 	"github.com/stretchr/testify/require"
 )
 

@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/robbyt/go-polyscript/abstract/data"
-	"github.com/robbyt/go-polyscript/abstract/evaluation"
+	"github.com/robbyt/go-polyscript/platform"
+	"github.com/robbyt/go-polyscript/platform/data"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -62,7 +62,7 @@ func TestResponseMethods(t *testing.T) {
 				assert.Equal(t, tt.expectValue, result.value)
 				assert.Equal(t, tt.execTime, result.execTime)
 				assert.Equal(t, tt.versionID, result.scriptExeID)
-				require.Implements(t, (*evaluation.EvaluatorResponse)(nil), result)
+				require.Implements(t, (*platform.EvaluatorResponse)(nil), result)
 			})
 		}
 	})

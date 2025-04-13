@@ -7,12 +7,12 @@ import (
 	"maps"
 	"time"
 
-	"github.com/robbyt/go-polyscript/abstract/constants"
-	"github.com/robbyt/go-polyscript/abstract/data"
-	"github.com/robbyt/go-polyscript/abstract/evaluation"
-	"github.com/robbyt/go-polyscript/abstract/script"
 	"github.com/robbyt/go-polyscript/engines/starlark/internal"
 	"github.com/robbyt/go-polyscript/internal/helpers"
+	"github.com/robbyt/go-polyscript/platform"
+	"github.com/robbyt/go-polyscript/platform/constants"
+	"github.com/robbyt/go-polyscript/platform/data"
+	"github.com/robbyt/go-polyscript/platform/script"
 	starlarkLib "go.starlark.net/starlark"
 )
 
@@ -145,7 +145,7 @@ func (be *Evaluator) exec(
 }
 
 // Eval evaluates the loaded bytecode and passes the provided data into the Starlark VM
-func (be *Evaluator) Eval(ctx context.Context) (evaluation.EvaluatorResponse, error) {
+func (be *Evaluator) Eval(ctx context.Context) (platform.EvaluatorResponse, error) {
 	logger := be.logger.WithGroup("Eval")
 	if be.execUnit == nil {
 		return nil, fmt.Errorf("executable unit is nil")

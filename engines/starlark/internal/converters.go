@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net/url"
 
-	"github.com/robbyt/go-polyscript/abstract/constants"
+	"github.com/robbyt/go-polyscript/platform/constants"
 	starlarkLib "go.starlark.net/starlark"
 )
 

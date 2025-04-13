@@ -7,8 +7,8 @@ import (
 	"testing"
 
 	extismSDK "github.com/extism/go-sdk"
-	"github.com/robbyt/go-polyscript/abstract/constants"
 	"github.com/robbyt/go-polyscript/engines/extism/compiler/internal/compile"
+	"github.com/robbyt/go-polyscript/platform/constants"
 	"github.com/stretchr/testify/require"
 	"github.com/tetratelabs/wazero"
 )

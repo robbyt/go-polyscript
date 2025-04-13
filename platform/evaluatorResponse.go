@@ -1,6 +1,6 @@
-package evaluation
+package platform
 
-import "github.com/robbyt/go-polyscript/abstract/data"
+import "github.com/robbyt/go-polyscript/platform/data"
 
 // EvaluatorResponse is based on the risor object.Object interface, but with some features removed
 type EvaluatorResponse interface {

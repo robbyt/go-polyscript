@@ -3,8 +3,8 @@ package mocks
 import (
 	"testing"
 
-	"github.com/robbyt/go-polyscript/abstract/data"
-	"github.com/robbyt/go-polyscript/abstract/evaluation"
+	"github.com/robbyt/go-polyscript/platform"
+	"github.com/robbyt/go-polyscript/platform/data"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -13,7 +13,7 @@ import (
 func TestEvaluatorResponseImplementsInterface(t *testing.T) {
 	t.Parallel()
 	// This is a compile-time check - if it doesn't compile, the test fails
-	var _ evaluation.EvaluatorResponse = (*EvaluatorResponse)(nil)
+	var _ platform.EvaluatorResponse = (*EvaluatorResponse)(nil)
 }
 
 // TestEvaluatorResponseType tests the Type method for different value types
@@ -207,7 +207,7 @@ func TestEvaluatorResponseFullUsage(t *testing.T) {
 	mockResp.On("GetExecTime").Return("50ms")
 
 	// Verify the implementation satisfies the interface
-	var response evaluation.EvaluatorResponse = mockResp
+	var response platform.EvaluatorResponse = mockResp
 
 	// Call all methods
 	assert.Equal(t, data.STRING, response.Type())

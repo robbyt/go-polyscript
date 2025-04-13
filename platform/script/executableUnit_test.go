@@ -11,9 +11,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/robbyt/go-polyscript/abstract/data"
-	"github.com/robbyt/go-polyscript/abstract/script/loader"
 	machineTypes "github.com/robbyt/go-polyscript/engines/types"
+	"github.com/robbyt/go-polyscript/platform/data"
+	"github.com/robbyt/go-polyscript/platform/script/loader"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )

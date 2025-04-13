@@ -6,10 +6,10 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/robbyt/go-polyscript/abstract/data"
-	"github.com/robbyt/go-polyscript/abstract/script/loader"
 	machineTypes "github.com/robbyt/go-polyscript/engines/types"
 	"github.com/robbyt/go-polyscript/internal/helpers"
+	"github.com/robbyt/go-polyscript/platform/data"
+	"github.com/robbyt/go-polyscript/platform/script/loader"
 )
 
 const checksumLength = 12

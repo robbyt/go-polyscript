@@ -3,8 +3,8 @@ package mocks
 import (
 	"context"
 
-	"github.com/robbyt/go-polyscript/abstract/evaluation"
-	"github.com/robbyt/go-polyscript/abstract/script"
+	"github.com/robbyt/go-polyscript/platform"
+	"github.com/robbyt/go-polyscript/platform/script"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -14,9 +14,9 @@ type Evaluator struct {
 }
 
 // Eval is a mock implementation of the Eval method.
-func (m *Evaluator) Eval(ctx context.Context) (evaluation.EvaluatorResponse, error) {
+func (m *Evaluator) Eval(ctx context.Context) (platform.EvaluatorResponse, error) {
 	args := m.Called(ctx)
-	return args.Get(0).(evaluation.EvaluatorResponse), args.Error(1)
+	return args.Get(0).(platform.EvaluatorResponse), args.Error(1)
 }
 
 // Reload is a mock implementation of the Reload method.

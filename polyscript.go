@@ -16,11 +16,11 @@ package polyscript
 import (
 	"log/slog"
 
-	"github.com/robbyt/go-polyscript/abstract/evaluation"
-	"github.com/robbyt/go-polyscript/abstract/script/loader"
 	extismMachine "github.com/robbyt/go-polyscript/engines/extism"
 	risorMachine "github.com/robbyt/go-polyscript/engines/risor"
 	starlarkMachine "github.com/robbyt/go-polyscript/engines/starlark"
+	"github.com/robbyt/go-polyscript/platform"
+	"github.com/robbyt/go-polyscript/platform/script/loader"
 )
 
 // FromExtismFile creates an Extism evaluator from a WASM file.
@@ -33,7 +33,7 @@ func FromExtismFile(
 	filePath string,
 	logHandler slog.Handler,
 	entryPoint string,
-) (evaluation.Evaluator, error) {
+) (platform.Evaluator, error) {
 	l, err := loader.NewFromDisk(filePath)
 	if err != nil {
 		return nil, err
@@ -58,7 +58,7 @@ func FromExtismFileWithData(
 	staticData map[string]any,
 	logHandler slog.Handler,
 	entryPoint string,
-) (evaluation.Evaluator, error) {
+) (platform.Evaluator, error) {
 	l, err := loader.NewFromDisk(filePath)
 	if err != nil {
 		return nil, err
@@ -76,7 +76,7 @@ func FromExtismFileWithData(
 func FromRisorFile(
 	filePath string,
 	logHandler slog.Handler,
-) (evaluation.Evaluator, error) {
+) (platform.Evaluator, error) {
 	l, err := loader.NewFromDisk(filePath)
 	if err != nil {
 		return nil, err
@@ -100,7 +100,7 @@ func FromRisorFileWithData(
 	filePath string,
 	staticData map[string]any,
 	logHandler slog.Handler,
-) (evaluation.Evaluator, error) {
+) (platform.Evaluator, error) {
 	l, err := loader.NewFromDisk(filePath)
 	if err != nil {
 		return nil, err
@@ -119,7 +119,7 @@ func FromRisorFileWithData(
 func FromRisorString(
 	content string,
 	logHandler slog.Handler,
-) (evaluation.Evaluator, error) {
+) (platform.Evaluator, error) {
 	l, err := loader.NewFromString(content)
 	if err != nil {
 		return nil, err
@@ -144,7 +144,7 @@ func FromRisorStringWithData(
 	script string,
 	staticData map[string]any,
 	logHandler slog.Handler,
-) (evaluation.Evaluator, error) {
+) (platform.Evaluator, error) {
 	l, err := loader.NewFromString(script)
 	if err != nil {
 		return nil, err
@@ -162,7 +162,7 @@ func FromRisorStringWithData(
 func FromStarlarkFile(
 	filePath string,
 	logHandler slog.Handler,
-) (evaluation.Evaluator, error) {
+) (platform.Evaluator, error) {
 	l, err := loader.NewFromDisk(filePath)
 	if err != nil {
 		return nil, err
@@ -186,7 +186,7 @@ func FromStarlarkFileWithData(
 	filePath string,
 	staticData map[string]any,
 	logHandler slog.Handler,
-) (evaluation.Evaluator, error) {
+) (platform.Evaluator, error) {
 	l, err := loader.NewFromDisk(filePath)
 	if err != nil {
 		return nil, err
@@ -205,7 +205,7 @@ func FromStarlarkFileWithData(
 func FromStarlarkString(
 	content string,
 	logHandler slog.Handler,
-) (evaluation.Evaluator, error) {
+) (platform.Evaluator, error) {
 	l, err := loader.NewFromString(content)
 	if err != nil {
 		return nil, err
@@ -231,7 +231,7 @@ func FromStarlarkStringWithData(
 	script string,
 	staticData map[string]any,
 	logHandler slog.Handler,
-) (evaluation.Evaluator, error) {
+) (platform.Evaluator, error) {
 	l, err := loader.NewFromString(script)
 	if err != nil {
 		return nil, err

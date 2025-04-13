@@ -8,10 +8,10 @@ import (
 	"os"
 	"testing"
 
-	"github.com/robbyt/go-polyscript/abstract/constants"
-	"github.com/robbyt/go-polyscript/abstract/data"
-	"github.com/robbyt/go-polyscript/abstract/script/loader"
 	"github.com/robbyt/go-polyscript/engines/starlark/compiler"
+	"github.com/robbyt/go-polyscript/platform/constants"
+	"github.com/robbyt/go-polyscript/platform/data"
+	"github.com/robbyt/go-polyscript/platform/script/loader"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

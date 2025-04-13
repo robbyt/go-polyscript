@@ -7,14 +7,14 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/robbyt/go-polyscript/abstract/evaluation"
-	"github.com/robbyt/go-polyscript/abstract/script"
 	extismCompiler "github.com/robbyt/go-polyscript/engines/extism/compiler"
 	extismEvaluator "github.com/robbyt/go-polyscript/engines/extism/evaluator"
 	risorCompiler "github.com/robbyt/go-polyscript/engines/risor/compiler"
 	risorEvaluator "github.com/robbyt/go-polyscript/engines/risor/evaluator"
 	starlarkCompiler "github.com/robbyt/go-polyscript/engines/starlark/compiler"
 	starlarkEvaluator "github.com/robbyt/go-polyscript/engines/starlark/evaluator"
+	"github.com/robbyt/go-polyscript/platform"
+	"github.com/robbyt/go-polyscript/platform/script"
 
 	machineTypes "github.com/robbyt/go-polyscript/engines/types"
 )
@@ -22,7 +22,7 @@ import (
 // NewEvaluator creates a new VM with the given CPU type and globals.
 // This will load a script from a ExecutableUnit object into the VM, and can be run immediately.
 // The ExecutableUnit contains a DataProvider that provides runtime data for evaluation.
-func NewEvaluator(handler slog.Handler, ver *script.ExecutableUnit) (evaluation.Evaluator, error) {
+func NewEvaluator(handler slog.Handler, ver *script.ExecutableUnit) (platform.Evaluator, error) {
 	if ver == nil {
 		return nil, fmt.Errorf("version is nil")
 	}

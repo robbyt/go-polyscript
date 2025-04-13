@@ -6,8 +6,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/robbyt/go-polyscript/abstract/data"
 	"github.com/robbyt/go-polyscript/engines/starlark/internal"
+	"github.com/robbyt/go-polyscript/platform/data"
 	starlarkLib "go.starlark.net/starlark"
 )
 

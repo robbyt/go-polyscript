@@ -7,8 +7,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/robbyt/go-polyscript/abstract/data"
-	"github.com/robbyt/go-polyscript/abstract/script"
+	"github.com/robbyt/go-polyscript/platform/data"
+	"github.com/robbyt/go-polyscript/platform/script"
 {{- range .Types}}
 	{{.Value}}Compiler "github.com/robbyt/go-polyscript/engines/{{.Value}}/compiler"
 {{- end}}

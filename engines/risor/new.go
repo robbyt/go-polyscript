@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/robbyt/go-polyscript/abstract/constants"
-	"github.com/robbyt/go-polyscript/abstract/data"
-	"github.com/robbyt/go-polyscript/abstract/script"
-	"github.com/robbyt/go-polyscript/abstract/script/loader"
 	"github.com/robbyt/go-polyscript/engines/risor/compiler"
 	"github.com/robbyt/go-polyscript/engines/risor/evaluator"
+	"github.com/robbyt/go-polyscript/platform/constants"
+	"github.com/robbyt/go-polyscript/platform/data"
+	"github.com/robbyt/go-polyscript/platform/script"
+	"github.com/robbyt/go-polyscript/platform/script/loader"
 )
 
 // FromRisorLoader creates a Risor evaluator from a loader with dynamic data only (ContextProvider)

@@ -7,8 +7,8 @@ import (
 	"log/slog"
 
 	extismSDK "github.com/extism/go-sdk"
-	"github.com/robbyt/go-polyscript/abstract/script"
 	"github.com/robbyt/go-polyscript/engines/extism/compiler/internal/compile"
+	"github.com/robbyt/go-polyscript/platform/script"
 )
 
 // Compiler implements the script.Compiler interface for WASM modules

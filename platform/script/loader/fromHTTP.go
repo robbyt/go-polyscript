@@ -20,8 +20,8 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/robbyt/go-polyscript/abstract/script/loader/httpauth"
 	"github.com/robbyt/go-polyscript/internal/helpers"
+	"github.com/robbyt/go-polyscript/platform/script/loader/httpauth"
 )
 
 // HTTPOptions contains configuration options for HTTP loader.

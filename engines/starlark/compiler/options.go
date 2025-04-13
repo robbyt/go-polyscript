@@ -6,8 +6,8 @@ import (
 	"os"
 	"slices"
 
-	"github.com/robbyt/go-polyscript/abstract/constants"
 	"github.com/robbyt/go-polyscript/internal/helpers"
+	"github.com/robbyt/go-polyscript/platform/constants"
 )
 
 // FunctionalOption is a function that configures a Compiler instance

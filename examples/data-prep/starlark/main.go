@@ -11,11 +11,11 @@ import (
 	"time"
 
 	"github.com/robbyt/go-polyscript"
-	"github.com/robbyt/go-polyscript/abstract/evaluation"
+	"github.com/robbyt/go-polyscript/platform"
 )
 
 // StarlarkEvaluator is a type alias to make testing cleaner
-type StarlarkEvaluator = evaluation.Evaluator
+type StarlarkEvaluator = platform.Evaluator
 
 //go:embed testdata/script.star
 var starlarkScript string

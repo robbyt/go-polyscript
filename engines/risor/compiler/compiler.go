@@ -6,8 +6,8 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/robbyt/go-polyscript/abstract/script"
 	"github.com/robbyt/go-polyscript/engines/risor/compiler/internal/compile"
+	"github.com/robbyt/go-polyscript/platform/script"
 )
 
 type Compiler struct {

@@ -31,7 +31,7 @@ import (
 	"testing"
 
 	"github.com/robbyt/go-polyscript"
-	"github.com/robbyt/go-polyscript/abstract/constants"
+	"github.com/robbyt/go-polyscript/platform/constants"
 )
 
 // quietHandler is a slog.Handler that discards all logs

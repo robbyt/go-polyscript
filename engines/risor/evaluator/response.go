@@ -7,7 +7,7 @@ import (
 	"time"
 
 	risorObject "github.com/risor-io/risor/object"
-	"github.com/robbyt/go-polyscript/abstract/data"
+	"github.com/robbyt/go-polyscript/platform/data"
 )
 
 // execResult is a wrapper around the risor object.Object interface, but with some features removed

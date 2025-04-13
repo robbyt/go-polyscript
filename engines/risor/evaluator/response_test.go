@@ -8,8 +8,8 @@ import (
 
 	rObj "github.com/risor-io/risor/object"
 	"github.com/risor-io/risor/op"
-	"github.com/robbyt/go-polyscript/abstract/data"
-	"github.com/robbyt/go-polyscript/abstract/evaluation"
+	"github.com/robbyt/go-polyscript/platform"
+	"github.com/robbyt/go-polyscript/platform/data"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -125,7 +125,7 @@ func TestResponseMethods(t *testing.T) {
 				require.Equal(t, tt.versionID, result.scriptExeID)
 
 				// Verify interface implementation
-				require.Implements(t, (*evaluation.EvaluatorResponse)(nil), result)
+				require.Implements(t, (*platform.EvaluatorResponse)(nil), result)
 
 				// Verify metadata methods
 				assert.Equal(t, tt.execTime.String(), result.GetExecTime())

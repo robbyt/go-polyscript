@@ -14,11 +14,11 @@ import (
 	"testing"
 
 	"github.com/robbyt/go-polyscript"
-	"github.com/robbyt/go-polyscript/abstract/constants"
-	"github.com/robbyt/go-polyscript/abstract/evaluation"
-	"github.com/robbyt/go-polyscript/abstract/script/loader"
 	"github.com/robbyt/go-polyscript/engines/mocks"
 	"github.com/robbyt/go-polyscript/engines/types"
+	"github.com/robbyt/go-polyscript/platform"
+	"github.com/robbyt/go-polyscript/platform/constants"
+	"github.com/robbyt/go-polyscript/platform/script/loader"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -46,7 +46,7 @@ func (m *mockPreparer) PrepareContext(ctx context.Context, data ...any) (context
 func evalAndExtractMap(
 	t *testing.T,
 	ctx context.Context,
-	evaluator evaluation.EvalOnly,
+	evaluator platform.EvalOnly,
 ) (map[string]any, error) {
 	t.Helper()
 
@@ -74,9 +74,9 @@ func evalAndExtractMap(
 func prepareAndEval(
 	t *testing.T,
 	ctx context.Context,
-	evaluator evaluation.Evaluator,
+	evaluator platform.Evaluator,
 	runtimeData map[string]any,
-) (evaluation.EvaluatorResponse, error) {
+) (platform.EvaluatorResponse, error) {
 	t.Helper()
 
 	enrichedCtx, err := evaluator.PrepareContext(ctx, runtimeData)
@@ -101,7 +101,7 @@ func TestMachineEvaluators(t *testing.T) {
 		name        string
 		content     string
 		machineType types.Type
-		creator     func(string, slog.Handler) (evaluation.Evaluator, error)
+		creator     func(string, slog.Handler) (platform.Evaluator, error)
 	}{
 		{
 			name:        "FromStarlarkString",
@@ -134,7 +134,7 @@ func TestFromStringLoaders(t *testing.T) {
 	tests := []struct {
 		name        string
 		content     string
-		creator     func(string, slog.Handler) (evaluation.Evaluator, error)
+		creator     func(string, slog.Handler) (platform.Evaluator, error)
 		logHandler  slog.Handler
 		expectError bool
 	}{
@@ -394,8 +394,8 @@ func TestEvalHelpers(t *testing.T) {
 
 			// Create a mock evaluator that implements both interfaces
 			mockEvalWithPrep := struct {
-				evaluation.EvalOnly
-				evaluation.DataPreparer
+				platform.EvalOnly
+				platform.DataPreparer
 			}{
 				EvalOnly:     mockEval,
 				DataPreparer: mockPrepCtx,
@@ -430,8 +430,8 @@ func TestEvalHelpers(t *testing.T) {
 
 			// Create a mock evaluator that implements both interfaces
 			mockEvalWithPrep := struct {
-				evaluation.EvalOnly
-				evaluation.DataPreparer
+				platform.EvalOnly
+				platform.DataPreparer
 			}{
 				EvalOnly:     mockEval,
 				DataPreparer: mockPrepCtx,

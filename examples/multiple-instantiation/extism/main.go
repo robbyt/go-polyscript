@@ -8,13 +8,13 @@ import (
 	"time"
 
 	"github.com/robbyt/go-polyscript"
-	"github.com/robbyt/go-polyscript/abstract/constants"
-	"github.com/robbyt/go-polyscript/abstract/evaluation"
 	"github.com/robbyt/go-polyscript/internal/helpers"
+	"github.com/robbyt/go-polyscript/platform"
+	"github.com/robbyt/go-polyscript/platform/constants"
 )
 
 // ExtismEvaluator is a type alias to make testing cleaner
-type ExtismEvaluator = evaluation.Evaluator
+type ExtismEvaluator = platform.Evaluator
 
 // createEvaluator initializes an Extism evaluator with context provider for runtime data
 func createEvaluator(handler slog.Handler) (ExtismEvaluator, error) {

@@ -1,4 +1,4 @@
-package evaluation_test
+package platform_test
 
 import (
 	"context"
@@ -10,9 +10,9 @@ import (
 	"testing"
 
 	"github.com/robbyt/go-polyscript"
-	"github.com/robbyt/go-polyscript/abstract/data"
-	"github.com/robbyt/go-polyscript/abstract/evaluation"
 	"github.com/robbyt/go-polyscript/engines/mocks"
+	"github.com/robbyt/go-polyscript/platform"
+	"github.com/robbyt/go-polyscript/platform/data"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -38,12 +38,12 @@ type mockEvaluatorWithPreparer struct {
 
 func (m *mockEvaluatorWithPreparer) Eval(
 	ctx context.Context,
-) (evaluation.EvaluatorResponse, error) {
+) (platform.EvaluatorResponse, error) {
 	args := m.Called(ctx)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(evaluation.EvaluatorResponse), args.Error(1)
+	return args.Get(0).(platform.EvaluatorResponse), args.Error(1)
 }
 
 func (m *mockEvaluatorWithPreparer) PrepareContext(

@@ -9,13 +9,13 @@ import (
 	"time"
 
 	extismSDK "github.com/extism/go-sdk"
-	"github.com/robbyt/go-polyscript/abstract/data"
-	"github.com/robbyt/go-polyscript/abstract/evaluation"
-	"github.com/robbyt/go-polyscript/abstract/script"
 	"github.com/robbyt/go-polyscript/engines/extism/adapters"
 	"github.com/robbyt/go-polyscript/engines/extism/compiler"
 	"github.com/robbyt/go-polyscript/engines/extism/internal"
 	"github.com/robbyt/go-polyscript/internal/helpers"
+	"github.com/robbyt/go-polyscript/platform"
+	"github.com/robbyt/go-polyscript/platform/data"
+	"github.com/robbyt/go-polyscript/platform/script"
 )
 
 // Evaluator executes compiled WASM modules with provided runtime data
@@ -143,7 +143,7 @@ func (be *Evaluator) exec(
 // Eval implements evaluation.Evaluator
 // TODO: Some error paths in this method are hard to test with the current design
 // Consider adding more integration tests to cover these paths.
-func (be *Evaluator) Eval(ctx context.Context) (evaluation.EvaluatorResponse, error) {
+func (be *Evaluator) Eval(ctx context.Context) (platform.EvaluatorResponse, error) {
 	logger := be.logger.WithGroup("Eval")
 	if be.execUnit == nil {
 		return nil, fmt.Errorf("executable unit is nil")
