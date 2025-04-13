@@ -166,9 +166,18 @@ func BenchmarkDataProviders(b *testing.B) {
 
 	b.Run("CompositeProvider", func(b *testing.B) {
 		// For CompositeProvider use case, we can prepare the context separately
+		// We need a special script that accesses the name via input_data
+		compositeScript := `
+			name := ctx["input_data"]["name"]
+			message := "Hello, " + name + "!"
+			{
+				"greeting": message,
+				"length": len(message)
+			}
+		`
 		staticData := map[string]any{"defaultKey": "value"}
 		evaluator, err := polyscript.FromRisorStringWithData(
-			scriptContent,
+			compositeScript,
 			staticData, // Static part
 			quietHandler,
 		)
