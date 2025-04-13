@@ -42,4 +42,4 @@ lint-fix: go-generate
 ## go-generate: Run code generation for type wrappers
 .PHONY: go-generate
 go-generate:
-	cd machines/types && go generate
+	cd engines/types && go generate

@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/robbyt/go-polyscript"
+	"github.com/robbyt/go-polyscript/internal/helpers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -37,7 +38,7 @@ func TestDemonstrateDataPrepAndEval(t *testing.T) {
 	logger := slog.New(handler)
 
 	// Find the WASM file
-	wasmFilePath, err := findWasmFile(logger)
+	wasmFilePath, err := helpers.FindWasmFile(logger)
 	if err != nil {
 		t.Errorf("Extism example failed: %v - this may be due to missing WASM file", err)
 		return
@@ -73,7 +74,7 @@ func TestPrepareRuntimeData(t *testing.T) {
 	logger := slog.New(handler)
 
 	// Find the WASM file
-	wasmFilePath, err := findWasmFile(logger)
+	wasmFilePath, err := helpers.FindWasmFile(logger)
 	if err != nil {
 		t.Errorf("Failed to find WASM file: %v", err)
 		return
@@ -107,7 +108,7 @@ func TestEvalAndExtractResult(t *testing.T) {
 	logger := slog.New(handler)
 
 	// Find the WASM file
-	wasmFilePath, err := findWasmFile(logger)
+	wasmFilePath, err := helpers.FindWasmFile(logger)
 	if err != nil {
 		t.Errorf("Failed to find WASM file: %v", err)
 		return
@@ -145,7 +146,7 @@ func TestFromExtismFileWithData(t *testing.T) {
 	logger := slog.New(handler)
 
 	// Find the WASM file
-	wasmFilePath, err := findWasmFile(logger)
+	wasmFilePath, err := helpers.FindWasmFile(logger)
 	if err != nil {
 		t.Errorf("Failed to find WASM file: %v", err)
 		return
@@ -166,7 +167,7 @@ func TestFromExtismFileWithData(t *testing.T) {
 }
 
 func TestFindWasmFile(t *testing.T) {
-	// This test just verifies the findWasmFile function doesn't panic
+	// This test just verifies the helpers.FindWasmFile function doesn't panic
 	// and follows the expected logic
 	handler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
 		Level: slog.LevelInfo,
@@ -174,9 +175,9 @@ func TestFindWasmFile(t *testing.T) {
 	logger := slog.New(handler)
 
 	// The function might not find a file but it shouldn't panic
-	wasmPath, err := findWasmFile(logger)
+	wasmPath, err := helpers.FindWasmFile(logger)
 	if err != nil {
-		t.Errorf("findWasmFile returned error: %v", err)
+		t.Logf("FindWasmFile returned error as expected when file not found: %v", err)
 		return
 	}
 

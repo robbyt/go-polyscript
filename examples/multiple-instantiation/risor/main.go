@@ -8,12 +8,12 @@ import (
 	"os"
 
 	"github.com/robbyt/go-polyscript"
-	"github.com/robbyt/go-polyscript/engine"
-	"github.com/robbyt/go-polyscript/execution/constants"
+	"github.com/robbyt/go-polyscript/abstract/constants"
+	"github.com/robbyt/go-polyscript/abstract/evaluation"
 )
 
 // RisorEvaluator is a type alias to make testing cleaner
-type RisorEvaluator = engine.EvaluatorWithPrep
+type RisorEvaluator = evaluation.EvaluatorWithPrep
 
 //go:embed testdata/script.risor
 var risorScript string

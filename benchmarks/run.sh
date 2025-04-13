@@ -67,10 +67,10 @@ echo "Results will be saved to $FRIENDLY_RESULTS_PATH"
 echo ""
 
 # Run benchmarks and save results (from the repo root)
-go test -bench=$PATTERN $BENCHTIME -benchmem ./engine -run=^$ | tee $RESULTS_FILE
+go test -bench=$PATTERN $BENCHTIME -benchmem ./benchmarks -run=^$ | tee $RESULTS_FILE
 
 # Also save JSON format for programmatic analysis
-go test -bench=$PATTERN $BENCHTIME -benchmem ./engine -run=^$ -json > $RESULTS_JSON
+go test -bench=$PATTERN $BENCHTIME -benchmem ./benchmarks -run=^$ -json > $RESULTS_JSON
 
 # Update "latest" symlink
 ln -sf "benchmark_$DATE.txt" $LATEST_LINK
