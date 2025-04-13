@@ -13,7 +13,7 @@ import (
 )
 
 // RisorEvaluator is a type alias to make testing cleaner
-type RisorEvaluator = evaluation.EvaluatorWithPrep
+type RisorEvaluator = evaluation.Evaluator
 
 //go:embed testdata/script.risor
 var risorScript string

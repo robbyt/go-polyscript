@@ -13,7 +13,7 @@ import (
 )
 
 // StarlarkEvaluator is a type alias to make testing cleaner
-type StarlarkEvaluator = evaluation.EvaluatorWithPrep
+type StarlarkEvaluator = evaluation.Evaluator
 
 //go:embed testdata/script.star
 var starlarkScript string

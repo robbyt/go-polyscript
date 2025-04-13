@@ -18,7 +18,7 @@ import (
 // - logHandler: logger handler for logging
 // - ldr: loader implementation for loading the Starlark script content
 //
-// Returns an evaluator, which implements the evaluation.EvaluatorWithPrep interface.
+// Returns an evaluator, which implements the evaluation.Evaluator interface.
 func FromStarlarkLoader(
 	logHandler slog.Handler,
 	ldr loader.Loader,
@@ -38,7 +38,7 @@ func FromStarlarkLoader(
 // - ldr: loader implementation for loading the Starlark script content
 // - staticData: map of initial static data to be passed to the script
 //
-// Returns an evaluator, which implements the evaluation.EvaluatorWithPrep interface.
+// Returns an evaluator, which implements the evaluation.Evaluator interface.
 func FromStarlarkLoaderWithData(
 	logHandler slog.Handler,
 	ldr loader.Loader,
@@ -63,7 +63,7 @@ func NewCompiler(opts ...compiler.FunctionalOption) (*compiler.Compiler, error) 
 }
 
 // NewEvaluator creates a Starlark evaluator with bytecode loaded, and ready for execution.
-// Returns a Evaluator, which implements the evaluation.EvaluatorWithPrep interface.
+// Returns a Evaluator, which implements the evaluation.Evaluator interface.
 func NewEvaluator(
 	logHandler slog.Handler,
 	ldr loader.Loader,

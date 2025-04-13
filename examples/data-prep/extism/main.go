@@ -14,7 +14,7 @@ import (
 )
 
 // ExtismEvaluator is a type alias to make testing cleaner
-type ExtismEvaluator = evaluation.EvaluatorWithPrep
+type ExtismEvaluator = evaluation.Evaluator
 
 const (
 	EntryPointFuncName = "greet" // Entry point in the WASM module

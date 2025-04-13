@@ -4,7 +4,7 @@ This package contains virtual machine implementations for executing scripts in v
 
 ## Design Philosophy
 
-1. **Common Interface**: All VMs present the same interface (`evaluation.EvaluatorWithPrep`) regardless of underlying implementation
+1. **Common Interface**: All VMs present the same interface (`evaluationEvaluator`) regardless of underlying implementation
 2. **Separation of Concerns**: Compilation, data preparation, and execution are distinct phases
 3. **Thread-safe Evaluation**: Each VM is designed to allow concurrent execution of scripts
 3. **Context-Based Data Flow**:  Runtime data is accessed with a `context.Context` object (saved/loaded with a `data.Provider`) 
@@ -27,12 +27,12 @@ This package contains virtual machine implementations for executing scripts in v
    - The `ExecutableUnit` is responsible for managing the lifecycle of the script execution
 
 3. **Evaluator Creation**
-   - `NewEvaluator` takes a `script.ExecutableUnit` and returns an object that implements `evaluation.EvaluatorWithPrep`
+   - `NewEvaluator` takes a `script.ExecutableUnit` and returns an object that implements `evaluationEvaluator`
    - At this point it can be called with `.Eval(ctx)`, however input data is required it must be prepared
 
 4. **Data Preparation Stage**
    - This phase is optional, and must happen prior to evaluation when runtime input data is used
-   - The `Evaluator` implements the `evaluation.EvaluatorWithPrep` interface, which has a `PrepareContext` method
+   - The `Evaluator` implements the `evaluationEvaluator` interface, which has a `PrepareContext` method
    - The `PrepareContext` method takes a `context.Context` and a variadic list of `any`
    - `PrepareContext` calls the `data.Provider` to convert and store the data, somewhere accessible to the Evaluator
    - The conversion is fairly opinionated, and handled by the `data.Provider`

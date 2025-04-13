@@ -11,5 +11,5 @@ import (
 func TestEvaluatorImplementsEvaluatorWithPrep(t *testing.T) {
 	t.Parallel()
 	// This is a compile-time check - if it doesn't compile, the test fails
-	var _ evaluation.EvaluatorWithPrep = (*Evaluator)(nil)
+	var _ evaluation.Evaluator = (*Evaluator)(nil)
 }

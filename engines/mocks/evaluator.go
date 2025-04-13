@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-// Evaluator is a mock implementation of evaluation.EvaluatorWithPrep for testing purposes.
+// Evaluator is a mock implementation of evaluation.Evaluator for testing purposes.
 type Evaluator struct {
 	mock.Mock
 }

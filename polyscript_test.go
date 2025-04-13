@@ -46,7 +46,7 @@ func (m *mockPreparer) PrepareContext(ctx context.Context, data ...any) (context
 func evalAndExtractMap(
 	t *testing.T,
 	ctx context.Context,
-	evaluator evaluation.Evaluator,
+	evaluator evaluation.EvalOnly,
 ) (map[string]any, error) {
 	t.Helper()
 
@@ -74,7 +74,7 @@ func evalAndExtractMap(
 func prepareAndEval(
 	t *testing.T,
 	ctx context.Context,
-	evaluator evaluation.EvaluatorWithPrep,
+	evaluator evaluation.Evaluator,
 	runtimeData map[string]any,
 ) (evaluation.EvaluatorResponse, error) {
 	t.Helper()
@@ -101,7 +101,7 @@ func TestMachineEvaluators(t *testing.T) {
 		name        string
 		content     string
 		machineType types.Type
-		creator     func(string, slog.Handler) (evaluation.EvaluatorWithPrep, error)
+		creator     func(string, slog.Handler) (evaluation.Evaluator, error)
 	}{
 		{
 			name:        "FromStarlarkString",
@@ -134,7 +134,7 @@ func TestFromStringLoaders(t *testing.T) {
 	tests := []struct {
 		name        string
 		content     string
-		creator     func(string, slog.Handler) (evaluation.EvaluatorWithPrep, error)
+		creator     func(string, slog.Handler) (evaluation.Evaluator, error)
 		logHandler  slog.Handler
 		expectError bool
 	}{
@@ -394,11 +394,11 @@ func TestEvalHelpers(t *testing.T) {
 
 			// Create a mock evaluator that implements both interfaces
 			mockEvalWithPrep := struct {
-				evaluation.Evaluator
-				evaluation.EvalDataPreparer
+				evaluation.EvalOnly
+				evaluation.DataPreparer
 			}{
-				Evaluator:        mockEval,
-				EvalDataPreparer: mockPrepCtx,
+				EvalOnly:     mockEval,
+				DataPreparer: mockPrepCtx,
 			}
 
 			// PrepareAndEval should return the prepare error
@@ -430,11 +430,11 @@ func TestEvalHelpers(t *testing.T) {
 
 			// Create a mock evaluator that implements both interfaces
 			mockEvalWithPrep := struct {
-				evaluation.Evaluator
-				evaluation.EvalDataPreparer
+				evaluation.EvalOnly
+				evaluation.DataPreparer
 			}{
-				Evaluator:        mockEval,
-				EvalDataPreparer: mockPrepCtx,
+				EvalOnly:     mockEval,
+				DataPreparer: mockPrepCtx,
 			}
 
 			// PrepareAndEval should return the eval error

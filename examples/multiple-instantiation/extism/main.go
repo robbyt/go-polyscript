@@ -14,7 +14,7 @@ import (
 )
 
 // ExtismEvaluator is a type alias to make testing cleaner
-type ExtismEvaluator = evaluation.EvaluatorWithPrep
+type ExtismEvaluator = evaluation.Evaluator
 
 // createEvaluator initializes an Extism evaluator with context provider for runtime data
 func createEvaluator(handler slog.Handler) (ExtismEvaluator, error) {

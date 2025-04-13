@@ -4,8 +4,8 @@ import (
 	"context"
 )
 
-// Evaluator is the interface for the generic code evaluator.
-type Evaluator interface {
+// EvalOnly is the interface for the generic code evaluator.
+type EvalOnly interface {
 	// Eval evaluates the pre-compiled script with data from the context.
 	// The script and its configuration were provided during evaluator creation.
 	// Runtime data is retrieved using the ExecutableUnit's DataProvider.
@@ -16,10 +16,10 @@ type Evaluator interface {
 	Eval(ctx context.Context) (EvaluatorResponse, error)
 }
 
-// EvalDataPreparer prepares data for script evaluation by enriching a context.
+// DataPreparer prepares data for script evaluation by enriching a context.
 // This interface supports separating data preparation from evaluation, enabling
 // distributed architectures where these steps can occur on different systems.
-type EvalDataPreparer interface {
+type DataPreparer interface {
 	// PrepareContext enriches a context with data for script evaluation.
 	// It processes input data according to the machine implementation and stores it
 	// in the context using the ExecutableUnit's DataProvider.
@@ -37,11 +37,11 @@ type EvalDataPreparer interface {
 	PrepareContext(ctx context.Context, data ...any) (context.Context, error)
 }
 
-// EvaluatorWithPrep combines the Evaluator and EvalDataPreparer interfaces,
+// Evaluator combines the EvalOnly and EvalDataPreparer interfaces,
 // providing a unified API for data preparation and script evaluation.
 // It allows these steps to be performed separately while maintaining their
 // logical connection, supporting distributed processing architectures.
-type EvaluatorWithPrep interface {
-	Evaluator
-	EvalDataPreparer
+type Evaluator interface {
+	EvalOnly
+	DataPreparer
 }

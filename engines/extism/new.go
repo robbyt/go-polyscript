@@ -19,7 +19,7 @@ import (
 // - logHandler: logger handler for logging
 // - entryPoint: entry point for the WASM module (which function to call in the WASM file)
 //
-// Returns an evaluator, which implements the evaluation.EvaluatorWithPrep interface.
+// Returns an evaluator, which implements the evaluation.Evaluator interface.
 func FromExtismLoader(
 	logHandler slog.Handler,
 	ldr loader.Loader,
@@ -42,7 +42,7 @@ func FromExtismLoader(
 // - logHandler: logger handler for logging
 // - entryPoint: entry point for the WASM module (which function to call in the WASM file)
 //
-// Returns an evaluator, which implements the evaluation.EvaluatorWithPrep interface.
+// Returns an evaluator, which implements the evaluation.Evaluator interface.
 func FromExtismLoaderWithData(
 	logHandler slog.Handler,
 	ldr loader.Loader,
@@ -68,7 +68,7 @@ func NewCompiler(opts ...compiler.FunctionalOption) (*compiler.Compiler, error) 
 }
 
 // NewEvaluator creates an Extism evaluator with WASM code loaded, and ready for execution.
-// Returns a Evaluator, which implements the evaluation.EvaluatorWithPrep interface.
+// Returns a Evaluator, which implements the evaluation.Evaluator interface.
 func NewEvaluator(
 	logHandler slog.Handler,
 	ldr loader.Loader,
