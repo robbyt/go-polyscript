@@ -1,0 +1,47 @@
+{"Time":"2025-04-13T15:46:54.176246-04:00","Action":"start","Package":"github.com/robbyt/go-polyscript/benchmarks"}
+{"Time":"2025-04-13T15:46:54.192033-04:00","Action":"output","Package":"github.com/robbyt/go-polyscript/benchmarks","Output":"goos: darwin\n"}
+{"Time":"2025-04-13T15:46:54.192322-04:00","Action":"output","Package":"github.com/robbyt/go-polyscript/benchmarks","Output":"goarch: amd64\n"}
+{"Time":"2025-04-13T15:46:54.192332-04:00","Action":"output","Package":"github.com/robbyt/go-polyscript/benchmarks","Output":"pkg: github.com/robbyt/go-polyscript/benchmarks\n"}
+{"Time":"2025-04-13T15:46:54.192346-04:00","Action":"output","Package":"github.com/robbyt/go-polyscript/benchmarks","Output":"cpu: Intel(R) Xeon(R) W-3275M CPU @ 2.50GHz\n"}
+{"Time":"2025-04-13T15:46:54.192363-04:00","Action":"run","Package":"github.com/robbyt/go-polyscript/benchmarks","Test":"BenchmarkEvaluationPatterns"}
+{"Time":"2025-04-13T15:46:54.192378-04:00","Action":"output","Package":"github.com/robbyt/go-polyscript/benchmarks","Test":"BenchmarkEvaluationPatterns","Output":"=== RUN   BenchmarkEvaluationPatterns\n"}
+{"Time":"2025-04-13T15:46:54.192391-04:00","Action":"output","Package":"github.com/robbyt/go-polyscript/benchmarks","Test":"BenchmarkEvaluationPatterns","Output":"BenchmarkEvaluationPatterns\n"}
+{"Time":"2025-04-13T15:46:54.192402-04:00","Action":"run","Package":"github.com/robbyt/go-polyscript/benchmarks","Test":"BenchmarkEvaluationPatterns/SingleExecution"}
+{"Time":"2025-04-13T15:46:54.192417-04:00","Action":"output","Package":"github.com/robbyt/go-polyscript/benchmarks","Test":"BenchmarkEvaluationPatterns/SingleExecution","Output":"=== RUN   BenchmarkEvaluationPatterns/SingleExecution\n"}
+{"Time":"2025-04-13T15:46:54.192426-04:00","Action":"output","Package":"github.com/robbyt/go-polyscript/benchmarks","Test":"BenchmarkEvaluationPatterns/SingleExecution","Output":"BenchmarkEvaluationPatterns/SingleExecution\n"}
+{"Time":"2025-04-13T15:46:55.387987-04:00","Action":"output","Package":"github.com/robbyt/go-polyscript/benchmarks","Test":"BenchmarkEvaluationPatterns/SingleExecution","Output":"BenchmarkEvaluationPatterns/SingleExecution-56         \t    4377\t    266378 ns/op\t  460985 B/op\t    1164 allocs/op\n"}
+{"Time":"2025-04-13T15:46:55.388119-04:00","Action":"run","Package":"github.com/robbyt/go-polyscript/benchmarks","Test":"BenchmarkEvaluationPatterns/CompileOnceRunMany"}
+{"Time":"2025-04-13T15:46:55.388135-04:00","Action":"output","Package":"github.com/robbyt/go-polyscript/benchmarks","Test":"BenchmarkEvaluationPatterns/CompileOnceRunMany","Output":"=== RUN   BenchmarkEvaluationPatterns/CompileOnceRunMany\n"}
+{"Time":"2025-04-13T15:46:55.388143-04:00","Action":"output","Package":"github.com/robbyt/go-polyscript/benchmarks","Test":"BenchmarkEvaluationPatterns/CompileOnceRunMany","Output":"BenchmarkEvaluationPatterns/CompileOnceRunMany\n"}
+{"Time":"2025-04-13T15:46:56.691348-04:00","Action":"output","Package":"github.com/robbyt/go-polyscript/benchmarks","Test":"BenchmarkEvaluationPatterns/CompileOnceRunMany","Output":"BenchmarkEvaluationPatterns/CompileOnceRunMany-56      \t    7465\t    172010 ns/op\t  373818 B/op\t     439 allocs/op\n"}
+{"Time":"2025-04-13T15:46:56.691427-04:00","Action":"run","Package":"github.com/robbyt/go-polyscript/benchmarks","Test":"BenchmarkDataProviders"}
+{"Time":"2025-04-13T15:46:56.691439-04:00","Action":"output","Package":"github.com/robbyt/go-polyscript/benchmarks","Test":"BenchmarkDataProviders","Output":"=== RUN   BenchmarkDataProviders\n"}
+{"Time":"2025-04-13T15:46:56.691454-04:00","Action":"output","Package":"github.com/robbyt/go-polyscript/benchmarks","Test":"BenchmarkDataProviders","Output":"BenchmarkDataProviders\n"}
+{"Time":"2025-04-13T15:46:56.692027-04:00","Action":"run","Package":"github.com/robbyt/go-polyscript/benchmarks","Test":"BenchmarkDataProviders/StaticProvider"}
+{"Time":"2025-04-13T15:46:56.692041-04:00","Action":"output","Package":"github.com/robbyt/go-polyscript/benchmarks","Test":"BenchmarkDataProviders/StaticProvider","Output":"=== RUN   BenchmarkDataProviders/StaticProvider\n"}
+{"Time":"2025-04-13T15:46:56.692085-04:00","Action":"output","Package":"github.com/robbyt/go-polyscript/benchmarks","Test":"BenchmarkDataProviders/StaticProvider","Output":"BenchmarkDataProviders/StaticProvider\n"}
+{"Time":"2025-04-13T15:46:57.975968-04:00","Action":"output","Package":"github.com/robbyt/go-polyscript/benchmarks","Test":"BenchmarkDataProviders/StaticProvider","Output":"BenchmarkDataProviders/StaticProvider-56               \t"}
+{"Time":"2025-04-13T15:46:57.976016-04:00","Action":"output","Package":"github.com/robbyt/go-polyscript/benchmarks","Test":"BenchmarkDataProviders/StaticProvider","Output":"    7290\t    173447 ns/op\t  373814 B/op\t     439 allocs/op\n"}
+{"Time":"2025-04-13T15:46:57.976047-04:00","Action":"run","Package":"github.com/robbyt/go-polyscript/benchmarks","Test":"BenchmarkDataProviders/ContextProvider"}
+{"Time":"2025-04-13T15:46:57.976054-04:00","Action":"output","Package":"github.com/robbyt/go-polyscript/benchmarks","Test":"BenchmarkDataProviders/ContextProvider","Output":"=== RUN   BenchmarkDataProviders/ContextProvider\n"}
+{"Time":"2025-04-13T15:46:57.976061-04:00","Action":"output","Package":"github.com/robbyt/go-polyscript/benchmarks","Test":"BenchmarkDataProviders/ContextProvider","Output":"BenchmarkDataProviders/ContextProvider\n"}
+{"Time":"2025-04-13T15:46:59.215857-04:00","Action":"output","Package":"github.com/robbyt/go-polyscript/benchmarks","Test":"BenchmarkDataProviders/ContextProvider","Output":"BenchmarkDataProviders/ContextProvider-56              \t"}
+{"Time":"2025-04-13T15:46:59.215904-04:00","Action":"output","Package":"github.com/robbyt/go-polyscript/benchmarks","Test":"BenchmarkDataProviders/ContextProvider","Output":"    7093\t    171918 ns/op\t  372678 B/op\t     431 allocs/op\n"}
+{"Time":"2025-04-13T15:46:59.21595-04:00","Action":"run","Package":"github.com/robbyt/go-polyscript/benchmarks","Test":"BenchmarkDataProviders/CompositeProvider"}
+{"Time":"2025-04-13T15:46:59.215959-04:00","Action":"output","Package":"github.com/robbyt/go-polyscript/benchmarks","Test":"BenchmarkDataProviders/CompositeProvider","Output":"=== RUN   BenchmarkDataProviders/CompositeProvider\n"}
+{"Time":"2025-04-13T15:46:59.215965-04:00","Action":"output","Package":"github.com/robbyt/go-polyscript/benchmarks","Test":"BenchmarkDataProviders/CompositeProvider","Output":"BenchmarkDataProviders/CompositeProvider\n"}
+{"Time":"2025-04-13T15:47:00.473731-04:00","Action":"output","Package":"github.com/robbyt/go-polyscript/benchmarks","Test":"BenchmarkDataProviders/CompositeProvider","Output":"BenchmarkDataProviders/CompositeProvider-56            \t    7202\t    171934 ns/op\t  374331 B/op\t     448 allocs/op\n"}
+{"Time":"2025-04-13T15:47:00.47379-04:00","Action":"run","Package":"github.com/robbyt/go-polyscript/benchmarks","Test":"BenchmarkVMComparison"}
+{"Time":"2025-04-13T15:47:00.473802-04:00","Action":"output","Package":"github.com/robbyt/go-polyscript/benchmarks","Test":"BenchmarkVMComparison","Output":"=== RUN   BenchmarkVMComparison\n"}
+{"Time":"2025-04-13T15:47:00.473822-04:00","Action":"output","Package":"github.com/robbyt/go-polyscript/benchmarks","Test":"BenchmarkVMComparison","Output":"BenchmarkVMComparison\n"}
+{"Time":"2025-04-13T15:47:00.474607-04:00","Action":"run","Package":"github.com/robbyt/go-polyscript/benchmarks","Test":"BenchmarkVMComparison/RisorVM"}
+{"Time":"2025-04-13T15:47:00.474617-04:00","Action":"output","Package":"github.com/robbyt/go-polyscript/benchmarks","Test":"BenchmarkVMComparison/RisorVM","Output":"=== RUN   BenchmarkVMComparison/RisorVM\n"}
+{"Time":"2025-04-13T15:47:00.474631-04:00","Action":"output","Package":"github.com/robbyt/go-polyscript/benchmarks","Test":"BenchmarkVMComparison/RisorVM","Output":"BenchmarkVMComparison/RisorVM\n"}
+{"Time":"2025-04-13T15:47:01.747146-04:00","Action":"output","Package":"github.com/robbyt/go-polyscript/benchmarks","Test":"BenchmarkVMComparison/RisorVM","Output":"BenchmarkVMComparison/RisorVM-56                       \t    7366\t    170135 ns/op\t  373858 B/op\t     439 allocs/op\n"}
+{"Time":"2025-04-13T15:47:01.74721-04:00","Action":"run","Package":"github.com/robbyt/go-polyscript/benchmarks","Test":"BenchmarkVMComparison/StarlarkVM"}
+{"Time":"2025-04-13T15:47:01.74724-04:00","Action":"output","Package":"github.com/robbyt/go-polyscript/benchmarks","Test":"BenchmarkVMComparison/StarlarkVM","Output":"=== RUN   BenchmarkVMComparison/StarlarkVM\n"}
+{"Time":"2025-04-13T15:47:01.747248-04:00","Action":"output","Package":"github.com/robbyt/go-polyscript/benchmarks","Test":"BenchmarkVMComparison/StarlarkVM","Output":"BenchmarkVMComparison/StarlarkVM\n"}
+{"Time":"2025-04-13T15:47:03.220621-04:00","Action":"output","Package":"github.com/robbyt/go-polyscript/benchmarks","Test":"BenchmarkVMComparison/StarlarkVM","Output":"BenchmarkVMComparison/StarlarkVM-56                    \t  107872\t     12520 ns/op\t    7769 B/op\t      72 allocs/op\n"}
+{"Time":"2025-04-13T15:47:03.220716-04:00","Action":"output","Package":"github.com/robbyt/go-polyscript/benchmarks","Output":"PASS\n"}
+{"Time":"2025-04-13T15:47:03.245074-04:00","Action":"output","Package":"github.com/robbyt/go-polyscript/benchmarks","Output":"ok  \tgithub.com/robbyt/go-polyscript/benchmarks\t9.069s\n"}
+{"Time":"2025-04-13T15:47:03.245121-04:00","Action":"pass","Package":"github.com/robbyt/go-polyscript/benchmarks","Elapsed":9.069}
