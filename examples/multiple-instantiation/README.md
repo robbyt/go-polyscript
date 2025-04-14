@@ -39,15 +39,15 @@ These examples follow a consistent pattern:
 
 ## Running the Examples
 
-Each example implements the same pattern with a different script engine:
+Each example implements the same pattern with a different engine:
 
 ```bash
-go run examples/multiple-instantiation/<engine>/main.go
+go run examples/multiple-instantiation/< engine >/main.go
 ```
 
 Note: The Extism example requires a WebAssembly module. The local `findWasmFile` function searches
 several relative paths for a pre-compiled `main.wasm` file. This file was compiled from the example
-code`machines/extism/testdata/examples/main.go`.
+code`engines/extism/testdata/examples/main.go`.
 
 ## Related Patterns
 

@@ -8,12 +8,12 @@ import (
 	"os"
 
 	"github.com/robbyt/go-polyscript"
-	"github.com/robbyt/go-polyscript/engine"
-	"github.com/robbyt/go-polyscript/execution/constants"
+	"github.com/robbyt/go-polyscript/platform"
+	"github.com/robbyt/go-polyscript/platform/constants"
 )
 
 // StarlarkEvaluator is a type alias to make testing cleaner
-type StarlarkEvaluator = engine.EvaluatorWithPrep
+type StarlarkEvaluator = platform.Evaluator
 
 //go:embed testdata/script.star
 var starlarkScript string

@@ -31,7 +31,7 @@ Each example follows the same pattern but demonstrates it with a different scrip
 go run examples/data-prep/<engine>/main.go
 ```
 
-Note: The Extism example requires a WASM file. If not found automatically, you may need to compile it using the `Makefile` in `/machines/extism/testdata/`.
+Note: The Extism example requires a WASM file. If not found automatically, you may need to compile it using the `Makefile` in `/engines/extism/testdata/`.
 
 ## Related Patterns
 

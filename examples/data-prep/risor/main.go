@@ -9,11 +9,11 @@ import (
 	"time"
 
 	"github.com/robbyt/go-polyscript"
-	"github.com/robbyt/go-polyscript/engine"
+	"github.com/robbyt/go-polyscript/platform"
 )
 
 // RisorEvaluator is a type alias to make testing cleaner
-type RisorEvaluator = engine.EvaluatorWithPrep
+type RisorEvaluator = platform.Evaluator
 
 //go:embed testdata/script.risor
 var risorScript string

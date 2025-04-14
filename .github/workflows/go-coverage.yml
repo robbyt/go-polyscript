@@ -29,7 +29,7 @@ jobs:
           cache: true
           cache-dependency-path: |
              go.sum
-             machines/extism/testdata/go.sum
+             engines/extism/testdata/go.sum
 
       - name: Display Go version
         run: go version
@@ -37,7 +37,7 @@ jobs:
       - name: Go test
         run: |
           go test -coverprofile=unit.coverage.out -cover ./...
-          cd machines/extism/testdata && \
+          cd engines/extism/testdata && \
             go test -coverprofile=../../../extism.coverage.out -cover .
 
       - name: SonarQube Scan
