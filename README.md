@@ -51,19 +51,15 @@ func main() {
 	logHandler := slog.NewTextHandler(os.Stdout, nil)
 
 	script := `
-		// Script has access to ctx variable passed from Go
+		// The ctx object from the Go inputData map
 		name := ctx.get("name", "Roberto")
 
+		p := "."
 		if ctx.get("excited") {
-			p := "!"
-		} else {
-		 	p := "."
+			p = "!"
 		}
 		
-		message := "Hello, " + name
-		if excited {
-			message = message + "!"
-		}
+		message := "Hello, " + name + p
 		
 		// Return a map with our result
 		{
