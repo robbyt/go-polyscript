@@ -21,7 +21,7 @@ test: go-generate
 ## bench: Run performance benchmarks and create reports
 .PHONY: bench
 bench: go-generate
-	benchmarks/run.sh
+	engines/benchmarks/run.sh
 
 ## bench-quick: Run benchmarks without creating reports
 .PHONY: bench-quick
