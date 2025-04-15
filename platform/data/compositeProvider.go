@@ -88,7 +88,7 @@ func deepMerge(src, dst map[string]any) map[string]any {
 //	ctx, err := composite.AddDataToContext(ctx, req, userData)
 func (p *CompositeProvider) AddDataToContext(
 	ctx context.Context,
-	data ...any,
+	data ...map[string]any,
 ) (context.Context, error) {
 	// Start with the original context
 	finalCtx := ctx

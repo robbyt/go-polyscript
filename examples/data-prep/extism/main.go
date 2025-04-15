@@ -45,7 +45,7 @@ func prepareRuntimeData(
 	}
 
 	// Add the request metadata to the context using the data.Provider
-	enrichedCtx, err := evaluator.PrepareContext(ctx, requestMeta)
+	enrichedCtx, err := evaluator.AddDataToContext(ctx, requestMeta)
 	if err != nil {
 		logger.Error("Failed to prepare context with request data", "error", err)
 		return nil, fmt.Errorf("failed to prepare context: %w", err)

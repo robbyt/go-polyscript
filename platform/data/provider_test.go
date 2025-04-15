@@ -180,10 +180,8 @@ func TestProvider_AddDataToContext(t *testing.T) {
 		data, err := provider.GetData(newCtx)
 		assert.NoError(t, err)
 
-		expectedData := map[string]any{
-			constants.InputData: map[string]any{"key": "value"},
-		}
-		assert.Equal(t, expectedData, data)
+		// Data should be at root level with no namespace
+		assert.Equal(t, "value", data["key"], "Data should be at root level")
 	})
 
 	t.Run("context provider with HTTP request", func(t *testing.T) {
@@ -191,7 +189,7 @@ func TestProvider_AddDataToContext(t *testing.T) {
 		ctx := context.Background()
 		req := createTestRequestHelper()
 
-		newCtx, err := provider.AddDataToContext(ctx, req)
+		newCtx, err := provider.AddDataToContext(ctx, map[string]any{"request": req})
 
 		assert.NoError(t, err)
 		assert.NotEqual(t, ctx, newCtx, "Context should be modified")
@@ -200,8 +198,9 @@ func TestProvider_AddDataToContext(t *testing.T) {
 		data, err := provider.GetData(newCtx)
 		assert.NoError(t, err)
 
-		requestMap, ok := data[constants.Request].(map[string]any)
-		assert.True(t, ok, "Request data should be a map")
+		// Request should be at root level with direct access
+		requestMap, ok := data["request"].(map[string]any)
+		assert.True(t, ok, "Request data should be a map at root level")
 		assert.Equal(t, "GET", requestMap["Method"])
 		assert.Equal(t, "/test", requestMap["URL_Path"])
 	})
@@ -239,11 +238,7 @@ func TestProvider_AddDataToContext(t *testing.T) {
 
 		// Should have both static and context data
 		assert.Equal(t, simpleData["string"], data["string"], "Should contain static data")
-		assert.Contains(t, data, constants.InputData, "Should contain input_data key")
-
-		inputData, ok := data[constants.InputData].(map[string]any)
-		assert.True(t, ok, "input_data should be a map")
-		assert.Equal(t, "value", inputData["key"], "Should contain added data")
+		assert.Equal(t, "value", data["key"], "Should contain added data")
 	})
 
 	t.Run("composite provider with all failures", func(t *testing.T) {
@@ -275,10 +270,8 @@ func TestProvider_AddDataToContext(t *testing.T) {
 		data, err := provider.GetData(newCtx)
 		assert.NoError(t, err)
 
-		inputData, ok := data[constants.InputData].(map[string]any)
-		assert.True(t, ok, "input_data should be a map")
-		assert.Equal(t, "value1", inputData["key1"], "Should contain first item")
-		assert.Equal(t, "value2", inputData["key2"], "Should contain second item")
+		assert.Equal(t, "value1", data["key1"], "Should contain first item")
+		assert.Equal(t, "value2", data["key2"], "Should contain second item")
 	})
 }
 

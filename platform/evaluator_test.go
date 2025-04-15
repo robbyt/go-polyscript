@@ -23,9 +23,9 @@ type mockDataPreparer struct {
 	mock.Mock
 }
 
-func (m *mockDataPreparer) PrepareContext(
+func (m *mockDataPreparer) AddDataToContext(
 	ctx context.Context,
-	data ...any,
+	data ...map[string]any,
 ) (context.Context, error) {
 	args := m.Called(ctx, data)
 	return args.Get(0).(context.Context), args.Error(1)
@@ -46,9 +46,9 @@ func (m *mockEvaluatorWithPreparer) Eval(
 	return args.Get(0).(platform.EvaluatorResponse), args.Error(1)
 }
 
-func (m *mockEvaluatorWithPreparer) PrepareContext(
+func (m *mockEvaluatorWithPreparer) AddDataToContext(
 	ctx context.Context,
-	data ...any,
+	data ...map[string]any,
 ) (context.Context, error) {
 	args := m.Called(ctx, data)
 	return args.Get(0).(context.Context), args.Error(1)
@@ -113,7 +113,7 @@ func TestEvalDataPreparerInterface(t *testing.T) {
 	// Create a logger for testing
 	handler := slog.NewTextHandler(os.Stdout, nil)
 
-	// Create an evaluator with PrepareContext capability
+	// Create an evaluator with AddDataToContext capability
 	// The key name may be different in the new implementation
 	scriptData := map[string]any{"greeting": "Hello, World!"}
 	evaluator, err := polyscript.FromRisorStringWithData(`
@@ -132,8 +132,8 @@ method + " " + greeting
 	req, err := http.NewRequest("GET", "http://localhost/test", nil)
 	require.NoError(t, err)
 
-	// Use PrepareContext to enrich the context
-	enrichedCtx, err := evaluator.PrepareContext(ctx, req)
+	// Use AddDataToContext to enrich the context
+	enrichedCtx, err := evaluator.AddDataToContext(ctx, map[string]any{"request": req})
 	require.NoError(t, err)
 	require.NotNil(t, enrichedCtx)
 
@@ -171,11 +171,16 @@ func TestEvalDataPreparerInterfaceDirectImplementation(t *testing.T) {
 	}
 
 	// Set up the mock behavior
-	dataPreparer.On("PrepareContext", ctx, []any{data1, data2, data3}).Return(enrichedCtx, nil)
+	dataPreparer.On("AddDataToContext", ctx, mock.Anything).Return(enrichedCtx, nil)
 
-	// Call PrepareContext
-	resultCtx, err := dataPreparer.PrepareContext(ctx, data1, data2, data3)
-	require.NoError(t, err, "PrepareContext should not return an error")
+	// Call AddDataToContext
+	resultCtx, err := dataPreparer.AddDataToContext(
+		ctx,
+		map[string]any{"data1": data1},
+		map[string]any{"data2": data2},
+		map[string]any{"data3": data3},
+	)
+	require.NoError(t, err, "AddDataToContext should not return an error")
 	require.NotNil(t, resultCtx, "Enriched context should not be nil")
 
 	// Verify data was stored correctly
@@ -188,10 +193,10 @@ func TestEvalDataPreparerInterfaceDirectImplementation(t *testing.T) {
 
 	// Test error case
 	errorPreparer := &mockDataPreparer{}
-	errorPreparer.On("PrepareContext", ctx, []any{"test"}).
+	errorPreparer.On("AddDataToContext", ctx, mock.Anything).
 		Return(ctx, errors.New("preparation error"))
 
-	ogCtx, err := errorPreparer.PrepareContext(ctx, "test")
+	ogCtx, err := errorPreparer.AddDataToContext(ctx, map[string]any{"test": "value"})
 	assert.Error(t, err, "Should return an error")
 	assert.ErrorContains(t, err, "preparation error", "Error message should be preserved")
 	assert.Equal(t, ctx, ogCtx, "Original context should be returned on error")
@@ -219,15 +224,15 @@ func TestEvaluatorWithPrepInterface(t *testing.T) {
 	enrichedCtx := context.WithValue(ctx, prepDataKey, "test-value")
 
 	// Set up mock behaviors
-	combinedEvaluator.On("PrepareContext", ctx, []any{"test data"}).Return(enrichedCtx, nil)
+	combinedEvaluator.On("AddDataToContext", ctx, mock.Anything).Return(enrichedCtx, nil)
 	combinedEvaluator.On("Eval", mock.MatchedBy(func(c context.Context) bool {
 		val, ok := c.Value(prepDataKey).(string)
 		return ok && val == "test-value"
 	})).Return(mockResponse, nil)
 
 	// Test the full workflow: prepare context then evaluate
-	resultCtx, err := combinedEvaluator.PrepareContext(ctx, "test data")
-	require.NoError(t, err, "PrepareContext should not return an error")
+	resultCtx, err := combinedEvaluator.AddDataToContext(ctx, map[string]any{"test": "data"})
+	require.NoError(t, err, "AddDataToContext should not return an error")
 	require.NotNil(t, resultCtx, "Enriched context should not be nil")
 
 	// Then evaluate with the enriched context
@@ -245,20 +250,20 @@ func TestEvaluatorWithPrepInterface(t *testing.T) {
 
 	// Test error in preparation
 	prepErrorEvaluator := &mockEvaluatorWithPreparer{}
-	prepErrorEvaluator.On("PrepareContext", ctx, []any{"test data"}).
+	prepErrorEvaluator.On("AddDataToContext", ctx, mock.Anything).
 		Return(ctx, errors.New("preparation error"))
 
-	_, err = prepErrorEvaluator.PrepareContext(ctx, "test data")
+	_, err = prepErrorEvaluator.AddDataToContext(ctx, map[string]any{"test": "data"})
 	assert.Error(t, err, "Should return an error when preparation fails")
 
 	// Test error in evaluation
 	evalErrorEvaluator := &mockEvaluatorWithPreparer{}
-	evalErrorEvaluator.On("PrepareContext", ctx, []any{"test data"}).Return(enrichedCtx, nil)
+	evalErrorEvaluator.On("AddDataToContext", ctx, mock.Anything).Return(enrichedCtx, nil)
 	evalErrorEvaluator.On("Eval", mock.Anything).
 		Return((*mocks.EvaluatorResponse)(nil), errors.New("evaluation error"))
 
-	evalCtx, prepErr := evalErrorEvaluator.PrepareContext(ctx, "test data")
-	require.NoError(t, prepErr, "PrepareContext should not return an error")
+	evalCtx, prepErr := evalErrorEvaluator.AddDataToContext(ctx, map[string]any{"test": "data"})
+	require.NoError(t, prepErr, "AddDataToContext should not return an error")
 	_, err = evalErrorEvaluator.Eval(evalCtx)
 	assert.Error(t, err, "Should return an error when evaluation fails")
 }
@@ -278,9 +283,12 @@ func TestEvaluatorWithPrepErrors(t *testing.T) {
 
 	// The context should still be usable
 	ctx := context.Background()
-	enrichedCtx, err := evaluator.PrepareContext(ctx, 123) // Integer not supported directly
+	enrichedCtx, err := evaluator.AddDataToContext(
+		ctx,
+		map[string]any{"value": 123},
+	) // Properly wrapped in map
 
-	// We expect an error because integers aren't directly supported
-	assert.Error(t, err, "PrepareContext should return an error for integers")
+	// This should now succeed as integers are properly wrapped in a map
+	assert.NoError(t, err, "AddDataToContext should succeed with properly wrapped integers")
 	assert.NotNil(t, enrichedCtx, "Should return a context regardless")
 }

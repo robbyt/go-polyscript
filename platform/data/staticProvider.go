@@ -39,7 +39,7 @@ func (p *StaticProvider) GetData(_ context.Context) (map[string]any, error) {
 // The CompositeProvider should check for this specific error using errors.Is.
 func (p *StaticProvider) AddDataToContext(
 	ctx context.Context,
-	data ...any,
+	_ ...map[string]any,
 ) (context.Context, error) {
 	return ctx, ErrStaticProviderNoRuntimeUpdates
 }

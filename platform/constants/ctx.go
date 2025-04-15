@@ -10,9 +10,4 @@ const (
 
 	// These are string keys used within the EvalData map, not context keys
 	Ctx = "ctx" // top-scope variable name for accessing input data from scripts
-
-	// These sub-keys will be nested under the ctx key, in the input data provided to the evaluator at runtime
-	Request   = "request"
-	Response  = "response"
-	InputData = "input_data"
 )

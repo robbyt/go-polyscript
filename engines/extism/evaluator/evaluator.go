@@ -208,21 +208,21 @@ func (be *Evaluator) Eval(ctx context.Context) (platform.EvaluatorResponse, erro
 	return result, nil
 }
 
-// PrepareContext implements the EvalDataPreparer interface for Extism WebAssembly modules.
+// AddDataToContext implements the data.Setter interface for Extism WebAssembly modules.
 // It enriches the provided context with data for script evaluation, using the
 // ExecutableUnit's DataProvider to store the data.
-func (be *Evaluator) PrepareContext(
+func (be *Evaluator) AddDataToContext(
 	ctx context.Context,
-	d ...any,
+	d ...map[string]any,
 ) (context.Context, error) {
-	logger := be.logger.WithGroup("PrepareContext")
+	logger := be.logger.WithGroup("AddDataToContext")
 
 	// Use the shared helper function for context preparation
 	if be.execUnit == nil || be.execUnit.GetDataProvider() == nil {
 		return ctx, fmt.Errorf("no data provider available")
 	}
 
-	return data.PrepareContextHelper(
+	return data.AddDataToContextHelper(
 		ctx,
 		logger,
 		be.execUnit.GetDataProvider(),

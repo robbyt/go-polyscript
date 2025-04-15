@@ -32,12 +32,12 @@ This package contains virtual machine implementations for executing scripts in v
 
 4. **Data Preparation Stage**
    - This phase is optional, and must happen prior to evaluation when runtime input data is used
-   - The `Evaluator` implements the `evaluationEvaluator` interface, which has a `PrepareContext` method
-   - The `PrepareContext` method takes a `context.Context` and a variadic list of `any`
-   - `PrepareContext` calls the `data.Provider` to convert and store the data, somewhere accessible to the Evaluator
+   - The `Evaluator` implements the `data.Setter` interface, which has an `AddDataToContext` method
+   - The `AddDataToContext` method takes a `context.Context` and a variadic list of `map[string]any`
+   - `AddDataToContext` calls the `data.Provider` to store the data, somewhere accessible to the Evaluator
    - The conversion is fairly opinionated, and handled by the `data.Provider`
    - For example, it converts an `http.Request` into a `map[string]any` using the schema in `helper.RequestToMap`
-   - The `PrepareContext` method returns a new context with the data stored or linked in it
+   - The `AddDataToContext` method returns a new context with the data stored or linked in it
 
 5. **Execution Stage**
    - When `Eval(ctx)` is called, the `data.Provider` first loads the input data into the VM

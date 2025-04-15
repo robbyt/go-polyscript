@@ -6,9 +6,9 @@ import (
 	"log/slog"
 )
 
-// PrepareContextHelper is a utility function that implements the common logic for
-// preparing a context with evaluation data. This function is used by various machine
-// implementations to maintain consistent context preparation behavior.
+// AddDataToContextHelper is a utility function that implements the common logic for
+// adding data to a context for evaluation. This function is used by various engine
+// implementations to maintain consistent data handling behavior.
 //
 // Parameters:
 //   - ctx: The base context to enrich
@@ -18,14 +18,15 @@ import (
 //
 // Returns:
 //   - enrichedCtx: The context with added data
-//   - err: Any error encountered during preparation
-func PrepareContextHelper(
+//   - err: Any error encountered during the operation
+func AddDataToContextHelper(
 	ctx context.Context,
 	logger *slog.Logger,
 	provider Provider,
-	d ...any,
+	d ...map[string]any,
 ) (context.Context, error) {
 	if logger == nil {
+		// TODO: remove or use logger more effectively
 		logger = slog.Default()
 	}
 

@@ -18,6 +18,7 @@ import (
 	"github.com/robbyt/go-polyscript/engines/types"
 	"github.com/robbyt/go-polyscript/platform"
 	"github.com/robbyt/go-polyscript/platform/constants"
+	"github.com/robbyt/go-polyscript/platform/data"
 	"github.com/robbyt/go-polyscript/platform/script/loader"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -37,7 +38,10 @@ type mockPreparer struct {
 	mock.Mock
 }
 
-func (m *mockPreparer) PrepareContext(ctx context.Context, data ...any) (context.Context, error) {
+func (m *mockPreparer) AddDataToContext(
+	ctx context.Context,
+	data ...map[string]any,
+) (context.Context, error) {
 	args := m.Called(ctx, data)
 	return args.Get(0).(context.Context), args.Error(1)
 }
@@ -79,7 +83,7 @@ func prepareAndEval(
 ) (platform.EvaluatorResponse, error) {
 	t.Helper()
 
-	enrichedCtx, err := evaluator.PrepareContext(ctx, runtimeData)
+	enrichedCtx, err := evaluator.AddDataToContext(ctx, runtimeData)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare context: %w", err)
 	}
@@ -304,7 +308,7 @@ func TestDataProviders(t *testing.T) {
 
 	t.Run("withCompositeProvider", func(t *testing.T) {
 		// Create a simple script that uses composite data
-		script := `print(ctx["static_key"], ", ", ctx["input_data"]["dynamic_key"])`
+		script := `print(ctx["static_key"], ", ", ctx["dynamic_key"])`
 
 		// Create static data
 		staticData := map[string]any{
@@ -321,7 +325,7 @@ func TestDataProviders(t *testing.T) {
 		// Test adding dynamic data
 		ctx := context.Background()
 		dynamicData := map[string]any{"dynamic_key": "dynamic_value"}
-		enrichedCtx, err := evaluator.PrepareContext(ctx, dynamicData)
+		enrichedCtx, err := evaluator.AddDataToContext(ctx, dynamicData)
 		require.NoError(t, err)
 
 		// Execute the script (won't fail if print works correctly)
@@ -336,7 +340,7 @@ func TestEvalHelpers(t *testing.T) {
 	t.Run("PrepareAndEval", func(t *testing.T) {
 		// Create a simple Risor evaluator
 		script := `
-            name := ctx["input_data"]["name"]
+            name := ctx["name"]
             {
                 "message": "Hello, " + name + "!",
                 "length": len(name)
@@ -379,30 +383,30 @@ func TestEvalHelpers(t *testing.T) {
 		}
 
 		// Create error-producing mocks
-		t.Run("PrepareContext error", func(t *testing.T) {
+		t.Run("AddDataToContext error", func(t *testing.T) {
 			// Create mocks for testing error cases
 			mockPrepCtx := &mockPreparer{}
 			mockEval := &mocks.Evaluator{}
 
 			// Create context and data
 			ctx := context.Background()
-			data := map[string]any{"name": "World"}
+			d := map[string]any{"name": "World"}
 
-			// Mock PrepareContext to return an error
-			mockPrepCtx.On("PrepareContext", ctx, []any{data}).
+			// Mock AddDataToContext to return an error
+			mockPrepCtx.On("AddDataToContext", ctx, mock.Anything).
 				Return(ctx, errors.New("prepare error"))
 
 			// Create a mock evaluator that implements both interfaces
 			mockEvalWithPrep := struct {
 				platform.EvalOnly
-				platform.DataPreparer
+				data.Setter
 			}{
-				EvalOnly:     mockEval,
-				DataPreparer: mockPrepCtx,
+				EvalOnly: mockEval,
+				Setter:   mockPrepCtx,
 			}
 
 			// PrepareAndEval should return the prepare error
-			_, err = prepareAndEval(t, ctx, mockEvalWithPrep, data)
+			_, err = prepareAndEval(t, ctx, mockEvalWithPrep, d)
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), "failed to prepare context")
 			mockPrepCtx.AssertExpectations(t)
@@ -415,14 +419,14 @@ func TestEvalHelpers(t *testing.T) {
 
 			// Create context and data
 			ctx := context.Background()
-			data := map[string]any{"name": "World"}
+			d := map[string]any{"name": "World"}
 
-			// Mock PrepareContext to succeed
+			// Mock AddDataToContext to succeed
 			// Define a type for context keys to avoid linting warnings
 			type contextKey string
 			testKey := contextKey("test-key")
 			enrichedCtx := context.WithValue(ctx, testKey, "test-value")
-			mockPrepCtx.On("PrepareContext", ctx, []any{data}).Return(enrichedCtx, nil)
+			mockPrepCtx.On("AddDataToContext", ctx, mock.Anything).Return(enrichedCtx, nil)
 
 			// Mock Eval to fail
 			mockEval.On("Eval", enrichedCtx).
@@ -431,14 +435,14 @@ func TestEvalHelpers(t *testing.T) {
 			// Create a mock evaluator that implements both interfaces
 			mockEvalWithPrep := struct {
 				platform.EvalOnly
-				platform.DataPreparer
+				data.Setter
 			}{
-				EvalOnly:     mockEval,
-				DataPreparer: mockPrepCtx,
+				EvalOnly: mockEval,
+				Setter:   mockPrepCtx,
 			}
 
 			// PrepareAndEval should return the eval error
-			_, err = prepareAndEval(t, ctx, mockEvalWithPrep, data)
+			_, err = prepareAndEval(t, ctx, mockEvalWithPrep, d)
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), "script evaluation failed")
 			mockPrepCtx.AssertExpectations(t)
@@ -540,7 +544,7 @@ func TestDataIntegrationScenarios(t *testing.T) {
 	// Create a basic Risor script that uses context
 	risorFileContent := `// Get data from context
 {
-    "message": "Hello, " + ctx["input_data"]["name"] + " (v" + ctx["app_version"] + ")",
+    "message": "Hello, " + ctx["name"] + " (v" + ctx["app_version"] + ")",
     "timeout": ctx["config"]["timeout"]
 }`
 	err = os.WriteFile(risorPath, []byte(risorFileContent), 0o644)
@@ -549,7 +553,7 @@ func TestDataIntegrationScenarios(t *testing.T) {
 	// Create a basic Starlark script that uses context
 	starlarkFileContent := `# Simple Starlark script
 result = {
-    "message": "Hello, " + ctx["input_data"]["name"] + " (v" + ctx["app_version"] + ")",
+    "message": "Hello, " + ctx["name"] + " (v" + ctx["app_version"] + ")",
     "timeout": ctx["config"]["timeout"]
 }
 _ = result`
@@ -572,7 +576,7 @@ _ = result`
             timeout := ctx["config"]["timeout"]
             
             // Access dynamic data
-            name := ctx["input_data"]["name"]
+            name := ctx["name"]
             
             {
                 "message": "Hello, " + name + " (v" + version + ")",
@@ -591,7 +595,7 @@ _ = result`
 		// Test with dynamic data
 		ctx := context.Background()
 		dynamicData := map[string]any{"name": "Risor User"}
-		enrichedCtx, err := risorEval.PrepareContext(ctx, dynamicData)
+		enrichedCtx, err := risorEval.AddDataToContext(ctx, dynamicData)
 		require.NoError(t, err)
 
 		risorResult, err := risorEval.Eval(enrichedCtx)
@@ -626,7 +630,7 @@ _ = result`
 		// Test with dynamic data
 		ctx := context.Background()
 		dynamicData := map[string]any{"name": "Starlark User"}
-		enrichedCtx, err := starlarkEval.PrepareContext(ctx, dynamicData)
+		enrichedCtx, err := starlarkEval.AddDataToContext(ctx, dynamicData)
 		require.NoError(t, err)
 
 		starlarkResult, err := starlarkEval.Eval(enrichedCtx)

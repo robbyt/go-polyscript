@@ -13,28 +13,27 @@ import (
 
 // ContextProvider retrieves and stores data in the context using a specified key.
 type ContextProvider struct {
-	contextKey  constants.ContextKey
-	storageKey  string
-	requestKey  string
-	responseKey string
+	contextKey constants.ContextKey
 }
 
 // NewContextProvider creates a new ContextProvider with the given context key.
-// For example, if the context key is "foo", the provider will store the input data under the
-// ctx.Value("foo") key. Later, lookup will also use the same key to retrieve the data from the
-// context object.
+// The context key determines where data is stored in the context object.
+// For example, if the context key is "foo", the provider will store data
+// at ctx.Value("foo") and retrieve it from the same location.
+//
+// Example:
+//
+//	provider := NewContextProvider(constants.EvalData)
+//	ctx, _ := provider.AddDataToContext(ctx, map[string]any{"user": map[string]any{"name": "Alice"}})
+//	// In script: name := ctx["user"]["name"]
 func NewContextProvider(contextKey constants.ContextKey) *ContextProvider {
 	return &ContextProvider{
 		contextKey: contextKey,
-
-		// hard-coded storage keys for accessing the data in the final ctx object.
-		storageKey:  constants.InputData, // ctx["input_data"]
-		requestKey:  constants.Request,   // ctx["request"]
-		responseKey: constants.Response,  // ctx["response"]
 	}
 }
 
-// GetData extracts a map[string]any data object from the context using the previously configured context key.
+// GetData extracts a map[string]any data object from the context using the configured context key.
+// It returns the entire context data as a map without any namespace filtering.
 func (p *ContextProvider) GetData(ctx context.Context) (map[string]any, error) {
 	if p.contextKey == "" {
 		return nil, fmt.Errorf("context key is empty")
@@ -54,23 +53,33 @@ func (p *ContextProvider) GetData(ctx context.Context) (map[string]any, error) {
 }
 
 // AddDataToContext stores data in the context for script execution.
-// Prioritizes consistent data structure for scripts over error propagation,
-// ensuring scripts always have required data structures available.
+// It merges data from the provided maps, with later maps overriding earlier ones
+// in case of key conflicts.
 //
-// Data is organized as follows:
-// - HTTP request/response objects are placed under input_data.request and input_data.response
-// - General map[string]any data is placed under input_data
+// The function recursively processes map entries to handle nested structures:
+// - Maps are recursively merged at each level
+// - HTTP Request objects are converted to maps using helpers.RequestToMap
+// - Empty string keys are not allowed
 //
 // Example:
 //
 //	ctx := context.Background()
 //	provider := NewContextProvider(constants.EvalData)
-//	req := &http.Request{...}
-//	inputData := map[string]any{"user": "admin"}
-//	ctx, err := provider.AddDataToContext(ctx, req, inputData)
+//
+//	// Add multiple data maps
+//	ctx, err := provider.AddDataToContext(ctx,
+//	    map[string]any{"user": map[string]any{"name": "Alice"}},
+//	    map[string]any{"request": httpRequest},
+//	    map[string]any{"options": map[string]any{"debug": true}}
+//	)
+//
+//	// In script, the data is accessed directly:
+//	// userName := ctx["user"]["name"]          // "Alice"
+//	// requestPath := ctx["request"]["URL_Path"]
+//	// debugMode := ctx["options"]["debug"]     // true
 func (p *ContextProvider) AddDataToContext(
 	ctx context.Context,
-	data ...any,
+	data ...map[string]any,
 ) (context.Context, error) {
 	if p.contextKey == "" {
 		return ctx, fmt.Errorf("context key is empty")
@@ -84,9 +93,6 @@ func (p *ContextProvider) AddDataToContext(
 	toStore := make(map[string]any)
 
 	// Get existing data from context if available
-	// This is important for preserving data across multiple calls to AddDataToContext
-	// on the same context. Each call should add to or update the existing data rather
-	// than replacing it completely.
 	if existingData := ctx.Value(p.contextKey); existingData != nil {
 		if existingMap, ok := existingData.(map[string]any); ok {
 			// Deep copy the existing data to preserve it while allowing modifications
@@ -94,87 +100,29 @@ func (p *ContextProvider) AddDataToContext(
 		}
 	}
 
-	// Process each data item based on its type
-	for _, item := range data {
-		if item == nil {
+	// Process each input map
+	for _, dataMap := range data {
+		if dataMap == nil {
 			continue
 		}
 
-		switch v := item.(type) {
-		default:
-			// For unhandled types, log an error and continue
-			errz = append(errz, fmt.Errorf("unsupported data type for ContextProvider: %T", item))
-			continue
-		case map[string]any:
-			inputData := make(map[string]any)
-
-			// Reuse existing data map if available, because we're iterating multiple data
-			if existingInputData, ok := toStore[p.storageKey].(map[string]any); ok {
-				inputData = existingInputData
-			}
-
-			// Copy new data into the map (overwriting any existing keys)
-			maps.Copy(inputData, v)
-			toStore[p.storageKey] = inputData
-		case *http.Request:
-			if v == nil {
+		// Process each key-value pair in the input map
+		for key, value := range dataMap {
+			// Ensure key is not empty
+			if key == "" {
+				errz = append(errz, fmt.Errorf("empty keys are not allowed"))
 				continue
 			}
 
-			if existingValue, exists := toStore[p.requestKey]; exists {
-				errz = append(errz, fmt.Errorf("request data already set: %v", existingValue))
-				continue
-			}
-
-			reqMap, err := helpers.RequestToMap(v)
+			// Process the value based on its type
+			processedValue, err := p.processValue(value)
 			if err != nil {
-				errz = append(errz, fmt.Errorf("failed to convert HTTP request to map: %w", err))
-				continue
-			}
-			toStore[p.requestKey] = reqMap
-		case http.Request:
-			if existingValue, exists := toStore[p.requestKey]; exists {
-				errz = append(errz, fmt.Errorf("request data already set: %v", existingValue))
+				errz = append(errz, fmt.Errorf("processing value for key '%s': %w", key, err))
 				continue
 			}
 
-			reqMap, err := helpers.RequestToMap(&v)
-			if err != nil {
-				errz = append(errz, fmt.Errorf("failed to convert HTTP request to map: %w", err))
-				continue
-			}
-			toStore[p.requestKey] = reqMap
-			/*
-				TODO: add helpers.ResponseToMap
-				case *http.Response:
-					if v == nil {
-						continue
-					}
-
-					if existingValue, exists := toStore[p.responseKey]; exists {
-						errz = append(errz, fmt.Errorf("response data already set: %v", existingValue))
-						continue
-					}
-
-					respMap, err := helpers.ResponseToMap(v)
-					if err != nil {
-						errz = append(errz, fmt.Errorf("failed to convert HTTP response to map: %w", err))
-						continue
-					}
-					toStore[p.responseKey] = respMap
-				case http.Response:
-					if existingValue, exists := toStore[p.responseKey]; exists {
-						errz = append(errz, fmt.Errorf("response data already set: %v", existingValue))
-						continue
-					}
-
-					respMap, err := helpers.ResponseToMap(&v)
-					if err != nil {
-						errz = append(errz, fmt.Errorf("failed to convert HTTP response to map: %w", err))
-						continue
-					}
-					toStore[p.responseKey] = respMap
-			*/
+			// Handle merging the processed value with existing data
+			p.mergeIntoMap(toStore, key, processedValue, &errz)
 		}
 	}
 
@@ -182,6 +130,65 @@ func (p *ContextProvider) AddDataToContext(
 	newCtx := context.WithValue(ctx, p.contextKey, toStore)
 
 	// Return any errors that occurred (errors.Join returns nil if errz is empty)
-	// Even with errors, we return the updated context
 	return newCtx, errors.Join(errz...)
+}
+
+// processValue handles different value types, converting them as needed
+func (p *ContextProvider) processValue(value any) (any, error) {
+	if value == nil {
+		return nil, nil
+	}
+
+	switch v := value.(type) {
+	case *http.Request:
+		if v == nil {
+			return nil, nil
+		}
+		return helpers.RequestToMap(v)
+	case http.Request:
+		return helpers.RequestToMap(&v)
+	case map[string]any:
+		// For maps, process each value recursively
+		result := make(map[string]any)
+		for k, val := range v {
+			if k == "" {
+				return nil, fmt.Errorf("empty keys are not allowed in nested maps")
+			}
+			processedVal, err := p.processValue(val)
+			if err != nil {
+				return nil, fmt.Errorf("processing nested value for key '%s': %w", k, err)
+			}
+			result[k] = processedVal
+		}
+		return result, nil
+	default:
+		// For other types, just use the value as is
+		return v, nil
+	}
+}
+
+// mergeIntoMap recursively merges values into the target map
+func (p *ContextProvider) mergeIntoMap(
+	target map[string]any,
+	key string,
+	value any,
+	errz *[]error,
+) {
+	// Handle maps specifically for recursive merging
+	if newMap, ok := value.(map[string]any); ok {
+		// If the key exists and is a map, merge recursively
+		if existingValue, exists := target[key]; exists {
+			if existingMap, ok := existingValue.(map[string]any); ok {
+				// Both are maps, do a recursive merge
+				for k, v := range newMap {
+					p.mergeIntoMap(existingMap, k, v, errz)
+				}
+				return
+			}
+		}
+	}
+
+	// For non-map values or when the existing value is not a map
+	// simply overwrite the value
+	target[key] = value
 }

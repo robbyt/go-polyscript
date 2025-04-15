@@ -10,8 +10,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestPrepareContextHelper tests the PrepareContextHelper utility function
-func TestPrepareContextHelper(t *testing.T) {
+// TestAddDataToContextHelper tests the AddDataToContextHelper utility function
+func TestAddDataToContextHelper(t *testing.T) {
 	t.Parallel()
 
 	// Create a test logger that discards output
@@ -19,7 +19,7 @@ func TestPrepareContextHelper(t *testing.T) {
 
 	t.Run("nil provider returns error", func(t *testing.T) {
 		baseCtx := context.Background()
-		enrichedCtx, err := PrepareContextHelper(
+		enrichedCtx, err := AddDataToContextHelper(
 			baseCtx,
 			logger,
 			nil,
@@ -34,7 +34,7 @@ func TestPrepareContextHelper(t *testing.T) {
 		provider := NewStaticProvider(simpleData)
 		baseCtx := context.Background()
 
-		enrichedCtx, err := PrepareContextHelper(
+		enrichedCtx, err := AddDataToContextHelper(
 			baseCtx,
 			logger,
 			provider,
@@ -50,7 +50,7 @@ func TestPrepareContextHelper(t *testing.T) {
 		provider := NewContextProvider(constants.EvalData)
 		baseCtx := context.Background()
 
-		enrichedCtx, err := PrepareContextHelper(
+		enrichedCtx, err := AddDataToContextHelper(
 			baseCtx,
 			logger,
 			provider,
@@ -67,11 +67,8 @@ func TestPrepareContextHelper(t *testing.T) {
 		contextMap, ok := data.(map[string]any)
 		require.True(t, ok, "Context value should be a map")
 
-		// Data should be under input_data key
-		assert.Contains(t, contextMap, constants.InputData)
-		inputData, ok := contextMap[constants.InputData].(map[string]any)
-		require.True(t, ok, "Input data should be a map")
-		assert.Equal(t, "value", inputData["key"])
+		// Data should be at root level with no namespace
+		assert.Equal(t, "value", contextMap["key"], "Should have key at root level")
 	})
 
 	t.Run("context provider with HTTP request", func(t *testing.T) {
@@ -79,7 +76,13 @@ func TestPrepareContextHelper(t *testing.T) {
 		baseCtx := context.Background()
 		req := createTestRequestHelper()
 
-		enrichedCtx, err := PrepareContextHelper(baseCtx, logger, provider, req)
+		// Wrap request in map
+		enrichedCtx, err := AddDataToContextHelper(
+			baseCtx,
+			logger,
+			provider,
+			map[string]any{"request": req},
+		)
 
 		assert.NoError(t, err)
 		assert.NotEqual(t, baseCtx, enrichedCtx, "Context should be modified")
@@ -92,8 +95,8 @@ func TestPrepareContextHelper(t *testing.T) {
 		require.True(t, ok, "Context value should be a map")
 
 		// Data should be under request key
-		assert.Contains(t, contextMap, constants.Request)
-		requestData, ok := contextMap[constants.Request].(map[string]any)
+		assert.Contains(t, contextMap, "request")
+		requestData, ok := contextMap["request"].(map[string]any)
 		require.True(t, ok, "Request data should be a map")
 		assert.Equal(t, "GET", requestData["Method"])
 		assert.Equal(t, "/test", requestData["URL_Path"])
@@ -104,8 +107,8 @@ func TestPrepareContextHelper(t *testing.T) {
 		baseCtx := context.Background()
 		req := createTestRequestHelper()
 
-		enrichedCtx, err := PrepareContextHelper(baseCtx, logger, provider,
-			map[string]any{"key": "value"}, req)
+		enrichedCtx, err := AddDataToContextHelper(baseCtx, logger, provider,
+			map[string]any{"key": "value"}, map[string]any{"request": req})
 
 		assert.NoError(t, err)
 		assert.NotEqual(t, baseCtx, enrichedCtx, "Context should be modified")
@@ -117,30 +120,27 @@ func TestPrepareContextHelper(t *testing.T) {
 		contextMap, ok := data.(map[string]any)
 		require.True(t, ok, "Context value should be a map")
 
-		// Verify input data
-		assert.Contains(t, contextMap, constants.InputData)
-		inputData, ok := contextMap[constants.InputData].(map[string]any)
-		require.True(t, ok, "Input data should be a map")
-		assert.Equal(t, "value", inputData["key"])
+		// Verify map data at root level
+		assert.Equal(t, "value", contextMap["key"], "Should have key at root level")
 
-		// Verify request data
-		assert.Contains(t, contextMap, constants.Request)
-		requestData, ok := contextMap[constants.Request].(map[string]any)
+		// Verify request data at root level
+		assert.Contains(t, contextMap, "request")
+		requestData, ok := contextMap["request"].(map[string]any)
 		require.True(t, ok, "Request data should be a map")
 		assert.Equal(t, "GET", requestData["Method"])
 		assert.Equal(t, "/test", requestData["URL_Path"])
 	})
 
-	t.Run("context provider with unsupported data", func(t *testing.T) {
+	t.Run("context provider with empty key", func(t *testing.T) {
 		provider := NewContextProvider(constants.EvalData)
 		baseCtx := context.Background()
 
-		enrichedCtx, err := PrepareContextHelper(
+		enrichedCtx, err := AddDataToContextHelper(
 			baseCtx,
 			logger,
 			provider,
-			42,
-		) // Integer is not supported
+			map[string]any{"": 42}, // Empty key should cause an error
+		)
 
 		assert.Error(t, err)
 		assert.Equal(t, baseCtx, enrichedCtx, "Context should be unchanged when there's an error")
@@ -157,7 +157,7 @@ func TestPrepareContextHelper(t *testing.T) {
 		)
 		baseCtx := context.Background()
 
-		enrichedCtx, err := PrepareContextHelper(baseCtx, logger, provider,
+		enrichedCtx, err := AddDataToContextHelper(baseCtx, logger, provider,
 			map[string]any{"key": "value"})
 
 		assert.NoError(t, err)
@@ -170,13 +170,13 @@ func TestPrepareContextHelper(t *testing.T) {
 		contextMap, ok := data.(map[string]any)
 		require.True(t, ok, "Context value should be a map")
 
-		// Data should be under input_data key
-		assert.Contains(t, contextMap, constants.InputData)
+		// Data should be at root level
+		assert.Equal(t, "value", contextMap["key"], "Key should be at root level")
 	})
 }
 
-// TestPrepareContextWithErrorHandling tests error propagation in the PrepareContextHelper
-func TestPrepareContextWithErrorHandling(t *testing.T) {
+// TestAddDataToContextWithErrorHandling tests error propagation in the AddDataToContextHelper
+func TestAddDataToContextWithErrorHandling(t *testing.T) {
 	t.Parallel()
 
 	// Create a test logger that discards output
@@ -188,9 +188,9 @@ func TestPrepareContextWithErrorHandling(t *testing.T) {
 		baseCtx := context.Background()
 
 		// Add a mix of valid and invalid data to trigger an error
-		enrichedCtx, err := PrepareContextHelper(baseCtx, logger, provider,
+		enrichedCtx, err := AddDataToContextHelper(baseCtx, logger, provider,
 			map[string]any{"valid": "data"},
-			42, // Will trigger an error
+			map[string]any{"": "empty-key"}, // Empty key will trigger an error
 		)
 
 		// Should return an error

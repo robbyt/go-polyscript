@@ -53,8 +53,11 @@ func (m *MockProvider) GetData(ctx context.Context) (map[string]any, error) {
 	return data, args.Error(1)
 }
 
-func (m *MockProvider) AddDataToContext(ctx context.Context, data ...any) (context.Context, error) {
-	args := m.Called(append([]any{ctx}, data...))
+func (m *MockProvider) AddDataToContext(
+	ctx context.Context,
+	data ...map[string]any,
+) (context.Context, error) {
+	args := m.Called(ctx, data)
 	newCtx, _ := args.Get(0).(context.Context)
 	return newCtx, args.Error(1)
 }

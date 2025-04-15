@@ -20,7 +20,7 @@ This pattern is valuable for:
 These examples follow a consistent three-phase pattern:
 
 1. **Create evaluator with static data**: Set up an evaluator with configuration data that remains constant across executions
-2. **Prepare runtime data**: Add dynamic data to the context using the `PrepareContext` method
+2. **Prepare runtime data**: Add dynamic data to the context using the `AddDataToContext` method
 3. **Evaluate script**: Execute the script with the enriched context
 
 ## Running the Examples

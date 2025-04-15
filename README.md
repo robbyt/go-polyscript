@@ -106,7 +106,7 @@ evaluator, _ := polyscript.FromRisorString(script, logHandler)
 
 ctx := context.Background()
 runtimeData := map[string]any{"name": "Billie Jean", "relationship": false}
-enrichedCtx, _ := evaluator.PrepareContext(ctx, runtimeData)
+enrichedCtx, _ := evaluator.AddDataToContext(ctx, runtimeData)
 
 // Execute with the "enriched" context containing the link to the input data
 result, _ := evaluator.Eval(enrichedCtx)
@@ -127,14 +127,14 @@ evaluator, _ := polyscript.FromRisorStringWithData(script, staticData, logHandle
 
 // For each request, prepare dynamic data
 requestData := map[string]any{"userId": 123}
-enrichedCtx, _ := evaluator.PrepareContext(context.Background(), requestData)
+enrichedCtx, _ := evaluator.AddDataToContext(context.Background(), requestData)
 
 // Execute with both static and dynamic data available
 result, _ := evaluator.Eval(enrichedCtx)
 
-// In scripts, data can be accessed from both locations:
-// appName := ctx["appName"]  // Static data: "MyApp"
-// userId := ctx["input_data"]["userId"]  // Dynamic data: 123
+// In scripts, all data is accessed from the context:
+// appName := ctx["appName"]    // From static data: "MyApp"
+// userId := ctx["userId"]      // From dynamic data: 123
 ```
 
 ## Architecture
@@ -151,11 +151,13 @@ go-polyscript is structured around a few key concepts:
 
 ### Note on Data Access Patterns
 
-go-polyscript uses a unified `Provider` interface to supply data to scripts. The library has standardized on storing dynamic runtime data under the `input_data` key (previously `script_data`). For maximum compatibility, scripts should handle two data access patterns:
+go-polyscript uses a two-layer approach for handling data:
 
-1. Top-level access for static data: `ctx["config_value"]`
-2. Nested access for dynamic data: `ctx["input_data"]["user_data"]`
-3. HTTP request data access: `ctx["input_data"]["request"]["method"]` (request objects are always stored under input_data)
+1. **Data Provider Layer**: The `Provider` interface (via `AddDataToContext`) handles storage mechanisms and general type conversions. This layer is pluggable, allowing data to be stored in various backends while maintaining a consistent API.
+
+2. **Engine-Specific Layer**: Each engine's `Evaluator` implementation handles the engine-specific conversions between the stored data and the format required by that particular scripting engine.
+
+This separation allows scripts to access data with consistent patterns regardless of the storage mechanism or script engine. For example, data you store with `{"config": value}` will be accessible in your scripts as `ctx["config"]`, with each engine handling the specific conversions needed for its runtime.
 
 See the [Data Providers](#working-with-data-providers) section for more details.
 
