@@ -253,6 +253,154 @@ func TestCompositeProvider_GetData(t *testing.T) {
 func TestCompositeProvider_AddDataToContext(t *testing.T) {
 	t.Parallel()
 
+	t.Run("multiple ContextProviders with same key", func(t *testing.T) {
+		// Create multiple context providers with the same key
+		contextProvider1 := NewContextProvider(constants.EvalData)
+		contextProvider2 := NewContextProvider(constants.EvalData)
+
+		// Composite provider with both context providers
+		provider := NewCompositeProvider(contextProvider1, contextProvider2)
+
+		// Start with empty context
+		ctx := context.Background()
+
+		// Add data with first call (should use the first provider)
+		data1 := map[string]any{
+			"user": map[string]any{
+				"name": "Alice",
+				"settings": map[string]any{
+					"theme": "dark",
+				},
+			},
+			"shared": "first",
+		}
+		ctx1, err1 := provider.AddDataToContext(ctx, data1)
+		require.NoError(t, err1)
+
+		// Add more data with second call (should use first provider again, since its earlier in the chain)
+		data2 := map[string]any{
+			"user": map[string]any{
+				"age": 30,
+				"settings": map[string]any{
+					"notifications": true,
+				},
+			},
+			"shared": "second", // This should override "first"
+		}
+		ctx2, err2 := provider.AddDataToContext(ctx1, data2)
+		require.NoError(t, err2)
+
+		// Verify the data was merged correctly
+		result, err := provider.GetData(ctx2)
+		require.NoError(t, err)
+
+		// Check that both data sets were merged
+		userMap, ok := result["user"].(map[string]any)
+		assert.True(t, ok, "User should be a map")
+		assert.Equal(t, "Alice", userMap["name"], "Name should be preserved")
+		assert.Equal(t, 30, userMap["age"], "Age should be added")
+
+		settings, ok := userMap["settings"].(map[string]any)
+		assert.True(t, ok, "Settings should be a map")
+		assert.Equal(t, "dark", settings["theme"], "Theme should be preserved")
+		assert.Equal(t, true, settings["notifications"], "Notifications should be added")
+
+		// Check that shared value was overridden
+		assert.Equal(t, "second", result["shared"], "Shared value should be overridden")
+	})
+
+	t.Run("complex interaction between multiple ContextProviders", func(t *testing.T) {
+		// Create three context providers with the same key
+		provider1 := NewContextProvider(constants.EvalData)
+		provider2 := NewContextProvider(constants.EvalData)
+		provider3 := NewContextProvider(constants.EvalData)
+
+		// Create composite provider with a specific order
+		composite := NewCompositeProvider(provider1, provider2, provider3)
+
+		// Setup initial context with data in each provider's storage
+		ctx := context.Background()
+
+		// Setup data for first provider (this should be accessible by all providers)
+		initialData := map[string]any{
+			"config": map[string]any{
+				"mode": "production",
+				"features": map[string]any{
+					"feature1": true,
+					"feature2": false,
+				},
+			},
+			"counter": 1,
+		}
+		ctx = context.WithValue(ctx, constants.EvalData, initialData)
+
+		// First AddDataToContext call (uses provider1)
+		data1 := map[string]any{
+			"config": map[string]any{
+				"features": map[string]any{
+					"feature2": true, // Override feature2
+					"feature3": true, // Add feature3
+				},
+				"timeout": 30, // Add timeout
+			},
+			"counter": 2, // Override counter
+		}
+		ctx, err := composite.AddDataToContext(ctx, data1)
+		require.NoError(t, err)
+
+		// Second AddDataToContext call (uses provider1 again)
+		data2 := map[string]any{
+			"config": map[string]any{
+				"mode": "development", // Override mode
+				"features": map[string]any{
+					"feature1": false, // Override feature1
+				},
+			},
+			"counter": 3,       // Override counter again
+			"user":    "admin", // Add new field
+		}
+		ctx, err = composite.AddDataToContext(ctx, data2)
+		require.NoError(t, err)
+
+		// Verify the final state
+		result, err := composite.GetData(ctx)
+		require.NoError(t, err)
+
+		// Check counter (simplest case - should be last value)
+		assert.Equal(t, 3, result["counter"])
+
+		// Check user (added in second call)
+		assert.Equal(t, "admin", result["user"])
+
+		// Check config (complex nested structure with multiple updates)
+		config, ok := result["config"].(map[string]any)
+		require.True(t, ok)
+
+		// Check mode (updated in second call)
+		assert.Equal(t, "development", config["mode"])
+
+		// Check timeout (added in first call, not touched in second)
+		assert.Equal(t, 30, config["timeout"])
+
+		// Check features (updated across multiple calls)
+		features, ok := config["features"].(map[string]any)
+		require.True(t, ok)
+
+		assert.Equal(
+			t,
+			false,
+			features["feature1"],
+			"feature1 should be false (updated in second call)",
+		)
+		assert.Equal(
+			t,
+			true,
+			features["feature2"],
+			"feature2 should be true (updated in first call)",
+		)
+		assert.Equal(t, true, features["feature3"], "feature3 should be true (added in first call)")
+	})
+
 	t.Run("empty providers list", func(t *testing.T) {
 		provider := NewCompositeProvider()
 		require.NotNil(t, provider)
@@ -396,6 +544,48 @@ func TestCompositeProvider_NestedStructures(t *testing.T) {
 		setupContext   func() context.Context
 		expectedResult map[string]any
 	}{
+		{
+			name: "multiple ContextProviders with same context key",
+			setupProviders: func() *CompositeProvider {
+				// Create multiple context providers with the same key
+				contextProvider1 := NewContextProvider(constants.EvalData)
+				contextProvider2 := NewContextProvider(constants.EvalData)
+				contextProvider3 := NewContextProvider(constants.EvalData)
+
+				// Composite provider with all three context providers
+				return NewCompositeProvider(contextProvider1, contextProvider2, contextProvider3)
+			},
+			setupContext: func() context.Context {
+				// Create a context with data for each provider to access/modify
+				ctx := context.Background()
+
+				// First provider data
+				ctx = context.WithValue(ctx, constants.EvalData, map[string]any{
+					"user": map[string]any{
+						"name": "Alice",
+						"role": "admin",
+						"settings": map[string]any{
+							"theme": "dark",
+						},
+					},
+					"version": "1.0",
+					"shared":  "first",
+				})
+
+				return ctx
+			},
+			expectedResult: map[string]any{
+				"user": map[string]any{
+					"name": "Alice",
+					"role": "admin",
+					"settings": map[string]any{
+						"theme": "dark",
+					},
+				},
+				"version": "1.0",
+				"shared":  "first",
+			},
+		},
 		{
 			name: "nested composite providers with static data",
 			setupProviders: func() *CompositeProvider {

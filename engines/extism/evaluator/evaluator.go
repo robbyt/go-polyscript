@@ -208,9 +208,8 @@ func (be *Evaluator) Eval(ctx context.Context) (platform.EvaluatorResponse, erro
 	return result, nil
 }
 
-// AddDataToContext implements the data.Setter interface for Extism WebAssembly modules.
-// It enriches the provided context with data for script evaluation, using the
-// ExecutableUnit's DataProvider to store the data.
+// AddDataToContext implements the data.Setter interface which stores and prepares runtime data
+// which can be eventually passed to the Eval method.
 func (be *Evaluator) AddDataToContext(
 	ctx context.Context,
 	d ...map[string]any,
