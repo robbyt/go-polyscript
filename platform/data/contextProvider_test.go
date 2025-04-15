@@ -2,6 +2,7 @@ package data
 
 import (
 	"context"
+	"net/http"
 	"testing"
 
 	"github.com/robbyt/go-polyscript/platform/constants"
@@ -313,6 +314,130 @@ func TestContextProvider_AddDataToContext(t *testing.T) {
 		settingsMap, ok := profileMap["settings"].(map[string]any)
 		assert.True(t, ok, "settings should be a map")
 		assert.Equal(t, true, settingsMap["notifications"], "Should contain correct settings")
+	})
+}
+
+// TestContextProvider_ProcessValue tests the processValue function directly
+func TestContextProvider_ProcessValue(t *testing.T) {
+	t.Parallel()
+
+	t.Run("nil value", func(t *testing.T) {
+		provider := NewContextProvider(constants.EvalData)
+		result, err := provider.processValue(nil)
+
+		assert.NoError(t, err, "Should not error for nil value")
+		assert.Nil(t, result, "Result should be nil")
+	})
+
+	t.Run("primitive types", func(t *testing.T) {
+		provider := NewContextProvider(constants.EvalData)
+
+		// Test string
+		result, err := provider.processValue("test string")
+		assert.NoError(t, err)
+		assert.Equal(t, "test string", result)
+
+		// Test number
+		result, err = provider.processValue(42)
+		assert.NoError(t, err)
+		assert.Equal(t, 42, result)
+
+		// Test boolean
+		result, err = provider.processValue(true)
+		assert.NoError(t, err)
+		assert.Equal(t, true, result)
+
+		// Test slice
+		slice := []string{"one", "two"}
+		result, err = provider.processValue(slice)
+		assert.NoError(t, err)
+		assert.Equal(t, slice, result)
+	})
+
+	t.Run("nil http request pointer", func(t *testing.T) {
+		provider := NewContextProvider(constants.EvalData)
+		var nilReq *http.Request = nil
+
+		result, err := provider.processValue(nilReq)
+		assert.NoError(t, err, "Should not error for nil HTTP request")
+		assert.Nil(t, result, "Result should be nil")
+	})
+
+	t.Run("http request", func(t *testing.T) {
+		provider := NewContextProvider(constants.EvalData)
+		req := createTestRequestHelper()
+
+		// Test *http.Request
+		result, err := provider.processValue(req)
+		assert.NoError(t, err)
+		resultMap, ok := result.(map[string]any)
+		assert.True(t, ok, "Result should be a map")
+		assert.Equal(t, "GET", resultMap["Method"])
+
+		// Test http.Request (value)
+		result, err = provider.processValue(*req)
+		assert.NoError(t, err)
+		resultMap, ok = result.(map[string]any)
+		assert.True(t, ok, "Result should be a map")
+		assert.Equal(t, "GET", resultMap["Method"])
+	})
+
+	t.Run("map with empty key", func(t *testing.T) {
+		provider := NewContextProvider(constants.EvalData)
+		mapWithEmptyKey := map[string]any{
+			"":      "value for empty key",
+			"valid": "value",
+		}
+
+		_, err := provider.processValue(mapWithEmptyKey)
+		assert.Error(t, err, "Should reject maps with empty keys")
+		assert.Contains(t, err.Error(), "empty keys are not allowed")
+	})
+
+	t.Run("deeply nested map", func(t *testing.T) {
+		provider := NewContextProvider(constants.EvalData)
+		nestedMap := map[string]any{
+			"level1": map[string]any{
+				"level2": map[string]any{
+					"level3": map[string]any{
+						"value": 42,
+					},
+				},
+			},
+		}
+
+		result, err := provider.processValue(nestedMap)
+		assert.NoError(t, err)
+
+		// Navigate through the levels to verify all maps were processed
+		resultMap, ok := result.(map[string]any)
+		assert.True(t, ok)
+
+		level1, ok := resultMap["level1"].(map[string]any)
+		assert.True(t, ok)
+
+		level2, ok := level1["level2"].(map[string]any)
+		assert.True(t, ok)
+
+		level3, ok := level2["level3"].(map[string]any)
+		assert.True(t, ok)
+
+		assert.Equal(t, 42, level3["value"])
+	})
+
+	t.Run("nested map with error in deeper level", func(t *testing.T) {
+		provider := NewContextProvider(constants.EvalData)
+		problematicMap := map[string]any{
+			"level1": map[string]any{
+				"level2": map[string]any{
+					"": "this key is empty and should cause an error",
+				},
+			},
+		}
+
+		_, err := provider.processValue(problematicMap)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "empty keys are not allowed")
 	})
 }
 
