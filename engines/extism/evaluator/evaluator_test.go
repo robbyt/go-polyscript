@@ -61,7 +61,7 @@ func (m *mockErrProvider) GetData(ctx context.Context) (map[string]any, error) {
 
 func (m *mockErrProvider) AddDataToContext(
 	ctx context.Context,
-	data ...any,
+	data ...map[string]any,
 ) (context.Context, error) {
 	return ctx, m.err
 }
@@ -607,14 +607,14 @@ func TestEvaluator_Evaluate(t *testing.T) {
 	})
 }
 
-// TestEvaluator_PrepareContext tests the PrepareContext method with various scenarios
-func TestEvaluator_PrepareContext(t *testing.T) {
+// TestEvaluator_AddDataToContext tests the AddDataToContext method with various scenarios
+func TestEvaluator_AddDataToContext(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name        string
 		setupExe    func(t *testing.T) *script.ExecutableUnit
-		inputs      []any
+		inputs      []map[string]any
 		wantError   bool
 		expectedErr string
 	}{
@@ -633,7 +633,7 @@ func TestEvaluator_PrepareContext(t *testing.T) {
 					Content:      content,
 				}
 			},
-			inputs:      []any{map[string]any{"test": "data"}},
+			inputs:      []map[string]any{{"test": "data"}},
 			wantError:   true,
 			expectedErr: "no data provider available",
 		},
@@ -652,7 +652,7 @@ func TestEvaluator_PrepareContext(t *testing.T) {
 					Content:      content,
 				}
 			},
-			inputs:    []any{map[string]any{"test": "data"}},
+			inputs:    []map[string]any{{"test": "data"}},
 			wantError: false,
 		},
 		{
@@ -670,7 +670,7 @@ func TestEvaluator_PrepareContext(t *testing.T) {
 					Content:      content,
 				}
 			},
-			inputs:    []any{},
+			inputs:    []map[string]any{{}},
 			wantError: false,
 		},
 		{
@@ -679,7 +679,7 @@ func TestEvaluator_PrepareContext(t *testing.T) {
 				t.Helper()
 				return nil
 			},
-			inputs:      []any{map[string]any{"test": "data"}},
+			inputs:      []map[string]any{{"test": "data"}},
 			wantError:   true,
 			expectedErr: "no data provider available",
 		},
@@ -701,7 +701,7 @@ func TestEvaluator_PrepareContext(t *testing.T) {
 					Content:      content,
 				}
 			},
-			inputs:      []any{map[string]any{"test": "data"}},
+			inputs:      []map[string]any{{"test": "data"}},
 			wantError:   true,
 			expectedErr: "provider error",
 		},
@@ -714,7 +714,7 @@ func TestEvaluator_PrepareContext(t *testing.T) {
 			evaluator := New(handler, exe)
 
 			ctx := context.Background()
-			enrichedCtx, err := evaluator.PrepareContext(ctx, tt.inputs...)
+			enrichedCtx, err := evaluator.AddDataToContext(ctx, tt.inputs...)
 
 			// Check error expectations
 			if tt.wantError {

@@ -18,12 +18,6 @@ func TestContextProvider_Creation(t *testing.T) {
 
 		assert.Equal(t, constants.EvalData, provider.contextKey,
 			"Context key should be set correctly")
-		assert.Equal(t, constants.InputData, provider.storageKey,
-			"Storage key should be initialized")
-		assert.Equal(t, constants.Request, provider.requestKey,
-			"Request key should be initialized")
-		assert.Equal(t, constants.Response, provider.responseKey,
-			"Response key should be initialized")
 	})
 
 	t.Run("custom context key", func(t *testing.T) {
@@ -31,8 +25,6 @@ func TestContextProvider_Creation(t *testing.T) {
 
 		assert.Equal(t, constants.ContextKey("custom_key"), provider.contextKey,
 			"Context key should be set correctly")
-		assert.Equal(t, constants.InputData, provider.storageKey,
-			"Storage key should be initialized")
 	})
 
 	t.Run("empty context key", func(t *testing.T) {
@@ -40,8 +32,6 @@ func TestContextProvider_Creation(t *testing.T) {
 
 		assert.Equal(t, constants.ContextKey(""), provider.contextKey,
 			"Context key should be set correctly")
-		assert.Equal(t, constants.InputData, provider.storageKey,
-			"Storage key should be initialized")
 	})
 }
 
@@ -73,7 +63,7 @@ func TestContextProvider_GetData(t *testing.T) {
 		getDataCheckHelper(t, provider, ctx)
 	})
 
-	t.Run("valid simple data", func(t *testing.T) {
+	t.Run("valid simple data without namespace", func(t *testing.T) {
 		provider := NewContextProvider(constants.EvalData)
 		ctx := context.WithValue(context.Background(), constants.EvalData, simpleData)
 
@@ -86,7 +76,7 @@ func TestContextProvider_GetData(t *testing.T) {
 		getDataCheckHelper(t, provider, ctx)
 	})
 
-	t.Run("valid complex data", func(t *testing.T) {
+	t.Run("valid complex data without namespace", func(t *testing.T) {
 		provider := NewContextProvider(constants.EvalData)
 		ctx := context.WithValue(context.Background(), constants.EvalData, complexData)
 
@@ -97,6 +87,75 @@ func TestContextProvider_GetData(t *testing.T) {
 
 		// Verify data consistency
 		getDataCheckHelper(t, provider, ctx)
+	})
+
+	t.Run("nested data structures", func(t *testing.T) {
+		provider := NewContextProvider(constants.EvalData)
+
+		// Create context with nested data
+		data := map[string]any{
+			"user": map[string]any{
+				"profile": map[string]any{
+					"name": "Alice",
+					"age":  30,
+				},
+			},
+			"settings": map[string]any{
+				"theme": "dark",
+			},
+		}
+		ctx := context.WithValue(context.Background(), constants.EvalData, data)
+
+		result, err := provider.GetData(ctx)
+		assert.NoError(t, err, "Should not return error for valid context")
+
+		// Verify top-level keys exist
+		assert.Contains(t, result, "user", "Should contain user key")
+		assert.Contains(t, result, "settings", "Should contain settings key")
+
+		// Verify nested data
+		userMap, ok := result["user"].(map[string]any)
+		assert.True(t, ok, "User should be a map")
+		profileMap, ok := userMap["profile"].(map[string]any)
+		assert.True(t, ok, "Profile should be a map")
+
+		assert.Equal(t, "Alice", profileMap["name"], "Should have correct name")
+		assert.Equal(t, 30, profileMap["age"], "Should have correct age")
+
+		settingsMap, ok := result["settings"].(map[string]any)
+		assert.True(t, ok, "Settings should be a map")
+		assert.Equal(t, "dark", settingsMap["theme"], "Should have correct theme")
+	})
+
+	t.Run("mixed data types", func(t *testing.T) {
+		provider := NewContextProvider(constants.EvalData)
+
+		// Create context with various data types
+		data := map[string]any{
+			"string": "value",
+			"number": 42,
+			"bool":   true,
+			"array":  []string{"one", "two"},
+			"map":    map[string]any{"key": "value"},
+		}
+		ctx := context.WithValue(context.Background(), constants.EvalData, data)
+
+		result, err := provider.GetData(ctx)
+		assert.NoError(t, err, "Should not return error for valid context")
+
+		// Verify all types are preserved
+		assert.Equal(t, "value", result["string"], "String should match")
+		assert.Equal(t, 42, result["number"], "Number should match")
+		assert.Equal(t, true, result["bool"], "Boolean should match")
+
+		// Note that we can't assert directly on slices, but we can check length and contents
+		arr, ok := result["array"].([]string)
+		assert.True(t, ok, "Array should be preserved")
+		assert.Equal(t, 2, len(arr), "Array should have correct length")
+
+		nestedMap, ok := result["map"].(map[string]any)
+		assert.True(t, ok, "Nested map should be preserved")
+		assert.Equal(t, "value", nestedMap["key"], "Nested map should have correct values")
 	})
 
 	t.Run("invalid data type (string)", func(t *testing.T) {
@@ -159,12 +218,10 @@ func TestContextProvider_AddDataToContext(t *testing.T) {
 
 		data, err := provider.GetData(newCtx)
 		assert.NoError(t, err)
-		assert.Contains(t, data, constants.InputData, "Should contain input_data key")
 
-		inputData, ok := data[constants.InputData].(map[string]any)
-		assert.True(t, ok, "input_data should be a map")
-		assert.Equal(t, "value1", inputData["key1"], "Should contain key1")
-		assert.Equal(t, 123, inputData["key2"], "Should contain key2")
+		// Data should be at root level
+		assert.Equal(t, "value1", data["key1"], "Should contain key1 at root level")
+		assert.Equal(t, 123, data["key2"], "Should contain key2 at root level")
 	})
 
 	t.Run("multiple map data items", func(t *testing.T) {
@@ -180,69 +237,82 @@ func TestContextProvider_AddDataToContext(t *testing.T) {
 
 		data, err := provider.GetData(newCtx)
 		assert.NoError(t, err)
-		assert.Contains(t, data, constants.InputData, "Should contain input_data key")
 
-		inputData, ok := data[constants.InputData].(map[string]any)
-		assert.True(t, ok, "input_data should be a map")
-		assert.Equal(t, "value1", inputData["key1"], "Should contain key1")
-		assert.Equal(t, "value2", inputData["key2"], "Should contain key2")
+		// Data should be at root level
+		assert.Equal(t, "value1", data["key1"], "Should contain key1 at root level")
+		assert.Equal(t, "value2", data["key2"], "Should contain key2 at root level")
 	})
 
-	t.Run("HTTP request data", func(t *testing.T) {
+	t.Run("HTTP request as map value", func(t *testing.T) {
 		provider := NewContextProvider(constants.EvalData)
 		ctx := context.Background()
 
-		newCtx, err := provider.AddDataToContext(ctx, createTestRequestHelper())
+		// Now we pass the request as a map value
+		req := createTestRequestHelper()
+		newCtx, err := provider.AddDataToContext(ctx, map[string]any{"request": req})
 
-		assert.NoError(t, err, "Should not return error with HTTP request")
+		assert.NoError(t, err, "Should not return error with HTTP request in map")
 		assert.NotEqual(t, ctx, newCtx, "Context should be modified")
 
 		data, err := provider.GetData(newCtx)
 		assert.NoError(t, err)
-		assert.Contains(t, data, constants.Request, "Should contain request key")
+		assert.Contains(t, data, "request", "Should contain request key")
 
-		requestData, ok := data[constants.Request].(map[string]any)
+		requestData, ok := data["request"].(map[string]any)
 		assert.True(t, ok, "request should be a map")
 		assert.Equal(t, "GET", requestData["Method"], "Should contain HTTP method")
 		assert.Equal(t, "/test", requestData["URL_Path"], "Should contain request path")
 	})
 
-	t.Run("unsupported data type", func(t *testing.T) {
+	t.Run("empty string keys are rejected", func(t *testing.T) {
 		provider := NewContextProvider(constants.EvalData)
 		ctx := context.Background()
 
-		newCtx, err := provider.AddDataToContext(ctx, 42) // Integer is not supported
+		// Try to add data with an empty key
+		newCtx, err := provider.AddDataToContext(ctx, map[string]any{"": "value"})
 
-		assert.Error(t, err, "Should error with unsupported data type")
-		assert.NotEqual(t, ctx, newCtx, "Context should be modified despite error")
+		assert.Error(t, err, "Should error with empty key")
+		assert.Contains(t, err.Error(), "empty keys are not allowed")
 
-		// Context should be modified but empty
+		// Context should be modified but the empty key should not be added
 		data, getErr := provider.GetData(newCtx)
-		assert.NoError(t, getErr, "GetData should work after AddDataToContext")
-		assert.NotNil(t, data, "Data should not be nil despite error")
-		assert.Empty(t, data, "Data should be empty with unsupported type")
+		assert.NoError(t, getErr)
+		assert.NotContains(t, data, "", "Empty key should not be added")
 	})
 
-	t.Run("mixed supported and unsupported", func(t *testing.T) {
+	t.Run("nested maps are processed recursively", func(t *testing.T) {
 		provider := NewContextProvider(constants.EvalData)
 		ctx := context.Background()
 
-		// Only the map is supported
-		newCtx, err := provider.AddDataToContext(ctx,
-			map[string]any{"key": "value"},
-			42,
-			"string")
+		// Add nested data
+		newCtx, err := provider.AddDataToContext(ctx, map[string]any{
+			"user": map[string]any{
+				"profile": map[string]any{
+					"name": "Alice",
+					"settings": map[string]any{
+						"notifications": true,
+					},
+				},
+			},
+		})
 
-		assert.Error(t, err, "Should error with unsupported data types")
-		assert.NotEqual(t, ctx, newCtx, "Context should be modified despite error")
+		assert.NoError(t, err)
 
 		data, getErr := provider.GetData(newCtx)
-		assert.NoError(t, getErr, "GetData should work after AddDataToContext")
-		assert.Contains(t, data, constants.InputData, "Should contain input_data key")
+		assert.NoError(t, getErr)
 
-		inputData, ok := data[constants.InputData].(map[string]any)
-		assert.True(t, ok, "input_data should be a map")
-		assert.Equal(t, "value", inputData["key"], "Should contain supported data")
+		// Navigate the nested structure
+		userMap, ok := data["user"].(map[string]any)
+		assert.True(t, ok, "user should be a map")
+
+		profileMap, ok := userMap["profile"].(map[string]any)
+		assert.True(t, ok, "profile should be a map")
+
+		assert.Equal(t, "Alice", profileMap["name"], "Should contain correct name")
+
+		settingsMap, ok := profileMap["settings"].(map[string]any)
+		assert.True(t, ok, "settings should be a map")
+		assert.Equal(t, true, settingsMap["notifications"], "Should contain correct settings")
 	})
 }
 
@@ -250,7 +320,7 @@ func TestContextProvider_AddDataToContext(t *testing.T) {
 func TestContextProvider_DataIntegration(t *testing.T) {
 	t.Parallel()
 
-	t.Run("single map data item", func(t *testing.T) {
+	t.Run("basic map data", func(t *testing.T) {
 		provider := NewContextProvider(constants.EvalData)
 		ctx := context.Background()
 
@@ -262,13 +332,8 @@ func TestContextProvider_DataIntegration(t *testing.T) {
 		data, err := provider.GetData(newCtx)
 		assert.NoError(t, err)
 
-		// Check for input_data key
-		assert.Contains(t, data, constants.InputData, "Should contain input_data key")
-
-		// Verify the input_data values
-		inputData, ok := data[constants.InputData].(map[string]any)
-		assert.True(t, ok, "input_data should be a map")
-		assert.Equal(t, "value", inputData["key"], "Should contain the correct value")
+		// Data should be available directly at root level
+		assert.Equal(t, "value", data["key"], "Should contain the correct value at root")
 	})
 
 	t.Run("should preserve context data across calls", func(t *testing.T) {
@@ -276,7 +341,7 @@ func TestContextProvider_DataIntegration(t *testing.T) {
 
 		// Create a context directly with data already in it
 		existingData := map[string]any{
-			constants.InputData: map[string]any{"existing": "value"},
+			"existing": "value",
 		}
 		ctx := context.WithValue(context.Background(), constants.EvalData, existingData)
 
@@ -287,11 +352,109 @@ func TestContextProvider_DataIntegration(t *testing.T) {
 		// Verify both pieces of data exist
 		data, err := provider.GetData(newCtx)
 		assert.NoError(t, err)
-		assert.Contains(t, data, constants.InputData, "Should contain input_data key")
 
-		inputData, ok := data[constants.InputData].(map[string]any)
-		assert.True(t, ok, "input_data should be a map")
-		assert.Equal(t, "value", inputData["existing"], "Should preserve existing value")
-		assert.Equal(t, "value", inputData["new"], "Should add new value")
+		assert.Equal(t, "value", data["existing"], "Should preserve existing value")
+		assert.Equal(t, "value", data["new"], "Should add new value")
+	})
+
+	t.Run("HTTP request as map value", func(t *testing.T) {
+		provider := NewContextProvider(constants.EvalData)
+		ctx := context.Background()
+
+		// Create request
+		req := createTestRequestHelper()
+
+		// Add an HTTP request as a value in a map
+		newCtx, err := provider.AddDataToContext(ctx, map[string]any{"request": req})
+		require.NoError(t, err)
+
+		// Get raw data from context
+		data, err := provider.GetData(newCtx)
+		assert.NoError(t, err)
+
+		// Request should be converted to a map
+		requestData, ok := data["request"].(map[string]any)
+		assert.True(t, ok, "Request should be a map")
+		assert.Equal(t, "GET", requestData["Method"], "Should contain HTTP method")
+	})
+
+	t.Run("should recursively merge nested maps", func(t *testing.T) {
+		provider := NewContextProvider(constants.EvalData)
+		ctx := context.Background()
+
+		// Add initial nested data
+		newCtx, err := provider.AddDataToContext(ctx, map[string]any{
+			"user": map[string]any{
+				"name": "Alice",
+				"settings": map[string]any{
+					"theme": "dark",
+				},
+			},
+		})
+		require.NoError(t, err)
+
+		// Add more data that should be merged with existing
+		newCtx, err = provider.AddDataToContext(newCtx, map[string]any{
+			"user": map[string]any{
+				"age": 30,
+				"settings": map[string]any{
+					"notifications": true,
+				},
+			},
+		})
+		require.NoError(t, err)
+
+		// Verify all data correctly merged
+		data, err := provider.GetData(newCtx)
+		assert.NoError(t, err)
+
+		userMap, ok := data["user"].(map[string]any)
+		assert.True(t, ok, "User should be a map")
+
+		assert.Equal(t, "Alice", userMap["name"], "Should retain original name")
+		assert.Equal(t, 30, userMap["age"], "Should add new age field")
+
+		settings, ok := userMap["settings"].(map[string]any)
+		assert.True(t, ok, "Settings should be a map")
+		assert.Equal(t, "dark", settings["theme"], "Should retain original theme setting")
+		assert.Equal(t, true, settings["notifications"], "Should add new notifications setting")
+	})
+
+	t.Run("multiple providers with different context keys", func(t *testing.T) {
+		provider1 := NewContextProvider("user_data")
+		provider2 := NewContextProvider("system_data")
+
+		ctx := context.Background()
+
+		// Add data with first provider
+		ctx, err1 := provider1.AddDataToContext(ctx, map[string]any{"name": "Alice"})
+		require.NoError(t, err1)
+
+		// Add data with second provider
+		ctx, err2 := provider2.AddDataToContext(ctx, map[string]any{"version": "1.0"})
+		require.NoError(t, err2)
+
+		// Get data from both providers
+		userData, err3 := provider1.GetData(ctx)
+		systemData, err4 := provider2.GetData(ctx)
+
+		require.NoError(t, err3)
+		require.NoError(t, err4)
+
+		// Each provider should see its own data
+		assert.Equal(t, "Alice", userData["name"], "User provider should see name")
+		assert.Equal(t, "1.0", systemData["version"], "System provider should see version")
+	})
+
+	t.Run("should reject empty keys", func(t *testing.T) {
+		provider := NewContextProvider(constants.EvalData)
+		ctx := context.Background()
+
+		// Add data with an empty key
+		badData := map[string]any{"": "value"}
+		_, err := provider.AddDataToContext(ctx, badData)
+
+		assert.Error(t, err, "Should reject empty keys")
+		assert.Contains(t, err.Error(), "empty keys are not allowed")
 	})
 }

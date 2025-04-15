@@ -24,7 +24,7 @@ For distributed architectures, separate data preparation from evaluation to impr
 
 ```go
 // PREPARE DATA (can happen on system A)
-enrichedCtx, _ := evaluator.PrepareContext(ctx, inputData)
+enrichedCtx, _ := evaluator.AddDataToContext(ctx, inputData)
 
 // EVALUATE (can happen on system B)
 result, _ := evaluator.Eval(enrichedCtx)

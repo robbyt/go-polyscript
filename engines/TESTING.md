@@ -36,7 +36,7 @@ This document outlines standardized testing principles for go-polyscript to ensu
 | Options             | `TestCompilerOptions`      |
 | Executables         | `TestExecutable`           |
 | Evaluator execution | `TestEvaluator_Evaluate`   |
-| Context preparation | `TestEvaluator_PrepareContext` |
+| Context preparation | `TestEvaluator_AddDataToContext` |
 | Response handling   | `TestResponseMethods`      |
 | Type conversion     | `TestToGoType` / `TestToMachineType` |
 

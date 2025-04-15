@@ -34,7 +34,7 @@ func FromExtismLoader(
 }
 
 // FromExtismLoaderWithData creates an Extism evaluator with both static and dynamic data capabilities.
-// To add runtime data, use the `PrepareContext` method on the evaluator to add data to the context.
+// To add runtime data, use the `AddDataToContext` method on the evaluator to add data to the context.
 //
 // Input parameters:
 // - l: loader implementation for loading the WASM content

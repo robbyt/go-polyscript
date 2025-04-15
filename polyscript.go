@@ -43,7 +43,7 @@ func FromExtismFile(
 }
 
 // FromExtismFileWithData creates an Extism evaluator with both static and dynamic data capabilities.
-// To add runtime data, use the PrepareContext method on the evaluator to add data to the context.
+// To add runtime data, use the AddDataToContext method on the evaluator to add data to the context.
 //
 // Example:
 //
@@ -51,7 +51,7 @@ func FromExtismFile(
 //	be, err := FromExtismFileWithData("path/to/module.wasm", staticData, slog.Default().Handler(), "process")
 //
 //	runtimeData := map[string]any{"request": req}
-//	ctx, err = be.PrepareContext(context.Background(), runtimeData)
+//	ctx, err = be.AddDataToContext(context.Background(), runtimeData)
 //	result, err := be.Eval(ctx)
 func FromExtismFileWithData(
 	filePath string,
@@ -86,7 +86,7 @@ func FromRisorFile(
 }
 
 // FromRisorFileWithData creates a Risor evaluator with both static and dynamic data capabilities.
-// To add runtime data, use the PrepareContext method on the evaluator to add data to the context.
+// To add runtime data, use the AddDataToContext method on the evaluator to add data to the context.
 //
 // Example:
 //
@@ -94,7 +94,7 @@ func FromRisorFile(
 //	be, err := FromRisorFileWithData("path/to/script.risor", staticData, slog.Default().Handler())
 //
 //	runtimeData := map[string]any{"request": req}
-//	ctx, err = be.PrepareContext(context.Background(), runtimeData)
+//	ctx, err = be.AddDataToContext(context.Background(), runtimeData)
 //	result, err := be.Eval(ctx)
 func FromRisorFileWithData(
 	filePath string,
@@ -129,7 +129,7 @@ func FromRisorString(
 }
 
 // FromRisorStringWithData creates a Risor evaluator with both static and dynamic data capabilities.
-// To add runtime data, use the PrepareContext method on the evaluator to add data to the context.
+// To add runtime data, use the AddDataToContext method on the evaluator to add data to the context.
 //
 // Example:
 //
@@ -138,7 +138,7 @@ func FromRisorString(
 //	be, err := FromRisorStringWithData(script, staticData, slog.Default().Handler())
 //
 //	runtimeData := map[string]any{"request": map[string]string{"field": "dynamic value"}}
-//	ctx, err = be.PrepareContext(context.Background(), runtimeData)
+//	ctx, err = be.AddDataToContext(context.Background(), runtimeData)
 //	result, err := be.Eval(ctx)
 func FromRisorStringWithData(
 	script string,
@@ -172,7 +172,7 @@ func FromStarlarkFile(
 }
 
 // FromStarlarkFileWithData creates a Starlark evaluator with both static and dynamic data capabilities.
-// To add runtime data, use the PrepareContext method on the evaluator to add data to the context.
+// To add runtime data, use the AddDataToContext method on the evaluator to add data to the context.
 //
 // Example:
 //
@@ -180,7 +180,7 @@ func FromStarlarkFile(
 //	be, err := FromStarlarkFileWithData("path/to/script.star", staticData, slog.Default().Handler())
 //
 //	runtimeData := map[string]any{"input": userInput}
-//	ctx, err = be.PrepareContext(context.Background(), runtimeData)
+//	ctx, err = be.AddDataToContext(context.Background(), runtimeData)
 //	result, err := be.Eval(ctx)
 func FromStarlarkFileWithData(
 	filePath string,
@@ -215,7 +215,7 @@ func FromStarlarkString(
 }
 
 // FromStarlarkStringWithData creates a Starlark evaluator with both static and dynamic data
-// capabilities. To add runtime data, use the PrepareContext method on the evaluator to add data
+// capabilities. To add runtime data, use the AddDataToContext method on the evaluator to add data
 // to the context.
 //
 // Example:
@@ -225,7 +225,7 @@ func FromStarlarkString(
 //	be, err := FromStarlarkStringWithData(script, staticData, slog.Default().Handler())
 //
 //	runtimeData := map[string]any{"user": map[string]string{"name": "World"}}
-//	ctx, err = be.PrepareContext(context.Background(), runtimeData)
+//	ctx, err = be.AddDataToContext(context.Background(), runtimeData)
 //	result, err := be.Eval(ctx)
 func FromStarlarkStringWithData(
 	script string,

@@ -166,9 +166,9 @@ func BenchmarkDataProviders(b *testing.B) {
 
 	b.Run("CompositeProvider", func(b *testing.B) {
 		// For CompositeProvider use case, we can prepare the context separately
-		// We need a special script that accesses the name via input_data
+		// We access the name directly from the context
 		compositeScript := `
-			name := ctx["input_data"]["name"]
+			name := ctx["name"]
 			message := "Hello, " + name + "!"
 			{
 				"greeting": message,
@@ -186,8 +186,8 @@ func BenchmarkDataProviders(b *testing.B) {
 		}
 
 		ctx := context.Background()
-		// Use PrepareContext to add the dynamic part
-		ctx, err = evaluator.PrepareContext(ctx, inputData)
+		// Use AddDataToContext to add the dynamic part
+		ctx, err = evaluator.AddDataToContext(ctx, map[string]any{"name": "World"})
 		if err != nil {
 			b.Fatalf("Failed to prepare context: %v", err)
 		}

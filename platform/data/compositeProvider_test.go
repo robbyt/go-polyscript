@@ -281,11 +281,7 @@ func TestCompositeProvider_AddDataToContext(t *testing.T) {
 		// Verify data was added correctly
 		data, err := provider.GetData(newCtx)
 		assert.NoError(t, err)
-		assert.Contains(t, data, constants.InputData)
-
-		inputDataResult, ok := data[constants.InputData].(map[string]any)
-		assert.True(t, ok)
-		assert.Equal(t, "value", inputDataResult["key"])
+		assert.Equal(t, "value", data["key"])
 	})
 
 	t.Run("single static provider always errors", func(t *testing.T) {
@@ -330,10 +326,7 @@ func TestCompositeProvider_AddDataToContext(t *testing.T) {
 		assert.Equal(t, simpleData["string"], data["string"], "Static data should be present")
 
 		// Context data should be present
-		assert.Contains(t, data, constants.InputData)
-		inputDataResult, ok := data[constants.InputData].(map[string]any)
-		assert.True(t, ok)
-		assert.Equal(t, "value", inputDataResult["key"], "Context data should be present")
+		assert.Equal(t, "value", data["key"], "Context data should be present")
 	})
 
 	t.Run("all providers fail", func(t *testing.T) {
@@ -371,7 +364,7 @@ func TestCompositeProvider_AddDataToContext(t *testing.T) {
 		// Verify context data was added
 		data, err := provider.GetData(newCtx)
 		assert.NoError(t, err)
-		assert.Contains(t, data, constants.InputData)
+		assert.Equal(t, "value", data["key"])
 	})
 
 	t.Run("composite with only static providers", func(t *testing.T) {
@@ -497,9 +490,7 @@ func TestCompositeProvider_NestedStructures(t *testing.T) {
 			setupContext: func() context.Context {
 				data := map[string]any{
 					"context_key": "context_value",
-					constants.InputData: map[string]any{
-						"nested_key": "nested_value",
-					},
+					"nested_key":  "nested_value",
 				}
 				return context.WithValue(context.Background(), constants.EvalData, data)
 			},
@@ -508,9 +499,7 @@ func TestCompositeProvider_NestedStructures(t *testing.T) {
 				"outer_key":   "outer_value",
 				"shared_key":  "outer_value",   // Outer static wins
 				"context_key": "context_value", // From context
-				constants.InputData: map[string]any{ // Nested under input_data from context
-					"nested_key": "nested_value",
-				},
+				"nested_key":  "nested_value",  // Directly accessible now, no namespace nesting
 			},
 		},
 	}

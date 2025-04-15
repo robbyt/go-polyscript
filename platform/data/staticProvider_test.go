@@ -163,7 +163,10 @@ func TestStaticProvider_AddDataToContext(t *testing.T) {
 		provider := NewStaticProvider(simpleData)
 		ctx := context.Background()
 
-		newCtx, err := provider.AddDataToContext(ctx, createTestRequestHelper())
+		newCtx, err := provider.AddDataToContext(
+			ctx,
+			map[string]any{"request": createTestRequestHelper()},
+		)
 
 		assert.Error(t, err, "StaticProvider should reject all attempts to add data")
 		assert.Equal(t, ctx, newCtx, "Context should remain unchanged")
@@ -175,7 +178,12 @@ func TestStaticProvider_AddDataToContext(t *testing.T) {
 		provider := NewStaticProvider(simpleData)
 		ctx := context.Background()
 
-		newCtx, err := provider.AddDataToContext(ctx, map[string]any{"key": "value"}, "string", 42)
+		newCtx, err := provider.AddDataToContext(
+			ctx,
+			map[string]any{"key": "value"},
+			map[string]any{"str": "string"},
+			map[string]any{"num": 42},
+		)
 
 		assert.Error(t, err, "StaticProvider should reject all attempts to add data")
 		assert.Equal(t, ctx, newCtx, "Context should remain unchanged")
@@ -191,7 +199,7 @@ func TestStaticProvider_ErrorIdentification(t *testing.T) {
 	provider := NewStaticProvider(simpleData)
 	ctx := context.Background()
 
-	_, err := provider.AddDataToContext(ctx, "some data")
+	_, err := provider.AddDataToContext(ctx, map[string]any{"data": "some data"})
 
 	// Test that errors.Is works correctly with the sentinel error
 	assert.True(t, errors.Is(err, ErrStaticProviderNoRuntimeUpdates),

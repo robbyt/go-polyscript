@@ -31,8 +31,11 @@ func (m *Evaluator) Load(newVersion script.ExecutableUnit) error {
 	return args.Error(0)
 }
 
-// PrepareContext is a mock implementation of the PrepareContext method.
-func (m *Evaluator) PrepareContext(ctx context.Context, d ...any) (context.Context, error) {
+// AddDataToContext is a mock implementation of the AddDataToContext method.
+func (m *Evaluator) AddDataToContext(
+	ctx context.Context,
+	d ...map[string]any,
+) (context.Context, error) {
 	args := m.Called(ctx, d)
 	return args.Get(0).(context.Context), args.Error(1)
 }

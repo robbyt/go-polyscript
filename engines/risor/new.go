@@ -31,7 +31,7 @@ func FromRisorLoader(
 }
 
 // FromRisorLoaderWithData creates a Risor evaluator with both static and dynamic data capabilities.
-// To add runtime data, use the `PrepareContext` method on the evaluator to add data to the context.
+// To add runtime data, use the `AddDataToContext` method on the evaluator to add data to the context.
 //
 // Input parameters:
 // - logHandler: logger handler for logging
