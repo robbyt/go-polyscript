@@ -210,3 +210,7 @@ func TestFromIoReader_GetSourceURL(t *testing.T) {
 	require.Contains(t, sourceURL.String(), expectedPrefix)
 	require.Contains(t, sourceURL.String(), expectedHash)
 }
+
+func TestFromIoReader_ImplementsLoader(t *testing.T) {
+	var _ Loader = (*FromIoReader)(nil)
+}

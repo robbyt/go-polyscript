@@ -252,3 +252,7 @@ func TestFromDisk_String(t *testing.T) {
 		require.NotContains(t, str, "SHA256:")
 	})
 }
+
+func TestFromDisk_ImplementsLoader(t *testing.T) {
+	var _ Loader = (*FromDisk)(nil)
+}
