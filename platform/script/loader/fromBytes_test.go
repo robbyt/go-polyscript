@@ -251,6 +251,235 @@ func TestFromBytes_String(t *testing.T) {
 	})
 }
 
+func TestIsOnlyWhitespace(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		input    []byte
+		expected bool
+	}{
+		{
+			name:     "empty input",
+			input:    []byte{},
+			expected: true,
+		},
+		{
+			name:     "space only",
+			input:    []byte("     "),
+			expected: true,
+		},
+		{
+			name:     "tabs only",
+			input:    []byte("\t\t\t"),
+			expected: true,
+		},
+		{
+			name:     "newlines only",
+			input:    []byte("\n\n\n"),
+			expected: true,
+		},
+		{
+			name:     "carriage returns only",
+			input:    []byte("\r\r\r"),
+			expected: true,
+		},
+		{
+			name:     "form feeds only",
+			input:    []byte("\f\f\f"),
+			expected: true,
+		},
+		{
+			name:     "vertical tabs only",
+			input:    []byte("\v\v\v"),
+			expected: true,
+		},
+		{
+			name:     "mixed whitespace",
+			input:    []byte(" \t\n\r\f\v"),
+			expected: true,
+		},
+		{
+			name:     "contains non-whitespace",
+			input:    []byte(" \t a \n"),
+			expected: false,
+		},
+		{
+			name:     "single non-whitespace",
+			input:    []byte("x"),
+			expected: false,
+		},
+		{
+			name:     "non-ascii character",
+			input:    []byte(" \t π \n"),
+			expected: false,
+		},
+		{
+			name:     "control characters",
+			input:    []byte{0x01, 0x02, 0x03},
+			expected: false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result := isOnlyWhitespace(tc.input)
+			require.Equal(t, tc.expected, result)
+		})
+	}
+}
+
+func TestHasBinaryCharacters(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		input    []byte
+		expected bool
+	}{
+		{
+			name:     "empty input",
+			input:    []byte{},
+			expected: false,
+		},
+		{
+			name:     "plain text",
+			input:    []byte("Hello, world!"),
+			expected: false,
+		},
+		{
+			name:     "text with newlines",
+			input:    []byte("Line 1\nLine 2\nLine 3"),
+			expected: false,
+		},
+		{
+			name:     "text with tabs",
+			input:    []byte("Column1\tColumn2\tColumn3"),
+			expected: false,
+		},
+		{
+			name:     "text with carriage returns",
+			input:    []byte("Windows\r\nLine endings"),
+			expected: false,
+		},
+		{
+			name:     "contains null byte",
+			input:    []byte{'H', 'e', 'l', 'l', 'o', 0, 'w', 'o', 'r', 'l', 'd'},
+			expected: true,
+		},
+		{
+			name:     "has control character",
+			input:    []byte{'T', 'e', 's', 't', 0x01, '!'},
+			expected: true,
+		},
+		{
+			name:     "leading null byte",
+			input:    []byte{0, 'D', 'a', 't', 'a'},
+			expected: true,
+		},
+		{
+			name:     "trailing null byte",
+			input:    []byte{'D', 'a', 't', 'a', 0},
+			expected: true,
+		},
+		{
+			name:     "control characters below 32",
+			input:    []byte{0x02, 0x05, 0x10},
+			expected: true,
+		},
+		{
+			name:     "allowed control chars (tab, CR, LF)",
+			input:    []byte{'\t', '\r', '\n'},
+			expected: false,
+		},
+		{
+			name:     "binary with printable chars",
+			input:    []byte{0xFF, 0xFE, 'A', 'B', 0x00},
+			expected: true,
+		},
+		{
+			name:     "extended ASCII",
+			input:    []byte{0x80, 0x90, 0xA0},
+			expected: false, // Extended ASCII isn't considered binary
+		},
+		{
+			name:     "UTF-8 characters",
+			input:    []byte("UTF-8 π Æ ¢ €"),
+			expected: false, // UTF-8 isn't considered binary
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result := hasBinaryCharacters(tc.input)
+			require.Equal(t, tc.expected, result, "Unexpected result for input %v", tc.input)
+		})
+	}
+}
+
+func TestWhitespaceAndBinaryInteraction(t *testing.T) {
+	t.Parallel()
+
+	// These test cases focus on how the two functions interact together
+	tests := []struct {
+		name           string
+		input          []byte
+		isBinary       bool
+		isWhitespace   bool
+		shouldBeLoaded bool
+	}{
+		{
+			name:           "regular text",
+			input:          []byte("Regular text"),
+			isBinary:       false,
+			isWhitespace:   false,
+			shouldBeLoaded: true,
+		},
+		{
+			name:           "only whitespace",
+			input:          []byte("  \t\n  "),
+			isBinary:       false,
+			isWhitespace:   true,
+			shouldBeLoaded: false, // Whitespace-only content isn't loaded
+		},
+		{
+			name:           "binary data",
+			input:          []byte{0x00, 0x01, 0xFF},
+			isBinary:       true,
+			isWhitespace:   false, // Irrelevant for binary
+			shouldBeLoaded: true,  // Binary always loads regardless of whitespace
+		},
+		{
+			name:           "binary with some whitespace",
+			input:          []byte{' ', '\t', 0x00, ' '},
+			isBinary:       true,
+			isWhitespace:   false, // Not only whitespace due to binary check
+			shouldBeLoaded: true,  // Binary always loads
+		},
+		{
+			name:           "empty input",
+			input:          []byte{},
+			isBinary:       false,
+			isWhitespace:   true, // Empty is considered whitespace
+			shouldBeLoaded: false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			isBinary := hasBinaryCharacters(tc.input)
+			isWhitespace := isOnlyWhitespace(tc.input)
+
+			require.Equal(t, tc.isBinary, isBinary)
+			require.Equal(t, tc.isWhitespace, isWhitespace)
+
+			// Test the loading condition used in FromBytes
+			willBeLoaded := len(tc.input) != 0 && (isBinary || !isWhitespace)
+			require.Equal(t, tc.shouldBeLoaded, willBeLoaded)
+		})
+	}
+}
+
 func TestFromBytes_ImplementsLoader(t *testing.T) {
 	var _ Loader = (*FromBytes)(nil)
 }
