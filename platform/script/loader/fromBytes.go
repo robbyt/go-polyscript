@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"net/url"
-	"strings"
 
 	"github.com/robbyt/go-polyscript/internal/helpers"
 )
@@ -22,18 +21,17 @@ func NewFromBytes(content []byte) (*FromBytes, error) {
 		return nil, fmt.Errorf("%w: content is empty", ErrScriptNotAvailable)
 	}
 
-	// Check if content contains only whitespace
-	contentStr := string(content)
-	contentStr = strings.TrimSpace(contentStr)
-	if len(contentStr) == 0 {
+	// Check if content contains only whitespace, but only if it appears to be text data
+	// For binary data with null bytes or high-bit bytes, skip whitespace check
+	if !hasBinaryCharacters(content) && isOnlyWhitespace(content) {
 		return nil, fmt.Errorf(
 			"%w: content is empty or contains only whitespace",
 			ErrScriptNotAvailable,
 		)
 	}
 
-	// Create source URL with a unique identifier based on content
-	u, err := url.Parse("bytes://inline/" + helpers.SHA256(string(content))[:8])
+	contentHash := helpers.SHA256Bytes(content)[:8]
+	u, err := url.Parse("bytes://inline/" + contentHash)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create source URL: %w", err)
 	}
@@ -56,4 +54,30 @@ func (l *FromBytes) GetReader() (io.ReadCloser, error) {
 // GetSourceURL returns the source URL of the script.
 func (l *FromBytes) GetSourceURL() *url.URL {
 	return l.sourceURL
+}
+
+// isOnlyWhitespace checks if a byte slice contains only whitespace characters
+func isOnlyWhitespace(data []byte) bool {
+	if len(data) == 0 {
+		return true
+	}
+
+	for _, b := range data {
+		// Check if byte is not a whitespace character
+		if b != ' ' && b != '\t' && b != '\n' && b != '\r' && b != '\f' && b != '\v' {
+			return false
+		}
+	}
+	return true
+}
+
+// hasBinaryCharacters checks if data contains likely binary (non-text) data
+func hasBinaryCharacters(data []byte) bool {
+	for _, b := range data {
+		// Check for null bytes or control characters (except common whitespace)
+		if b == 0 || (b < 32 && b != '\n' && b != '\r' && b != '\t') {
+			return true
+		}
+	}
+	return false
 }
