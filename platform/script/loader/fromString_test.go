@@ -201,3 +201,7 @@ func TestFromString_String(t *testing.T) {
 		}
 	})
 }
+
+func TestFromString_ImplementsLoader(t *testing.T) {
+	var _ Loader = (*FromString)(nil)
+}

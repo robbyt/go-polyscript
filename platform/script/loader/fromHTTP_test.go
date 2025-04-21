@@ -659,3 +659,7 @@ func TestFromHTTP_GetSourceURL(t *testing.T) {
 		require.Equal(t, testURL, sourceURL.String())
 	})
 }
+
+func TestFromHTTP_ImplementsLoader(t *testing.T) {
+	var _ Loader = (*FromHTTP)(nil)
+}
