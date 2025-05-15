@@ -19,6 +19,8 @@ github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 h1:Jamvg5psRI
 github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/risor-io/risor v1.7.0 h1:Na+eUTaWHa1pOjRUdhCEKWFStQT8VnsgthZ2vUqk3rg=
 github.com/risor-io/risor v1.7.0/go.mod h1:aDLqChiRcPwIbD6gvaNdpXJiKRxZ8w6bUAKIcDEB3q0=
+github.com/risor-io/risor v1.8.1 h1:FaycOBo56LudgozpU3FkSBxBgzQJs4GJ4lAno/M2CFo=
+github.com/risor-io/risor v1.8.1/go.mod h1:OuP9WH8h3dzvK7NDfBTA+k095dyTaQxWi/qPTCx3W0g=
 github.com/rogpeppe/go-internal v1.12.0 h1:exVL4IDcn6na9z1rAb56Vxr+CgyK3nn3O+epU5NdKM8=
 github.com/rogpeppe/go-internal v1.12.0/go.mod h1:E+RYuTGaKKdloAfM02xzb0FW3Paa99yedzYV+kq4uf4=
 github.com/stretchr/objx v0.5.2 h1:xuMeJ0Sdp5ZMRXx/aWO6RZxdr3beISkG5/G/aIRr3pY=
