@@ -257,7 +257,7 @@ func TestNewEvaluator(t *testing.T) {
 		require.Error(t, err)
 		require.Nil(t, evalInstance)
 		// Update error message check to match actual Starlark error message
-		assert.Contains(t, err.Error(), "illegal token")
+		assert.ErrorIs(t, err, compiler.ErrValidationFailed)
 	})
 }
 
