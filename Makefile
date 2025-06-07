@@ -1,6 +1,3 @@
-# Variables
-PACKAGES := $(shell go list ./...)
-
 .PHONY: all
 all: help
 
@@ -16,7 +13,7 @@ help: Makefile
 ## test: Run tests with race detection and coverage
 .PHONY: test
 test: go-generate
-	go test -race -cover $(PACKAGES)
+	go test -race -cover ./...
 
 ## bench: Run performance benchmarks and create reports
 .PHONY: bench
@@ -26,7 +23,7 @@ bench: go-generate
 ## bench-quick: Run benchmarks without creating reports
 .PHONY: bench-quick
 bench-quick: go-generate
-	go test -run=^$$ -bench=. -benchmem $(PACKAGES)
+	go test -run=^$$ -bench=. -benchmem ./...
 
 ## lint: Run golangci-lint code quality checks
 .PHONY: lint
