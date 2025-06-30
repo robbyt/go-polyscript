@@ -7,14 +7,14 @@ require (
 	github.com/risor-io/risor v1.8.1
 	github.com/stretchr/testify v1.10.0
 	github.com/tetratelabs/wazero v1.9.0
-	go.starlark.net v0.0.0-20250603171236-27fdb1d4744d
+	go.starlark.net v0.0.0-20250623223156-8bf495bf4e9a
 )
 
 require (
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/dylibso/observe-sdk/go v0.0.0-20240828172851-9145d8ad07e1 // indirect
 	github.com/gobwas/glob v0.2.3 // indirect
-	github.com/ianlancetaylor/demangle v0.0.0-20250417193237-f615e6bd150b // indirect
+	github.com/ianlancetaylor/demangle v0.0.0-20250628045327-2d64ad6b7ec5 // indirect
 	github.com/kr/text v0.2.0 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
