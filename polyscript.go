@@ -67,6 +67,51 @@ func FromExtismFileWithData(
 	return extismMachine.FromExtismLoaderWithData(logHandler, l, staticData, entryPoint)
 }
 
+// FromExtismBytes creates an Extism evaluator from WASM bytecode.
+//
+// Example:
+//
+//	wasmBytes := []byte{...} // Your WASM bytecode
+//	be, err := FromExtismBytes(wasmBytes, slog.Default().Handler(), "process")
+func FromExtismBytes(
+	wasmBytes []byte,
+	logHandler slog.Handler,
+	entryPoint string,
+) (platform.Evaluator, error) {
+	l, err := loader.NewFromBytes(wasmBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	return extismMachine.FromExtismLoader(logHandler, l, entryPoint)
+}
+
+// FromExtismBytesWithData creates an Extism evaluator from WASM bytecode with both static and dynamic data capabilities.
+// To add runtime data, use the AddDataToContext method on the evaluator to add data to the context.
+//
+// Example:
+//
+//	wasmBytes := []byte{...} // Your WASM bytecode
+//	staticData := map[string]any{"config": "value"}
+//	be, err := FromExtismBytesWithData(wasmBytes, staticData, slog.Default().Handler(), "process")
+//
+//	runtimeData := map[string]any{"request": req}
+//	ctx, err = be.AddDataToContext(context.Background(), runtimeData)
+//	result, err := be.Eval(ctx)
+func FromExtismBytesWithData(
+	wasmBytes []byte,
+	staticData map[string]any,
+	logHandler slog.Handler,
+	entryPoint string,
+) (platform.Evaluator, error) {
+	l, err := loader.NewFromBytes(wasmBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	return extismMachine.FromExtismLoaderWithData(logHandler, l, staticData, entryPoint)
+}
+
 // FromRisorFile creates a Risor evaluator from a .risor file.
 //
 // Example:

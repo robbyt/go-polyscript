@@ -20,8 +20,8 @@ func FindWasmFile(logger *slog.Logger) (string, error) {
 	paths := []string{
 		"main.wasm",                   // Current directory
 		"examples/testdata/main.wasm", // Project's main example WASM
-		"../../../engines/extism/testdata/examples/main.wasm", // From engines testdata
-		"engines/extism/testdata/examples/main.wasm",          // From project root to testdata
+		"../../../engines/extism/wasmdata/examples/main.wasm", // From engines wasmdata
+		"engines/extism/wasmdata/examples/main.wasm",          // From project root to wasmdata
 	}
 
 	// Log the searched paths if logger is available
@@ -54,7 +54,7 @@ func FindWasmFile(logger *slog.Logger) (string, error) {
 	errMsg := `WASM file not found in any of the expected locations.
 
 To fix this issue:
-1. Run 'make build' in the engines/extism/testdata directory to generate the WASM file
+1. Run 'make build' in the engines/extism/wasmdata directory to generate the WASM file
 2. OR copy a pre-built WASM file to one of these locations:
 `
 

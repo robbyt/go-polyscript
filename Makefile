@@ -12,7 +12,7 @@ help: Makefile
 
 ## test: Run tests with race detection and coverage
 .PHONY: test
-test: go-generate
+test: go-generate wasmdata-build
 	go test -race -cover ./...
 
 ## bench: Run performance benchmarks and create reports
@@ -40,3 +40,8 @@ lint-fix: go-generate
 .PHONY: go-generate
 go-generate:
 	cd engines/types && go generate
+
+## wasmdata-build: Build WASM test data
+.PHONY: wasmdata-build
+wasmdata-build:
+	cd engines/extism/wasmdata && make build

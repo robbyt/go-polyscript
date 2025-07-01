@@ -6,22 +6,15 @@ import (
 	"encoding/json"
 	"io"
 	"log/slog"
-	"os"
 	"testing"
 
 	extismSDK "github.com/extism/go-sdk"
+	"github.com/robbyt/go-polyscript/engines/extism/wasmdata"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/tetratelabs/wazero"
 )
-
-func readTestWasm(t *testing.T) []byte {
-	t.Helper()
-	wasmBytes, err := os.ReadFile("../testdata/examples/main.wasm")
-	require.NoError(t, err)
-	return wasmBytes
-}
 
 // createTestCompiler creates a compiler with the given entry point for testing
 func createTestCompiler(t *testing.T, entryPoint string) *Compiler {
@@ -117,7 +110,7 @@ func TestCompiler_Compile(t *testing.T) {
 
 	t.Run("success cases", func(t *testing.T) {
 		t.Run("valid wasm binary with existing function", func(t *testing.T) {
-			wasmBytes := readTestWasm(t)
+			wasmBytes := wasmdata.TestModule
 			entryPoint := "greet"
 			comp := createTestCompiler(t, entryPoint)
 			reader := newMockScriptReaderCloser(wasmBytes)
@@ -161,7 +154,7 @@ func TestCompiler_Compile(t *testing.T) {
 		})
 
 		t.Run("custom entry point function exists", func(t *testing.T) {
-			wasmBytes := readTestWasm(t)
+			wasmBytes := wasmdata.TestModule
 			entryPoint := "process_complex"
 			comp := createTestCompiler(t, entryPoint)
 			reader := newMockScriptReaderCloser(wasmBytes)
@@ -197,7 +190,7 @@ func TestCompiler_Compile(t *testing.T) {
 		})
 
 		t.Run("custom compilation options", func(t *testing.T) {
-			wasmBytes := readTestWasm(t)
+			wasmBytes := wasmdata.TestModule
 			entryPoint := "greet"
 
 			comp, err := New(
@@ -279,7 +272,7 @@ func TestCompiler_Compile(t *testing.T) {
 		})
 
 		t.Run("missing function", func(t *testing.T) {
-			wasmBytes := readTestWasm(t)
+			wasmBytes := wasmdata.TestModule
 			comp, err := New(
 				WithEntryPoint("nonexistent_function"),
 				WithLogHandler(slog.NewTextHandler(io.Discard, nil)),

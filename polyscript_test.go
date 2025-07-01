@@ -2,7 +2,6 @@ package polyscript_test
 
 import (
 	"context"
-	_ "embed"
 	"errors"
 	"fmt"
 	"io"
@@ -14,6 +13,7 @@ import (
 	"testing"
 
 	"github.com/robbyt/go-polyscript"
+	"github.com/robbyt/go-polyscript/engines/extism/wasmdata"
 	"github.com/robbyt/go-polyscript/engines/mocks"
 	"github.com/robbyt/go-polyscript/engines/types"
 	"github.com/robbyt/go-polyscript/platform"
@@ -25,8 +25,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-//go:embed examples/testdata/main.wasm
-var wasmData []byte
+var wasmData = wasmdata.TestModule
 
 // Helper functions for tests
 func getLogger() slog.Handler {

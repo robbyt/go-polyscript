@@ -1,4 +1,4 @@
-package main
+package wasmdata
 
 import (
 	"context"
@@ -14,8 +14,8 @@ import (
 	"github.com/tetratelabs/wazero"
 )
 
-//go:embed examples/main.wasm
-var testWasmBytes []byte
+// testWasmBytes is now provided by TestModule in wasm.go
+var testWasmBytes = TestModule
 
 func TestExtismWasmIntegration(t *testing.T) {
 	t.Parallel()
@@ -31,7 +31,9 @@ func TestExtismWasmIntegration(t *testing.T) {
 	// Create context and plugin config
 	ctx := context.Background()
 	cache := wazero.NewCompilationCache()
-	defer cache.Close(ctx)
+	defer func() {
+		assert.NoError(t, cache.Close(ctx))
+	}()
 
 	config := extismSDK.PluginConfig{
 		EnableWasi:    true, // Enable WASI since our plugin uses the PDK
@@ -39,9 +41,16 @@ func TestExtismWasmIntegration(t *testing.T) {
 	}
 
 	// Create compiled plugin first
-	compiledPlugin, err := extismSDK.NewCompiledPlugin(ctx, manifest, config, []extismSDK.HostFunction{})
+	compiledPlugin, err := extismSDK.NewCompiledPlugin(
+		ctx,
+		manifest,
+		config,
+		[]extismSDK.HostFunction{},
+	)
 	require.NoError(t, err, "Failed to create compiled plugin")
-	defer compiledPlugin.Close(ctx)
+	defer func() {
+		assert.NoError(t, compiledPlugin.Close(ctx))
+	}()
 
 	t.Run("concurrent greet calls", func(t *testing.T) {
 		// Names to process concurrently
@@ -80,7 +89,9 @@ func TestExtismWasmIntegration(t *testing.T) {
 					mu.Unlock()
 					return
 				}
-				defer instance.Close(instanceCtx)
+				defer func() {
+					assert.NoError(t, instance.Close(instanceCtx))
+				}()
 
 				// Create JSON input with the expected format
 				inputJSON, err := json.Marshal(map[string]string{"input": input})
@@ -103,7 +114,12 @@ func TestExtismWasmIntegration(t *testing.T) {
 				}
 
 				if exit != 0 {
-					t.Logf("Non-zero exit code %d: %d, output: %s", instanceID, exit, string(output))
+					t.Logf(
+						"Non-zero exit code %d: %d, output: %s",
+						instanceID,
+						exit,
+						string(output),
+					)
 					mu.Lock()
 					hasErrors = true
 					mu.Unlock()
@@ -113,7 +129,12 @@ func TestExtismWasmIntegration(t *testing.T) {
 				// Parse the JSON result
 				var result map[string]string
 				if err := json.Unmarshal(output, &result); err != nil {
-					t.Logf("Failed to parse result %d: %v, output: %s", instanceID, err, string(output))
+					t.Logf(
+						"Failed to parse result %d: %v, output: %s",
+						instanceID,
+						err,
+						string(output),
+					)
 					mu.Lock()
 					hasErrors = true
 					mu.Unlock()
@@ -123,13 +144,17 @@ func TestExtismWasmIntegration(t *testing.T) {
 				// Verify expected greeting format
 				expectedGreeting := "Hello, " + input + "!"
 				if result["greeting"] != expectedGreeting {
-					t.Logf("Unexpected greeting %d: got %s, want %s", instanceID, result["greeting"], expectedGreeting)
+					t.Logf(
+						"Unexpected greeting %d: got %s, want %s",
+						instanceID,
+						result["greeting"],
+						expectedGreeting,
+					)
 					mu.Lock()
 					hasErrors = true
 					mu.Unlock()
 					return
 				}
-
 			}(i, name)
 		}
 
@@ -147,7 +172,9 @@ func TestExtismWasmIntegration(t *testing.T) {
 			ModuleConfig: wazero.NewModuleConfig(),
 		})
 		require.NoError(t, err, "Failed to create instance for complex test")
-		defer instance.Close(instanceCtx)
+		defer func() {
+			assert.NoError(t, instance.Close(instanceCtx))
+		}()
 
 		// Create a test request
 		complexRequest := map[string]any{
@@ -198,7 +225,9 @@ func TestExtismWasmIntegration(t *testing.T) {
 			ModuleConfig: wazero.NewModuleConfig(),
 		})
 		require.NoError(t, err, "Failed to create instance")
-		defer instance.Close(instanceCtx)
+		defer func() {
+			assert.NoError(t, instance.Close(instanceCtx))
+		}()
 
 		// Test input
 		vowelInput := map[string]string{"input": "Hello World"}
@@ -228,7 +257,9 @@ func TestExtismWasmIntegration(t *testing.T) {
 			ModuleConfig: wazero.NewModuleConfig(),
 		})
 		require.NoError(t, err, "Failed to create instance")
-		defer instance.Close(instanceCtx)
+		defer func() {
+			assert.NoError(t, instance.Close(instanceCtx))
+		}()
 
 		// Test input
 		reverseInput := map[string]string{"input": "Hello World"}
