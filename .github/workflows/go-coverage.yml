@@ -29,7 +29,7 @@ jobs:
           cache: true
           cache-dependency-path: |
              go.sum
-             engines/extism/testdata/go.sum
+             engines/extism/wasmdata/examples/go.sum
 
       - name: Display Go version
         run: go version
@@ -37,8 +37,8 @@ jobs:
       - name: Go test
         run: |
           go test -coverprofile=unit.coverage.out -cover ./...
-          cd engines/extism/testdata && \
-            go test -coverprofile=../../../extism.coverage.out -cover .
+          cd engines/extism/wasmdata/examples && \
+            go test -coverprofile=../../../../extism.coverage.out -cover .
 
       - name: SonarQube Scan
         uses: SonarSource/sonarqube-scan-action@v5

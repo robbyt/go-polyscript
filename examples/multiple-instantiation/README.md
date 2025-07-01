@@ -45,9 +45,8 @@ Each example implements the same pattern with a different engine:
 go run examples/multiple-instantiation/< engine >/main.go
 ```
 
-Note: The Extism example requires a WebAssembly module. The local `findWasmFile` function searches
-several relative paths for a pre-compiled `main.wasm` file. This file was compiled from the example
-code`engines/extism/testdata/examples/main.go`.
+Note: The Extism example uses an embedded WebAssembly module from the `wasmdata` package, eliminating 
+the need for external WASM files.
 
 ## Related Patterns
 

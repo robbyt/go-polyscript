@@ -12,7 +12,7 @@ help: Makefile
 
 ## test: Run tests with race detection and coverage
 .PHONY: test
-test: go-generate wasmdata-build
+test: go-generate engines/extism/wasmdata/main.wasm
 	go test -race -cover ./...
 
 ## bench: Run performance benchmarks and create reports
@@ -36,6 +36,10 @@ lint-fix: go-generate
 	golangci-lint fmt
 	golangci-lint run --fix ./...
 
+# Build WASM module when needed
+engines/extism/wasmdata/main.wasm: engines/extism/wasmdata/examples/main.go engines/extism/wasmdata/examples/go.mod engines/extism/wasmdata/examples/go.sum
+	cd engines/extism/wasmdata && make main.wasm
+
 ## go-generate: Run code generation for type wrappers
 .PHONY: go-generate
 go-generate:
@@ -43,5 +47,4 @@ go-generate:
 
 ## wasmdata-build: Build WASM test data
 .PHONY: wasmdata-build
-wasmdata-build:
-	cd engines/extism/wasmdata && make build
+wasmdata-build: engines/extism/wasmdata/main.wasm

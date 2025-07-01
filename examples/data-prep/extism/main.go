@@ -9,16 +9,12 @@ import (
 	"time"
 
 	"github.com/robbyt/go-polyscript"
-	"github.com/robbyt/go-polyscript/internal/helpers"
+	"github.com/robbyt/go-polyscript/engines/extism/wasmdata"
 	"github.com/robbyt/go-polyscript/platform"
 )
 
 // ExtismEvaluator is a type alias to make testing cleaner
 type ExtismEvaluator = platform.Evaluator
-
-const (
-	EntryPointFuncName = "greet" // Entry point in the WASM module
-)
 
 // prepareRuntimeData adds dynamic runtime data to the context.
 // Returns the enriched context or an error.
@@ -116,18 +112,12 @@ func run() error {
 		"input": "Static User",
 	}
 
-	// Find the WASM file
-	wasmFilePath, err := helpers.FindWasmFile(logger)
-	if err != nil {
-		return fmt.Errorf("failed to find WASM file: %w", err)
-	}
-
-	// Create evaluator with static and dynamic data providers
-	evaluator, err := polyscript.FromExtismFileWithData(
-		wasmFilePath,
+	// Create evaluator with embedded WASM and static data
+	evaluator, err := polyscript.FromExtismBytesWithData(
+		wasmdata.TestModule,
 		staticData,
 		logger.Handler(),
-		EntryPointFuncName,
+		wasmdata.EntrypointGreet,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create evaluator: %w", err)
