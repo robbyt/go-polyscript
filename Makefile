@@ -38,7 +38,7 @@ lint-fix: go-generate
 
 # Build WASM module when needed
 engines/extism/wasmdata/main.wasm: engines/extism/wasmdata/examples/main.go engines/extism/wasmdata/examples/go.mod engines/extism/wasmdata/examples/go.sum
-	cd engines/extism/wasmdata && make main.wasm
+	$(MAKE) -C engines/extism/wasmdata main.wasm
 
 ## go-generate: Run code generation for type wrappers
 .PHONY: go-generate
@@ -48,3 +48,8 @@ go-generate:
 ## wasmdata-build: Build WASM test data
 .PHONY: wasmdata-build
 wasmdata-build: engines/extism/wasmdata/main.wasm
+
+## clean: Clean up build artifacts
+.PHONY: clean
+clean:
+	$(MAKE) -C engines/extism/wasmdata clean
