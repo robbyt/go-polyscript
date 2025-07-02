@@ -27,9 +27,7 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
-          cache-dependency-path: |
-             go.sum
-             engines/extism/wasmdata/examples/go.sum
+          cache-dependency-path: go.sum
 
       - name: Display Go version
         run: go version
@@ -37,8 +35,6 @@ jobs:
       - name: Go test
         run: |
           go test -coverprofile=unit.coverage.out -cover ./...
-          cd engines/extism/wasmdata/examples && \
-            go test -coverprofile=../../../../extism.coverage.out -cover .
 
       - name: SonarQube Scan
         uses: SonarSource/sonarqube-scan-action@v5
@@ -48,7 +44,7 @@ jobs:
           args: >
             -Dsonar.projectKey=robbyt_go-polyscript
             -Dsonar.organization=robbyt
-            -Dsonar.go.coverage.reportPaths=unit.coverage.out,extism.coverage.out
+            -Dsonar.go.coverage.reportPaths=unit.coverage.out
             -Dsonar.sources=.
             -Dsonar.coverage.exclusions=examples/**
             -Dsonar.exclusions=**/*_test.go
