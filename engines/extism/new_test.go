@@ -7,26 +7,15 @@ import (
 	"log/slog"
 	"net/url"
 	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/robbyt/go-polyscript/engines/extism/compiler"
+	"github.com/robbyt/go-polyscript/engines/extism/wasmdata"
 	"github.com/robbyt/go-polyscript/platform/data"
 	"github.com/robbyt/go-polyscript/platform/script/loader"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-// getTestWasmBytes returns the test WASM bytes from the examples directory
-func getTestWasmBytes(t *testing.T) []byte {
-	t.Helper()
-	// Find the main.wasm file in the examples directory
-	wasmPath := filepath.Join("..", "..", "examples", "testdata", "main.wasm")
-	bytes, err := os.ReadFile(wasmPath)
-	require.NoError(t, err, "Failed to read test WASM file")
-	require.NotEmpty(t, bytes, "Test WASM file is empty")
-	return bytes
-}
 
 func setupMockLoader(t *testing.T) *loader.MockLoader {
 	t.Helper()
@@ -36,7 +25,7 @@ func setupMockLoader(t *testing.T) *loader.MockLoader {
 	mockLoader.On("GetSourceURL").Return(mockURL)
 
 	// Create a reader that will call Close on the mock loader when it's closed
-	wasmBytes := getTestWasmBytes(t)
+	wasmBytes := wasmdata.TestModule
 	reader := io.NopCloser(bytes.NewReader(wasmBytes))
 	mockLoader.On("GetReader").Return(reader, nil)
 
@@ -93,7 +82,7 @@ func TestFromExtismLoader(t *testing.T) {
 		handler := slog.NewTextHandler(os.Stdout, nil)
 		mockLoader := new(loader.MockLoader)
 		mockLoader.On("GetSourceURL").Return(nil)
-		mockLoader.On("GetReader").Return(io.NopCloser(bytes.NewReader(getTestWasmBytes(t))), nil)
+		mockLoader.On("GetReader").Return(io.NopCloser(bytes.NewReader(wasmdata.TestModule)), nil)
 		// Don't expect Close - loader.Close() is not called by the code
 
 		// Execute
@@ -214,7 +203,7 @@ func TestNewEvaluator(t *testing.T) {
 		handler := slog.NewTextHandler(os.Stdout, nil)
 		mockLoader := new(loader.MockLoader)
 		mockLoader.On("GetSourceURL").Return(nil)
-		mockLoader.On("GetReader").Return(io.NopCloser(bytes.NewReader(getTestWasmBytes(t))), nil)
+		mockLoader.On("GetReader").Return(io.NopCloser(bytes.NewReader(wasmdata.TestModule)), nil)
 		// Don't expect Close - loader.Close() is not called by the code
 
 		provider := data.NewContextProvider("test_key")
@@ -302,7 +291,7 @@ func TestDiskLoaderIntegration(t *testing.T) {
 		tmpDir := t.TempDir()
 
 		// Get WASM bytes for test
-		wasmBytes := getTestWasmBytes(t)
+		wasmBytes := wasmdata.TestModule
 
 		// Create a temporary file in the temporary directory
 		tempFilePath := fmt.Sprintf("%s/test.wasm", tmpDir)

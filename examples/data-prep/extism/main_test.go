@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/robbyt/go-polyscript"
-	"github.com/robbyt/go-polyscript/internal/helpers"
+	"github.com/robbyt/go-polyscript/engines/extism/wasmdata"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -37,22 +37,15 @@ func TestDemonstrateDataPrepAndEval(t *testing.T) {
 	})
 	logger := slog.New(handler)
 
-	// Find the WASM file
-	wasmFilePath, err := helpers.FindWasmFile(logger)
-	if err != nil {
-		t.Errorf("Extism example failed: %v - this may be due to missing WASM file", err)
-		return
-	}
-
 	// Get static test data
 	staticData := getTestStaticData()
 
-	// Create evaluator
-	evaluator, err := polyscript.FromExtismFileWithData(
-		wasmFilePath,
+	// Create evaluator using embedded WASM
+	evaluator, err := polyscript.FromExtismBytesWithData(
+		wasmdata.TestModule,
 		staticData,
 		logger.Handler(),
-		EntryPointFuncName,
+		wasmdata.EntrypointGreet,
 	)
 	if err != nil {
 		t.Errorf("Failed to create evaluator: %v", err)
@@ -73,22 +66,15 @@ func TestPrepareRuntimeData(t *testing.T) {
 	})
 	logger := slog.New(handler)
 
-	// Find the WASM file
-	wasmFilePath, err := helpers.FindWasmFile(logger)
-	if err != nil {
-		t.Errorf("Failed to find WASM file: %v", err)
-		return
-	}
-
 	// Get static test data
 	staticData := getTestStaticData()
 
-	// Create evaluator
-	evaluator, err := polyscript.FromExtismFileWithData(
-		wasmFilePath,
+	// Create evaluator using embedded WASM
+	evaluator, err := polyscript.FromExtismBytesWithData(
+		wasmdata.TestModule,
 		staticData,
 		logger.Handler(),
-		EntryPointFuncName,
+		wasmdata.EntrypointGreet,
 	)
 	require.NoError(t, err, "Failed to create evaluator")
 	require.NotNil(t, evaluator, "Evaluator should not be nil")
@@ -107,22 +93,15 @@ func TestEvalAndExtractResult(t *testing.T) {
 	})
 	logger := slog.New(handler)
 
-	// Find the WASM file
-	wasmFilePath, err := helpers.FindWasmFile(logger)
-	if err != nil {
-		t.Errorf("Failed to find WASM file: %v", err)
-		return
-	}
-
 	// Get static test data
 	staticData := getTestStaticData()
 
-	// Create evaluator
-	evaluator, err := polyscript.FromExtismFileWithData(
-		wasmFilePath,
+	// Create evaluator using embedded WASM
+	evaluator, err := polyscript.FromExtismBytesWithData(
+		wasmdata.TestModule,
 		staticData,
 		logger.Handler(),
-		EntryPointFuncName,
+		wasmdata.EntrypointGreet,
 	)
 	require.NoError(t, err, "Failed to create evaluator")
 	require.NotNil(t, evaluator, "Evaluator should not be nil")
@@ -145,43 +124,24 @@ func TestFromExtismFileWithData(t *testing.T) {
 	})
 	logger := slog.New(handler)
 
-	// Find the WASM file
-	wasmFilePath, err := helpers.FindWasmFile(logger)
-	if err != nil {
-		t.Errorf("Failed to find WASM file: %v", err)
-		return
-	}
-
 	// Get static test data
 	staticData := getTestStaticData()
 
-	// Test FromExtismFileWithData function
-	evaluator, err := polyscript.FromExtismFileWithData(
-		wasmFilePath,
+	// Test FromExtismBytesWithData function
+	evaluator, err := polyscript.FromExtismBytesWithData(
+		wasmdata.TestModule,
 		staticData,
 		logger.Handler(),
-		EntryPointFuncName,
+		wasmdata.EntrypointGreet,
 	)
 	assert.NoError(t, err, "Should create evaluator without error")
 	assert.NotNil(t, evaluator, "Evaluator should not be nil")
 }
 
-func TestFindWasmFile(t *testing.T) {
-	// This test just verifies the helpers.FindWasmFile function doesn't panic
-	// and follows the expected logic
-	handler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
-		Level: slog.LevelInfo,
-	})
-	logger := slog.New(handler)
-
-	// The function might not find a file but it shouldn't panic
-	wasmPath, err := helpers.FindWasmFile(logger)
-	if err != nil {
-		t.Logf("FindWasmFile returned error as expected when file not found: %v", err)
-		return
-	}
-
-	t.Logf("Found WASM file at: %s", wasmPath)
+func TestEmbeddedWasmModule(t *testing.T) {
+	// Verify the embedded WASM module is available
+	assert.NotEmpty(t, wasmdata.TestModule, "Embedded WASM module should not be empty")
+	assert.NotEmpty(t, wasmdata.EntrypointGreet, "Entrypoint constant should not be empty")
 }
 
 func TestRun(t *testing.T) {

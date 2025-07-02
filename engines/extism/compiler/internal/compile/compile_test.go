@@ -4,12 +4,12 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
-	"os"
 	"testing"
 	"time"
 
 	extismSDK "github.com/extism/go-sdk"
 	"github.com/robbyt/go-polyscript/engines/extism/adapters"
+	"github.com/robbyt/go-polyscript/engines/extism/wasmdata"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/tetratelabs/wazero"
@@ -25,16 +25,9 @@ type TestRequest struct {
 	Active    bool              `json:"active"`
 }
 
-func readTestWasm(t *testing.T) []byte {
-	t.Helper()
-	wasmBytes, err := os.ReadFile("../../../testdata/examples/main.wasm")
-	require.NoError(t, err)
-	return wasmBytes
-}
-
 func TestCompileSuccess(t *testing.T) {
 	t.Parallel()
-	wasmBytes := readTestWasm(t)
+	wasmBytes := wasmdata.TestModule
 	ctx := context.Background()
 
 	t.Run("default options", func(t *testing.T) {
@@ -287,7 +280,7 @@ func TestCompileOptionsDefaults(t *testing.T) {
 
 func TestCompileWithHostFunctions(t *testing.T) {
 	ctx := context.Background()
-	wasmBytes := readTestWasm(t)
+	wasmBytes := wasmdata.TestModule
 
 	// Create test host function
 	testHostFn := extismSDK.NewHostFunctionWithStack(

@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/robbyt/go-polyscript"
-	"github.com/robbyt/go-polyscript/internal/helpers"
+	"github.com/robbyt/go-polyscript/engines/extism/wasmdata"
 )
 
 // runExtismExample executes an Extism WASM module and returns the result
@@ -20,24 +20,17 @@ func runExtismExample(handler slog.Handler) (map[string]any, error) {
 	}
 	logger := slog.New(handler)
 
-	// Find the WASM file
-	wasmFilePath, err := helpers.FindWasmFile(logger)
-	if err != nil {
-		logger.Error("Failed to find WASM file", "error", err)
-		return nil, err
-	}
-
 	// Create input data
 	inputData := map[string]any{
 		"input": "World",
 	}
 
-	// Create evaluator using the new simplified interface
-	evaluator, err := polyscript.FromExtismFileWithData(
-		wasmFilePath,
+	// Create evaluator using embedded WASM
+	evaluator, err := polyscript.FromExtismBytesWithData(
+		wasmdata.TestModule,
 		inputData,
 		handler,
-		"greet", // entry point
+		wasmdata.EntrypointGreet,
 	)
 	if err != nil {
 		logger.Error("Failed to create evaluator", "error", err)
