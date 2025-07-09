@@ -47,3 +47,107 @@ This package contains virtual machine implementations for executing scripts in v
    - The process for building the `evaluation.EvaluatorResponse` is different for each VM
    - There are several type conversions, and the result is accessible with the `Interface()` method
    - The `evaluation.EvaluatorResponse` also contains metadata about the execution
+
+## Engine-Specific Data Handling
+
+While all engines receive the same `map[string]any` input data, **each engine processes and exposes this data differently** to the script runtime. Understanding these differences is important for structuring your data correctly.
+
+### Risor Engine: `ctx` Variable Wrapper
+
+**Data Processing:** `engines/risor/internal/converters.go`
+- Input data is wrapped in a global `ctx` variable
+- All data becomes accessible via `ctx["key"]` in scripts
+
+**Example:**
+```go
+// Go code
+data := map[string]any{
+    "name": "World",
+    "config": map[string]any{"debug": true},
+}
+
+// Risor script access
+name := ctx["name"]           // "World"
+debug := ctx["config"]["debug"] // true
+```
+
+### Starlark Engine: `ctx` Dictionary Wrapper
+
+**Data Processing:** `engines/starlark/internal/converters.go`
+- Input data is converted to Starlark types and wrapped in a `ctx` dictionary
+- All data becomes accessible via `ctx["key"]` in scripts
+
+**Example:**
+```go
+// Go code
+data := map[string]any{
+    "name": "World",
+    "config": map[string]any{"debug": true},
+}
+
+// Starlark script access
+name = ctx["name"]           # "World"
+debug = ctx["config"]["debug"] # true
+```
+
+### Extism Engine: Direct JSON Pass-Through
+
+**Data Processing:** `engines/extism/internal/converters.go`
+- Input data is marshaled directly to JSON and passed to the WASM module
+- **No wrapper variable** - the WASM module receives the raw JSON structure
+- **Data structure must exactly match what your WASM module expects**
+
+**Example:**
+```go
+// Go code
+data := map[string]any{
+    "name": "World",
+    "config": map[string]any{"debug": true},
+}
+
+// WASM module receives JSON directly:
+// {"name": "World", "config": {"debug": true}}
+```
+
+### Key Implications
+
+1. **Risor/Starlark**: Any data structure works - everything is accessible via `ctx["key"]`
+2. **Extism/WASM**: Data structure must match your WASM module's expectations exactly
+3. **Flexibility**: WASM modules have complete control over their input format
+4. **Consistency**: Risor/Starlark provide a standardized `ctx` interface
+
+### Troubleshooting WASM Data Structure Issues
+
+If your WASM module reports errors like "input string is empty" or "missing field":
+
+1. **Check the expected JSON structure** in your WASM module's input parsing code
+2. **Structure your Go data** to match exactly what the WASM module expects
+3. **Use the debug logging** in development to verify the JSON being passed
+
+**Example for a WASM module expecting `{"request": {"Body": "text"}, "static_data": {...}}`:**
+```go
+data := map[string]any{
+    "request": map[string]any{
+        "Body": "text to process",
+    },
+    "static_data": map[string]any{
+        "search_characters": "aeiou",
+        "case_sensitive": false,
+    },
+}
+```
+
+## Data Provider Patterns
+
+For detailed information about data provider patterns, usage examples, and best practices, see the [platform/data documentation](../platform/data/README.md).
+
+The `platform/data` package provides:
+- **StaticProvider**: For configuration and constants that don't change
+- **ContextProvider**: For thread-safe dynamic runtime data that changes per request  
+- **CompositeProvider**: For combining static configuration with dynamic runtime data
+
+Key points for engine usage:
+- **Risor/Starlark**: Data is accessible via the top-level `ctx` variable in scripts
+- **Extism/WASM**: Data is passed directly as JSON to the WASM module (no `ctx` wrapper)
+- Use explicit keys when adding data: `map[string]any{"request": httpRequest}`
+- HTTP requests are automatically converted using `helpers.RequestToMap`
