@@ -21,7 +21,7 @@ There are two main types of data in go-polyscript:
    - Added to the context via `AddDataToContext` method
    - Stored directly at the root level of the context
 
-Both types of data are made available to scripts as part of the top-level `ctx` variable, which is injected into the script's global scope.
+Both types of data are made available to scripts, though the exact format depends on the engine (see [engines documentation](../engines/README.md#engine-specific-data-handling) for details).
 
 ### Data Flow
 
@@ -54,19 +54,19 @@ Both types of data are made available to scripts as part of the top-level `ctx` 
 │                        VM Execution                                 │
 │                                                                     │
 │  - VM implementations access data through the Provider interface    │
-│  - Each VM makes the data available as a global `ctx` variable      │
+│  - Each VM exposes data differently to scripts (see engines docs)   │
 │                                                                     │
-│  Script accesses via top-level `ctx` variable:                      │
-│    ctx["config_value1"]             // Static data                  │
-│    ctx["user_data"]                 // Dynamic data                 │
-│    ctx["request"]["Method"]         // HTTP request data            │
+│  Script data access (format varies by engine):                      │
+│    - Risor/Starlark: ctx["config_value1"], ctx["user_data"]         │
+│    - Extism/WASM: Direct JSON structure passed to WASM module       │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
 ## Data Access Patterns in Scripts
 
-Scripts access all data directly from the top level of the context:
+Script data access depends on the engine being used:
 
+**Risor/Starlark engines:**
 ```
 // Static configuration
 config := ctx["config_name"]
@@ -79,6 +79,9 @@ requestMethod := ctx["request"]["Method"]
 urlPath := ctx["request"]["URL_Path"]
 requestBody := ctx["request"]["Body"]
 ```
+
+**Extism/WASM engine:**
+Data is passed directly as JSON to the WASM module without a `ctx` wrapper. See [engines documentation](../engines/README.md#engine-specific-data-handling) for details.
 
 When providing data to scripts, use explicit keys in your data maps for clarity:
 
