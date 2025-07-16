@@ -1,10 +1,12 @@
 package loader
 
 import (
+	"encoding/base64"
 	"io"
 	"testing"
 
 	"github.com/robbyt/go-polyscript/internal/helpers"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -204,4 +206,53 @@ func TestFromString_String(t *testing.T) {
 
 func TestFromString_ImplementsLoader(t *testing.T) {
 	var _ Loader = (*FromString)(nil)
+}
+
+func TestNewFromStringBase64(t *testing.T) {
+	t.Parallel()
+	script := "function test() { return 'hello world'; }"
+	encodedScript := base64.StdEncoding.EncodeToString([]byte(script))
+
+	t.Run("valid base64 content", func(t *testing.T) {
+		loader, err := NewFromStringBase64(encodedScript)
+		require.NoError(t, err)
+
+		reader, err := loader.GetReader()
+		require.NoError(t, err)
+
+		verifyReaderContent(t, reader, script)
+	})
+
+	t.Run("invalid base64 falls back to original string", func(t *testing.T) {
+		loader, err := NewFromStringBase64(script)
+		require.NoError(t, err)
+
+		reader, err := loader.GetReader()
+		require.NoError(t, err)
+
+		verifyReaderContent(t, reader, script)
+	})
+
+	t.Run("empty string", func(t *testing.T) {
+		_, err := NewFromStringBase64("")
+		assert.ErrorIs(t, err, ErrScriptNotAvailable)
+	})
+
+	t.Run("whitespace only", func(t *testing.T) {
+		_, err := NewFromStringBase64("   \n\t  ")
+		assert.ErrorIs(t, err, ErrScriptNotAvailable)
+	})
+
+	t.Run("base64 with whitespace", func(t *testing.T) {
+		e := base64.StdEncoding.EncodeToString([]byte(script))
+		contentWithWhitespace := "  " + e + "  \n"
+
+		loader, err := NewFromStringBase64(contentWithWhitespace)
+		require.NoError(t, err)
+
+		reader, err := loader.GetReader()
+		require.NoError(t, err)
+
+		verifyReaderContent(t, reader, script)
+	})
 }
