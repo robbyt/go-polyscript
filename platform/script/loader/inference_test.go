@@ -54,8 +54,10 @@ func TestInferLoader(t *testing.T) {
 				expectedType: "*loader.FromString",
 			},
 			{
-				name:         "base64 encoded content",
-				input:        base64.StdEncoding.EncodeToString([]byte("console.log('base64 test');")),
+				name: "base64 encoded content",
+				input: base64.StdEncoding.EncodeToString(
+					[]byte("console.log('base64 test');"),
+				),
 				expectedType: "*loader.FromBytes",
 			},
 			{
@@ -335,8 +337,10 @@ func TestInferFromString(t *testing.T) {
 				expectedContent: "console.log('hello');",
 			},
 			{
-				name:            "valid base64 multiline",
-				input:           base64.StdEncoding.EncodeToString([]byte("function test() {\n  return 42;\n}")),
+				name: "valid base64 multiline",
+				input: base64.StdEncoding.EncodeToString(
+					[]byte("function test() {\n  return 42;\n}"),
+				),
 				expectedType:    "*loader.FromBytes",
 				expectedContent: "function test() {\n  return 42;\n}",
 			},
