@@ -2,8 +2,9 @@ package loader
 
 import (
 	"encoding/base64"
-	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
@@ -19,46 +20,46 @@ func TestInferLoader(t *testing.T) {
 		tests := []struct {
 			name          string
 			input         string
-			expectedType  string
+			expectedType  any
 			shouldError   bool
 			errorContains string
 		}{
 			{
 				name:         "HTTP URL",
 				input:        "http://example.com/script.js",
-				expectedType: "*loader.FromHTTP",
+				expectedType: (*FromHTTP)(nil),
 			},
 			{
 				name:         "HTTPS URL",
 				input:        "https://example.com/script.js",
-				expectedType: "*loader.FromHTTP",
+				expectedType: (*FromHTTP)(nil),
 			},
 			{
 				name:         "file URL",
 				input:        "file:///path/to/script.js",
-				expectedType: "*loader.FromDisk",
+				expectedType: (*FromDisk)(nil),
 			},
 			{
 				name:         "absolute path",
 				input:        "/absolute/path/script.js",
-				expectedType: "*loader.FromDisk",
+				expectedType: (*FromDisk)(nil),
 			},
 			{
 				name:         "inline script content",
 				input:        "function test() { return 'hello'; }",
-				expectedType: "*loader.FromString",
+				expectedType: (*FromString)(nil),
 			},
 			{
 				name:         "multiline script content",
 				input:        "function test() {\n  return 'hello';\n}",
-				expectedType: "*loader.FromString",
+				expectedType: (*FromString)(nil),
 			},
 			{
 				name: "base64 encoded content",
 				input: base64.StdEncoding.EncodeToString(
 					[]byte("console.log('base64 test');"),
 				),
-				expectedType: "*loader.FromBytes",
+				expectedType: (*FromBytes)(nil),
 			},
 			{
 				name:        "empty string",
@@ -85,13 +86,7 @@ func TestInferLoader(t *testing.T) {
 				}
 
 				require.NoError(t, err, "Unexpected error for input: %s", tc.input)
-				assert.Equal(
-					t,
-					tc.expectedType,
-					getTypeName(result),
-					"Type mismatch for input: %s",
-					tc.input,
-				)
+				assert.IsType(t, tc.expectedType, result, "Type mismatch for input: %s", tc.input)
 			})
 		}
 	})
@@ -100,13 +95,13 @@ func TestInferLoader(t *testing.T) {
 		tests := []struct {
 			name         string
 			input        []byte
-			expectedType string
+			expectedType any
 			shouldError  bool
 		}{
 			{
 				name:         "non-empty bytes",
 				input:        []byte("function test() { return 'hello'; }"),
-				expectedType: "*loader.FromBytes",
+				expectedType: (*FromBytes)(nil),
 			},
 			{
 				name:        "empty bytes",
@@ -130,7 +125,7 @@ func TestInferLoader(t *testing.T) {
 				}
 
 				require.NoError(t, err, "Unexpected error for input")
-				assert.Equal(t, tc.expectedType, getTypeName(result), "Type mismatch for input")
+				assert.IsType(t, tc.expectedType, result, "Type mismatch for input")
 			})
 		}
 	})
@@ -142,7 +137,7 @@ func TestInferLoader(t *testing.T) {
 		result, err := InferLoader(reader)
 
 		require.NoError(t, err)
-		assert.Equal(t, "*loader.FromIoReader", getTypeName(result))
+		assert.IsType(t, (*FromIoReader)(nil), result)
 	})
 
 	t.Run("existing loader input", func(t *testing.T) {
@@ -187,27 +182,27 @@ func TestInferFromString(t *testing.T) {
 		tests := []struct {
 			name         string
 			input        string
-			expectedType string
+			expectedType any
 		}{
 			{
 				name:         "http scheme",
 				input:        "http://localhost:8080/script.js",
-				expectedType: "*loader.FromHTTP",
+				expectedType: (*FromHTTP)(nil),
 			},
 			{
 				name:         "https scheme",
 				input:        "https://api.example.com/script.js",
-				expectedType: "*loader.FromHTTP",
+				expectedType: (*FromHTTP)(nil),
 			},
 			{
 				name:         "file scheme",
 				input:        "file:///usr/local/scripts/test.js",
-				expectedType: "*loader.FromDisk",
+				expectedType: (*FromDisk)(nil),
 			},
 			{
 				name:         "custom scheme treated as content",
 				input:        "custom://path/to/script",
-				expectedType: "*loader.FromString",
+				expectedType: (*FromString)(nil),
 			},
 		}
 
@@ -216,13 +211,7 @@ func TestInferFromString(t *testing.T) {
 				result, err := inferFromString(tc.input)
 
 				require.NoError(t, err, "Unexpected error for input: %s", tc.input)
-				assert.Equal(
-					t,
-					tc.expectedType,
-					getTypeName(result),
-					"Type mismatch for input: %s",
-					tc.input,
-				)
+				assert.IsType(t, tc.expectedType, result, "Type mismatch for input: %s", tc.input)
 			})
 		}
 	})
@@ -231,17 +220,17 @@ func TestInferFromString(t *testing.T) {
 		tests := []struct {
 			name         string
 			input        string
-			expectedType string
+			expectedType any
 		}{
 			{
 				name:         "absolute unix path",
 				input:        "/usr/local/bin/script.js",
-				expectedType: "*loader.FromDisk",
+				expectedType: (*FromDisk)(nil),
 			},
 			{
 				name:         "path with forward slash",
 				input:        "some/path/script.js",
-				expectedType: "*loader.FromDisk",
+				expectedType: (*FromDisk)(nil),
 			},
 		}
 
@@ -250,13 +239,7 @@ func TestInferFromString(t *testing.T) {
 				result, err := inferFromString(tc.input)
 
 				require.NoError(t, err, "Unexpected error for input: %s", tc.input)
-				assert.Equal(
-					t,
-					tc.expectedType,
-					getTypeName(result),
-					"Type mismatch for input: %s",
-					tc.input,
-				)
+				assert.IsType(t, tc.expectedType, result)
 			})
 		}
 	})
@@ -269,17 +252,17 @@ func TestInferFromString(t *testing.T) {
 		tests := []struct {
 			name         string
 			input        string
-			expectedType string
+			expectedType any
 		}{
 			{
 				name:         "windows absolute path",
 				input:        "C:\\Program Files\\script.js",
-				expectedType: "*loader.FromDisk",
+				expectedType: (*FromDisk)(nil),
 			},
 			{
 				name:         "windows drive with colon",
 				input:        "D:\\scripts\\test.js",
-				expectedType: "*loader.FromDisk",
+				expectedType: (*FromDisk)(nil),
 			},
 		}
 
@@ -288,13 +271,7 @@ func TestInferFromString(t *testing.T) {
 				result, err := inferFromString(tc.input)
 
 				require.NoError(t, err, "Unexpected error for input: %s", tc.input)
-				assert.Equal(
-					t,
-					tc.expectedType,
-					getTypeName(result),
-					"Type mismatch for input: %s",
-					tc.input,
-				)
+				assert.IsType(t, tc.expectedType, result)
 			})
 		}
 	})
@@ -313,12 +290,7 @@ func TestInferFromString(t *testing.T) {
 				result, err := inferFromString(input)
 
 				require.NoError(t, err, "Unexpected error for input: %s", input)
-				assert.Equal(
-					t,
-					"*loader.FromString",
-					getTypeName(result),
-					"Should detect as inline content",
-				)
+				assert.IsType(t, (*FromString)(nil), result)
 			})
 		}
 	})
@@ -327,13 +299,13 @@ func TestInferFromString(t *testing.T) {
 		tests := []struct {
 			name            string
 			input           string
-			expectedType    string
+			expectedType    any
 			expectedContent string
 		}{
 			{
 				name:            "valid base64 script",
 				input:           base64.StdEncoding.EncodeToString([]byte("console.log('hello');")),
-				expectedType:    "*loader.FromBytes",
+				expectedType:    (*FromBytes)(nil),
 				expectedContent: "console.log('hello');",
 			},
 			{
@@ -341,19 +313,19 @@ func TestInferFromString(t *testing.T) {
 				input: base64.StdEncoding.EncodeToString(
 					[]byte("function test() {\n  return 42;\n}"),
 				),
-				expectedType:    "*loader.FromBytes",
+				expectedType:    (*FromBytes)(nil),
 				expectedContent: "function test() {\n  return 42;\n}",
 			},
 			{
 				name:            "invalid base64 falls back to string",
 				input:           "not-base64-content",
-				expectedType:    "*loader.FromString",
+				expectedType:    (*FromString)(nil),
 				expectedContent: "not-base64-content",
 			},
 			{
 				name:            "plain text that looks like base64",
 				input:           base64.StdEncoding.EncodeToString([]byte("Hello World")),
-				expectedType:    "*loader.FromBytes",
+				expectedType:    (*FromBytes)(nil),
 				expectedContent: "Hello World",
 			},
 		}
@@ -364,7 +336,7 @@ func TestInferFromString(t *testing.T) {
 				require.NoError(t, err)
 
 				// Check loader type
-				assert.Equal(t, tc.expectedType, getTypeName(result))
+				assert.IsType(t, tc.expectedType, result)
 
 				// Verify content
 				reader, err := result.GetReader()
@@ -388,7 +360,7 @@ func TestInferLoader_WindowsPath(t *testing.T) {
 
 	result, err := InferLoader("C:\\windows\\path\\script.js")
 	require.NoError(t, err)
-	assert.Equal(t, "*loader.FromDisk", getTypeName(result))
+	assert.IsType(t, (*FromDisk)(nil), result)
 }
 
 func TestInferLoader_Integration(t *testing.T) {
@@ -470,12 +442,31 @@ func TestInferLoader_Integration(t *testing.T) {
 			})
 		}
 	})
-}
 
-// Helper function to get type name for assertions
-func getTypeName(v any) string {
-	if v == nil {
-		return "nil"
-	}
-	return fmt.Sprintf("%T", v)
+	t.Run("file path inference with temp file", func(t *testing.T) {
+		// Create a temporary directory and file
+		tempDir := t.TempDir()
+		tempFile := filepath.Join(tempDir, "test_script.js")
+
+		// Write some content to the file
+		content := "console.log('temporary file test');"
+		err := os.WriteFile(tempFile, []byte(content), 0o644)
+		require.NoError(t, err)
+
+		// Test that InferLoader returns a FromDisk loader for the file path
+		result, err := InferLoader(tempFile)
+		require.NoError(t, err)
+		assert.IsType(t, (*FromDisk)(nil), result)
+
+		// Verify the content can be read
+		reader, err := result.GetReader()
+		require.NoError(t, err)
+		t.Cleanup(func() {
+			assert.NoError(t, reader.Close())
+		})
+
+		actualContent, err := io.ReadAll(reader)
+		require.NoError(t, err)
+		assert.Equal(t, content, string(actualContent))
+	})
 }
