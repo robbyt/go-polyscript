@@ -8,14 +8,20 @@ import (
 	"strings"
 )
 
-// InferLoader analyzes the input and returns an appropriate loader based on type inference.
-// It supports the following input types:
-//   - string: Infers from URI scheme (http/https -> HTTP, file -> Disk) or content (inline string with base64 decoding)
-//   - []byte: Returns FromBytes loader
-//   - io.Reader: Returns FromIoReader loader
-//   - Loader: Returns as-is
+// InferLoader determines the appropriate loader for the given input.
 //
-// Returns an error if the input type is unsupported or if loader creation fails.
+// For string inputs, it applies the following checks in order:
+//  1. URI scheme detection (http/https -> HTTP, file -> Disk)
+//  2. File path format detection (absolute paths, known extensions)
+//  3. Base64 validation (attempts decode)
+//  4. String fallback
+//
+// Other input types:
+//   - []byte: FromBytes loader
+//   - io.Reader: FromIoReader loader
+//   - Loader: returned unchanged
+//
+// Returns an error for unsupported input types or loader creation failures.
 func InferLoader(input any) (Loader, error) {
 	switch v := input.(type) {
 	case string:
@@ -32,21 +38,20 @@ func InferLoader(input any) (Loader, error) {
 }
 
 // inferFromString analyzes a string input and returns the appropriate loader.
-// It checks for URI schemes and falls back to treating the string as inline content.
+// It follows this order: scheme check -> file path check -> base64 check -> string fallback.
 func inferFromString(input string) (Loader, error) {
 	input = strings.TrimSpace(input)
 	if input == "" {
 		return nil, fmt.Errorf("empty string input")
 	}
 
-	// Try to parse as URL to detect scheme
+	// 1. Check for URI scheme
 	if parsed, err := url.Parse(input); err == nil && parsed.Scheme != "" {
 		switch parsed.Scheme {
 		case "http", "https":
 			return NewFromHTTP(input)
 		case "file":
 			path := parsed.Path
-			// Convert relative paths to absolute paths
 			if !filepath.IsAbs(path) {
 				absPath, err := filepath.Abs(path)
 				if err != nil {
@@ -55,26 +60,44 @@ func inferFromString(input string) (Loader, error) {
 				path = absPath
 			}
 			return NewFromDisk(path)
-		default:
-			// Unknown scheme, treat as inline content
-			return NewFromStringBase64(input)
 		}
 	}
 
-	// Check if it looks like a file path
-	if filepath.IsAbs(input) || strings.Contains(input, "/") || strings.Contains(input, "\\") {
+	// 2. Check if it's a valid file path
+	if isValidFilePath(input) {
+		path := input
 		// Convert relative paths to absolute paths
 		if !filepath.IsAbs(input) {
 			absPath, err := filepath.Abs(input)
 			if err != nil {
-				// If we can't resolve the path, treat as inline content
-				return NewFromStringBase64(input)
+				return nil, fmt.Errorf("failed to resolve relative path %q: %w", input, err)
 			}
-			input = absPath
+			path = absPath
 		}
-		return NewFromDisk(input)
+		return NewFromDisk(path)
 	}
 
-	// Default to treating as inline string content
+	// 3. Use the base64 check to determine if the input is valid base64
+	// (it returns FromBytes if valid, otherwise falls back to FromString)
 	return NewFromStringBase64(input)
+}
+
+// isValidFilePath checks if a string looks like a valid file path format.
+func isValidFilePath(s string) bool {
+	// Don't consider strings with newlines/carriage returns as file paths
+	if strings.ContainsAny(s, "\n\r") {
+		return false
+	}
+
+	// Check for specific script file extensions (case insensitive)
+	validExtensions := []string{".wasm", ".risor", ".star", ".starlark"}
+	lower := strings.ToLower(s)
+	for _, ext := range validExtensions {
+		if strings.HasSuffix(lower, ext) {
+			return true
+		}
+	}
+
+	// Basic file path patterns without filesystem check
+	return filepath.IsAbs(s)
 }

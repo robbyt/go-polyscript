@@ -26,22 +26,44 @@ func TestInferLoader(t *testing.T) {
 		}{
 			{
 				name:         "HTTP URL",
-				input:        "http://example.com/script.js",
+				input:        "http://example.com/script.wasm",
 				expectedType: (*FromHTTP)(nil),
 			},
 			{
 				name:         "HTTPS URL",
-				input:        "https://example.com/script.js",
+				input:        "https://example.com/script.risor",
 				expectedType: (*FromHTTP)(nil),
 			},
 			{
 				name:         "file URL",
-				input:        "file:///path/to/script.js",
+				input:        "file:///path/to/script.star",
 				expectedType: (*FromDisk)(nil),
 			},
 			{
-				name:         "absolute path",
-				input:        "/absolute/path/script.js",
+				name:  "absolute path with invalid extension",
+				input: "/absolute/path/script.invalid",
+				expectedType: (*FromDisk)(
+					nil,
+				), // Absolute paths are treated as file paths regardless of extension
+			},
+			{
+				name:         "absolute path with wasm extension",
+				input:        "/absolute/path/script.wasm",
+				expectedType: (*FromDisk)(nil),
+			},
+			{
+				name:         "absolute path with risor extension",
+				input:        "/absolute/path/script.risor",
+				expectedType: (*FromDisk)(nil),
+			},
+			{
+				name:         "absolute path with star extension",
+				input:        "/absolute/path/script.star",
+				expectedType: (*FromDisk)(nil),
+			},
+			{
+				name:         "absolute path with starlark extension",
+				input:        "/absolute/path/script.starlark",
 				expectedType: (*FromDisk)(nil),
 			},
 			{
@@ -186,17 +208,17 @@ func TestInferFromString(t *testing.T) {
 		}{
 			{
 				name:         "http scheme",
-				input:        "http://localhost:8080/script.js",
+				input:        "http://localhost:8080/script.wasm",
 				expectedType: (*FromHTTP)(nil),
 			},
 			{
 				name:         "https scheme",
-				input:        "https://api.example.com/script.js",
+				input:        "https://api.example.com/script.risor",
 				expectedType: (*FromHTTP)(nil),
 			},
 			{
 				name:         "file scheme",
-				input:        "file:///usr/local/scripts/test.js",
+				input:        "file:///usr/local/scripts/test.star",
 				expectedType: (*FromDisk)(nil),
 			},
 			{
@@ -223,14 +245,21 @@ func TestInferFromString(t *testing.T) {
 			expectedType any
 		}{
 			{
-				name:         "absolute unix path",
-				input:        "/usr/local/bin/script.js",
+				name:  "absolute unix path with invalid extension",
+				input: "/usr/local/bin/script.invalid",
+				expectedType: (*FromDisk)(
+					nil,
+				), // Absolute paths are file paths even with unsupported extensions
+			},
+			{
+				name:         "absolute unix path with wasm extension",
+				input:        "/usr/local/bin/script.wasm",
 				expectedType: (*FromDisk)(nil),
 			},
 			{
-				name:         "path with forward slash",
-				input:        "some/path/script.js",
-				expectedType: (*FromDisk)(nil),
+				name:         "path with forward slash and invalid extension",
+				input:        "some/path/script.invalid",
+				expectedType: (*FromString)(nil),
 			},
 		}
 
@@ -255,14 +284,14 @@ func TestInferFromString(t *testing.T) {
 			expectedType any
 		}{
 			{
-				name:         "windows absolute path",
-				input:        "C:\\Program Files\\script.js",
-				expectedType: (*FromDisk)(nil),
+				name:         "windows absolute path with invalid extension",
+				input:        "C:\\Program Files\\script.invalid",
+				expectedType: (*FromString)(nil),
 			},
 			{
-				name:         "windows drive with colon",
-				input:        "D:\\scripts\\test.js",
-				expectedType: (*FromDisk)(nil),
+				name:         "windows drive with colon and invalid extension",
+				input:        "D:\\scripts\\test.invalid",
+				expectedType: (*FromString)(nil),
 			},
 		}
 
@@ -358,7 +387,7 @@ func TestInferLoader_WindowsPath(t *testing.T) {
 		t.Skip("Windows path test only runs on Windows")
 	}
 
-	result, err := InferLoader("C:\\windows\\path\\script.js")
+	result, err := InferLoader("C:\\windows\\path\\script.starlark")
 	require.NoError(t, err)
 	assert.IsType(t, (*FromDisk)(nil), result)
 }
@@ -446,7 +475,7 @@ func TestInferLoader_Integration(t *testing.T) {
 	t.Run("file path inference with temp file", func(t *testing.T) {
 		// Create a temporary directory and file
 		tempDir := t.TempDir()
-		tempFile := filepath.Join(tempDir, "test_script.js")
+		tempFile := filepath.Join(tempDir, "test_script.wasm")
 
 		// Write some content to the file
 		content := "console.log('temporary file test');"
@@ -469,4 +498,270 @@ func TestInferLoader_Integration(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, content, string(actualContent))
 	})
+}
+
+// TestInferLoader_MultilineScriptContent tests multiline content that might be misinterpreted as paths.
+func TestInferLoader_MultilineScriptContent(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		input string
+	}{
+		{
+			name: "script with comment header",
+			input: `// JavaScript comment
+function test() {
+    return "hello world";
+}`,
+		},
+		{
+			name: "script starting with path-like comment",
+			input: `// /usr/bin/node
+const fs = require('fs');
+console.log("test");`,
+		},
+		{
+			name: "script with windows path in content",
+			input: `const path = "C:\\Program Files\\App\\script.invalid";
+function loadScript() {
+    return path;
+}`,
+		},
+		{
+			name:  "multiline with control characters",
+			input: "function test() {\n\treturn 'hello\\nworld';\n}",
+		},
+		{
+			name: "content starting with /usr/bin",
+			input: `/usr/bin/node
+function test() { return 42; }`,
+		},
+		{
+			name: "risor script with data access patterns",
+			input: `func process() {
+    service_name := ctx.get("service_name", "unknown")
+    version := ctx.get("version", "1.0.0") 
+    return {"message": "Hello from Risor!", "version": version}
+}
+process()`,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result, err := InferLoader(tc.input)
+			require.NoError(t, err, "Input: %s", tc.input)
+			assert.IsType(
+				t,
+				(*FromString)(nil),
+				result,
+				"Should treat multiline content as string, not path",
+			)
+
+			// Verify content can be read correctly
+			reader, err := result.GetReader()
+			require.NoError(t, err)
+			defer func() {
+				assert.NoError(t, reader.Close())
+			}()
+
+			content, err := io.ReadAll(reader)
+			require.NoError(t, err)
+			assert.Equal(t, tc.input, string(content))
+		})
+	}
+}
+
+// TestInferLoader_AmbiguousContentDetection tests edge cases between paths and content.
+func TestInferLoader_AmbiguousContentDetection(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		input        string
+		expectedType any
+		description  string
+	}{
+		{
+			name:         "path that doesn't exist should return FromString",
+			input:        "nonexistent/path/script.invalid",
+			expectedType: (*FromString)(nil),
+			description:  "Paths with unsupported extensions should be treated as content",
+		},
+		{
+			name:         "path with spaces and unsupported extension",
+			input:        "some path with spaces.invalid",
+			expectedType: (*FromString)(nil),
+			description:  "Paths with unsupported extensions should be treated as content",
+		},
+		{
+			name:         "relative path without extension",
+			input:        "relative/path/file",
+			expectedType: (*FromString)(nil),
+			description:  "Relative paths should be treated as content",
+		},
+		{
+			name:         "wasm file extension",
+			input:        "script.wasm",
+			expectedType: (*FromDisk)(nil),
+			description:  "WASM files should be treated as paths",
+		},
+		{
+			name:         "risor file extension",
+			input:        "script.risor",
+			expectedType: (*FromDisk)(nil),
+			description:  "Risor files should be treated as paths",
+		},
+		{
+			name:         "star file extension",
+			input:        "config.star",
+			expectedType: (*FromDisk)(nil),
+			description:  "Star files should be treated as paths",
+		},
+		{
+			name:         "starlark file extension",
+			input:        "build.starlark",
+			expectedType: (*FromDisk)(nil),
+			description:  "Starlark files should be treated as paths",
+		},
+		{
+			name:         "case insensitive WASM",
+			input:        "MODULE.WASM",
+			expectedType: (*FromDisk)(nil),
+			description:  "Case insensitive file extensions should work",
+		},
+		{
+			name:  "single line code that looks like path",
+			input: "/bin/bash -c 'echo hello'",
+			expectedType: (*FromDisk)(
+				nil,
+			), // Absolute paths are treated as file paths even if they look like commands
+			description: "Absolute paths take precedence over content detection",
+		},
+		{
+			name:         "function call looks like content",
+			input:        "function() { return 42; }",
+			expectedType: (*FromString)(nil),
+			description:  "Function definitions should be treated as content",
+		},
+		{
+			name:         "javascript var declaration",
+			input:        "var x = '/some/path'; console.log(x);",
+			expectedType: (*FromString)(nil),
+			description:  "Variable declarations should be treated as content",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result, err := InferLoader(tc.input)
+			require.NoError(t, err)
+			assert.IsType(t, tc.expectedType, result, tc.description)
+		})
+	}
+}
+
+// TestInferLoader_URLParsingEdgeCases tests graceful handling of URL parsing failures.
+func TestInferLoader_URLParsingEdgeCases(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name          string
+		input         string
+		shouldError   bool
+		errorContains string
+		expectedType  any
+	}{
+		{
+			name:         "URL with control characters should fall back to content",
+			input:        "http://example.com/script\nwith\nnewlines.invalid",
+			shouldError:  false,
+			expectedType: (*FromString)(nil),
+		},
+		{
+			name:         "file URL with spaces should be handled gracefully",
+			input:        "file:///path with spaces/script.wasm",
+			shouldError:  false,
+			expectedType: (*FromDisk)(nil), // Valid file URL should return FromDisk
+		},
+		{
+			name:         "malformed scheme treated as content",
+			input:        "ht!tp://invalid-scheme.com/script.invalid",
+			expectedType: (*FromString)(nil),
+		},
+		{
+			name:         "content that looks like URL with control chars",
+			input:        "http://example.com\nfunction test() {}",
+			expectedType: (*FromString)(nil),
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result, err := InferLoader(tc.input)
+
+			if tc.shouldError {
+				assert.Error(t, err)
+				if tc.errorContains != "" {
+					assert.Contains(t, err.Error(), tc.errorContains)
+				}
+				return
+			}
+
+			require.NoError(t, err)
+			if tc.expectedType != nil {
+				assert.IsType(t, tc.expectedType, result)
+			}
+		})
+	}
+}
+
+// TestInferLoader_ControlCharactersAndSpecialCases tests handling of various special characters.
+func TestInferLoader_ControlCharactersAndSpecialCases(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		input        string
+		expectedType any
+	}{
+		{
+			name:         "content with newlines and tabs",
+			input:        "function test() {\n\treturn 'hello\\nworld';\n}",
+			expectedType: (*FromString)(nil),
+		},
+		{
+			name:         "content with carriage returns",
+			input:        "line1\r\nline2\r\nfunction test() {}",
+			expectedType: (*FromString)(nil),
+		},
+		{
+			name: "content with null bytes as binary",
+			input: string(
+				[]byte{0x00, 0x61, 0x73, 0x6D, 0x01, 0x00, 0x00, 0x00},
+			), // WASM magic as string
+			expectedType: (*FromString)(
+				nil,
+			), // Raw binary should be string, not auto-detected
+		},
+		{
+			name:         "content with multiple spaces",
+			input:        "const  x  =  'value';",
+			expectedType: (*FromString)(nil),
+		},
+		{
+			name:         "windows path with spaces and unsupported extension",
+			input:        "C:\\Program Files\\App with spaces\\script.invalid",
+			expectedType: (*FromString)(nil),
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result, err := InferLoader(tc.input)
+			require.NoError(t, err)
+			assert.IsType(t, tc.expectedType, result, "Input: %q", tc.input)
+		})
+	}
 }
