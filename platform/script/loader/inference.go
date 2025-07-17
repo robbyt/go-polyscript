@@ -89,15 +89,6 @@ func isValidFilePath(s string) bool {
 		return false
 	}
 
-	// Don't consider strings that look like code as file paths
-	if strings.Contains(s, " -c ") || // shell commands
-		strings.Contains(s, "';") || // code with semicolons after quotes
-		strings.Contains(s, "console.") || // JavaScript console calls
-		strings.Contains(s, "var ") || // variable declarations
-		strings.Contains(s, "function ") { // function declarations
-		return false
-	}
-
 	// Check for specific script file extensions (case insensitive)
 	validExtensions := []string{".wasm", ".risor", ".star", ".starlark"}
 	lower := strings.ToLower(s)
