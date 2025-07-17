@@ -98,6 +98,6 @@ func isValidFilePath(s string) bool {
 		}
 	}
 
-	// Don't treat absolute paths as file paths unless they have supported extensions
-	return false
+	// Basic file path patterns without filesystem check
+	return filepath.IsAbs(s)
 }

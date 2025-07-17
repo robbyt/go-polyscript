@@ -40,9 +40,11 @@ func TestInferLoader(t *testing.T) {
 				expectedType: (*FromDisk)(nil),
 			},
 			{
-				name:         "absolute path with invalid extension",
-				input:        "/absolute/path/script.invalid",
-				expectedType: (*FromString)(nil),
+				name:  "absolute path with invalid extension",
+				input: "/absolute/path/script.invalid",
+				expectedType: (*FromDisk)(
+					nil,
+				), // Absolute paths are treated as file paths regardless of extension
 			},
 			{
 				name:         "absolute path with wasm extension",
@@ -243,9 +245,11 @@ func TestInferFromString(t *testing.T) {
 			expectedType any
 		}{
 			{
-				name:         "absolute unix path with invalid extension",
-				input:        "/usr/local/bin/script.invalid",
-				expectedType: (*FromString)(nil),
+				name:  "absolute unix path with invalid extension",
+				input: "/usr/local/bin/script.invalid",
+				expectedType: (*FromDisk)(
+					nil,
+				), // Absolute paths are file paths even with unsupported extensions
 			},
 			{
 				name:         "absolute unix path with wasm extension",
@@ -628,10 +632,12 @@ func TestInferLoader_AmbiguousContentDetection(t *testing.T) {
 			description:  "Case insensitive file extensions should work",
 		},
 		{
-			name:         "single line code that looks like path",
-			input:        "/bin/bash -c 'echo hello'",
-			expectedType: (*FromString)(nil),
-			description:  "Shell commands should be treated as content",
+			name:  "single line code that looks like path",
+			input: "/bin/bash -c 'echo hello'",
+			expectedType: (*FromDisk)(
+				nil,
+			), // Absolute paths are treated as file paths even if they look like commands
+			description: "Absolute paths take precedence over content detection",
 		},
 		{
 			name:         "function call looks like content",
