@@ -1,38 +1,19 @@
 # go-polyscript Examples
 
-This directory contains examples demonstrating the core capabilities of go-polyscript with different script engines.
-
-## Directory Structure
-
-The examples are organized by execution pattern and script engine:
-
-```
-examples/
-├── simple/                        # Simple one-time execution examples
-│   ├── risor/                     # Risor simple example
-│   ├── starlark/                  # Starlark simple example
-│   └── extism/                    # Extism simple example
-├── multiple-instantiation/        # Compile-once-run-many examples
-│   ├── risor/                     # Risor multiple execution example
-│   ├── starlark/                  # Starlark multiple execution example
-│   └── extism/                    # Extism multiple execution example
-└── data-prep/                     # Data preparation examples
-    ├── risor/                     # Risor with data preparation
-    ├── starlark/                  # Starlark with data preparation
-    └── extism/                    # Extism with data preparation
-```
+This directory contains examples demonstrating the core capabilities of go-polyscript with different script engines. The examples are organized by execution pattern and script engine.
 
 ## Execution Patterns
 
 go-polyscript supports three primary execution patterns:
 
-### 1. Simple Execution (Compile and Run Once)
+### 1. Simple Execution (One-Time Execution)
 
-The simplest pattern compiles and executes a script in a single operation:
+The simplest pattern provides both script and data at creation time:
 
-- Script is compiled every time it runs
-- All data is provided at compilation time through a `StaticProvider`
-- Suitable for one-off script executions
+- Uses `FromEngineWithData` functions to create an evaluator with static data
+- Script and data are provided together at creation time
+- Evaluator is created and executed once
+- Suitable for one-off script executions with known data
 
 **Examples:** [Risor](/examples/simple/risor), [Starlark](/examples/simple/starlark), [Extism](/examples/simple/extism)
 
@@ -40,9 +21,10 @@ The simplest pattern compiles and executes a script in a single operation:
 
 This pattern separates compilation from execution for better performance:
 
-- Script is compiled only once into an `ExecutableUnit`
-- The same compiled script is executed multiple times with different data
-- Data is provided at runtime through a `ContextProvider`
+- Uses `FromEngine` functions to create an evaluator without data
+- Script is compiled once into an evaluator
+- The same evaluator is executed multiple times with different runtime data
+- Data is provided dynamically at execution time via context
 - Improves performance for multiple executions of the same script
 
 **Examples:** [Risor](/examples/multiple-instantiation/risor), [Starlark](/examples/multiple-instantiation/starlark), [Extism](/examples/multiple-instantiation/extism)
@@ -51,10 +33,10 @@ This pattern separates compilation from execution for better performance:
 
 This pattern separates data preparation from script evaluation:
 
-- Uses a combination of static and dynamic data providers
-- Static data (configuration) is provided at compile time
-- Dynamic data (runtime variables) is injected at execution time
-- Enables flexibility in how data is prepared and passed to scripts
+- Uses `FromEngineWithData` functions with static configuration data
+- Additional dynamic data is added to context before evaluation using `AddDataToContext`
+- Combines static configuration with runtime variables
+- Enables flexible data preparation workflows
 
 **Examples:** [Risor](/examples/data-prep/risor), [Starlark](/examples/data-prep/starlark), [Extism](/examples/data-prep/extism)
 
@@ -70,43 +52,38 @@ This pattern separates data preparation from script evaluation:
 
 ### Extism (WebAssembly)
 
-[Extism](https://extism.org/) enables WebAssembly module execution within your Go application.
-
-Note: The Extism examples require a WebAssembly module (main.wasm).
+[Extism](https://extism.org/) enables WebAssembly module execution within your Go application. The examples use an embedded test WebAssembly module for demonstration purposes.
 
 ## Key Components Across All Examples
 
-All examples demonstrate these core go-polyscript components:
+### The `ctx` Global Variable
 
-### Data Providers
+All scripts access data through the `ctx` global variable:
 
-Data providers control how data flows from your Go application into scripts:
-
-- `StaticProvider`: Provides fixed data known at compile time
-- `ContextProvider`: Retrieves data dynamically from the Go context at runtime
-- `CompositeProvider`: Combines multiple providers for complex data flows
-
-### The `ctx` Global
-
-The `ctx` global variable serves as a bridge between Go and the script:
-
-- In Go: You populate data in a provider
-- In Script: The script accesses that data through the `ctx` variable
-- This maintains a clear separation between your application and embedded scripts
+- **Risor & Starlark**: Access data as `ctx["key"]` 
+- **Extism**: Data is automatically mapped to the WASM module's input
+- This provides a consistent interface regardless of the underlying script engine
 
 ### Evaluators
 
-Evaluators wrap a compiled script in a standardized interface:
+Each example creates an evaluator using the appropriate function:
 
-- They handle script compilation and execution
-- They execute the script with provided data
-- They process script results
-- Each script engine (Starlark, Risor, Extism) has its own evaluator implementation
+- **Static Data**: `FromEngineWithData(script, data, logger)` - data provided at creation
+- **Dynamic Data**: `FromEngine(script, logger)` - data provided via context at runtime
+- **Combined**: Use `AddDataToContext` to enrich context with additional data
 
-### Result Handling
+### Data Flow Patterns
 
-All examples demonstrate techniques for:
-- Processing script outputs
-- Validating returned data structures  
-- Converting between Go and script data types
-- Error handling and reporting
+Examples demonstrate different data flow approaches:
+
+- **Simple**: All data provided upfront when creating the evaluator
+- **Multiple-instantiation**: Data provided dynamically via context for each execution
+- **Data-prep**: Static configuration data at creation + dynamic data via context
+
+### Result Processing
+
+All examples show how to:
+- Handle script execution results
+- Validate returned data structures
+- Convert between Go and script data types
+- Process both successful results and errors
