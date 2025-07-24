@@ -89,8 +89,7 @@ func evalAndExtractResult(
 	// Evaluate the script with the prepared context
 	result, err := evaluator.Eval(ctx)
 	if err != nil {
-		logger.Error("Script evaluation failed", "error", err)
-		return nil, err
+		return nil, fmt.Errorf("script evaluation failed: %w", err)
 	}
 
 	// Process the result
@@ -102,7 +101,6 @@ func evalAndExtractResult(
 
 	data, ok := val.(map[string]any)
 	if !ok {
-		logger.Error("Result is not a map", "type", fmt.Sprintf("%T", val))
 		return nil, fmt.Errorf("result is not a map: %T", val)
 	}
 

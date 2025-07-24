@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"log/slog"
-	"os"
 	"testing"
 
 	"github.com/robbyt/go-polyscript"
@@ -31,12 +30,6 @@ func getTestStaticData() map[string]any {
 }
 
 func TestDemonstrateDataPrepAndEval(t *testing.T) {
-	// Create a test logger
-	handler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
-		Level: slog.LevelInfo,
-	})
-	logger := slog.New(handler)
-
 	// Get static test data
 	staticData := getTestStaticData()
 
@@ -44,7 +37,7 @@ func TestDemonstrateDataPrepAndEval(t *testing.T) {
 	evaluator, err := polyscript.FromExtismBytesWithData(
 		wasmdata.TestModule,
 		staticData,
-		logger.Handler(),
+		slog.Default().Handler(),
 		wasmdata.EntrypointGreet,
 	)
 	if err != nil {
@@ -60,14 +53,9 @@ func TestDemonstrateDataPrepAndEval(t *testing.T) {
 }
 
 func TestPrepareRuntimeData(t *testing.T) {
-	// Create a test logger
-	handler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
-		Level: slog.LevelInfo,
-	})
-	logger := slog.New(handler)
-
 	// Get static test data
 	staticData := getTestStaticData()
+	logger := slog.Default()
 
 	// Create evaluator using embedded WASM
 	evaluator, err := polyscript.FromExtismBytesWithData(
@@ -87,14 +75,9 @@ func TestPrepareRuntimeData(t *testing.T) {
 }
 
 func TestEvalAndExtractResult(t *testing.T) {
-	// Create a test logger
-	handler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
-		Level: slog.LevelInfo,
-	})
-	logger := slog.New(handler)
-
 	// Get static test data
 	staticData := getTestStaticData()
+	logger := slog.Default()
 
 	// Create evaluator using embedded WASM
 	evaluator, err := polyscript.FromExtismBytesWithData(
@@ -118,12 +101,6 @@ func TestEvalAndExtractResult(t *testing.T) {
 }
 
 func TestFromExtismFileWithData(t *testing.T) {
-	// Create a test logger
-	handler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
-		Level: slog.LevelInfo,
-	})
-	logger := slog.New(handler)
-
 	// Get static test data
 	staticData := getTestStaticData()
 
@@ -131,7 +108,7 @@ func TestFromExtismFileWithData(t *testing.T) {
 	evaluator, err := polyscript.FromExtismBytesWithData(
 		wasmdata.TestModule,
 		staticData,
-		logger.Handler(),
+		slog.Default().Handler(),
 		wasmdata.EntrypointGreet,
 	)
 	assert.NoError(t, err, "Should create evaluator without error")
