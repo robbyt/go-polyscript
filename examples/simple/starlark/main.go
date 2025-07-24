@@ -14,11 +14,10 @@ import (
 var starlarkScript string
 
 // runStarlarkExample executes a Starlark script once and returns the result
-func runStarlarkExample(handler slog.Handler) (map[string]any, error) {
-	if handler == nil {
-		handler = slog.NewTextHandler(os.Stdout, nil)
+func runStarlarkExample(logger *slog.Logger) (map[string]any, error) {
+	if logger == nil {
+		logger = slog.Default()
 	}
-	logger := slog.New(handler)
 
 	// Create input data
 	input := map[string]any{
@@ -29,19 +28,17 @@ func runStarlarkExample(handler slog.Handler) (map[string]any, error) {
 	evaluator, err := polyscript.FromStarlarkStringWithData(
 		starlarkScript,
 		input,
-		handler,
+		logger.Handler(),
 	)
 	if err != nil {
-		logger.Error("Failed to create evaluator", "error", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to create evaluator: %w", err)
 	}
 
 	// Execute the script
 	ctx := context.Background()
 	result, err := evaluator.Eval(ctx)
 	if err != nil {
-		logger.Error("Failed to evaluate script", "error", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to evaluate script: %w", err)
 	}
 
 	// Handle potential nil result from Interface()
@@ -54,7 +51,6 @@ func runStarlarkExample(handler slog.Handler) (map[string]any, error) {
 	// Process the result
 	data, ok := val.(map[string]any)
 	if !ok {
-		logger.Error("Result is not a map", "type", fmt.Sprintf("%T", val))
 		return nil, fmt.Errorf("result is not a map: %T", val)
 	}
 	return data, nil
@@ -66,7 +62,7 @@ func run() error {
 	logger := slog.New(handler.WithGroup("starlark-simple-example"))
 
 	// Run the example
-	result, err := runStarlarkExample(handler)
+	result, err := runStarlarkExample(logger)
 	if err != nil {
 		return fmt.Errorf("failed to run example: %w", err)
 	}

@@ -19,35 +19,32 @@ type StarlarkEvaluator = platform.Evaluator
 var starlarkScript string
 
 // createEvaluator initializes a Starlark evaluator with context provider for runtime data
-func createEvaluator(handler slog.Handler) (StarlarkEvaluator, error) {
-	if handler == nil {
-		handler = slog.NewTextHandler(os.Stdout, nil)
+func createEvaluator(logger *slog.Logger) (StarlarkEvaluator, error) {
+	if logger == nil {
+		logger = slog.Default()
 	}
-	logger := slog.New(handler)
 
 	// Create evaluator using the new simplified interface
 	// This provides a dynamic context provider automatically
 	evaluator, err := polyscript.FromStarlarkString(
 		starlarkScript,
-		handler,
+		logger.Handler(),
 	)
 	if err != nil {
-		logger.Error("Failed to create evaluator", "error", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to create evaluator: %w", err)
 	}
 
 	return evaluator, nil
 }
 
 // runMultipleTimes demonstrates the "compile once, run many times" pattern
-func runMultipleTimes(handler slog.Handler) ([]map[string]any, error) {
-	if handler == nil {
-		handler = slog.NewTextHandler(os.Stdout, nil)
+func runMultipleTimes(logger *slog.Logger) ([]map[string]any, error) {
+	if logger == nil {
+		logger = slog.Default()
 	}
-	logger := slog.New(handler)
 
 	// Create the evaluator once
-	evaluator, err := createEvaluator(handler)
+	evaluator, err := createEvaluator(logger)
 	if err != nil {
 		return nil, err
 	}
@@ -72,8 +69,7 @@ func runMultipleTimes(handler slog.Handler) ([]map[string]any, error) {
 		// Execute the script with the context
 		result, err := evaluator.Eval(ctx)
 		if err != nil {
-			logger.Error("Script evaluation failed", "error", err, "name", name)
-			continue
+			return nil, fmt.Errorf("script evaluation failed for name %q: %w", name, err)
 		}
 
 		// Process result
@@ -85,8 +81,7 @@ func runMultipleTimes(handler slog.Handler) ([]map[string]any, error) {
 
 		data, ok := val.(map[string]any)
 		if !ok {
-			logger.Error("Result is not a map", "type", fmt.Sprintf("%T", val), "name", name)
-			continue
+			return nil, fmt.Errorf("result is not a map for name %q: %T", name, val)
 		}
 
 		results = append(results, data)
@@ -102,10 +97,9 @@ func run() error {
 	logger := slog.New(handler.WithGroup("starlark-multiple-example"))
 
 	// Run the example
-	results, err := runMultipleTimes(handler)
+	results, err := runMultipleTimes(logger)
 	if err != nil {
-		logger.Error("Failed to run example", "error", err)
-		return err
+		return fmt.Errorf("failed to run example: %w", err)
 	}
 
 	// Print the results

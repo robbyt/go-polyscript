@@ -48,8 +48,7 @@ func prepareRuntimeData(
 	// Create an HTTP request object (will not make a real request!)
 	reqURL, err := url.Parse("http://localhost:8080/api/users?limit=10&offset=0")
 	if err != nil {
-		logger.Error("Failed to parse URL", "error", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to parse URL: %w", err)
 	}
 
 	httpReq := &http.Request{
@@ -103,8 +102,7 @@ func evalAndExtractResult(
 	// Evaluate the script with the prepared context
 	result, err := evaluator.Eval(ctx)
 	if err != nil {
-		logger.Error("Script evaluation failed", "error", err)
-		return nil, err
+		return nil, fmt.Errorf("script evaluation failed: %w", err)
 	}
 
 	// Process the result
@@ -116,7 +114,6 @@ func evalAndExtractResult(
 
 	data, ok := val.(map[string]any)
 	if !ok {
-		logger.Error("Result is not a map", "type", fmt.Sprintf("%T", val))
 		return nil, fmt.Errorf("result is not a map: %T", val)
 	}
 

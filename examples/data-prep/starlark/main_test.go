@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"log/slog"
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -26,14 +25,6 @@ func getTestStaticData() map[string]any {
 	}
 }
 
-// setupTestLogger creates a logger for testing
-func setupTestLogger() *slog.Logger {
-	handler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
-		Level: slog.LevelInfo,
-	})
-	return slog.New(handler.WithGroup("starlark-test"))
-}
-
 func TestRun(t *testing.T) {
 	// This is a simple test of the run function
 	err := run()
@@ -41,7 +32,7 @@ func TestRun(t *testing.T) {
 }
 
 func TestCreateStarlarkEvaluator(t *testing.T) {
-	logger := setupTestLogger()
+	logger := slog.Default()
 	staticData := getTestStaticData()
 
 	// Test creating evaluator
@@ -56,7 +47,7 @@ func TestCreateStarlarkEvaluator(t *testing.T) {
 }
 
 func TestPrepareRuntimeData(t *testing.T) {
-	logger := setupTestLogger()
+	logger := slog.Default()
 	staticData := getTestStaticData()
 
 	// Create evaluator
@@ -71,7 +62,7 @@ func TestPrepareRuntimeData(t *testing.T) {
 }
 
 func TestEvalAndExtractResult(t *testing.T) {
-	logger := setupTestLogger()
+	logger := slog.Default()
 	staticData := getTestStaticData()
 
 	// Create evaluator
@@ -102,7 +93,7 @@ func TestEvalAndExtractResult(t *testing.T) {
 
 // TestFullExecution tests the entire execution flow as an integration test
 func TestFullExecution(t *testing.T) {
-	logger := setupTestLogger()
+	logger := slog.Default()
 	staticData := getTestStaticData()
 
 	// Create evaluator with static data

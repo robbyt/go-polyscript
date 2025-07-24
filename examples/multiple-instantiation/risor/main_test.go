@@ -1,8 +1,6 @@
 package main
 
 import (
-	"log/slog"
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -10,63 +8,57 @@ import (
 )
 
 func TestRunMultipleTimes(t *testing.T) {
-	// Create a test logger
-	handler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
-		Level: slog.LevelInfo,
-	})
+	results, err := runMultipleTimes(nil)
+	require.NoError(t, err, "runMultipleTimes should not return an error")
+	require.NotNil(t, results, "Results should not be nil")
 
-	// Run the example
-	results, err := runMultipleTimes(handler)
-	require.NoError(t, err, "Risor example should run without error")
-
-	// Verify we got the expected number of results
-	require.Len(t, results, 3, "Should have 3 results")
-
-	// Expected greetings based on the inputs
-	expectedGreetings := []string{
-		"Hello, World!",
-		"Hello, Risor!",
-		"Hello, Go!",
+	expectedResults := []struct {
+		name     string
+		greeting string
+		length   int64
+	}{
+		{
+			name:     "World",
+			greeting: "Hello, World!",
+			length:   13,
+		},
+		{
+			name:     "Alice",
+			greeting: "Hello, Alice!",
+			length:   13,
+		},
+		{
+			name:     "Bob",
+			greeting: "Hello, Bob!",
+			length:   11,
+		},
+		{
+			name:     "Charlie",
+			greeting: "Hello, Charlie!",
+			length:   15,
+		},
 	}
 
-	// Expected lengths based on the greetings
-	expectedLengths := []int64{
-		13, // length of "Hello, World!"
-		13, // length of "Hello, Risor!"
-		10, // length of "Hello, Go!"
-	}
+	require.Len(t, results, len(expectedResults))
+	for i, expected := range expectedResults {
+		t.Run(expected.name, func(t *testing.T) {
+			result := results[i]
+			require.NotNil(t, result, "Result at index %d should not be nil", i)
 
-	// Verify each result
-	for i, result := range results {
-		// Verify greeting
-		greeting, ok := result["greeting"].(string)
-		assert.True(t, ok, "Greeting should be a string")
-		assert.Equal(t, expectedGreetings[i], greeting, "Should have the correct greeting")
+			greeting, exists := result["greeting"]
+			require.True(t, exists, "Result should have a greeting field")
+			require.IsType(t, "", greeting, "Greeting should be a string")
+			assert.Equal(t, expected.greeting, greeting, "Should have the correct greeting")
 
-		// Verify length
-		length := result["length"]
-		assert.NotNil(t, length, "Should have a length field")
-
-		// Check length based on its type (could be float64 or int64 depending on implementation)
-		lengthValue, ok := length.(int64)
-		if !ok {
-			lengthValueFloat, ok := length.(float64)
-			if ok {
-				assert.Equal(
-					t,
-					float64(expectedLengths[i]),
-					lengthValueFloat,
-					"Should have the correct length",
-				)
-			} else {
-				assert.Fail(t, "Length is neither int64 nor float64")
-			}
-		} else {
-			assert.Equal(t, expectedLengths[i], lengthValue, "Should have the correct length")
-		}
+			length, exists := result["length"]
+			require.True(t, exists, "Result should have a length field")
+			require.IsType(t, int64(0), length, "Length should be int64")
+			assert.Equal(t, expected.length, length, "Should have the correct length")
+		})
 	}
 }
 
 func TestRun(t *testing.T) {
-	assert.NoError(t, run(), "run() should execute without error")
+	err := run()
+	require.NoError(t, err, "run() should execute without error")
 }

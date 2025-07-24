@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"log/slog"
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -11,14 +10,11 @@ import (
 )
 
 // Helper function to create Risor evaluator - makes testing easier
-func createRisorEvalHelper(t *testing.T, handler slog.Handler) (RisorEvaluator, error) {
+func createRisorEvalHelper(t *testing.T, logger *slog.Logger) (RisorEvaluator, error) {
 	t.Helper()
 
 	// Get static test data
 	staticData := getTestStaticData()
-
-	// Create a logger for testing
-	logger := slog.New(handler.WithGroup("risor-test"))
 
 	// Create evaluator with the script and static data
 	return createRisorEvaluator(logger, risorScript, staticData)
@@ -47,26 +43,17 @@ func TestRun(t *testing.T) {
 }
 
 func TestCreateRisorEvaluator(t *testing.T) {
-	// Create a test logger
-	handler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
-		Level: slog.LevelInfo,
-	})
-
 	// Test creating evaluator
-	evaluator, err := createRisorEvalHelper(t, handler)
+	evaluator, err := createRisorEvalHelper(t, slog.Default())
 	require.NoError(t, err, "Should create evaluator without error")
 	require.NotNil(t, evaluator, "Evaluator should not be nil")
 }
 
 func TestPrepareRuntimeData(t *testing.T) {
-	// Create a test logger
-	handler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
-		Level: slog.LevelInfo,
-	})
-	logger := slog.New(handler)
+	logger := slog.Default()
 
 	// Create evaluator
-	evaluator, err := createRisorEvalHelper(t, handler)
+	evaluator, err := createRisorEvalHelper(t, logger)
 	require.NoError(t, err, "Failed to create evaluator")
 
 	// Test prepareRuntimeData function
@@ -77,14 +64,10 @@ func TestPrepareRuntimeData(t *testing.T) {
 }
 
 func TestEvalAndExtractResult(t *testing.T) {
-	// Create a test logger
-	handler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
-		Level: slog.LevelInfo,
-	})
-	logger := slog.New(handler)
+	logger := slog.Default()
 
 	// Create evaluator
-	evaluator, err := createRisorEvalHelper(t, handler)
+	evaluator, err := createRisorEvalHelper(t, logger)
 	require.NoError(t, err, "Failed to create evaluator")
 
 	// Prepare data first
@@ -104,11 +87,7 @@ func TestEvalAndExtractResult(t *testing.T) {
 // TestFullExecution tests the entire execution flow as an integration test
 func TestFullExecution(t *testing.T) {
 	// This test mirrors the functionality in the run() function
-	// Create a test logger
-	handler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
-		Level: slog.LevelInfo,
-	})
-	logger := slog.New(handler)
+	logger := slog.Default()
 
 	// Get test static data
 	staticData := getTestStaticData()

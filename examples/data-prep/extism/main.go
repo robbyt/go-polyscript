@@ -43,7 +43,6 @@ func prepareRuntimeData(
 	// Add the request metadata to the context using the data.Provider
 	enrichedCtx, err := evaluator.AddDataToContext(ctx, requestMeta)
 	if err != nil {
-		logger.Error("Failed to prepare context with request data", "error", err)
 		return nil, fmt.Errorf("failed to prepare context: %w", err)
 	}
 
@@ -67,8 +66,7 @@ func evalAndExtractResult(
 	// Evaluate the script
 	response, err := evaluator.Eval(evalCtx)
 	if err != nil {
-		logger.Error("Failed to evaluate script", "error", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to evaluate script: %w", err)
 	}
 
 	// Process the result
@@ -81,7 +79,6 @@ func evalAndExtractResult(
 	// Return the result
 	resultMap, ok := val.(map[string]any)
 	if !ok {
-		logger.Error("Unexpected response type", "type", fmt.Sprintf("%T", val))
 		return nil, fmt.Errorf("unexpected response type: %T", val)
 	}
 
