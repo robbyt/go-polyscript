@@ -1,8 +1,6 @@
 package main
 
 import (
-	"log/slog"
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -10,13 +8,8 @@ import (
 )
 
 func TestRunStarlarkExample(t *testing.T) {
-	// Create a test logger
-	handler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
-		Level: slog.LevelInfo,
-	})
-
 	// Run the example
-	result, err := runStarlarkExample(handler)
+	result, err := runStarlarkExample(nil)
 	require.NoError(t, err, "Starlark example should run without error")
 
 	// Verify the result

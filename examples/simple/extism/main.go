@@ -12,13 +12,10 @@ import (
 )
 
 // runExtismExample executes an Extism WASM module and returns the result
-func runExtismExample(handler slog.Handler) (map[string]any, error) {
-	if handler == nil {
-		handler = slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
-			Level: slog.LevelDebug,
-		})
+func runExtismExample(logger *slog.Logger) (map[string]any, error) {
+	if logger == nil {
+		logger = slog.Default()
 	}
-	logger := slog.New(handler)
 
 	// Create input data
 	inputData := map[string]any{
@@ -29,12 +26,11 @@ func runExtismExample(handler slog.Handler) (map[string]any, error) {
 	evaluator, err := polyscript.FromExtismBytesWithData(
 		wasmdata.TestModule,
 		inputData,
-		handler,
+		logger.Handler(),
 		wasmdata.EntrypointGreet,
 	)
 	if err != nil {
-		logger.Error("Failed to create evaluator", "error", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to create evaluator: %w", err)
 	}
 
 	// Set a timeout for script execution
@@ -44,8 +40,7 @@ func runExtismExample(handler slog.Handler) (map[string]any, error) {
 	// Evaluate the script
 	response, err := evaluator.Eval(ctx)
 	if err != nil {
-		logger.Error("Failed to evaluate script", "error", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to evaluate script: %w", err)
 	}
 
 	// Process the result
@@ -71,7 +66,7 @@ func run() error {
 	logger := slog.New(handler.WithGroup("extism-simple-example"))
 
 	// Run the example
-	result, err := runExtismExample(handler)
+	result, err := runExtismExample(logger)
 	if err != nil {
 		return fmt.Errorf("failed to run example: %w", err)
 	}

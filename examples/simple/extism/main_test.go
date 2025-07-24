@@ -1,8 +1,6 @@
 package main
 
 import (
-	"log/slog"
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -10,13 +8,8 @@ import (
 )
 
 func TestRunExtismExample(t *testing.T) {
-	// Create a test logger
-	handler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
-		Level: slog.LevelInfo,
-	})
-
 	// Run the example
-	result, err := runExtismExample(handler)
+	result, err := runExtismExample(nil)
 	require.NoError(t, err, "Extism example should run without error")
 
 	// Verify the result
