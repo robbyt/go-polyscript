@@ -1,8 +1,6 @@
 package main
 
 import (
-	"log/slog"
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -10,13 +8,8 @@ import (
 )
 
 func TestRunMultipleTimes(t *testing.T) {
-	// Create a test logger
-	handler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
-		Level: slog.LevelInfo,
-	})
-
 	// Run the "compile once, run many times" example
-	results, err := runMultipleTimes(handler)
+	results, err := runMultipleTimes(nil)
 	require.NoError(t, err, "Multiple executions should run without error")
 
 	// Expect 4 results (World, Alice, Bob, Charlie)

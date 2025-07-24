@@ -1,8 +1,6 @@
 package main
 
 import (
-	"log/slog"
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -10,13 +8,8 @@ import (
 )
 
 func TestRunMultipleTimes(t *testing.T) {
-	// Create a test logger
-	handler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
-		Level: slog.LevelInfo,
-	})
-
 	// Run the example
-	results, err := runMultipleTimes(handler)
+	results, err := runMultipleTimes(nil)
 	require.NoError(t, err, "Risor example should run without error")
 
 	// Verify we got the expected number of results

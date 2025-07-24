@@ -1,8 +1,6 @@
 package main
 
 import (
-	"log/slog"
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -10,13 +8,8 @@ import (
 )
 
 func TestRunMultipleTimes(t *testing.T) {
-	// Create a test logger
-	handler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
-		Level: slog.LevelInfo,
-	})
-
 	// Run the multiple execution example
-	results, err := runMultipleTimes(handler)
+	results, err := runMultipleTimes(nil)
 	if err != nil {
 		t.Logf("Extism example failed: %v - this may be due to missing WASM file", err)
 		t.Skip("Skipping Extism test as it requires a WASM file")
