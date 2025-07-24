@@ -8,15 +8,17 @@ import (
 )
 
 func TestRunExtismExample(t *testing.T) {
-	// Run the example
 	result, err := runExtismExample(nil)
-	require.NoError(t, err, "Extism example should run without error")
+	require.NoError(t, err, "runExtismExample should not return an error")
+	require.NotNil(t, result, "Result should not be nil")
 
-	// Verify the result
-	assert.NotEmpty(t, result, "Result should not be empty")
-	assert.Contains(t, result, "greeting", "Result should contain a greeting field")
+	greeting, exists := result["greeting"]
+	require.True(t, exists, "Result should have a greeting field")
+	require.IsType(t, "", greeting, "Greeting should be a string")
+	assert.Equal(t, "Hello, World!", greeting, "Should have the correct greeting")
 }
 
 func TestRun(t *testing.T) {
-	assert.NoError(t, run(), "run() should execute without errors")
+	err := run()
+	require.NoError(t, err, "run() should execute without error")
 }

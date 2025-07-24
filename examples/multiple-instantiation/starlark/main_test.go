@@ -8,56 +8,58 @@ import (
 )
 
 func TestRunMultipleTimes(t *testing.T) {
-	// Run the "compile once, run many times" example
 	results, err := runMultipleTimes(nil)
-	require.NoError(t, err, "Multiple executions should run without error")
+	require.NoError(t, err, "runMultipleTimes should not return an error")
+	require.NotNil(t, results, "Results should not be nil")
 
-	// Expect 4 results (World, Alice, Bob, Charlie)
-	require.Len(t, results, 4, "Should have 4 results from multiple executions")
+	expectedResults := []struct {
+		name     string
+		greeting string
+		length   int64
+	}{
+		{
+			name:     "World",
+			greeting: "Hello, World!",
+			length:   13,
+		},
+		{
+			name:     "Alice",
+			greeting: "Hello, Alice!",
+			length:   13,
+		},
+		{
+			name:     "Bob",
+			greeting: "Hello, Bob!",
+			length:   11,
+		},
+		{
+			name:     "Charlie",
+			greeting: "Hello, Charlie!",
+			length:   15,
+		},
+	}
 
-	// Check each result
-	expectedNames := []string{"World", "Alice", "Bob", "Charlie"}
-	for i, name := range expectedNames {
-		result := results[i]
-		expectedGreeting := "Hello, " + name + "!"
+	require.Len(t, results, len(expectedResults), "Should have %d results", len(expectedResults))
 
-		// Verify greeting
-		assert.Equal(
-			t,
-			expectedGreeting,
-			result["greeting"],
-			"Should have the correct greeting for %s",
-			name,
-		)
+	for i, expected := range expectedResults {
+		t.Run(expected.name, func(t *testing.T) {
+			result := results[i]
+			require.NotNil(t, result, "Result at index %d should not be nil", i)
 
-		// Verify length
-		length := result["length"]
-		assert.NotNil(t, length, "Should have a length field")
+			greeting, exists := result["greeting"]
+			require.True(t, exists, "Result should have a greeting field")
+			require.IsType(t, "", greeting, "Greeting should be a string")
+			assert.Equal(t, expected.greeting, greeting, "Should have the correct greeting")
 
-		// Length should match the greeting length
-		expectedLength := int64(len(expectedGreeting))
-
-		// Handle different numeric types
-		lengthValue, ok := length.(int64)
-		if !ok {
-			lengthValueFloat, ok := length.(float64)
-			if ok {
-				assert.Equal(
-					t,
-					float64(expectedLength),
-					lengthValueFloat,
-					"Should have the correct length for %s",
-					name,
-				)
-			} else {
-				assert.Fail(t, "Length is neither int64 nor float64")
-			}
-		} else {
-			assert.Equal(t, expectedLength, lengthValue, "Should have the correct length for %s", name)
-		}
+			length, exists := result["length"]
+			require.True(t, exists, "Result should have a length field")
+			require.IsType(t, int64(0), length, "Length should be int64")
+			assert.Equal(t, expected.length, length, "Should have the correct length")
+		})
 	}
 }
 
 func TestRun(t *testing.T) {
-	assert.NoError(t, run(), "run() should execute without error")
+	err := run()
+	require.NoError(t, err, "run() should execute without error")
 }

@@ -8,31 +8,31 @@ import (
 )
 
 func TestRunMultipleTimes(t *testing.T) {
-	// Run the multiple execution example
 	results, err := runMultipleTimes(nil)
-	if err != nil {
-		t.Logf("Extism example failed: %v - this may be due to missing WASM file", err)
-		t.Skip("Skipping Extism test as it requires a WASM file")
-		return
-	}
-
-	// Verify we got 3 results
+	require.NoError(t, err, "runMultipleTimes should not return an error")
+	require.NotNil(t, results, "Results should not be nil")
 	require.Len(t, results, 3, "Should have 3 results")
 
-	// Verify each result
-	expectedGreetings := []string{
+	expectedResults := []string{
 		"Hello, World!",
 		"Hello, Extism!",
 		"Hello, Go-PolyScript!",
 	}
 
 	for i, result := range results {
+		assert.NotNil(t, result, "Result at index %d should not be nil", i)
+
 		greeting, ok := result["greeting"]
-		assert.True(t, ok, "Result should have a greeting field")
-		assert.Equal(t, expectedGreetings[i], greeting, "Should have the correct greeting")
+		require.True(t, ok, "Result at index %d should have a greeting field", i)
+		assert.Equal(t, expectedResults[i], greeting,
+			"Result at index %d should have the correct greeting", i,
+		)
+
+		require.IsType(t, "", greeting, "Greeting at index %d should be a string", i)
 	}
 }
 
 func TestRun(t *testing.T) {
-	assert.NoError(t, run(), "run() should execute without error")
+	err := run()
+	require.NoError(t, err, "run() should execute without error")
 }

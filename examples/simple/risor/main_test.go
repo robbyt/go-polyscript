@@ -8,29 +8,22 @@ import (
 )
 
 func TestRunRisorExample(t *testing.T) {
-	// Run the example
 	result, err := runRisorExample(nil)
-	require.NoError(t, err, "Risor example should run without error")
+	require.NoError(t, err, "runRisorExample should not return an error")
+	require.NotNil(t, result, "Result should not be nil")
 
-	// Verify the result
-	assert.Equal(t, "Hello, World!", result["greeting"], "Should have the correct greeting")
+	greeting, exists := result["greeting"]
+	require.True(t, exists, "Result should have a greeting field")
+	require.IsType(t, "", greeting, "Greeting should be a string")
+	assert.Equal(t, "Hello, World!", greeting, "Should have the correct greeting")
 
-	// Check length based on its type (could be float64 or int64 depending on implementation)
-	length := result["length"]
-	assert.NotNil(t, length, "Should have a length field")
-	lengthValue, ok := length.(int64)
-	if !ok {
-		lengthValueFloat, ok := length.(float64)
-		if ok {
-			assert.Equal(t, float64(13), lengthValueFloat, "Should have the correct length")
-		} else {
-			assert.Fail(t, "Length is neither int64 nor float64")
-		}
-	} else {
-		assert.Equal(t, int64(13), lengthValue, "Should have the correct length")
-	}
+	length, exists := result["length"]
+	require.True(t, exists, "Result should have a length field")
+	require.IsType(t, int64(0), length, "Length should be int64")
+	assert.Equal(t, int64(13), length, "Should have the correct length")
 }
 
 func TestRun(t *testing.T) {
-	assert.NoError(t, run(), "run() should execute without errors")
+	err := run()
+	require.NoError(t, err, "run() should execute without error")
 }

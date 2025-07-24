@@ -50,7 +50,7 @@ func runMultipleTimes(logger *slog.Logger) ([]map[string]any, error) {
 	}
 
 	// Names to greet - we'll run the script once for each name
-	names := []string{"World", "Risor", "Go"}
+	names := []string{"World", "Alice", "Bob", "Charlie"}
 	results := make([]map[string]any, 0, len(names))
 
 	// Execute the script multiple times with different inputs

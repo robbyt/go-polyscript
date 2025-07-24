@@ -8,15 +8,22 @@ import (
 )
 
 func TestRunStarlarkExample(t *testing.T) {
-	// Run the example
 	result, err := runStarlarkExample(nil)
-	require.NoError(t, err, "Starlark example should run without error")
+	require.NoError(t, err, "runStarlarkExample should not return an error")
+	require.NotNil(t, result, "Result should not be nil")
 
-	// Verify the result
-	assert.Equal(t, "Hello, World!", result["greeting"], "Should have the correct greeting")
-	assert.Equal(t, int64(13), result["length"], "Should have the correct length")
+	greeting, exists := result["greeting"]
+	require.True(t, exists, "Result should have a greeting field")
+	require.IsType(t, "", greeting, "Greeting should be a string")
+	assert.Equal(t, "Hello, World!", greeting, "Should have the correct greeting")
+
+	length, exists := result["length"]
+	require.True(t, exists, "Result should have a length field")
+	require.IsType(t, int64(0), length, "Length should be int64")
+	assert.Equal(t, int64(13), length, "Should have the correct length")
 }
 
 func TestRun(t *testing.T) {
-	assert.NoError(t, run(), "run() should execute without errors")
+	err := run()
+	require.NoError(t, err, "run() should execute without error")
 }
