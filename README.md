@@ -48,11 +48,11 @@ import (
 )
 
 func main() {
-	logHandler := slog.NewTextHandler(os.Stdout, nil)
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
 	script := `
 		// The ctx object from the Go inputData map
-		name := ctx.get("name", "Roberto")
+		name := ctx["name"]
 
 		p := "."
 		if ctx.get("excited") {
@@ -73,7 +73,7 @@ func main() {
 	evaluator, _ := polyscript.FromRisorStringWithData(
 		script,
 		inputData,
-		logHandler,
+		logger.Handler(),
 	)
 	
 	ctx := context.Background()
@@ -102,7 +102,7 @@ However, when using `StaticProvider`, each evaluation will always use the same i
 The `ContextProvider` retrieves dynamic data from the context object sent to Eval. This is useful when input data changes at runtime:
 
 ```go
-evaluator, _ := polyscript.FromRisorString(script, logHandler)
+evaluator, _ := polyscript.FromRisorString(script, logger.Handler())
 
 ctx := context.Background()
 runtimeData := map[string]any{"name": "Billie Jean", "relationship": false}
@@ -123,7 +123,7 @@ staticData := map[string]any{
 }
 
 // Create the evaluator with the static data
-evaluator, _ := polyscript.FromRisorStringWithData(script, staticData, logHandler)
+evaluator, _ := polyscript.FromRisorStringWithData(script, staticData, logger.Handler())
 
 // For each request, prepare dynamic data
 requestData := map[string]any{"userId": 123}
@@ -183,7 +183,7 @@ staticData := map[string]any{"name": "World"}
 evaluator, err := polyscript.FromStarlarkStringWithData(
     scriptContent,
     staticData,
-    logHandler,
+    logger.Handler(),
 )
 
 // Execute with a context
@@ -200,7 +200,7 @@ staticData := map[string]any{"input": "World"}
 evaluator, err := polyscript.FromExtismFileWithData(
     "/path/to/module.wasm",
     staticData,
-    logHandler,
+    logger.Handler(),
     "greet",  // entryPoint
 )
 

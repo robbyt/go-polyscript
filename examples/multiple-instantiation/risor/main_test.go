@@ -45,13 +45,11 @@ func TestRunMultipleTimes(t *testing.T) {
 			result := results[i]
 			require.NotNil(t, result, "Result at index %d should not be nil", i)
 
-			greeting, exists := result["greeting"]
-			require.True(t, exists, "Result should have a greeting field")
+			greeting := result["greeting"]
 			require.IsType(t, "", greeting, "Greeting should be a string")
 			assert.Equal(t, expected.greeting, greeting, "Should have the correct greeting")
 
-			length, exists := result["length"]
-			require.True(t, exists, "Result should have a length field")
+			length := result["length"]
 			require.IsType(t, int64(0), length, "Length should be int64")
 			assert.Equal(t, expected.length, length, "Should have the correct length")
 		})

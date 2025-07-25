@@ -12,8 +12,7 @@ func TestRunExtismExample(t *testing.T) {
 	require.NoError(t, err, "runExtismExample should not return an error")
 	require.NotNil(t, result, "Result should not be nil")
 
-	greeting, exists := result["greeting"]
-	require.True(t, exists, "Result should have a greeting field")
+	greeting := result["greeting"]
 	require.IsType(t, "", greeting, "Greeting should be a string")
 	assert.Equal(t, "Hello, World!", greeting, "Should have the correct greeting")
 }

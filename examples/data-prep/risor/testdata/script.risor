@@ -1,27 +1,24 @@
 // Wrap everything in a function for Risor syntax
 func process() {
-    // Script has access to ctx variable passed from Go
-    // Access data with fallbacks for compatibility with both patterns
-    input_data := ctx.get("input_data", {})
     
     // Access static config data (set at compile time)
     app_version := ctx.get("app_version", "unknown")
     environment := ctx.get("environment", "unknown")
     config := ctx.get("config", {})
     
-    // Get name from runtime data
-    name := input_data.get("name", "Default")
+    // Get name from runtime data (added via AddDataToContext)
+    name := ctx.get("name", "Default")
     
     // Get timestamp from runtime data
-    timestamp := input_data.get("timestamp", "Unknown")
+    timestamp := ctx.get("timestamp", "Unknown")
     
     // Process user data from runtime data
-    user_data := input_data.get("user_data", {})
+    user_data := ctx.get("user_data", {})
     user_role := user_data.get("role", "guest")
     user_id := user_data.get("id", "unknown")
     
     // Access request data if available
-    request := input_data.get("request", {})
+    request := ctx.get("request", {})
     request_method := request.get("Method", "")
     request_path := request.get("URL_Path", "")
     

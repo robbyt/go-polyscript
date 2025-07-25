@@ -83,12 +83,27 @@ func TestEvalAndExtractResult(t *testing.T) {
 	assert.Contains(t, result, "greeting", "Result should contain a greeting")
 	assert.Contains(t, result, "app_info", "Result should contain app info")
 
+	// Verify actual dynamic data is used, not fallback values
+	greeting := result["greeting"]
+	require.IsType(t, "", greeting, "Greeting should be a string")
+	assert.Equal(t,
+		"Hello, World!", greeting,
+		"Should use actual name 'World', not fallback 'Default'")
+
+	userID := result["user_id"]
+	require.IsType(t, "", userID, "user_id should be a string")
+	assert.Equal(t, "user-123", userID, "Should use actual user_id, not fallback 'unknown'")
+
+	timestamp := result["timestamp"]
+	require.IsType(t, "", timestamp, "timestamp should be a string")
+	assert.NotEqual(t, "Unknown", timestamp, "Should use actual timestamp, not fallback 'Unknown'")
+
 	// Verify app info contains data from static provider
-	appInfo, hasAppInfo := result["app_info"].(map[string]any)
-	if assert.True(t, hasAppInfo, "app_info should be a map") {
-		assert.Equal(t, "1.0.0-test", appInfo["version"], "Should have correct app version")
-		assert.Equal(t, "test", appInfo["environment"], "Should have test environment")
-	}
+	appInfo := result["app_info"]
+	require.IsType(t, map[string]any{}, appInfo, "app_info should be a map")
+	appInfoMap := appInfo.(map[string]any)
+	assert.Equal(t, "1.0.0-test", appInfoMap["version"], "Should have correct app version")
+	assert.Equal(t, "test", appInfoMap["environment"], "Should have test environment")
 }
 
 // TestFullExecution tests the entire execution flow as an integration test
@@ -115,4 +130,32 @@ func TestFullExecution(t *testing.T) {
 	assert.Contains(t, result, "user_id", "Result should have user_id from dynamic data")
 	assert.Contains(t, result, "app_info", "Result should have app_info from static data")
 	assert.Contains(t, result, "request_info", "Result should have request_info from HTTP request")
+
+	// Verify the dynamic data is returned, not the fallback values
+	greeting := result["greeting"]
+	require.IsType(t, "", greeting, "Greeting should be a string")
+	assert.Equal(
+		t,
+		"Hello, World!",
+		greeting,
+		"Should use actual name 'World', not fallback 'Default'",
+	)
+
+	userID := result["user_id"]
+	require.IsType(t, "", userID, "user_id should be a string")
+	assert.Equal(t, "user-123", userID, "Should use actual user_id, not fallback 'unknown'")
+
+	timestamp := result["timestamp"]
+	require.IsType(t, "", timestamp, "timestamp should be a string")
+	assert.NotEqual(t, "Unknown", timestamp, "Should use actual timestamp, not fallback 'Unknown'")
+
+	message := result["message"]
+	require.IsType(t, "", message, "message should be a string")
+	assert.Contains(
+		t,
+		message,
+		"admin",
+		"Should use actual user role 'admin', not fallback 'guest'",
+	)
+	assert.NotContains(t, message, "guest", "Should not contain fallback role 'guest'")
 }
