@@ -5,7 +5,7 @@
 [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=robbyt_go-polyscript&metric=coverage)](https://sonarcloud.io/summary/new_code?id=robbyt_go-polyscript)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 
-A Go package providing a unified interface for loading and running various scripting languages and WASM in your app.
+A unified abstraction package for loading and running various scripting languages and WASM in your Go app.
 
 ## Overview
 
@@ -13,15 +13,15 @@ go-polyscript democratizes different scripting engines by abstracting the loadin
 
 ## Features
 
-- **Unified API**: Common interfaces and implementations for several scripting languages
+- **Unified Abstraction API**: Common interfaces and implementations for several scripting languages
 - **Flexible Engine Selection**: Easily switch between different script engines
 - **Thread-safe Data Management**: Multiple ways to provide input data to scripts
-- **Compilation and Evaluation Separation**: Compile once, run multiple times with different inputs
-- **Data Preparation and Evaluation Separation**: Prepare data in one step/system, evaluate in another
+- **Compilation, Evaluation, and Data Handling**: Compile scripts once with static data when creating the evaluator instance, then run multiple evaluation executions with variable input.
+
 
 ## Engines Implemented
 
-- **Risor**: A simple scripting language specifically designed for embedding in Go applications
+- **Risor**: A scripting language specifically designed for embedding in Go applications
 - **Starlark**: Google's configuration language (a Python dialect) used in Bazel and many other tools
 - **Extism**: Pure Go runtime and plugin system for executing WASM
 
@@ -52,7 +52,7 @@ func main() {
 
 	script := `
 		// The ctx object from the Go inputData map
-		name := ctx["name"]
+		name := ctx.get("name")
 
 		p := "."
 		if ctx.get("excited") {
@@ -84,22 +84,22 @@ func main() {
 
 ## Working with Data Providers
 
-go-polyscript enables you to send input data using a system called "data providers". There are several built-in providers, and you can implement your own or stack multiple with the `CompositeProvider`.
+To send input data to a script, use a "data provider" implementation. There are several built-in providers, or implement your own and stack multiple with the `CompositeProvider`.
 
 ### StaticProvider
 
-The `FromRisorStringWithData` function uses a `StaticProvider` to send the static data map.
+For example, when working with Risor, the `FromRisorStringWithData` constructor function uses a `StaticProvider` to send the static data map into the evaluator during creation.
 
 ```go
 inputData := map[string]any{"name": "cats", "excited": true}
-evaluator, _ := polyscript.FromRisorStringWithData(script, inputData, logHandler)
+evaluator, _ := polyscript.FromRisorStringWithData(script, inputData, logger.Handler())
 ```
 
-However, when using `StaticProvider`, each evaluation will always use the same input data. If you need to provide dynamic runtime data that varies per evaluation, you can use the `ContextProvider`.
+However, when using `StaticProvider`, each evaluation will always use the same input data. Use the `ContextProvider` to provide dynamic runtime data that varies per evaluation.
 
 ### ContextProvider
 
-The `ContextProvider` retrieves dynamic data from the context object sent to Eval. This is useful when input data changes at runtime:
+The `ContextProvider` retrieves dynamic data from the context object sent to Eval.
 
 ```go
 evaluator, _ := polyscript.FromRisorString(script, logger.Handler())
@@ -114,7 +114,7 @@ result, _ := evaluator.Eval(enrichedCtx)
 
 ### Combining Static and Dynamic Runtime Data
 
-This is a common pattern where you want both fixed configuration values and threadsafe per-request data to be available during evaluation:
+Use the following pattern for fixed configuration values and threadsafe per-request data. Loading, parsing and instantiating the script is relatively slow, so the example below shows how to compile the script once with static data, then reuse it multiple times with different dynamic data.
 
 ```go
 staticData := map[string]any{
@@ -132,7 +132,7 @@ enrichedCtx, _ := evaluator.AddDataToContext(context.Background(), requestData)
 // Execute with both static and dynamic data available
 result, _ := evaluator.Eval(enrichedCtx)
 
-// In scripts, all data is accessed from the context:
+// In Risor and Starlark scripts, data is accessed from the ctx variable:
 // appName := ctx["appName"]    // From static data: "MyApp"
 // userId := ctx["userId"]      // From dynamic data: 123
 ```
