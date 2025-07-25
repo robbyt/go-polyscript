@@ -22,13 +22,11 @@ func TestRunMultipleTimes(t *testing.T) {
 	for i, result := range results {
 		assert.NotNil(t, result, "Result at index %d should not be nil", i)
 
-		greeting, ok := result["greeting"]
-		require.True(t, ok, "Result at index %d should have a greeting field", i)
+		greeting := result["greeting"]
+		require.IsType(t, "", greeting, "Greeting at index %d should be a string", i)
 		assert.Equal(t, expectedResults[i], greeting,
 			"Result at index %d should have the correct greeting", i,
 		)
-
-		require.IsType(t, "", greeting, "Greeting at index %d should be a string", i)
 	}
 }
 

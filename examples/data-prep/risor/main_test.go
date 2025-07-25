@@ -81,7 +81,30 @@ func TestEvalAndExtractResult(t *testing.T) {
 	assert.NotNil(t, result, "Result should not be nil")
 
 	// Check basic result fields
-	assert.Contains(t, result, "greeting", "Result should contain a greeting")
+	assert.Contains(t,
+		result, "greeting",
+		"Result should contain a greeting")
+
+	// Verify actual dynamic data is returned, not the fallback values
+	greeting := result["greeting"]
+	require.IsType(t, "", greeting, "Greeting should be a string")
+	assert.Equal(t,
+		"Hello, World!", greeting,
+		"Should use actual name 'World', not fallback 'Default'")
+
+	userID := result["user_id"]
+	require.IsType(t, "", userID, "user_id should be a string")
+	assert.Equal(t,
+		"user-123", userID,
+		"Should use actual user_id, not fallback 'unknown'")
+
+	timestamp := result["timestamp"]
+	require.IsType(t,
+		"", timestamp,
+		"timestamp should be a string")
+	assert.NotEqual(t,
+		"Unknown", timestamp,
+		"Should use actual timestamp, not fallback 'Unknown'")
 }
 
 // TestFullExecution tests the entire execution flow as an integration test
@@ -110,4 +133,32 @@ func TestFullExecution(t *testing.T) {
 	assert.Contains(t, result, "greeting", "Result should have greeting")
 	assert.Contains(t, result, "user_id", "Result should have user_id")
 	assert.Contains(t, result, "app_info", "Result should have app_info")
+
+	// Verify the dynamic data is returned, not the fallback values
+	greeting := result["greeting"]
+	require.IsType(t, "", greeting, "Greeting should be a string")
+	assert.Equal(
+		t,
+		"Hello, World!",
+		greeting,
+		"Should use actual name 'World', not fallback 'Default'",
+	)
+
+	userID := result["user_id"]
+	require.IsType(t, "", userID, "user_id should be a string")
+	assert.Equal(t, "user-123", userID, "Should use actual user_id, not fallback 'unknown'")
+
+	timestamp := result["timestamp"]
+	require.IsType(t, "", timestamp, "timestamp should be a string")
+	assert.NotEqual(t, "Unknown", timestamp, "Should use actual timestamp, not fallback 'Unknown'")
+
+	message := result["message"]
+	require.IsType(t, "", message, "message should be a string")
+	assert.Contains(
+		t,
+		message,
+		"admin",
+		"Should use actual user role 'admin', not fallback 'guest'",
+	)
+	assert.NotContains(t, message, "guest", "Should not contain fallback role 'guest'")
 }
