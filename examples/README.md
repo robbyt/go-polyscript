@@ -24,7 +24,7 @@ This pattern separates compilation from execution for better performance:
 - Uses `FromEngine` functions to create an evaluator without data
 - Script is compiled once into an evaluator
 - The same evaluator is executed multiple times with different runtime data
-- Data is provided dynamically at execution time via context
+- Data is provided at runtime via context
 - Improves performance for multiple executions of the same script
 
 **Examples:** [Risor](/examples/multiple-instantiation/risor), [Starlark](/examples/multiple-instantiation/starlark), [Extism](/examples/multiple-instantiation/extism)

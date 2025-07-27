@@ -4,7 +4,7 @@ This directory contains examples demonstrating how to separate data preparation 
 
 ## Overview
 
-The data preparation pattern separates static configuration data from dynamic runtime data, making code more modular and flexible. This pattern uses a composite data provider combining static and dynamic data sources, with a clear separation between configuration, preparation, and evaluation phases.
+The data preparation pattern separates static data from runtime data, making code more modular and flexible. This pattern uses a composite data provider combining static and dynamic data sources, with a clear separation between configuration, preparation, and evaluation phases.
 
 ## When to Use This Pattern
 
@@ -12,7 +12,7 @@ This pattern is valuable for:
 
 - **Distributed Architecture**: Prepare data on one system (e.g., web server) and evaluate on another (e.g., worker)
 - **Separation of Concerns**: Clearly separate data processing from script execution
-- **Layered Data Access**: Combine static configuration with dynamic runtime data
+- **Layered Data Access**: Combine static data with runtime data
 - **Performance Optimization**: Prepare data asynchronously while other operations are happening
 
 ## Implementation Pattern

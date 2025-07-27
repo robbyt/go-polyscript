@@ -14,7 +14,7 @@ This package contains engine implementations for executing scripts in various la
 
 ## Dataflow & Architecture
 
-1. **Compilation Instantiation**
+1. **Compilation Stage**
    - Each engine has a `NewCompiler` function that returns a compiler instance that implements the `script.Compiler` interface
    - The `NewCompiler` function may have some engine-specific options
    - The `Compiler` object includes a `Compile` method that takes a `loader.Loader` implementation
@@ -30,10 +30,10 @@ This package contains engine implementations for executing scripts in various la
 
 3. **Evaluator Creation**
    - `NewEvaluator` takes a `script.ExecutableUnit` and returns an object that implements `platform.Evaluator`
-   - At this point it can be called with `.Eval(ctx)`, however input data is required it must be prepared
+   - At this point it can be called with `.Eval(ctx)`, however runtime data is required it must be prepared
 
 4. **Data Preparation Stage**
-   - This phase is optional, and must happen prior to evaluation when runtime input data is used
+   - This phase is optional, and must happen prior to evaluation when runtime data is used
    - The `Evaluator` implements the `data.Setter` interface, which has an `AddDataToContext` method
    - The `AddDataToContext` method takes a `context.Context` and a variadic list of `map[string]any`
    - `AddDataToContext` calls the `data.Provider` to store the data, somewhere accessible to the Evaluator
@@ -42,7 +42,7 @@ This package contains engine implementations for executing scripts in various la
    - The `AddDataToContext` method returns a new context with the data stored or linked in it
 
 5. **Execution Stage**
-   - When `Eval(ctx)` is called, the `data.Provider` first loads the input data into the engine
+   - When `Eval(ctx)` is called, the `data.Provider` first loads the runtime data into the engine
    - The engine executes the script and returns a `platform.EvaluatorResponse`
 
 6. **Result Processing**
@@ -54,11 +54,11 @@ This package contains engine implementations for executing scripts in various la
 
 While all engines receive the same `map[string]any` input data, **each engine processes and exposes this data differently** to the script runtime. Understanding these differences is important for structuring your data correctly.
 
-### Risor Engine: `ctx` Variable Wrapper
+### Risor Engine: `ctx` Context Wrapper
 
 **Data Processing:** `engines/risor/internal/converters.go`
 - Input data is wrapped in a global `ctx` variable
-- All data becomes accessible via `ctx["key"]` in scripts
+- All data is accessible via `ctx["key"]` in scripts
 
 **Example:**
 ```go
@@ -73,11 +73,11 @@ name := ctx["name"]           // "World"
 debug := ctx["config"]["debug"] // true
 ```
 
-### Starlark Engine: `ctx` Dictionary Wrapper
+### Starlark Engine: `ctx` Context Wrapper
 
 **Data Processing:** `engines/starlark/internal/converters.go`
 - Input data is converted to Starlark types and wrapped in a `ctx` dictionary
-- All data becomes accessible via `ctx["key"]` in scripts
+- All data is accessible via `ctx["key"]` in scripts
 
 **Example:**
 ```go
@@ -92,7 +92,7 @@ name = ctx["name"]           # "World"
 debug = ctx["config"]["debug"] # true
 ```
 
-### Extism Engine: Direct JSON Pass-Through
+### Extism Engine: Direct JSON Processing
 
 **Data Processing:** `engines/extism/internal/converters.go`
 - Input data is marshaled directly to JSON and passed to the WASM module
@@ -145,7 +145,7 @@ For detailed information about data provider patterns, usage examples, and best 
 
 The `platform/data` package provides:
 - **StaticProvider**: For configuration and constants that don't change
-- **ContextProvider**: For thread-safe dynamic runtime data that changes per request  
+- **ContextProvider**: For thread-safe dynamic runtime data that changes per-request  
 - **CompositeProvider**: For combining static configuration with dynamic runtime data
 
 Key points for engine usage:
