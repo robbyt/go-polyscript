@@ -1,20 +1,22 @@
-# Machine Implementations
+# Engine Implementations
 
-This package contains virtual machine implementations for executing scripts in various languages through a consistent interface. While each supported VM has its own unique characteristics, they all follow a standardized flow pattern.
+> **Note:** This documentation is intended for developers implementing new engines or understanding the internal architecture of go-polyscript. For general usage, see the [main README](../README.md) and [examples](../examples).
+
+This package contains engine implementations for executing scripts in various languages through a consistent interface. While each supported engine has its own unique characteristics, they all implement the same interfaces and lifecycle.
 
 ## Design Philosophy
 
-1. **Common Interface**: All VMs present the same interface (`evaluationEvaluator`) regardless of underlying implementation
+1. **Common Interface**: All engines implement the same `platform.Evaluator` interface regardless of underlying implementation
 2. **Separation of Concerns**: Compilation, data preparation, and execution are distinct phases
-3. **Thread-safe Evaluation**: Each VM is designed to allow concurrent execution of scripts
-3. **Context-Based Data Flow**:  Runtime data is accessed with a `context.Context` object (saved/loaded with a `data.Provider`) 
-4. **Execution Results**: All VMs return the same `evaluation.EvaluatorResponse` object, which contains the execution result and metadata
+3. **Thread-safe Evaluation**: Each engine is designed to allow concurrent execution of scripts
+4. **Context-Based Data Flow**: Runtime data is accessed with a `context.Context` object (saved/loaded with a `data.Provider`)
+5. **Unified Response Type**: All engines return a `platform.EvaluatorResponse` containing the execution result and metadata
 
 ## Dataflow & Architecture
 
 1. **Compilation Instantiation**
-   - Each VM has a `NewCompiler` function that returns a compiler instance that implements the `script.Compiler` interface
-   - The `NewCompiler` function may have some VM-specific options
+   - Each engine has a `NewCompiler` function that returns a compiler instance that implements the `script.Compiler` interface
+   - The `NewCompiler` function may have some engine-specific options
    - The `Compiler` object includes a `Compile` method that takes a `loader.Loader` implementation
    - `loader.Loader` is a generic way to load script content from various sources
    - Compile-time errors are captured and returned to the caller
@@ -27,7 +29,7 @@ This package contains virtual machine implementations for executing scripts in v
    - The `ExecutableUnit` is responsible for managing the lifecycle of the script execution
 
 3. **Evaluator Creation**
-   - `NewEvaluator` takes a `script.ExecutableUnit` and returns an object that implements `evaluationEvaluator`
+   - `NewEvaluator` takes a `script.ExecutableUnit` and returns an object that implements `platform.Evaluator`
    - At this point it can be called with `.Eval(ctx)`, however input data is required it must be prepared
 
 4. **Data Preparation Stage**
@@ -40,13 +42,13 @@ This package contains virtual machine implementations for executing scripts in v
    - The `AddDataToContext` method returns a new context with the data stored or linked in it
 
 5. **Execution Stage**
-   - When `Eval(ctx)` is called, the `data.Provider` first loads the input data into the VM
-   - The VM executes the script and returns an `evaluation.EvaluatorResponse`
+   - When `Eval(ctx)` is called, the `data.Provider` first loads the input data into the engine
+   - The engine executes the script and returns a `platform.EvaluatorResponse`
 
 6. **Result Processing**
-   - The process for building the `evaluation.EvaluatorResponse` is different for each VM
+   - The process for building the `platform.EvaluatorResponse` is different for each engine
    - There are several type conversions, and the result is accessible with the `Interface()` method
-   - The `evaluation.EvaluatorResponse` also contains metadata about the execution
+   - The `platform.EvaluatorResponse` also contains metadata about the execution
 
 ## Engine-Specific Data Handling
 

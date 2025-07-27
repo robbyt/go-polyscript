@@ -19,8 +19,8 @@ import (
 	machineTypes "github.com/robbyt/go-polyscript/engines/types"
 )
 
-// NewEvaluator creates a new VM with the given CPU type and globals.
-// This will load a script from a ExecutableUnit object into the VM, and can be run immediately.
+// NewEvaluator creates a new engine evaluator with the given engine type.
+// This will load a script from a ExecutableUnit object into the engine, and can be run immediately.
 // The ExecutableUnit contains a DataProvider that provides runtime data for evaluation.
 func NewEvaluator(handler slog.Handler, ver *script.ExecutableUnit) (platform.Evaluator, error) {
 	if ver == nil {
@@ -29,13 +29,13 @@ func NewEvaluator(handler slog.Handler, ver *script.ExecutableUnit) (platform.Ev
 
 	switch ver.GetMachineType() {
 	case machineTypes.Risor:
-		// Risor VM: https://github.com/risor-io/risor
+		// Risor engine: https://github.com/risor-io/risor
 		return risorEvaluator.New(handler, ver), nil
 	case machineTypes.Starlark:
-		// Starlark VM: https://github.com/google/starlark-go
+		// Starlark engine: https://github.com/google/starlark-go
 		return starlarkEvaluator.New(handler, ver), nil
 	case machineTypes.Extism:
-		// Extism WASM VM: https://extism.org/
+		// Extism WASM engine: https://extism.org/
 		return extismEvaluator.New(handler, ver), nil
 	default:
 		return nil, fmt.Errorf("%w: %s", machineTypes.ErrInvalidMachineType, ver.GetMachineType())

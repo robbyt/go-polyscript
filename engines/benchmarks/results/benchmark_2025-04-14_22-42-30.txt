@@ -7,7 +7,7 @@ BenchmarkEvaluationPatterns/CompileOnceRunMany-56      	    7215	    176081 ns/o
 BenchmarkDataProviders/StaticProvider-56               	    6421	    180574 ns/op	  373826 B/op	     439 allocs/op
 BenchmarkDataProviders/ContextProvider-56              	    7070	    178503 ns/op	  372708 B/op	     431 allocs/op
 BenchmarkDataProviders/CompositeProvider-56            	    6562	    177747 ns/op	  373908 B/op	     441 allocs/op
-BenchmarkVMComparison/RisorVM-56                       	    6741	    183428 ns/op	  373892 B/op	     439 allocs/op
-BenchmarkVMComparison/StarlarkVM-56                    	   97491	     12488 ns/op	    7773 B/op	      72 allocs/op
+BenchmarkEngineComparison/RisorEngine-56                       	    6741	    183428 ns/op	  373892 B/op	     439 allocs/op
+BenchmarkEngineComparison/StarlarkEngine-56                    	   97491	     12488 ns/op	    7773 B/op	      72 allocs/op
 PASS
 ok  	github.com/robbyt/go-polyscript/engines/benchmarks	8.735s

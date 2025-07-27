@@ -61,7 +61,7 @@ make bench
 make bench-quick
 
 # Benchmark with specific iterations
-go test -bench=BenchmarkVMComparison -benchmem -benchtime=10x ./engine
+go test -bench=BenchmarkEngineComparison -benchmem -benchtime=10x ./engines/benchmarks
 ```
 
 ## Historical Results

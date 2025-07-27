@@ -9,7 +9,7 @@ import (
 )
 
 // TestEvaluatorResponseImplementsInterface verifies at compile time
-// that our mock EvaluatorResponse implements the evaluation.EvaluatorResponse interface.
+// that our mock EvaluatorResponse implements the platform.EvaluatorResponse interface.
 func TestEvaluatorResponseImplementsInterface(t *testing.T) {
 	t.Parallel()
 	// This is a compile-time check - if it doesn't compile, the test fails

@@ -14,7 +14,7 @@
 #   ./run.sh                           # Run all benchmarks
 #   ./run.sh BenchmarkEvaluationPatterns  # Run just evaluation pattern benchmarks
 #   ./run.sh CompositeProvider 20x     # Run CompositeProvider benchmarks with 20 iterations
-#   ./run.sh RisorVM 5x                # Run RisorVM benchmarks with just 5 iterations
+#   ./run.sh RisorEngine 5x                # Run RisorEngine benchmarks with just 5 iterations
 #
 # The script saves results to benchmark/results/ directory and creates comparison reports
 # to help identify performance improvements or regressions between changes.

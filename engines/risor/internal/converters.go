@@ -4,8 +4,8 @@ import (
 	risorLib "github.com/risor-io/risor"
 )
 
-// ConvertToRisorOptions converts a Go map into Risor VM options object.
-// The input data will be wrapped in a single "ctx" object passed to the VM.
+// ConvertToRisorOptions converts a Go map into Risor engine options object.
+// The input data will be wrapped in a single "ctx" object passed to the engine.
 //
 // For example, if the inputData is {"foo": "bar", "baz": 123}, the output will be:
 //

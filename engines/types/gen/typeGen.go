@@ -10,7 +10,7 @@ import (
 	"text/template"
 )
 
-type VMType struct {
+type EngineType struct {
 	Name        string
 	Value       string
 	BuildTag    string
@@ -35,24 +35,24 @@ func loadTemplate(filename string) string {
 }
 
 func main() {
-	vmTypes := []VMType{
+	eTypes := []EngineType{
 		{
 			Name:        "Risor",
 			Value:       "risor",
 			BuildTag:    "risor",
-			Description: "Risor VM: https://github.com/risor-io/risor",
+			Description: "Risor engine: https://github.com/risor-io/risor",
 		},
 		{
 			Name:        "Starlark",
 			Value:       "starlark",
 			BuildTag:    "starlark",
-			Description: "Starlark VM: https://github.com/google/starlark-go",
+			Description: "Starlark engine: https://github.com/google/starlark-go",
 		},
 		{
 			Name:        "Extism",
 			Value:       "extism",
 			BuildTag:    "extism",
-			Description: "Extism WASM VM: https://extism.org/",
+			Description: "Extism WASM engine: https://extism.org/",
 		},
 	}
 
@@ -83,7 +83,7 @@ func main() {
 		t := template.Must(template.New("types").Parse(templateContent))
 
 		var buf bytes.Buffer
-		if err := t.Execute(&buf, struct{ Types []VMType }{vmTypes}); err != nil {
+		if err := t.Execute(&buf, struct{ Types []EngineType }{eTypes}); err != nil {
 			log.Fatal(err)
 		}
 

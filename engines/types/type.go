@@ -20,11 +20,11 @@ func (t Type) String() string {
 
 const (
 	Unsupported Type = "unsupported"
-	// Risor VM: https://github.com/risor-io/risor
+	// Risor engine: https://github.com/risor-io/risor
 	Risor Type = "risor"
-	// Starlark VM: https://github.com/google/starlark-go
+	// Starlark engine: https://github.com/google/starlark-go
 	Starlark Type = "starlark"
-	// Extism WASM VM: https://extism.org/
+	// Extism WASM engine: https://extism.org/
 	Extism Type = "extism"
 )
 

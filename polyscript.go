@@ -10,7 +10,7 @@
 //  2. With data preparation: Provide initial static data, and thread-safe dynamic runtime data
 //
 // All functions in this package return a common evaluation.Evaluator interface. For direct
-// access to the underlying machine, use the specific machine's methods.
+// access to the underlying engine, use the specific engine's methods.
 package polyscript
 
 import (
