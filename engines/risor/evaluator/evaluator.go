@@ -16,9 +16,9 @@ import (
 	"github.com/robbyt/go-polyscript/platform/script"
 )
 
-// Evaluator is an abstraction layer for evaluating bytecode on the Risor VM
+// Evaluator is an abstraction layer for evaluating bytecode on the Risor engine
 type Evaluator struct {
-	// ctxKey is the variable name used to access input data inside the vm (ctx)
+	// ctxKey is the variable name used to access input data inside the engine (ctx)
 	ctxKey string
 
 	// execUnit contains the compiled script and data provider
@@ -48,7 +48,7 @@ func (be *Evaluator) String() string {
 }
 
 // loadInputData retrieves input data using the data provider in the executable unit.
-// Returns a map that will be used as input for the Risor VM.
+// Returns a map that will be used as input for the Risor engine.
 func (be *Evaluator) loadInputData(ctx context.Context) (map[string]any, error) {
 	logger := be.logger.WithGroup("loadInputData")
 
@@ -88,7 +88,7 @@ func (be *Evaluator) exec(
 	return newEvalResult(be.logHandler, result, execTime, ""), nil
 }
 
-// Eval evaluates the loaded bytecode and uses the provided EvalData to pass data in to the Risor VM execution
+// Eval evaluates the loaded bytecode and uses the provided EvalData to pass data in to the Risor engine execution
 func (be *Evaluator) Eval(ctx context.Context) (platform.EvaluatorResponse, error) {
 	logger := be.logger.WithGroup("Eval")
 	if be.execUnit == nil {
@@ -127,7 +127,7 @@ func (be *Evaluator) Eval(ctx context.Context) (platform.EvaluatorResponse, erro
 		return nil, fmt.Errorf("failed to get input data: %w", err)
 	}
 
-	// 3. Convert to Risor VM format
+	// 3. Convert to Risor engine format
 	runtimeData := internal.ConvertToRisorOptions(be.ctxKey, rawInputData)
 
 	// 4. Execute the program

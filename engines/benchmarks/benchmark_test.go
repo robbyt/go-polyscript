@@ -12,10 +12,10 @@
 //   - ContextProvider: Data retrieved from context at runtime
 //   - CompositeProvider: Combines multiple providers
 //
-// 3. VM Implementations:
-//   - RisorVM: Go-oriented scripting language
-//   - StarlarkVM: Python-like configuration language
-//   - ExtismVM: WebAssembly module execution (not benchmarked by default)
+// 3. Engine Implementations:
+//   - Risor: Go-oriented scripting language
+//   - Starlark: Python-like configuration language
+//   - Extism: WebAssembly module execution (not benchmarked by default)
 //
 // To run these benchmarks, use the benchmark.sh script:
 //
@@ -202,12 +202,12 @@ func BenchmarkDataProviders(b *testing.B) {
 	})
 }
 
-// BenchmarkVMComparison compares performance across different VM implementations:
+// BenchmarkEngineComparison compares performance across different engine implementations:
 // - Risor
 // - Starlark
 // - Extism
-func BenchmarkVMComparison(b *testing.B) {
-	// Input data for all VMs
+func BenchmarkEngineComparison(b *testing.B) {
+	// Input data for all engines
 	inputData := map[string]any{
 		"name": "World",
 	}
@@ -234,7 +234,7 @@ message = "Hello, " + name + "!"
 	// Note: Extism benchmark would need an actual WASM file,
 	// which is more complex to set up in this benchmark template
 
-	b.Run("RisorVM", func(b *testing.B) {
+	b.Run("RisorEngine", func(b *testing.B) {
 		evaluator, err := polyscript.FromRisorStringWithData(
 			risorScript,
 			inputData,
@@ -253,7 +253,7 @@ message = "Hello, " + name + "!"
 		}
 	})
 
-	b.Run("StarlarkVM", func(b *testing.B) {
+	b.Run("StarlarkEngine", func(b *testing.B) {
 		evaluator, err := polyscript.FromStarlarkStringWithData(
 			starlarkScript,
 			inputData,

@@ -16,9 +16,9 @@ import (
 	starlarkLib "go.starlark.net/starlark"
 )
 
-// Evaluator is an abstraction layer for evaluating code on the Starlark VM
+// Evaluator is an abstraction layer for evaluating code on the Starlark engine
 type Evaluator struct {
-	// universe is the global variable map for the Starlark VM
+	// universe is the global variable map for the Starlark engine
 	universe starlarkLib.StringDict
 
 	// execUnit contains the compiled script and data provider
@@ -55,7 +55,7 @@ func (be *Evaluator) String() string {
 }
 
 // loadInputData retrieves input data using the data provider in the executable unit.
-// Returns a map that will be used as input for the Starlark VM.
+// Returns a map that will be used as input for the Starlark engine.
 func (be *Evaluator) loadInputData(ctx context.Context) (map[string]any, error) {
 	logger := be.logger.WithGroup("loadInputData")
 
@@ -144,7 +144,7 @@ func (be *Evaluator) exec(
 	return newEvalResult(be.logHandler, mainVal, execTime, ""), nil
 }
 
-// Eval evaluates the loaded bytecode and passes the provided data into the Starlark VM
+// Eval evaluates the loaded bytecode and passes the provided data into the Starlark engine
 func (be *Evaluator) Eval(ctx context.Context) (platform.EvaluatorResponse, error) {
 	logger := be.logger.WithGroup("Eval")
 	if be.execUnit == nil {

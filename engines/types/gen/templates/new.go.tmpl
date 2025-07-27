@@ -17,8 +17,8 @@ import (
 	machineTypes "github.com/robbyt/go-polyscript/engines/types"
 )
 
-// NewEvaluator creates a new VM with the given CPU type and globals.
-// This will load a script from a ExecutableUnit object into the VM, and can be run immediately.
+// NewEvaluator creates a new engine evaluator with the given engine type.
+// This will load a script from a ExecutableUnit object into the engine, and can be run immediately.
 // The ExecutableUnit contains a DataProvider that provides runtime data for evaluation.
 func NewEvaluator(handler slog.Handler, ver *script.ExecutableUnit) (platform.Evaluator, error) {
 	if ver == nil {

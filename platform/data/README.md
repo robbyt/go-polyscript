@@ -51,10 +51,10 @@ Both types of data are made available to scripts, though the exact format depend
                                       │
                                       ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│                        VM Execution                                 │
+│                     Engine Execution                                │
 │                                                                     │
-│  - VM implementations access data through the Provider interface    │
-│  - Each VM exposes data differently to scripts (see engines docs)   │
+│ - Engine implementations access data through the Provider interface │
+│ - Each engine exposes data differently to scripts (see engines docs)│
 │                                                                     │
 │  Script data access (format varies by engine):                      │
 │    - Risor/Starlark: ctx["config_value1"], ctx["user_data"]         │

@@ -185,7 +185,7 @@ func (be *Evaluator) Eval(ctx context.Context) (platform.EvaluatorResponse, erro
 		return nil, fmt.Errorf("failed to get input data: %w", err)
 	}
 
-	// 3. Convert input data to JSON for passing into the WASM VM
+	// 3. Convert input data to JSON for passing into the WASM engine
 	runtimeData, err := internal.ConvertToExtismFormat(rawInputData)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal input data: %w", err)
