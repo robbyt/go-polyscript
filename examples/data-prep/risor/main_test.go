@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"log/slog"
 	"testing"
 
@@ -57,7 +56,7 @@ func TestPrepareRuntimeData(t *testing.T) {
 	require.NoError(t, err, "Failed to create evaluator")
 
 	// Test prepareRuntimeData function
-	ctx := context.Background()
+	ctx := t.Context()
 	enrichedCtx, err := prepareRuntimeData(ctx, logger, evaluator)
 	assert.NoError(t, err, "prepareRuntimeData should not return an error")
 	assert.NotNil(t, enrichedCtx, "Enriched context should not be nil")
@@ -71,7 +70,7 @@ func TestEvalAndExtractResult(t *testing.T) {
 	require.NoError(t, err, "Failed to create evaluator")
 
 	// Prepare data first
-	ctx := context.Background()
+	ctx := t.Context()
 	preparedCtx, err := prepareRuntimeData(ctx, logger, evaluator)
 	require.NoError(t, err, "Failed to prepare context")
 
@@ -120,7 +119,7 @@ func TestFullExecution(t *testing.T) {
 	require.NoError(t, err, "Failed to create evaluator")
 
 	// Prepare runtime data
-	ctx := context.Background()
+	ctx := t.Context()
 	preparedCtx, err := prepareRuntimeData(ctx, logger, evaluator)
 	require.NoError(t, err, "Failed to prepare runtime data")
 

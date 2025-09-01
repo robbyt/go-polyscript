@@ -69,7 +69,7 @@ func TestEvaluatorInterface(t *testing.T) {
 	testKey := contextKey("test-key")
 
 	// Create a context with a test key
-	ctx := context.WithValue(context.Background(), testKey, "test-value")
+	ctx := context.WithValue(t.Context(), testKey, "test-value")
 
 	// Create a mock evaluator with success case
 	evaluator := new(mocks.Evaluator)
@@ -102,7 +102,7 @@ func TestEvaluatorInterface(t *testing.T) {
 	errorEvaluator.On("Eval", mock.Anything).
 		Return((*mocks.EvaluatorResponse)(nil), errors.New("evaluation error"))
 
-	response, err = errorEvaluator.Eval(context.Background())
+	response, err = errorEvaluator.Eval(t.Context())
 	assert.Error(t, err, "Eval should return an error")
 	assert.Nil(t, response, "Response should be nil when there's an error")
 	assert.Contains(t, err.Error(), "evaluation error", "Error message should be preserved")
@@ -128,7 +128,7 @@ method + " " + greeting
 	require.NotNil(t, evaluator)
 
 	// Create context and test data
-	ctx := context.Background()
+	ctx := t.Context()
 	req, err := http.NewRequest("GET", "http://localhost/test", nil)
 	require.NoError(t, err)
 
@@ -156,7 +156,7 @@ func TestEvalDataPreparerInterfaceDirectImplementation(t *testing.T) {
 	dataPreparer := &mockDataPreparer{}
 
 	// Test with various data types
-	ctx := context.Background()
+	ctx := t.Context()
 	data1 := "string data"
 	data2 := map[string]any{"key": "value"}
 	data3 := 123
@@ -220,7 +220,7 @@ func TestEvaluatorWithPrepInterface(t *testing.T) {
 	combinedEvaluator := &mockEvaluatorWithPreparer{}
 
 	// Define context and test data
-	ctx := context.Background()
+	ctx := t.Context()
 	enrichedCtx := context.WithValue(ctx, prepDataKey, "test-value")
 
 	// Set up mock behaviors
@@ -282,7 +282,7 @@ func TestEvaluatorWithPrepErrors(t *testing.T) {
 	require.NoError(t, err)
 
 	// The context should still be usable
-	ctx := context.Background()
+	ctx := t.Context()
 	enrichedCtx, err := evaluator.AddDataToContext(
 		ctx,
 		map[string]any{"value": 123},

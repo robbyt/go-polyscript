@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"log/slog"
 	"testing"
 
@@ -68,7 +67,7 @@ func TestPrepareRuntimeData(t *testing.T) {
 	require.NotNil(t, evaluator, "Evaluator should not be nil")
 
 	// Test prepareRuntimeData function
-	ctx := context.Background()
+	ctx := t.Context()
 	enrichedCtx, err := prepareRuntimeData(ctx, logger, evaluator)
 	assert.NoError(t, err, "prepareRuntimeData should not return an error")
 	assert.NotNil(t, enrichedCtx, "Enriched context should not be nil")
@@ -90,7 +89,7 @@ func TestEvalAndExtractResult(t *testing.T) {
 	require.NotNil(t, evaluator, "Evaluator should not be nil")
 
 	// Prepare the context
-	ctx := context.Background()
+	ctx := t.Context()
 	ctx, err = prepareRuntimeData(ctx, logger, evaluator)
 	require.NoError(t, err, "Failed to prepare context")
 

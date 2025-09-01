@@ -1,7 +1,6 @@
 package script
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -421,7 +420,7 @@ func TestNewVersionWithScriptData(t *testing.T) {
 		require.NoError(t, err, "Expected no error creating executable unit")
 		require.NotNil(t, exe, "Expected executable unit to be non-nil")
 
-		dataFromProvider, err := exe.DataProvider.GetData(context.Background())
+		dataFromProvider, err := exe.DataProvider.GetData(t.Context())
 		require.NoError(t, err, "Expected no error when getting data from provider")
 		require.Equal(t, scriptData, dataFromProvider, "Expected script data to match")
 
@@ -456,7 +455,7 @@ func TestNewVersionWithScriptData(t *testing.T) {
 		)
 
 		require.NotNil(t, exe, "Expected version to be non-nil")
-		dataFromProvider, err := exe.DataProvider.GetData(context.Background())
+		dataFromProvider, err := exe.DataProvider.GetData(t.Context())
 		require.NoError(t, err, "Expected no error when getting data from provider")
 		require.Equal(
 			t,

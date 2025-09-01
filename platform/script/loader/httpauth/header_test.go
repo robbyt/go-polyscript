@@ -78,7 +78,7 @@ func TestHeaderAuth(t *testing.T) {
 
 		req, err := http.NewRequest(http.MethodGet, "http://localhost/test", nil)
 		require.NoError(t, err)
-		ctx := context.Background()
+		ctx := t.Context()
 
 		err = auth.AuthenticateWithContext(ctx, req)
 		require.NoError(t, err)
@@ -95,7 +95,7 @@ func TestHeaderAuth(t *testing.T) {
 		req, err := http.NewRequest(http.MethodGet, "http://localhost/test", nil)
 		require.NoError(t, err)
 
-		ctx, cancel := context.WithCancel(context.Background())
+		ctx, cancel := context.WithCancel(t.Context())
 		cancel() // Cancel immediately
 		defer cancel()
 
@@ -112,7 +112,7 @@ func TestHeaderAuth(t *testing.T) {
 		req, err := http.NewRequest(http.MethodGet, "http://localhost/test", nil)
 		require.NoError(t, err)
 
-		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Nanosecond)
+		ctx, cancel := context.WithTimeout(t.Context(), 1*time.Nanosecond)
 		time.Sleep(5 * time.Millisecond) // Ensure the timeout occurs
 		defer cancel()
 

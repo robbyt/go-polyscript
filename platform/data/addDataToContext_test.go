@@ -1,7 +1,6 @@
 package data
 
 import (
-	"context"
 	"log/slog"
 	"testing"
 
@@ -18,7 +17,7 @@ func TestAddDataToContextHelper(t *testing.T) {
 	logger := slog.Default()
 
 	t.Run("nil provider returns error", func(t *testing.T) {
-		baseCtx := context.Background()
+		baseCtx := t.Context()
 		enrichedCtx, err := AddDataToContextHelper(
 			baseCtx,
 			logger,
@@ -32,7 +31,7 @@ func TestAddDataToContextHelper(t *testing.T) {
 
 	t.Run("static provider always returns error", func(t *testing.T) {
 		provider := NewStaticProvider(simpleData)
-		baseCtx := context.Background()
+		baseCtx := t.Context()
 
 		enrichedCtx, err := AddDataToContextHelper(
 			baseCtx,
@@ -48,7 +47,7 @@ func TestAddDataToContextHelper(t *testing.T) {
 
 	t.Run("context provider with valid data", func(t *testing.T) {
 		provider := NewContextProvider(constants.EvalData)
-		baseCtx := context.Background()
+		baseCtx := t.Context()
 
 		enrichedCtx, err := AddDataToContextHelper(
 			baseCtx,
@@ -73,7 +72,7 @@ func TestAddDataToContextHelper(t *testing.T) {
 
 	t.Run("context provider with HTTP request", func(t *testing.T) {
 		provider := NewContextProvider(constants.EvalData)
-		baseCtx := context.Background()
+		baseCtx := t.Context()
 		req := createTestRequestHelper()
 
 		// Wrap request in map
@@ -104,7 +103,7 @@ func TestAddDataToContextHelper(t *testing.T) {
 
 	t.Run("context provider with mixed data", func(t *testing.T) {
 		provider := NewContextProvider(constants.EvalData)
-		baseCtx := context.Background()
+		baseCtx := t.Context()
 		req := createTestRequestHelper()
 
 		enrichedCtx, err := AddDataToContextHelper(baseCtx, logger, provider,
@@ -133,7 +132,7 @@ func TestAddDataToContextHelper(t *testing.T) {
 
 	t.Run("context provider with empty key", func(t *testing.T) {
 		provider := NewContextProvider(constants.EvalData)
-		baseCtx := context.Background()
+		baseCtx := t.Context()
 
 		enrichedCtx, err := AddDataToContextHelper(
 			baseCtx,
@@ -155,7 +154,7 @@ func TestAddDataToContextHelper(t *testing.T) {
 			NewStaticProvider(simpleData),
 			NewContextProvider(constants.EvalData),
 		)
-		baseCtx := context.Background()
+		baseCtx := t.Context()
 
 		enrichedCtx, err := AddDataToContextHelper(baseCtx, logger, provider,
 			map[string]any{"key": "value"})
@@ -185,7 +184,7 @@ func TestAddDataToContextWithErrorHandling(t *testing.T) {
 	t.Run("provider returns error and keeps original context", func(t *testing.T) {
 		// Create a context provider
 		provider := NewContextProvider(constants.EvalData)
-		baseCtx := context.Background()
+		baseCtx := t.Context()
 
 		// Add a mix of valid and invalid data to trigger an error
 		enrichedCtx, err := AddDataToContextHelper(baseCtx, logger, provider,

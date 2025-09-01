@@ -198,7 +198,7 @@ func TestEvaluator_Evaluate(t *testing.T) {
 				evalData := map[string]any{
 					"request": rMap,
 				}
-				ctx := context.WithValue(context.Background(), constants.EvalData, evalData)
+				ctx := context.WithValue(t.Context(), constants.EvalData, evalData)
 
 				// Execute the script
 				response, err := evaluator.Eval(ctx)
@@ -289,7 +289,7 @@ func TestEvaluator_Evaluate(t *testing.T) {
 					logger:     slog.New(handler),
 				}
 
-				ctx := context.Background()
+				ctx := t.Context()
 				result, err := evaluator.Eval(ctx)
 
 				require.Error(t, err)
@@ -314,7 +314,7 @@ func TestEvaluator_Evaluate(t *testing.T) {
 					return nil
 				},
 				setupCtx: func() context.Context {
-					return context.Background()
+					return t.Context()
 				},
 				expectError: false,
 				expectEmpty: true,
@@ -331,7 +331,7 @@ func TestEvaluator_Evaluate(t *testing.T) {
 					}
 				},
 				setupCtx: func() context.Context {
-					return context.Background()
+					return t.Context()
 				},
 				expectError:  true,
 				errorMessage: "provider error",
@@ -349,7 +349,7 @@ func TestEvaluator_Evaluate(t *testing.T) {
 					}
 				},
 				setupCtx: func() context.Context {
-					return context.Background()
+					return t.Context()
 				},
 				expectError: false,
 				expectEmpty: true,
@@ -366,7 +366,7 @@ func TestEvaluator_Evaluate(t *testing.T) {
 					}
 				},
 				setupCtx: func() context.Context {
-					return context.Background()
+					return t.Context()
 				},
 				expectError: false,
 				expectEmpty: false,
@@ -476,7 +476,7 @@ func TestEvaluator_AddDataToContext(t *testing.T) {
 
 				mockProvider := &MockProvider{}
 				enrichedCtx := context.WithValue(
-					context.Background(),
+					t.Context(),
 					constants.EvalData,
 					"enriched",
 				)
@@ -539,7 +539,7 @@ func TestEvaluator_AddDataToContext(t *testing.T) {
 				logger:     slog.New(handler),
 			}
 
-			ctx := context.Background()
+			ctx := t.Context()
 			result, err := evaluator.AddDataToContext(ctx, tt.inputs...)
 
 			if tt.wantError {

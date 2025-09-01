@@ -144,7 +144,7 @@ _ = request_handler(ctx.get("request"))
 					"request": rMap,
 				}
 
-				ctx := context.WithValue(context.Background(), constants.EvalData, evalData)
+				ctx := context.WithValue(t.Context(), constants.EvalData, evalData)
 
 				// Evaluate the script with the provided HttpRequest
 				response, err := evaluator.Eval(ctx)
@@ -166,7 +166,7 @@ _ = request_handler(ctx.get("request"))
 			handler := slog.NewTextHandler(os.Stdout, nil)
 			evaluator := New(handler, nil)
 
-			response, err := evaluator.Eval(context.Background())
+			response, err := evaluator.Eval(t.Context())
 			require.Error(t, err)
 			require.Nil(t, response)
 			require.Contains(t, err.Error(), "executable unit is nil")
@@ -181,7 +181,7 @@ _ = request_handler(ctx.get("request"))
 			}
 			evaluator := New(handler, exe)
 
-			response, err := evaluator.Eval(context.Background())
+			response, err := evaluator.Eval(t.Context())
 			require.Error(t, err)
 			require.Nil(t, response)
 			require.Contains(t, err.Error(), "content is nil")
@@ -198,7 +198,7 @@ def invalid_func():
 invalid_func()
 `
 			_, evaluator := evalBuilder(t, scriptContent)
-			response, err := evaluator.Eval(context.Background())
+			response, err := evaluator.Eval(t.Context())
 			require.Error(t, err)
 			require.Nil(t, response)
 			require.Contains(t, err.Error(), "intentional error")
@@ -234,7 +234,7 @@ func TestEvaluator_AddDataToContext(t *testing.T) {
 
 				mockProvider := &MockProvider{}
 				enrichedCtx := context.WithValue(
-					context.Background(),
+					t.Context(),
 					constants.EvalData,
 					"enriched",
 				)
@@ -292,7 +292,7 @@ func TestEvaluator_AddDataToContext(t *testing.T) {
 
 			evaluator := New(handler, exe)
 
-			ctx := context.Background()
+			ctx := t.Context()
 			result, err := evaluator.AddDataToContext(ctx, tt.inputs...)
 
 			if tt.wantError {

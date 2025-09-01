@@ -141,7 +141,7 @@ func TestExecutable(t *testing.T) {
 
 	// Test Close functionality (specific to Extism)
 	t.Run("Close", func(t *testing.T) {
-		ctx := context.Background()
+		ctx := t.Context()
 		wasmBytes := []byte("mock wasm bytes")
 		entryPoint := "run"
 

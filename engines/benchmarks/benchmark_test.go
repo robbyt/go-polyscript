@@ -71,7 +71,7 @@ func BenchmarkEvaluationPatterns(b *testing.B) {
 			}
 
 			// Execute the script
-			_, err = evaluator.Eval(context.Background())
+			_, err = evaluator.Eval(b.Context())
 			if err != nil {
 				b.Fatalf("Failed to evaluate script: %v", err)
 			}
@@ -95,7 +95,7 @@ func BenchmarkEvaluationPatterns(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			// Just run evaluation in the loop
-			_, err = evaluator.Eval(context.Background())
+			_, err = evaluator.Eval(b.Context())
 			if err != nil {
 				b.Fatalf("Failed to evaluate script: %v", err)
 			}
@@ -136,7 +136,7 @@ func BenchmarkDataProviders(b *testing.B) {
 
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			_, err = evaluator.Eval(context.Background())
+			_, err = evaluator.Eval(b.Context())
 			if err != nil {
 				b.Fatalf("Failed to evaluate script: %v", err)
 			}
@@ -153,7 +153,7 @@ func BenchmarkDataProviders(b *testing.B) {
 			b.Fatalf("Failed to create evaluator: %v", err)
 		}
 
-		ctx := context.WithValue(context.Background(), constants.EvalData, inputData)
+		ctx := context.WithValue(b.Context(), constants.EvalData, inputData)
 
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
@@ -185,7 +185,7 @@ func BenchmarkDataProviders(b *testing.B) {
 			b.Fatalf("Failed to create evaluator: %v", err)
 		}
 
-		ctx := context.Background()
+		ctx := b.Context()
 		// Use AddDataToContext to add the dynamic part
 		ctx, err = evaluator.AddDataToContext(ctx, map[string]any{"name": "World"})
 		if err != nil {
@@ -246,7 +246,7 @@ message = "Hello, " + name + "!"
 
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			_, err = evaluator.Eval(context.Background())
+			_, err = evaluator.Eval(b.Context())
 			if err != nil {
 				b.Fatalf("Failed to evaluate Risor script: %v", err)
 			}
@@ -265,7 +265,7 @@ message = "Hello, " + name + "!"
 
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			_, err = evaluator.Eval(context.Background())
+			_, err = evaluator.Eval(b.Context())
 			if err != nil {
 				b.Fatalf("Failed to evaluate Starlark script: %v", err)
 			}
