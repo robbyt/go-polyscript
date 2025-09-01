@@ -31,6 +31,13 @@ type Response struct {
 	Summary     string         `json:"summary"`
 }
 
+// VowelCount represents a vowel counting result
+type VowelCount struct {
+	Count  int    `json:"count"`
+	Vowels string `json:"vowels"`
+	Input  string `json:"input"`
+}
+
 //go:wasmexport greet
 func greet() int32 {
 	// Update to use InputJSON
@@ -48,12 +55,7 @@ func greet() int32 {
 		return 1
 	}
 
-	greeting := "Hello, " + input.Input + "!"
-
-	// Use OutputJSON for consistent output handling
-	result := map[string]string{
-		"greeting": greeting,
-	}
+	result := doGreet(input.Input)
 
 	if err := pdk.OutputJSON(result); err != nil {
 		pdk.SetError(err)
@@ -113,25 +115,7 @@ func countVowels() int32 {
 		return 1
 	}
 
-	type VowelCount struct {
-		Count  int    `json:"count"`
-		Vowels string `json:"vowels"`
-		Input  string `json:"input"`
-	}
-
-	vowels := "aeiouAEIOU"
-	count := 0
-	for _, c := range input.Input {
-		if strings.ContainsRune(vowels, c) {
-			count++
-		}
-	}
-
-	result := VowelCount{
-		Count:  count,
-		Vowels: vowels,
-		Input:  input.Input,
-	}
+	result := doCountVowels(input.Input)
 
 	if err := pdk.OutputJSON(result); err != nil {
 		pdk.SetError(err)
@@ -157,16 +141,7 @@ func reverseString() int32 {
 		return 1
 	}
 
-	// Convert to runes to handle UTF-8 correctly
-	runes := []rune(input.Input)
-	for i, j := 0, len(runes)-1; i < j; i, j = i+1, j-1 {
-		runes[i], runes[j] = runes[j], runes[i]
-	}
-
-	// Use OutputJSON for consistent output handling
-	result := map[string]string{
-		"reversed": string(runes),
-	}
+	result := doReverseString(input.Input)
 
 	if err := pdk.OutputJSON(result); err != nil {
 		pdk.SetError(err)
@@ -195,7 +170,133 @@ func createSummary(req Request) string {
 	)
 }
 
+// Core business logic helpers for string processing functions
+func doGreet(input string) map[string]string {
+	greeting := "Hello, " + input + "!"
+	return map[string]string{
+		"greeting": greeting,
+	}
+}
+
+func doCountVowels(input string) VowelCount {
+	vowels := "aeiouAEIOU"
+	count := 0
+	for _, c := range input {
+		if strings.ContainsRune(vowels, c) {
+			count++
+		}
+	}
+
+	return VowelCount{
+		Count:  count,
+		Vowels: vowels,
+		Input:  input,
+	}
+}
+
+func doReverseString(input string) map[string]string {
+	// Convert to runes to handle UTF-8 correctly
+	runes := []rune(input)
+	for i, j := 0, len(runes)-1; i < j; i, j = i+1, j-1 {
+		runes[i], runes[j] = runes[j], runes[i]
+	}
+
+	return map[string]string{
+		"reversed": string(runes),
+	}
+}
+
 //go:wasmexport run
 func run() int32 {
 	return greet()
+}
+
+// Namespaced Functions - These functions accept input under a "data" namespace
+// This provides compatibility for applications that use structured data organization
+
+//go:wasmexport greet_namespaced
+func greetNamespaced() int32 {
+	// Accepts namespaced input structure: {"data": {"input": "..."}, "request": {...}}
+	var input struct {
+		Data struct {
+			Input string `json:"input"`
+		} `json:"data"`
+		Request map[string]any `json:"request,omitempty"`
+	}
+
+	if err := pdk.InputJSON(&input); err != nil {
+		pdk.SetError(err)
+		return 1
+	}
+
+	if input.Data.Input == "" {
+		pdk.SetError(errors.New("input string is empty"))
+		return 1
+	}
+
+	result := doGreet(input.Data.Input)
+
+	if err := pdk.OutputJSON(result); err != nil {
+		pdk.SetError(err)
+		return 1
+	}
+	return 0
+}
+
+//go:wasmexport count_vowels_namespaced
+func countVowelsNamespaced() int32 {
+	// Accepts namespaced input structure: {"data": {"input": "..."}, "request": {...}}
+	var input struct {
+		Data struct {
+			Input string `json:"input"`
+		} `json:"data"`
+		Request map[string]any `json:"request,omitempty"`
+	}
+
+	if err := pdk.InputJSON(&input); err != nil {
+		pdk.SetError(err)
+		return 1
+	}
+
+	if input.Data.Input == "" {
+		pdk.SetError(errors.New("input string is empty"))
+		return 1
+	}
+
+	result := doCountVowels(input.Data.Input)
+
+	if err := pdk.OutputJSON(result); err != nil {
+		pdk.SetError(err)
+		return 1
+	}
+	return 0
+}
+
+//go:wasmexport reverse_string_namespaced
+func reverseStringNamespaced() int32 {
+	// Accepts namespaced input structure: {"data": {"input": "..."}, "request": {...}}
+	var input struct {
+		Data struct {
+			Input string `json:"input"`
+		} `json:"data"`
+		Request map[string]any `json:"request,omitempty"`
+	}
+
+	if err := pdk.InputJSON(&input); err != nil {
+		pdk.SetError(err)
+		return 1
+	}
+
+	if input.Data.Input == "" {
+		pdk.SetError(errors.New("input string is empty"))
+		return 1
+	}
+
+	result := doReverseString(input.Data.Input)
+
+	if err := pdk.OutputJSON(result); err != nil {
+		pdk.SetError(err)
+		return 1
+	}
+	return 0
 }
