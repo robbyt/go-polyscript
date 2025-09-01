@@ -29,7 +29,7 @@ func TestExtismWasmIntegration(t *testing.T) {
 	}
 
 	// Create context and plugin config
-	ctx := context.Background()
+	ctx := t.Context()
 	cache := wazero.NewCompilationCache()
 	defer func() {
 		assert.NoError(t, cache.Close(ctx))
