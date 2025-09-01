@@ -1,7 +1,6 @@
 package compiler
 
 import (
-	"context"
 	_ "embed"
 	"encoding/json"
 	"io"
@@ -128,12 +127,12 @@ func TestCompiler_Compile(t *testing.T) {
 			require.NotNil(t, plugin)
 
 			instance, err := plugin.Instance(
-				context.Background(),
+				t.Context(),
 				extismSDK.PluginInstanceConfig{},
 			)
 			require.NoError(t, err)
 			defer func() {
-				require.NoError(t, instance.Close(context.Background()), "Failed to close instance")
+				require.NoError(t, instance.Close(t.Context()), "Failed to close instance")
 			}()
 
 			assert.True(t, instance.FunctionExists("greet"), "Function 'greet' should exist")
@@ -148,7 +147,7 @@ func TestCompiler_Compile(t *testing.T) {
 			require.NoError(t, json.Unmarshal(output, &result))
 			assert.Equal(t, "Hello, Test!", result.Greeting)
 
-			ctx := context.Background()
+			ctx := t.Context()
 			require.NoError(t, executable.Close(ctx))
 			reader.AssertExpectations(t)
 		})
@@ -173,18 +172,18 @@ func TestCompiler_Compile(t *testing.T) {
 			require.NotNil(t, plugin)
 
 			instance, err := plugin.Instance(
-				context.Background(),
+				t.Context(),
 				extismSDK.PluginInstanceConfig{},
 			)
 			require.NoError(t, err)
 			defer func() {
-				require.NoError(t, instance.Close(context.Background()), "Failed to close instance")
+				require.NoError(t, instance.Close(t.Context()), "Failed to close instance")
 			}()
 
 			assert.True(t, instance.FunctionExists("process_complex"),
 				"Function 'process_complex' should exist")
 
-			ctx := context.Background()
+			ctx := t.Context()
 			require.NoError(t, executable.Close(ctx))
 			reader.AssertExpectations(t)
 		})
@@ -212,7 +211,7 @@ func TestCompiler_Compile(t *testing.T) {
 			require.True(t, ok, "Expected *Executable type")
 			assert.Equal(t, wasmBytes, []byte(executable.GetSource()))
 
-			ctx := context.Background()
+			ctx := t.Context()
 			require.NoError(t, executable.Close(ctx))
 			reader.AssertExpectations(t)
 		})

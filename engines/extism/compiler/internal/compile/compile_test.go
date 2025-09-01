@@ -28,7 +28,7 @@ type TestRequest struct {
 func TestCompileSuccess(t *testing.T) {
 	t.Parallel()
 	wasmBytes := wasmdata.TestModule
-	ctx := context.Background()
+	ctx := t.Context()
 
 	t.Run("default options", func(t *testing.T) {
 		plugin, err := CompileBytes(ctx, wasmBytes, nil)
@@ -215,7 +215,7 @@ func testFunctions(t *testing.T, instance adapters.PluginInstance) {
 
 func TestCompileErrors(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 
 	tests := []struct {
 		name      string
@@ -279,7 +279,7 @@ func TestCompileOptionsDefaults(t *testing.T) {
 }
 
 func TestCompileWithHostFunctions(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	wasmBytes := wasmdata.TestModule
 
 	// Create test host function

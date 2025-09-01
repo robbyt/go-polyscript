@@ -79,7 +79,7 @@ func TestCompositeProvider_GetData(t *testing.T) {
 				return NewCompositeProvider()
 			},
 			setupContext: func() context.Context {
-				return context.Background()
+				return t.Context()
 			},
 			expectedData: map[string]any{},
 			expectError:  false,
@@ -90,7 +90,7 @@ func TestCompositeProvider_GetData(t *testing.T) {
 				return NewCompositeProvider(NewStaticProvider(simpleData))
 			},
 			setupContext: func() context.Context {
-				return context.Background()
+				return t.Context()
 			},
 			expectedData: simpleData,
 			expectError:  false,
@@ -101,7 +101,7 @@ func TestCompositeProvider_GetData(t *testing.T) {
 				return NewCompositeProvider(NewContextProvider(constants.EvalData))
 			},
 			setupContext: func() context.Context {
-				return context.WithValue(context.Background(), constants.EvalData, simpleData)
+				return context.WithValue(t.Context(), constants.EvalData, simpleData)
 			},
 			expectedData: simpleData,
 			expectError:  false,
@@ -116,7 +116,7 @@ func TestCompositeProvider_GetData(t *testing.T) {
 			},
 			setupContext: func() context.Context {
 				return context.WithValue(
-					context.Background(),
+					t.Context(),
 					constants.EvalData,
 					map[string]any{"runtime_key": "runtime_value"},
 				)
@@ -140,7 +140,7 @@ func TestCompositeProvider_GetData(t *testing.T) {
 			},
 			setupContext: func() context.Context {
 				return context.WithValue(
-					context.Background(),
+					t.Context(),
 					constants.EvalData,
 					map[string]any{
 						"shared_key":  "runtime_value",
@@ -178,7 +178,7 @@ func TestCompositeProvider_GetData(t *testing.T) {
 						"retries": 5,                // Override existing key
 					},
 				}
-				return context.WithValue(context.Background(), constants.EvalData, data)
+				return context.WithValue(t.Context(), constants.EvalData, data)
 			},
 			expectedData: map[string]any{
 				"config": map[string]any{
@@ -202,7 +202,7 @@ func TestCompositeProvider_GetData(t *testing.T) {
 				)
 			},
 			setupContext: func() context.Context {
-				return context.Background()
+				return t.Context()
 			},
 			expectedData: nil,
 			expectError:  true,
@@ -217,7 +217,7 @@ func TestCompositeProvider_GetData(t *testing.T) {
 				)
 			},
 			setupContext: func() context.Context {
-				return context.Background()
+				return t.Context()
 			},
 			expectedData: map[string]any{
 				"key1": "value1",
@@ -262,7 +262,7 @@ func TestCompositeProvider_AddDataToContext(t *testing.T) {
 		provider := NewCompositeProvider(contextProvider1, contextProvider2)
 
 		// Start with empty context
-		ctx := context.Background()
+		ctx := t.Context()
 
 		// Add data with first call (should use the first provider)
 		data1 := map[string]any{
@@ -319,7 +319,7 @@ func TestCompositeProvider_AddDataToContext(t *testing.T) {
 		composite := NewCompositeProvider(provider1, provider2, provider3)
 
 		// Setup initial context with data in each provider's storage
-		ctx := context.Background()
+		ctx := t.Context()
 
 		// Setup data for first provider (this should be accessible by all providers)
 		initialData := map[string]any{
@@ -405,7 +405,7 @@ func TestCompositeProvider_AddDataToContext(t *testing.T) {
 		provider := NewCompositeProvider()
 		require.NotNil(t, provider)
 
-		ctx := context.Background()
+		ctx := t.Context()
 		inputData := map[string]any{"key": "value"}
 
 		newCtx, err := provider.AddDataToContext(ctx, inputData)
@@ -418,7 +418,7 @@ func TestCompositeProvider_AddDataToContext(t *testing.T) {
 		provider := NewCompositeProvider(NewContextProvider(constants.EvalData))
 		require.NotNil(t, provider)
 
-		ctx := context.Background()
+		ctx := t.Context()
 		inputData := map[string]any{"key": "value"}
 
 		newCtx, err := provider.AddDataToContext(ctx, inputData)
@@ -436,7 +436,7 @@ func TestCompositeProvider_AddDataToContext(t *testing.T) {
 		provider := NewCompositeProvider(NewStaticProvider(simpleData))
 		require.NotNil(t, provider)
 
-		ctx := context.Background()
+		ctx := t.Context()
 		inputData := map[string]any{"key": "value"}
 
 		newCtx, err := provider.AddDataToContext(ctx, inputData)
@@ -458,7 +458,7 @@ func TestCompositeProvider_AddDataToContext(t *testing.T) {
 		)
 		require.NotNil(t, provider)
 
-		ctx := context.Background()
+		ctx := t.Context()
 		inputData := map[string]any{"key": "value"}
 
 		newCtx, err := provider.AddDataToContext(ctx, inputData)
@@ -484,7 +484,7 @@ func TestCompositeProvider_AddDataToContext(t *testing.T) {
 		)
 		require.NotNil(t, provider)
 
-		ctx := context.Background()
+		ctx := t.Context()
 		inputData := map[string]any{"key": "value"}
 
 		newCtx, err := provider.AddDataToContext(ctx, inputData)
@@ -501,7 +501,7 @@ func TestCompositeProvider_AddDataToContext(t *testing.T) {
 		)
 		require.NotNil(t, provider)
 
-		ctx := context.Background()
+		ctx := t.Context()
 		inputData := map[string]any{"key": "value"}
 
 		newCtx, err := provider.AddDataToContext(ctx, inputData)
@@ -522,7 +522,7 @@ func TestCompositeProvider_AddDataToContext(t *testing.T) {
 		)
 		require.NotNil(t, provider)
 
-		ctx := context.Background()
+		ctx := t.Context()
 		inputData := map[string]any{"key": "value"}
 
 		newCtx, err := provider.AddDataToContext(ctx, inputData)
@@ -557,7 +557,7 @@ func TestCompositeProvider_NestedStructures(t *testing.T) {
 			},
 			setupContext: func() context.Context {
 				// Create a context with data for each provider to access/modify
-				ctx := context.Background()
+				ctx := t.Context()
 
 				// First provider data
 				ctx = context.WithValue(ctx, constants.EvalData, map[string]any{
@@ -608,7 +608,7 @@ func TestCompositeProvider_NestedStructures(t *testing.T) {
 				return NewCompositeProvider(innerComposite, outerStatic)
 			},
 			setupContext: func() context.Context {
-				return context.Background()
+				return t.Context()
 			},
 			expectedResult: map[string]any{
 				"inner1_key": "inner1_value",
@@ -644,7 +644,7 @@ func TestCompositeProvider_NestedStructures(t *testing.T) {
 				return NewCompositeProvider(level2Composite, level1Static)
 			},
 			setupContext: func() context.Context {
-				return context.Background()
+				return t.Context()
 			},
 			expectedResult: map[string]any{
 				"level":        1, // Should be overridden to 1
@@ -682,7 +682,7 @@ func TestCompositeProvider_NestedStructures(t *testing.T) {
 					"context_key": "context_value",
 					"nested_key":  "nested_value",
 				}
-				return context.WithValue(context.Background(), constants.EvalData, data)
+				return context.WithValue(t.Context(), constants.EvalData, data)
 			},
 			expectedResult: map[string]any{
 				"static_key":  "static_value",

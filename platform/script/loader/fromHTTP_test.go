@@ -445,7 +445,7 @@ func TestFromHTTP_GetReaderWithContext(t *testing.T) {
 		loader, err := NewFromHTTP(testURL)
 		require.NoError(t, err)
 
-		ctx := context.Background()
+		ctx := t.Context()
 		reader, err := loader.GetReaderWithContext(ctx)
 		require.NoError(t, err)
 		require.NotNil(t, reader)
@@ -467,7 +467,7 @@ func TestFromHTTP_GetReaderWithContext(t *testing.T) {
 		require.NoError(t, err)
 
 		// Create cancelled context
-		ctx, cancel := context.WithCancel(context.Background())
+		ctx, cancel := context.WithCancel(t.Context())
 		cancel() // Cancel immediately
 
 		// Use mock client to ensure we're testing context cancellation
@@ -502,7 +502,7 @@ func TestFromHTTP_GetReaderWithContext(t *testing.T) {
 		require.NoError(t, err)
 
 		// Create context with very short timeout
-		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Nanosecond)
+		ctx, cancel := context.WithTimeout(t.Context(), 1*time.Nanosecond)
 		defer cancel()
 
 		// Use mock client to ensure we're testing context timeout

@@ -312,7 +312,7 @@ func TestCompilerOptions_Options(t *testing.T) {
 		// Success cases
 		t.Run("valid context", func(t *testing.T) {
 			customCtx := context.WithValue(
-				context.Background(),
+				t.Context(),
 				constants.EvalData,
 				"test-value",
 			)
@@ -328,7 +328,7 @@ func TestCompilerOptions_Options(t *testing.T) {
 		})
 
 		t.Run("background context", func(t *testing.T) {
-			ctx := context.Background()
+			ctx := t.Context()
 
 			c := &Compiler{}
 			c.applyDefaults()
@@ -420,7 +420,7 @@ func TestCompilerOptions_DefaultsAndValidation(t *testing.T) {
 
 		t.Run("custom values preserved", func(t *testing.T) {
 			customEntryPoint := "custom_entry"
-			customCtx := context.WithValue(context.Background(), constants.EvalData, "value")
+			customCtx := context.WithValue(t.Context(), constants.EvalData, "value")
 			customConfig := wazero.NewRuntimeConfig()
 
 			// Create a compiler with defaults
@@ -488,7 +488,7 @@ func TestCompilerOptions_DefaultsAndValidation(t *testing.T) {
 			c := &Compiler{
 				entryPointName: "custom",
 				logHandler:     slog.NewTextHandler(bytes.NewBuffer(nil), nil),
-				ctx:            context.Background(),
+				ctx:            t.Context(),
 				options: &compile.Settings{
 					RuntimeConfig: wazero.NewRuntimeConfig(),
 				},
@@ -502,7 +502,7 @@ func TestCompilerOptions_DefaultsAndValidation(t *testing.T) {
 		t.Run("missing logger and handler", func(t *testing.T) {
 			c := &Compiler{
 				entryPointName: "test",
-				ctx:            context.Background(),
+				ctx:            t.Context(),
 				logHandler:     nil,
 				logger:         nil,
 				options: &compile.Settings{
@@ -519,7 +519,7 @@ func TestCompilerOptions_DefaultsAndValidation(t *testing.T) {
 			c := &Compiler{
 				entryPointName: "",
 				logHandler:     slog.NewTextHandler(bytes.NewBuffer(nil), nil),
-				ctx:            context.Background(),
+				ctx:            t.Context(),
 				options: &compile.Settings{
 					RuntimeConfig: wazero.NewRuntimeConfig(),
 				},
@@ -534,7 +534,7 @@ func TestCompilerOptions_DefaultsAndValidation(t *testing.T) {
 			c := &Compiler{
 				entryPointName: "test",
 				logHandler:     slog.NewTextHandler(bytes.NewBuffer(nil), nil),
-				ctx:            context.Background(),
+				ctx:            t.Context(),
 				options:        nil,
 			}
 
@@ -547,7 +547,7 @@ func TestCompilerOptions_DefaultsAndValidation(t *testing.T) {
 			c := &Compiler{
 				entryPointName: "test",
 				logHandler:     slog.NewTextHandler(bytes.NewBuffer(nil), nil),
-				ctx:            context.Background(),
+				ctx:            t.Context(),
 				options: &compile.Settings{
 					RuntimeConfig: nil,
 				},
@@ -889,7 +889,7 @@ func TestCompilerOptions(t *testing.T) {
 		})
 
 		t.Run("WithContext option", func(t *testing.T) {
-			ctx := context.Background()
+			ctx := t.Context()
 
 			t.Run("valid context", func(t *testing.T) {
 				c := &Compiler{}
@@ -937,7 +937,7 @@ func TestCompilerOptions(t *testing.T) {
 				c := &Compiler{
 					entryPointName: "",
 					options:        &compile.Settings{},
-					ctx:            context.Background(),
+					ctx:            t.Context(),
 				}
 				c.applyDefaults()
 
@@ -948,7 +948,7 @@ func TestCompilerOptions(t *testing.T) {
 				c := &Compiler{
 					entryPointName: "initialValue",
 					options:        &compile.Settings{},
-					ctx:            context.Background(),
+					ctx:            t.Context(),
 				}
 
 				require.Equal(t, "initialValue", c.entryPointName)
@@ -964,7 +964,7 @@ func TestCompilerOptions(t *testing.T) {
 				c := &Compiler{
 					entryPointName: customEntryPoint,
 					options:        &compile.Settings{},
-					ctx:            context.Background(),
+					ctx:            t.Context(),
 				}
 
 				c.applyDefaults()

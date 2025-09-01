@@ -1,7 +1,6 @@
 package data
 
 import (
-	"context"
 	"errors"
 	"testing"
 
@@ -45,7 +44,7 @@ func TestStaticProvider_Creation(t *testing.T) {
 			provider := NewStaticProvider(tt.inputData)
 			require.NotNil(t, provider, "Provider should never be nil")
 
-			ctx := context.Background()
+			ctx := t.Context()
 			result, err := provider.GetData(ctx)
 
 			assert.NoError(t, err, "GetData should never return an error")
@@ -93,7 +92,7 @@ func TestStaticProvider_GetData(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			provider := NewStaticProvider(tt.inputData)
-			ctx := context.Background()
+			ctx := t.Context()
 
 			result, err := provider.GetData(ctx)
 
@@ -132,7 +131,7 @@ func TestStaticProvider_AddDataToContext(t *testing.T) {
 
 	t.Run("nil context arg returns error", func(t *testing.T) {
 		provider := NewStaticProvider(simpleData)
-		ctx := context.Background()
+		ctx := t.Context()
 
 		newCtx, err := provider.AddDataToContext(ctx, nil)
 
@@ -149,7 +148,7 @@ func TestStaticProvider_AddDataToContext(t *testing.T) {
 
 	t.Run("map context arg returns error", func(t *testing.T) {
 		provider := NewStaticProvider(simpleData)
-		ctx := context.Background()
+		ctx := t.Context()
 
 		newCtx, err := provider.AddDataToContext(ctx, map[string]any{"new": "data"})
 
@@ -161,7 +160,7 @@ func TestStaticProvider_AddDataToContext(t *testing.T) {
 
 	t.Run("HTTP request context arg returns error", func(t *testing.T) {
 		provider := NewStaticProvider(simpleData)
-		ctx := context.Background()
+		ctx := t.Context()
 
 		newCtx, err := provider.AddDataToContext(
 			ctx,
@@ -176,7 +175,7 @@ func TestStaticProvider_AddDataToContext(t *testing.T) {
 
 	t.Run("multiple args returns error", func(t *testing.T) {
 		provider := NewStaticProvider(simpleData)
-		ctx := context.Background()
+		ctx := t.Context()
 
 		newCtx, err := provider.AddDataToContext(
 			ctx,
@@ -197,7 +196,7 @@ func TestStaticProvider_ErrorIdentification(t *testing.T) {
 	t.Parallel()
 
 	provider := NewStaticProvider(simpleData)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	_, err := provider.AddDataToContext(ctx, map[string]any{"data": "some data"})
 

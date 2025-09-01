@@ -42,7 +42,7 @@ func TestContextProvider_GetData(t *testing.T) {
 
 	t.Run("empty context key", func(t *testing.T) {
 		provider := NewContextProvider("")
-		ctx := context.Background()
+		ctx := t.Context()
 
 		result, err := provider.GetData(ctx)
 
@@ -52,7 +52,7 @@ func TestContextProvider_GetData(t *testing.T) {
 
 	t.Run("nil context value", func(t *testing.T) {
 		provider := NewContextProvider(constants.EvalData)
-		ctx := context.Background()
+		ctx := t.Context()
 
 		result, err := provider.GetData(ctx)
 
@@ -66,7 +66,7 @@ func TestContextProvider_GetData(t *testing.T) {
 
 	t.Run("valid simple data without namespace", func(t *testing.T) {
 		provider := NewContextProvider(constants.EvalData)
-		ctx := context.WithValue(context.Background(), constants.EvalData, simpleData)
+		ctx := context.WithValue(t.Context(), constants.EvalData, simpleData)
 
 		result, err := provider.GetData(ctx)
 
@@ -79,7 +79,7 @@ func TestContextProvider_GetData(t *testing.T) {
 
 	t.Run("valid complex data without namespace", func(t *testing.T) {
 		provider := NewContextProvider(constants.EvalData)
-		ctx := context.WithValue(context.Background(), constants.EvalData, complexData)
+		ctx := context.WithValue(t.Context(), constants.EvalData, complexData)
 
 		result, err := provider.GetData(ctx)
 
@@ -105,7 +105,7 @@ func TestContextProvider_GetData(t *testing.T) {
 				"theme": "dark",
 			},
 		}
-		ctx := context.WithValue(context.Background(), constants.EvalData, data)
+		ctx := context.WithValue(t.Context(), constants.EvalData, data)
 
 		result, err := provider.GetData(ctx)
 		assert.NoError(t, err, "Should not return error for valid context")
@@ -139,7 +139,7 @@ func TestContextProvider_GetData(t *testing.T) {
 			"array":  []string{"one", "two"},
 			"map":    map[string]any{"key": "value"},
 		}
-		ctx := context.WithValue(context.Background(), constants.EvalData, data)
+		ctx := context.WithValue(t.Context(), constants.EvalData, data)
 
 		result, err := provider.GetData(ctx)
 		assert.NoError(t, err, "Should not return error for valid context")
@@ -161,7 +161,7 @@ func TestContextProvider_GetData(t *testing.T) {
 
 	t.Run("invalid data type (string)", func(t *testing.T) {
 		provider := NewContextProvider(constants.EvalData)
-		ctx := context.WithValue(context.Background(), constants.EvalData, "not a map")
+		ctx := context.WithValue(t.Context(), constants.EvalData, "not a map")
 
 		result, err := provider.GetData(ctx)
 
@@ -171,7 +171,7 @@ func TestContextProvider_GetData(t *testing.T) {
 
 	t.Run("invalid data type (int)", func(t *testing.T) {
 		provider := NewContextProvider(constants.EvalData)
-		ctx := context.WithValue(context.Background(), constants.EvalData, 42)
+		ctx := context.WithValue(t.Context(), constants.EvalData, 42)
 
 		result, err := provider.GetData(ctx)
 
@@ -186,7 +186,7 @@ func TestContextProvider_AddDataToContext(t *testing.T) {
 
 	t.Run("empty context key", func(t *testing.T) {
 		provider := NewContextProvider("")
-		ctx := context.Background()
+		ctx := t.Context()
 
 		newCtx, err := provider.AddDataToContext(ctx, map[string]any{"key": "value"})
 
@@ -196,7 +196,7 @@ func TestContextProvider_AddDataToContext(t *testing.T) {
 
 	t.Run("nil input data", func(t *testing.T) {
 		provider := NewContextProvider(constants.EvalData)
-		ctx := context.Background()
+		ctx := t.Context()
 
 		newCtx, err := provider.AddDataToContext(ctx, nil)
 
@@ -210,7 +210,7 @@ func TestContextProvider_AddDataToContext(t *testing.T) {
 
 	t.Run("simple map data", func(t *testing.T) {
 		provider := NewContextProvider(constants.EvalData)
-		ctx := context.Background()
+		ctx := t.Context()
 
 		newCtx, err := provider.AddDataToContext(ctx, map[string]any{"key1": "value1", "key2": 123})
 
@@ -227,7 +227,7 @@ func TestContextProvider_AddDataToContext(t *testing.T) {
 
 	t.Run("multiple map data items", func(t *testing.T) {
 		provider := NewContextProvider(constants.EvalData)
-		ctx := context.Background()
+		ctx := t.Context()
 
 		newCtx, err := provider.AddDataToContext(ctx,
 			map[string]any{"key1": "value1"},
@@ -246,7 +246,7 @@ func TestContextProvider_AddDataToContext(t *testing.T) {
 
 	t.Run("HTTP request as map value", func(t *testing.T) {
 		provider := NewContextProvider(constants.EvalData)
-		ctx := context.Background()
+		ctx := t.Context()
 
 		// Now we pass the request as a map value
 		req := createTestRequestHelper()
@@ -267,7 +267,7 @@ func TestContextProvider_AddDataToContext(t *testing.T) {
 
 	t.Run("empty string keys are rejected", func(t *testing.T) {
 		provider := NewContextProvider(constants.EvalData)
-		ctx := context.Background()
+		ctx := t.Context()
 
 		// Try to add data with an empty key
 		newCtx, err := provider.AddDataToContext(ctx, map[string]any{"": "value"})
@@ -283,7 +283,7 @@ func TestContextProvider_AddDataToContext(t *testing.T) {
 
 	t.Run("nested maps are processed recursively", func(t *testing.T) {
 		provider := NewContextProvider(constants.EvalData)
-		ctx := context.Background()
+		ctx := t.Context()
 
 		// Add nested data
 		newCtx, err := provider.AddDataToContext(ctx, map[string]any{
@@ -447,7 +447,7 @@ func TestContextProvider_DataIntegration(t *testing.T) {
 
 	t.Run("basic map data", func(t *testing.T) {
 		provider := NewContextProvider(constants.EvalData)
-		ctx := context.Background()
+		ctx := t.Context()
 
 		// Add some data
 		newCtx, err := provider.AddDataToContext(ctx, map[string]any{"key": "value"})
@@ -468,7 +468,7 @@ func TestContextProvider_DataIntegration(t *testing.T) {
 		existingData := map[string]any{
 			"existing": "value",
 		}
-		ctx := context.WithValue(context.Background(), constants.EvalData, existingData)
+		ctx := context.WithValue(t.Context(), constants.EvalData, existingData)
 
 		// Add more data
 		newCtx, err := provider.AddDataToContext(ctx, map[string]any{"new": "value"})
@@ -484,7 +484,7 @@ func TestContextProvider_DataIntegration(t *testing.T) {
 
 	t.Run("HTTP request as map value", func(t *testing.T) {
 		provider := NewContextProvider(constants.EvalData)
-		ctx := context.Background()
+		ctx := t.Context()
 
 		// Create request
 		req := createTestRequestHelper()
@@ -505,7 +505,7 @@ func TestContextProvider_DataIntegration(t *testing.T) {
 
 	t.Run("should recursively merge nested maps", func(t *testing.T) {
 		provider := NewContextProvider(constants.EvalData)
-		ctx := context.Background()
+		ctx := t.Context()
 
 		// Add initial nested data
 		newCtx, err := provider.AddDataToContext(ctx, map[string]any{
@@ -549,7 +549,7 @@ func TestContextProvider_DataIntegration(t *testing.T) {
 		provider1 := NewContextProvider("user_data")
 		provider2 := NewContextProvider("system_data")
 
-		ctx := context.Background()
+		ctx := t.Context()
 
 		// Add data with first provider
 		ctx, err1 := provider1.AddDataToContext(ctx, map[string]any{"name": "Alice"})
@@ -573,7 +573,7 @@ func TestContextProvider_DataIntegration(t *testing.T) {
 
 	t.Run("should reject empty keys", func(t *testing.T) {
 		provider := NewContextProvider(constants.EvalData)
-		ctx := context.Background()
+		ctx := t.Context()
 
 		// Add data with an empty key
 		badData := map[string]any{"": "value"}

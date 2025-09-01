@@ -1,7 +1,6 @@
 package engines
 
 import (
-	"context"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -79,7 +78,7 @@ tags := ctx["tags"]
 			require.NoError(t, err)
 
 			// Execute
-			result, err := evaluator.Eval(context.Background())
+			result, err := evaluator.Eval(t.Context())
 			require.NoError(t, err)
 
 			// Verify results
@@ -132,7 +131,7 @@ _ = result
 			require.NoError(t, err)
 
 			// Execute
-			result, err := evaluator.Eval(context.Background())
+			result, err := evaluator.Eval(t.Context())
 			require.NoError(t, err)
 
 			// Verify results
@@ -172,7 +171,7 @@ _ = result
 		require.NoError(t, err)
 
 		// Execute
-		result, err := evaluator.Eval(context.Background())
+		result, err := evaluator.Eval(t.Context())
 		require.NoError(t, err)
 
 		// Verify results - the greet function returns {"greeting": "Hello, <input>!"}
@@ -231,7 +230,7 @@ action := ctx["action"]
 		require.NoError(t, err)
 
 		// Add dynamic data to context
-		ctx := context.Background()
+		ctx := t.Context()
 		enrichedCtx, err := evaluator.AddDataToContext(ctx, runtimeData)
 		require.NoError(t, err)
 
@@ -274,7 +273,7 @@ _ = result
 		require.NoError(t, err)
 
 		// Add dynamic data to context
-		ctx := context.Background()
+		ctx := t.Context()
 		enrichedCtx, err := evaluator.AddDataToContext(ctx, runtimeData)
 		require.NoError(t, err)
 
@@ -315,7 +314,7 @@ _ = result
 		require.NoError(t, err)
 
 		// Add dynamic data to context
-		ctx := context.Background()
+		ctx := t.Context()
 		enrichedCtx, err := evaluator.AddDataToContext(ctx, extismRuntimeData)
 		require.NoError(t, err)
 
@@ -362,7 +361,7 @@ debug := ctx["config"]["debug"]
 		evaluator, err := polyscript.FromRisorStringWithData(script, data, handler)
 		require.NoError(t, err)
 
-		result, err := evaluator.Eval(context.Background())
+		result, err := evaluator.Eval(t.Context())
 		require.NoError(t, err)
 
 		resultMap, ok := result.Interface().(map[string]any)
@@ -388,7 +387,7 @@ _ = result
 		evaluator, err := polyscript.FromStarlarkStringWithData(script, data, handler)
 		require.NoError(t, err)
 
-		result, err := evaluator.Eval(context.Background())
+		result, err := evaluator.Eval(t.Context())
 		require.NoError(t, err)
 
 		resultMap, ok := result.Interface().(map[string]any)
@@ -414,7 +413,7 @@ _ = result
 		)
 		require.NoError(t, err)
 
-		result, err := evaluator.Eval(context.Background())
+		result, err := evaluator.Eval(t.Context())
 		require.NoError(t, err)
 
 		resultMap, ok := result.Interface().(map[string]any)
@@ -457,7 +456,7 @@ user_data := ctx["user_data"]
 				require.NoError(t, err)
 
 				// Add data using context provider
-				ctx := context.Background()
+				ctx := t.Context()
 				enrichedCtx, err := evaluator.AddDataToContext(ctx, map[string]any{
 					"config": map[string]any{
 						"debug":   true,
@@ -513,7 +512,7 @@ _ = result
 				require.NoError(t, err)
 
 				// Add data using context provider
-				ctx := context.Background()
+				ctx := t.Context()
 				enrichedCtx, err := evaluator.AddDataToContext(ctx, map[string]any{
 					"config": map[string]any{
 						"debug":   true,
@@ -560,7 +559,7 @@ _ = result
 			require.NoError(t, err)
 
 			// Add data using context provider - structure for greet function
-			ctx := context.Background()
+			ctx := t.Context()
 			enrichedCtx, err := evaluator.AddDataToContext(ctx, map[string]any{
 				"input": "ContextProvider",
 				"config": map[string]any{
@@ -616,7 +615,7 @@ max_retries := ctx["constants"]["max_retries"]
 			require.NoError(t, err)
 
 			// Execute without additional context data
-			result, err := evaluator.Eval(context.Background())
+			result, err := evaluator.Eval(t.Context())
 			require.NoError(t, err)
 
 			// Verify
@@ -651,7 +650,7 @@ _ = result
 			require.NoError(t, err)
 
 			// Execute without additional context data
-			result, err := evaluator.Eval(context.Background())
+			result, err := evaluator.Eval(t.Context())
 			require.NoError(t, err)
 
 			// Verify
@@ -683,7 +682,7 @@ _ = result
 			require.NoError(t, err)
 
 			// Execute without additional context data
-			result, err := evaluator.Eval(context.Background())
+			result, err := evaluator.Eval(t.Context())
 			require.NoError(t, err)
 
 			// Verify
@@ -733,7 +732,7 @@ request_id := ctx["request_id"]
 				require.NoError(t, err)
 
 				// Add runtime data to context
-				ctx := context.Background()
+				ctx := t.Context()
 				enrichedCtx, err := evaluator.AddDataToContext(ctx, map[string]any{
 					"user_id":    "user123",
 					"request_id": "req456",
@@ -782,7 +781,7 @@ _ = result
 				require.NoError(t, err)
 
 				// Add runtime data to context
-				ctx := context.Background()
+				ctx := t.Context()
 				enrichedCtx, err := evaluator.AddDataToContext(ctx, map[string]any{
 					"user_id":    "user123",
 					"request_id": "req456",
@@ -830,7 +829,7 @@ _ = result
 			require.NoError(t, err)
 
 			// Add runtime data to context (will override static "input")
-			ctx := context.Background()
+			ctx := t.Context()
 			enrichedCtx, err := evaluator.AddDataToContext(ctx, map[string]any{
 				"input": "DynamicComposite",
 			})
@@ -897,7 +896,7 @@ content_type := ctx["request"]["Headers"]["Content-Type"][0]
 				require.NoError(t, err)
 
 				// Add HTTP request data with explicit key (as documented)
-				ctx := context.Background()
+				ctx := t.Context()
 				enrichedCtx, err := evaluator.AddDataToContext(ctx, map[string]any{
 					"request": createTestRequest(),
 				})
@@ -944,7 +943,7 @@ _ = result
 				require.NoError(t, err)
 
 				// Add HTTP request data with explicit key (as documented)
-				ctx := context.Background()
+				ctx := t.Context()
 				enrichedCtx, err := evaluator.AddDataToContext(ctx, map[string]any{
 					"request": createTestRequest(),
 				})
@@ -979,7 +978,7 @@ _ = result
 			require.NoError(t, err)
 
 			// Add HTTP request data - the greet function will use the request body as input
-			ctx := context.Background()
+			ctx := t.Context()
 			enrichedCtx, err := evaluator.AddDataToContext(ctx, map[string]any{
 				"input":   "request body",      // Use the request body as input
 				"request": createTestRequest(), // Include full request for potential processing
@@ -1026,7 +1025,7 @@ config_data := ctx["config"]
 			require.NoError(t, err)
 
 			// Use explicit keys as recommended in the documentation
-			ctx := context.Background()
+			ctx := t.Context()
 			enrichedCtx, err := evaluator.AddDataToContext(ctx,
 				map[string]any{"request": createTestRequest()},
 				map[string]any{"user": map[string]any{"name": "TestUser", "id": 123}},

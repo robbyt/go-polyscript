@@ -164,7 +164,7 @@ func TestEvaluator_Evaluate(t *testing.T) {
 
 			evaluator := New(handler, exe)
 
-			ctx := context.Background()
+			ctx := t.Context()
 			evalData := map[string]any{"test": "data"}
 			ctx = context.WithValue(ctx, constants.EvalData, evalData)
 
@@ -202,7 +202,7 @@ func TestEvaluator_Evaluate(t *testing.T) {
 			}
 
 			evaluator := New(handler, exe)
-			ctx := context.Background()
+			ctx := t.Context()
 			evalData := map[string]any{"test": "data"}
 			ctx = context.WithValue(ctx, constants.EvalData, evalData)
 
@@ -253,7 +253,7 @@ func TestEvaluator_Evaluate(t *testing.T) {
 					}
 
 					evaluator := New(handler, dummyExe)
-					ctx := context.Background()
+					ctx := t.Context()
 
 					if tt.ctxData != nil {
 						ctx = context.WithValue(ctx, constants.EvalData, tt.ctxData)
@@ -303,7 +303,7 @@ func TestEvaluator_Evaluate(t *testing.T) {
 			handler := slog.NewTextHandler(os.Stdout, nil)
 			evaluator := New(handler, nil)
 
-			ctx := context.Background()
+			ctx := t.Context()
 			_, err := evaluator.Eval(ctx)
 
 			require.Error(t, err)
@@ -329,7 +329,7 @@ func TestEvaluator_Evaluate(t *testing.T) {
 
 			evaluator := New(handler, exe)
 
-			ctx := context.Background()
+			ctx := t.Context()
 			_, err := evaluator.Eval(ctx)
 
 			require.Error(t, err)
@@ -355,7 +355,7 @@ func TestEvaluator_Evaluate(t *testing.T) {
 
 			evaluator := New(handler, exe)
 
-			ctx := context.Background()
+			ctx := t.Context()
 			_, err := evaluator.Eval(ctx)
 
 			require.Error(t, err)
@@ -365,7 +365,7 @@ func TestEvaluator_Evaluate(t *testing.T) {
 		// Test context cancellation
 		t.Run("context cancellation", func(t *testing.T) {
 			// Create a cancel context
-			ctx, cancel := context.WithCancel(context.Background())
+			ctx, cancel := context.WithCancel(t.Context())
 
 			// Create mock plugin that will check for cancellation
 			mockPlugin := new(MockCompiledPlugin)
@@ -431,7 +431,7 @@ func TestEvaluator_Evaluate(t *testing.T) {
 			}
 
 			evaluator := New(handler, exe)
-			ctx := context.Background()
+			ctx := t.Context()
 			evalData := map[string]any{"test": "data"}
 			ctx = context.WithValue(ctx, constants.EvalData, evalData)
 
@@ -457,7 +457,7 @@ func TestEvaluator_Evaluate(t *testing.T) {
 			}
 
 			evaluator := New(handler, exe)
-			ctx := context.Background()
+			ctx := t.Context()
 
 			_, err := evaluator.Eval(ctx)
 			require.Error(t, err)
@@ -513,7 +513,7 @@ func TestEvaluator_Evaluate(t *testing.T) {
 				{
 					name: "successful execution",
 					setup: func() (*mockPluginInstance, context.Context, context.CancelFunc) {
-						ctx, cancel := context.WithCancel(context.Background())
+						ctx, cancel := context.WithCancel(t.Context())
 						return &mockPluginInstance{
 							exitCode: 0,
 							output:   []byte(`{"result": "success", "count": 42}`),
@@ -526,7 +526,7 @@ func TestEvaluator_Evaluate(t *testing.T) {
 				{
 					name: "non-zero exit code",
 					setup: func() (*mockPluginInstance, context.Context, context.CancelFunc) {
-						ctx, cancel := context.WithCancel(context.Background())
+						ctx, cancel := context.WithCancel(t.Context())
 						return &mockPluginInstance{
 							exitCode: 1,
 							output:   []byte(`{"error": "something went wrong"}`),
@@ -540,7 +540,7 @@ func TestEvaluator_Evaluate(t *testing.T) {
 				{
 					name: "execution error",
 					setup: func() (*mockPluginInstance, context.Context, context.CancelFunc) {
-						ctx, cancel := context.WithCancel(context.Background())
+						ctx, cancel := context.WithCancel(t.Context())
 						return &mockPluginInstance{
 							callErr: errors.New("execution failed"),
 						}, ctx, cancel
@@ -553,7 +553,7 @@ func TestEvaluator_Evaluate(t *testing.T) {
 				{
 					name: "context cancellation",
 					setup: func() (*mockPluginInstance, context.Context, context.CancelFunc) {
-						ctx, cancel := context.WithCancel(context.Background())
+						ctx, cancel := context.WithCancel(t.Context())
 						mock := &mockPluginInstance{
 							cancelFunc: cancel, // This will cancel the context during execution
 							callErr:    context.Canceled,
@@ -713,7 +713,7 @@ func TestEvaluator_AddDataToContext(t *testing.T) {
 			exe := tt.setupExe(t)
 			evaluator := New(handler, exe)
 
-			ctx := context.Background()
+			ctx := t.Context()
 			enrichedCtx, err := evaluator.AddDataToContext(ctx, tt.inputs...)
 
 			// Check error expectations

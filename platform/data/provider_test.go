@@ -37,7 +37,7 @@ func TestProvider_GetData(t *testing.T) {
 	// Test static provider
 	t.Run("static provider with simple data", func(t *testing.T) {
 		provider := NewStaticProvider(simpleData)
-		ctx := context.Background()
+		ctx := t.Context()
 
 		result, err := provider.GetData(ctx)
 		assert.NoError(t, err)
@@ -51,7 +51,7 @@ func TestProvider_GetData(t *testing.T) {
 
 	t.Run("static provider with empty data", func(t *testing.T) {
 		provider := NewStaticProvider(nil)
-		ctx := context.Background()
+		ctx := t.Context()
 
 		result, err := provider.GetData(ctx)
 		assert.NoError(t, err)
@@ -61,7 +61,7 @@ func TestProvider_GetData(t *testing.T) {
 	// Test context provider
 	t.Run("context provider with valid data", func(t *testing.T) {
 		provider := NewContextProvider(constants.EvalData)
-		ctx := context.WithValue(context.Background(), constants.EvalData, simpleData)
+		ctx := context.WithValue(t.Context(), constants.EvalData, simpleData)
 
 		result, err := provider.GetData(ctx)
 		assert.NoError(t, err)
@@ -75,7 +75,7 @@ func TestProvider_GetData(t *testing.T) {
 
 	t.Run("context provider with empty key", func(t *testing.T) {
 		provider := NewContextProvider("")
-		ctx := context.Background()
+		ctx := t.Context()
 
 		result, err := provider.GetData(ctx)
 		assert.Error(t, err)
@@ -84,7 +84,7 @@ func TestProvider_GetData(t *testing.T) {
 
 	t.Run("context provider with invalid value type", func(t *testing.T) {
 		provider := NewContextProvider(constants.EvalData)
-		ctx := context.WithValue(context.Background(), constants.EvalData, "not a map")
+		ctx := context.WithValue(t.Context(), constants.EvalData, "not a map")
 
 		result, err := provider.GetData(ctx)
 		assert.Error(t, err)
@@ -99,7 +99,7 @@ func TestProvider_GetData(t *testing.T) {
 		)
 
 		ctx := context.WithValue(
-			context.Background(),
+			t.Context(),
 			constants.EvalData,
 			map[string]any{"context": "value", "shared": "context"},
 		)
@@ -125,7 +125,7 @@ func TestProvider_GetData(t *testing.T) {
 
 	t.Run("empty composite provider", func(t *testing.T) {
 		provider := NewCompositeProvider()
-		ctx := context.Background()
+		ctx := t.Context()
 
 		result, err := provider.GetData(ctx)
 		assert.NoError(t, err)
@@ -137,7 +137,7 @@ func TestProvider_GetData(t *testing.T) {
 			NewStaticProvider(simpleData),
 			newMockErrorProvider(),
 		)
-		ctx := context.Background()
+		ctx := t.Context()
 
 		result, err := provider.GetData(ctx)
 		assert.Error(t, err)
@@ -152,7 +152,7 @@ func TestProvider_AddDataToContext(t *testing.T) {
 	// Test with static provider
 	t.Run("static provider should reject all data", func(t *testing.T) {
 		provider := NewStaticProvider(simpleData)
-		ctx := context.Background()
+		ctx := t.Context()
 
 		newCtx, err := provider.AddDataToContext(ctx, map[string]any{"key": "value"})
 
@@ -169,7 +169,7 @@ func TestProvider_AddDataToContext(t *testing.T) {
 	// Test with context provider
 	t.Run("context provider with valid map data", func(t *testing.T) {
 		provider := NewContextProvider(constants.EvalData)
-		ctx := context.Background()
+		ctx := t.Context()
 
 		newCtx, err := provider.AddDataToContext(ctx, map[string]any{"key": "value"})
 
@@ -186,7 +186,7 @@ func TestProvider_AddDataToContext(t *testing.T) {
 
 	t.Run("context provider with HTTP request", func(t *testing.T) {
 		provider := NewContextProvider(constants.EvalData)
-		ctx := context.Background()
+		ctx := t.Context()
 		req := createTestRequestHelper()
 
 		newCtx, err := provider.AddDataToContext(ctx, map[string]any{"request": req})
@@ -207,7 +207,7 @@ func TestProvider_AddDataToContext(t *testing.T) {
 
 	t.Run("context provider with empty key", func(t *testing.T) {
 		provider := NewContextProvider("")
-		ctx := context.Background()
+		ctx := t.Context()
 
 		newCtx, err := provider.AddDataToContext(ctx, map[string]any{"key": "value"})
 
@@ -221,7 +221,7 @@ func TestProvider_AddDataToContext(t *testing.T) {
 			NewStaticProvider(simpleData),
 			NewContextProvider(constants.EvalData),
 		)
-		ctx := context.Background()
+		ctx := t.Context()
 
 		newCtx, err := provider.AddDataToContext(ctx, map[string]any{"key": "value"})
 
@@ -246,7 +246,7 @@ func TestProvider_AddDataToContext(t *testing.T) {
 			NewStaticProvider(simpleData),
 			newMockErrorProvider(),
 		)
-		ctx := context.Background()
+		ctx := t.Context()
 
 		newCtx, err := provider.AddDataToContext(ctx, map[string]any{"key": "value"})
 
@@ -257,7 +257,7 @@ func TestProvider_AddDataToContext(t *testing.T) {
 	// Test with multiple data items
 	t.Run("context provider with multiple data items", func(t *testing.T) {
 		provider := NewContextProvider(constants.EvalData)
-		ctx := context.Background()
+		ctx := t.Context()
 
 		newCtx, err := provider.AddDataToContext(ctx,
 			map[string]any{"key1": "value1"},
