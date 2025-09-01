@@ -30,4 +30,19 @@ const (
 	// EntrypointReverseString reverses the input string, handling UTF-8 correctly.
 	// Input: {"input": "hello"} -> Output: {"reversed": "olleh"}
 	EntrypointReverseString = "reverse_string"
+
+	// Namespaced entrypoints expect input under "data" namespace
+	// These functions accept {"data": {"input": "..."}, "request": {...}} format
+
+	// EntrypointGreetNamespaced processes namespaced JSON input and returns a greeting.
+	// Input: {"data": {"input": "world"}} -> Output: {"greeting": "Hello, world!"}
+	EntrypointGreetNamespaced = "greet_namespaced"
+
+	// EntrypointCountVowelsNamespaced counts vowels in namespaced input.
+	// Input: {"data": {"input": "hello"}} -> Output: {"count": 2, "vowels": "aeiouAEIOU", "input": "hello"}
+	EntrypointCountVowelsNamespaced = "count_vowels_namespaced"
+
+	// EntrypointReverseStringNamespaced reverses namespaced input string, handling UTF-8 correctly.
+	// Input: {"data": {"input": "hello"}} -> Output: {"reversed": "olleh"}
+	EntrypointReverseStringNamespaced = "reverse_string_namespaced"
 )

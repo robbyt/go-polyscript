@@ -278,4 +278,75 @@ func TestExtismWasmIntegration(t *testing.T) {
 
 		assert.Equal(t, "dlroW olleH", reverseResult["reversed"])
 	})
+
+	t.Run("count_vowels_namespaced function", func(t *testing.T) {
+		// Create a new instance
+		instanceCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+		defer cancel()
+
+		instance, err := compiledPlugin.Instance(instanceCtx, extismSDK.PluginInstanceConfig{
+			ModuleConfig: wazero.NewModuleConfig(),
+		})
+		require.NoError(t, err, "Failed to create instance")
+		defer func() {
+			assert.NoError(t, instance.Close(instanceCtx))
+		}()
+
+		// Test input with namespaced structure
+		namespacedInput := map[string]any{
+			"data": map[string]string{
+				"input": "Hello World",
+			},
+		}
+		namespacedInputJSON, err := json.Marshal(namespacedInput)
+		require.NoError(t, err, "Failed to marshal namespaced input")
+
+		// Call function
+		exit, output, err := instance.Call("count_vowels_namespaced", namespacedInputJSON)
+		require.NoError(t, err, "Count_vowels_namespaced call failed")
+		require.Equal(t, uint32(0), exit, "Count_vowels_namespaced returned non-zero exit code")
+
+		// Parse and verify result
+		var vowelResult map[string]any
+		err = json.Unmarshal(output, &vowelResult)
+		require.NoError(t, err, "Failed to parse vowel result")
+
+		assert.Equal(t, "Hello World", vowelResult["input"])
+		assert.Equal(t, float64(3), vowelResult["count"]) // 3 vowels in "Hello World"
+	})
+
+	t.Run("reverse_string_namespaced function", func(t *testing.T) {
+		// Create a new instance
+		instanceCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+		defer cancel()
+
+		instance, err := compiledPlugin.Instance(instanceCtx, extismSDK.PluginInstanceConfig{
+			ModuleConfig: wazero.NewModuleConfig(),
+		})
+		require.NoError(t, err, "Failed to create instance")
+		defer func() {
+			assert.NoError(t, instance.Close(instanceCtx))
+		}()
+
+		// Test input with namespaced structure
+		namespacedInput := map[string]any{
+			"data": map[string]string{
+				"input": "Hello World",
+			},
+		}
+		namespacedInputJSON, err := json.Marshal(namespacedInput)
+		require.NoError(t, err, "Failed to marshal namespaced input")
+
+		// Call function
+		exit, output, err := instance.Call("reverse_string_namespaced", namespacedInputJSON)
+		require.NoError(t, err, "Reverse_string_namespaced call failed")
+		require.Equal(t, uint32(0), exit, "Reverse_string_namespaced returned non-zero exit code")
+
+		// Parse and verify result
+		var reverseResult map[string]string
+		err = json.Unmarshal(output, &reverseResult)
+		require.NoError(t, err, "Failed to parse reverse result")
+
+		assert.Equal(t, "dlroW olleH", reverseResult["reversed"])
+	})
 }
