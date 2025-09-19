@@ -7,7 +7,7 @@ require (
 	github.com/risor-io/risor v1.8.1
 	github.com/stretchr/testify v1.11.1
 	github.com/tetratelabs/wazero v1.9.0
-	go.starlark.net v0.0.0-20250826212936-2a4f36945129
+	go.starlark.net v0.0.0-20250906160240-bf296ed553ea
 )
 
 require (
