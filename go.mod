@@ -1,6 +1,6 @@
 module github.com/robbyt/go-polyscript
 
-go 1.25.3
+go 1.25.4
 
 require (
 	github.com/extism/go-sdk v1.7.1
