@@ -22,12 +22,12 @@ type Request struct {
 
 // Response represents a complex output object
 type Response struct {
-	RequestID   string         `json:"request_id"`
-	ProcessedAt string         `json:"processed_at"`
+	RequestID   string         `json:"requestId"`
+	ProcessedAt string         `json:"processedAt"`
 	Results     map[string]any `json:"results"`
-	TagCount    int            `json:"tag_count"`
-	MetaCount   int            `json:"meta_count"`
-	IsActive    bool           `json:"is_active"`
+	TagCount    int            `json:"tagCount"`
+	MetaCount   int            `json:"metaCount"`
+	IsActive    bool           `json:"isActive"`
 	Summary     string         `json:"summary"`
 }
 

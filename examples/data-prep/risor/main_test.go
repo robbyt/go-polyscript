@@ -58,7 +58,7 @@ func TestPrepareRuntimeData(t *testing.T) {
 	// Test prepareRuntimeData function
 	ctx := t.Context()
 	enrichedCtx, err := prepareRuntimeData(ctx, logger, evaluator)
-	assert.NoError(t, err, "prepareRuntimeData should not return an error")
+	require.NoError(t, err, "prepareRuntimeData should not return an error")
 	assert.NotNil(t, enrichedCtx, "Enriched context should not be nil")
 }
 
@@ -76,7 +76,7 @@ func TestEvalAndExtractResult(t *testing.T) {
 
 	// Test evaluation
 	result, err := evalAndExtractResult(preparedCtx, logger, evaluator)
-	assert.NoError(t, err, "evalAndExtractResult should not return an error")
+	require.NoError(t, err, "evalAndExtractResult should not return an error")
 	assert.NotNil(t, result, "Result should not be nil")
 
 	// Check basic result fields

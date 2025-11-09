@@ -2,11 +2,11 @@ package data
 
 import (
 	"context"
-	"errors"
 	"testing"
 
 	"github.com/robbyt/go-polyscript/platform/constants"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestProvider_Interface ensures that all provider implementations comply with the Provider interface
@@ -40,12 +40,12 @@ func TestProvider_GetData(t *testing.T) {
 		ctx := t.Context()
 
 		result, err := provider.GetData(ctx)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, simpleData, result)
 
 		// Get a fresh copy to verify data consistency
 		newResult, err := provider.GetData(ctx)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, simpleData, newResult)
 	})
 
@@ -54,7 +54,7 @@ func TestProvider_GetData(t *testing.T) {
 		ctx := t.Context()
 
 		result, err := provider.GetData(ctx)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Empty(t, result)
 	})
 
@@ -64,12 +64,12 @@ func TestProvider_GetData(t *testing.T) {
 		ctx := context.WithValue(t.Context(), constants.EvalData, simpleData)
 
 		result, err := provider.GetData(ctx)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, simpleData, result)
 
 		// Get a fresh copy to verify data consistency
 		newResult, err := provider.GetData(ctx)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, simpleData, newResult)
 	})
 
@@ -78,7 +78,7 @@ func TestProvider_GetData(t *testing.T) {
 		ctx := t.Context()
 
 		result, err := provider.GetData(ctx)
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Nil(t, result)
 	})
 
@@ -87,7 +87,7 @@ func TestProvider_GetData(t *testing.T) {
 		ctx := context.WithValue(t.Context(), constants.EvalData, "not a map")
 
 		result, err := provider.GetData(ctx)
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Nil(t, result)
 	})
 
@@ -105,7 +105,7 @@ func TestProvider_GetData(t *testing.T) {
 		)
 
 		result, err := provider.GetData(ctx)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		// Verify expected values (context overrides static for shared keys)
 		assert.Equal(t, "value", result["static"])
@@ -119,7 +119,7 @@ func TestProvider_GetData(t *testing.T) {
 
 		// Get a fresh copy to verify data consistency
 		newResult, err := provider.GetData(ctx)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, result, newResult)
 	})
 
@@ -128,7 +128,7 @@ func TestProvider_GetData(t *testing.T) {
 		ctx := t.Context()
 
 		result, err := provider.GetData(ctx)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Empty(t, result)
 	})
 
@@ -140,7 +140,7 @@ func TestProvider_GetData(t *testing.T) {
 		ctx := t.Context()
 
 		result, err := provider.GetData(ctx)
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Nil(t, result)
 	})
 }
@@ -156,13 +156,13 @@ func TestProvider_AddDataToContext(t *testing.T) {
 
 		newCtx, err := provider.AddDataToContext(ctx, map[string]any{"key": "value"})
 
-		assert.Error(t, err, "StaticProvider should reject data additions")
-		assert.True(t, errors.Is(err, ErrStaticProviderNoRuntimeUpdates))
+		require.Error(t, err, "StaticProvider should reject data additions")
+		require.ErrorIs(t, err, ErrStaticProviderNoRuntimeUpdates)
 		assert.Equal(t, ctx, newCtx, "Context should remain unchanged")
 
 		// Verify static data is still available
 		data, err := provider.GetData(ctx)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, simpleData, data)
 	})
 
@@ -173,12 +173,12 @@ func TestProvider_AddDataToContext(t *testing.T) {
 
 		newCtx, err := provider.AddDataToContext(ctx, map[string]any{"key": "value"})
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.NotEqual(t, ctx, newCtx, "Context should be modified")
 
 		// Verify data was stored correctly
 		data, err := provider.GetData(newCtx)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		// Data should be at root level with no namespace
 		assert.Equal(t, "value", data["key"], "Data should be at root level")
@@ -191,12 +191,12 @@ func TestProvider_AddDataToContext(t *testing.T) {
 
 		newCtx, err := provider.AddDataToContext(ctx, map[string]any{"request": req})
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.NotEqual(t, ctx, newCtx, "Context should be modified")
 
 		// Verify request data was stored correctly
 		data, err := provider.GetData(newCtx)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		// Request should be at root level with direct access
 		requestMap, ok := data["request"].(map[string]any)
@@ -211,7 +211,7 @@ func TestProvider_AddDataToContext(t *testing.T) {
 
 		newCtx, err := provider.AddDataToContext(ctx, map[string]any{"key": "value"})
 
-		assert.Error(t, err, "Empty context key should cause error")
+		require.Error(t, err, "Empty context key should cause error")
 		assert.Equal(t, ctx, newCtx, "Context should remain unchanged on error")
 	})
 
@@ -225,7 +225,7 @@ func TestProvider_AddDataToContext(t *testing.T) {
 
 		newCtx, err := provider.AddDataToContext(ctx, map[string]any{"key": "value"})
 
-		assert.NoError(
+		require.NoError(
 			t,
 			err,
 			"StaticProvider error should be ignored when ContextProvider succeeds",
@@ -234,7 +234,7 @@ func TestProvider_AddDataToContext(t *testing.T) {
 
 		// Verify data
 		data, err := provider.GetData(newCtx)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		// Should have both static and context data
 		assert.Equal(t, simpleData["string"], data["string"], "Should contain static data")
@@ -250,7 +250,7 @@ func TestProvider_AddDataToContext(t *testing.T) {
 
 		newCtx, err := provider.AddDataToContext(ctx, map[string]any{"key": "value"})
 
-		assert.Error(t, err, "Should error when all providers fail")
+		require.Error(t, err, "Should error when all providers fail")
 		assert.Equal(t, ctx, newCtx, "Context should remain unchanged")
 	})
 
@@ -263,12 +263,12 @@ func TestProvider_AddDataToContext(t *testing.T) {
 			map[string]any{"key1": "value1"},
 			map[string]any{"key2": "value2"})
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.NotEqual(t, ctx, newCtx, "Context should be modified")
 
 		// Verify data was merged correctly
 		data, err := provider.GetData(newCtx)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		assert.Equal(t, "value1", data["key1"], "Should contain first item")
 		assert.Equal(t, "value2", data["key2"], "Should contain second item")

@@ -77,9 +77,9 @@ func TestFixJSONNumberTypes(t *testing.T) {
 		assert.True(t, ok, "Result should be a map")
 
 		// Check that the values were converted to float64
-		assert.Equal(t, float64(19.99), mapResult["price"])
-		assert.Equal(t, float64(4.5), mapResult["rating"])
-		assert.Equal(t, float64(75.5), mapResult["percentage"])
+		assert.InDelta(t, float64(19.99), mapResult["price"], 0.0001)
+		assert.InDelta(t, float64(4.5), mapResult["rating"], 0.0001)
+		assert.InDelta(t, float64(75.5), mapResult["percentage"], 0.0001)
 		assert.IsType(t, float64(0), mapResult["price"])
 		assert.IsType(t, float64(0), mapResult["rating"])
 		assert.IsType(t, float64(0), mapResult["percentage"])
@@ -113,7 +113,7 @@ func TestFixJSONNumberTypes(t *testing.T) {
 		stats, ok := user["stats"].(map[string]any)
 		assert.True(t, ok, "stats should be a map")
 		assert.Equal(t, int(42), stats["login_count"])
-		assert.Equal(t, float64(95.5), stats["score"])
+		assert.InDelta(t, float64(95.5), stats["score"], 0.0001)
 	})
 
 	t.Run("handles slices", func(t *testing.T) {
@@ -142,7 +142,7 @@ func TestFixJSONNumberTypes(t *testing.T) {
 		itemMap, ok := sliceResult[3].(map[string]any)
 		assert.True(t, ok, "Item at index 3 should be a map")
 		assert.Equal(t, int(123), itemMap["item_id"])
-		assert.Equal(t, float64(9.99), itemMap["price"])
+		assert.InDelta(t, float64(9.99), itemMap["price"], 0.0001)
 	})
 
 	t.Run("handles nested slices", func(t *testing.T) {
@@ -177,13 +177,13 @@ func TestFixJSONNumberTypes(t *testing.T) {
 		product1, ok := products[0].(map[string]any)
 		assert.True(t, ok, "First product should be a map")
 		assert.Equal(t, int(1), product1["product_id"])
-		assert.Equal(t, float64(19.99), product1["price"])
+		assert.InDelta(t, float64(19.99), product1["price"], 0.0001)
 
 		// Check second product
 		product2, ok := products[1].(map[string]any)
 		assert.True(t, ok, "Second product should be a map")
 		assert.Equal(t, int(2), product2["product_id"])
-		assert.Equal(t, float64(29.99), product2["price"])
+		assert.InDelta(t, float64(29.99), product2["price"], 0.0001)
 	})
 
 	t.Run("handles invalid numbers gracefully", func(t *testing.T) {

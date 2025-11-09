@@ -55,10 +55,10 @@ func TestNewHTTPRequestWrapper(t *testing.T) {
 		require.Equal(t, "HTTP/1.1", reqStruct.Proto)
 		require.Equal(t, int64(0), reqStruct.ContentLength)
 		require.Equal(t, "localhost:8080", reqStruct.Host)
-		require.Equal(t, "", reqStruct.RemoteAddr)
+		require.Empty(t, reqStruct.RemoteAddr)
 		require.Equal(t, map[string][]string{}, reqStruct.QueryParams)
 		require.Equal(t, map[string][]string{}, reqStruct.Headers)
-		require.Equal(t, "", reqStruct.Body)
+		require.Empty(t, reqStruct.Body)
 	})
 
 	t.Run("with query parameters", func(t *testing.T) {
@@ -82,13 +82,13 @@ func TestNewHTTPRequestWrapper(t *testing.T) {
 		require.Equal(t, "HTTP/1.1", reqStruct.Proto)
 		require.Equal(t, int64(0), reqStruct.ContentLength)
 		require.Equal(t, "localhost:8080", reqStruct.Host)
-		require.Equal(t, "", reqStruct.RemoteAddr)
+		require.Empty(t, reqStruct.RemoteAddr)
 		require.Equal(t, map[string][]string{
 			"param1": {"value1"},
 			"param2": {"value2"},
 		}, reqStruct.QueryParams)
 		require.Equal(t, map[string][]string{}, reqStruct.Headers)
-		require.Equal(t, "", reqStruct.Body)
+		require.Empty(t, reqStruct.Body)
 	})
 
 	t.Run("nil request", func(t *testing.T) {
@@ -146,10 +146,10 @@ func TestRequestToMap(t *testing.T) {
 		require.Equal(t, "HTTP/1.1", result["Proto"])
 		require.Equal(t, int64(0), result["ContentLength"])
 		require.Equal(t, "localhost:8080", result["Host"])
-		require.Equal(t, "", result["RemoteAddr"])
+		require.Empty(t, result["RemoteAddr"])
 		require.Equal(t, map[string][]string{}, result["QueryParams"])
 		require.Equal(t, map[string][]string{}, result["Headers"])
-		require.Equal(t, "", result["Body"])
+		require.Empty(t, result["Body"])
 	})
 
 	t.Run("with query parameters", func(t *testing.T) {
@@ -173,12 +173,12 @@ func TestRequestToMap(t *testing.T) {
 		require.Equal(t, "HTTP/1.1", result["Proto"])
 		require.Equal(t, int64(0), result["ContentLength"])
 		require.Equal(t, "localhost:8080", result["Host"])
-		require.Equal(t, "", result["RemoteAddr"])
+		require.Empty(t, result["RemoteAddr"])
 		require.Equal(t, map[string][]string{
 			"param1": {"value1"},
 			"param2": {"value2"},
 		}, result["QueryParams"])
 		require.Equal(t, map[string][]string{}, result["Headers"])
-		require.Equal(t, "", result["Body"])
+		require.Empty(t, result["Body"])
 	})
 }

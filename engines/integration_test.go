@@ -422,7 +422,7 @@ _ = result
 		// The greet function returns {"greeting": "Hello, <input>!"}
 		greeting, exists := resultMap["greeting"]
 		require.True(t, exists)
-		assert.True(t, strings.Contains(greeting.(string), "World"))
+		assert.Contains(t, greeting.(string), "World")
 	})
 }
 

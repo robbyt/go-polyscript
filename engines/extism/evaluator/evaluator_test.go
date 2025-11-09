@@ -178,7 +178,7 @@ func TestEvaluator_Evaluate(t *testing.T) {
 			require.Contains(t, resultMap, "result")
 			require.Equal(t, "success", resultMap["result"])
 			require.Contains(t, resultMap, "value")
-			require.Equal(t, float64(42), resultMap["value"])
+			require.InDelta(t, float64(42), resultMap["value"], 0.0001)
 		})
 
 		// Test successful string response
@@ -398,8 +398,7 @@ func TestEvaluator_Evaluate(t *testing.T) {
 			// Call Eval, which should be cancelled during execution
 			result, err := evaluator.Eval(ctx)
 
-			// Should get a cancellation error
-			assert.Error(t, err)
+			require.Error(t, err, "Expected cancellation error")
 			assert.Nil(t, result)
 			assert.Contains(t, err.Error(), "execution")
 
@@ -588,19 +587,18 @@ func TestEvaluator_Evaluate(t *testing.T) {
 						"Expected the mock instance to be called",
 					)
 
-					// Check for expected errors
 					if tt.wantErr {
-						assert.Error(t, err)
+						require.Error(t, err)
 						if tt.errContains != "" {
 							assert.Contains(t, err.Error(), tt.errContains)
 						}
 					} else {
-						assert.NoError(t, err)
+						require.NoError(t, err)
 						assert.NotNil(t, result)
 					}
 
 					// Execution time should always be measured
-					assert.Greater(t, execTime.Nanoseconds(), int64(0))
+					assert.Positive(t, execTime.Nanoseconds())
 				})
 			}
 		})

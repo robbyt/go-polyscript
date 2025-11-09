@@ -209,10 +209,10 @@ func TestExtismWasmIntegration(t *testing.T) {
 		err = json.Unmarshal(output, &response)
 		require.NoError(t, err, "Failed to parse complex response")
 
-		assert.Equal(t, "test-123", response["request_id"])
-		assert.NotEmpty(t, response["processed_at"])
-		assert.Equal(t, float64(3), response["tag_count"]) // JSON numbers are float64
-		assert.Equal(t, float64(3), response["meta_count"])
+		assert.Equal(t, "test-123", response["requestId"])
+		assert.NotEmpty(t, response["processedAt"])
+		assert.InDelta(t, float64(3), response["tagCount"], 0.0001) // JSON numbers are float64
+		assert.InDelta(t, float64(3), response["metaCount"], 0.0001)
 		assert.Contains(t, response["summary"], "test-123")
 	})
 
@@ -245,7 +245,7 @@ func TestExtismWasmIntegration(t *testing.T) {
 		require.NoError(t, err, "Failed to parse vowel result")
 
 		assert.Equal(t, "Hello World", vowelResult["input"])
-		assert.Equal(t, float64(3), vowelResult["count"]) // 3 vowels in "Hello World"
+		assert.InDelta(t, float64(3), vowelResult["count"], 0.0001) // 3 vowels in "Hello World"
 	})
 
 	t.Run("reverse_string function", func(t *testing.T) {
@@ -312,7 +312,7 @@ func TestExtismWasmIntegration(t *testing.T) {
 		require.NoError(t, err, "Failed to parse vowel result")
 
 		assert.Equal(t, "Hello World", vowelResult["input"])
-		assert.Equal(t, float64(3), vowelResult["count"]) // 3 vowels in "Hello World"
+		assert.InDelta(t, float64(3), vowelResult["count"], 0.0001) // 3 vowels in "Hello World"
 	})
 
 	t.Run("reverse_string_namespaced function", func(t *testing.T) {

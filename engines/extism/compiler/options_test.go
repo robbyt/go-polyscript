@@ -53,7 +53,7 @@ func TestCompilerOptions_Options(t *testing.T) {
 
 		t.Run("empty value", func(t *testing.T) {
 			c := &Compiler{entryPointName: ""}
-			require.Equal(t, "", c.GetEntryPointName())
+			require.Empty(t, c.GetEntryPointName())
 		})
 
 		t.Run("with defaults", func(t *testing.T) {
@@ -617,7 +617,7 @@ func TestCompilerOptions(t *testing.T) {
 			c2 := &Compiler{
 				entryPointName: "",
 			}
-			require.Equal(t, "", c2.GetEntryPointName())
+			require.Empty(t, c2.GetEntryPointName())
 		})
 	})
 

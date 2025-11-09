@@ -103,7 +103,7 @@ func TestEvaluatorInterface(t *testing.T) {
 		Return((*mocks.EvaluatorResponse)(nil), errors.New("evaluation error"))
 
 	response, err = errorEvaluator.Eval(t.Context())
-	assert.Error(t, err, "Eval should return an error")
+	require.Error(t, err, "Eval should return an error")
 	assert.Nil(t, response, "Response should be nil when there's an error")
 	assert.Contains(t, err.Error(), "evaluation error", "Error message should be preserved")
 }
@@ -197,8 +197,8 @@ func TestEvalDataPreparerInterfaceDirectImplementation(t *testing.T) {
 		Return(ctx, errors.New("preparation error"))
 
 	ogCtx, err := errorPreparer.AddDataToContext(ctx, map[string]any{"test": "value"})
-	assert.Error(t, err, "Should return an error")
-	assert.ErrorContains(t, err, "preparation error", "Error message should be preserved")
+	require.Error(t, err, "Should return an error")
+	require.ErrorContains(t, err, "preparation error", "Error message should be preserved")
 	assert.Equal(t, ctx, ogCtx, "Original context should be returned on error")
 }
 
@@ -254,7 +254,7 @@ func TestEvaluatorWithPrepInterface(t *testing.T) {
 		Return(ctx, errors.New("preparation error"))
 
 	_, err = prepErrorEvaluator.AddDataToContext(ctx, map[string]any{"test": "data"})
-	assert.Error(t, err, "Should return an error when preparation fails")
+	require.Error(t, err, "Should return an error when preparation fails")
 
 	// Test error in evaluation
 	evalErrorEvaluator := &mockEvaluatorWithPreparer{}
@@ -289,6 +289,6 @@ func TestEvaluatorWithPrepErrors(t *testing.T) {
 	) // Properly wrapped in map
 
 	// This should now succeed as integers are properly wrapped in a map
-	assert.NoError(t, err, "AddDataToContext should succeed with properly wrapped integers")
+	require.NoError(t, err, "AddDataToContext should succeed with properly wrapped integers")
 	assert.NotNil(t, enrichedCtx, "Should return a context regardless")
 }

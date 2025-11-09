@@ -118,7 +118,7 @@ func TestEvaluatorResponseUsage(t *testing.T) {
 
 	// Type checking pattern
 	result := mockResponse.Interface()
-	require.Equal(t, mockResponse.Type(), data.STRING)
+	require.Equal(t, data.STRING, mockResponse.Type())
 
 	strResult, ok := result.(string)
 	assert.True(t, ok, "Should convert to string")
@@ -134,7 +134,7 @@ func TestEvaluatorResponseUsage(t *testing.T) {
 
 	// Type checking for map
 	result = mockResponse.Interface()
-	require.Equal(t, mockResponse.Type(), data.MAP)
+	require.Equal(t, data.MAP, mockResponse.Type())
 
 	mapResult, ok := result.(map[string]any)
 	assert.True(t, ok, "Should convert to map")

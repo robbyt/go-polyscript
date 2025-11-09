@@ -2,7 +2,6 @@ package data
 
 import (
 	"context"
-	"errors"
 	"testing"
 
 	"github.com/robbyt/go-polyscript/platform/constants"
@@ -236,11 +235,11 @@ func TestCompositeProvider_GetData(t *testing.T) {
 			result, err := provider.GetData(ctx)
 
 			if tt.expectError {
-				assert.Error(t, err, "Should return error when a provider fails")
+				require.Error(t, err, "Should return error when a provider fails")
 				return
 			}
 
-			assert.NoError(t, err, "Should not return error for valid providers")
+			require.NoError(t, err, "Should not return error for valid providers")
 			assertMapContainsExpectedHelper(t, tt.expectedData, result)
 
 			// Verify data consistency across calls
@@ -410,7 +409,7 @@ func TestCompositeProvider_AddDataToContext(t *testing.T) {
 
 		newCtx, err := provider.AddDataToContext(ctx, inputData)
 
-		assert.NoError(t, err, "Should not return error with empty provider list")
+		require.NoError(t, err, "Should not return error with empty provider list")
 		assert.Equal(t, ctx, newCtx, "Context should remain unchanged")
 	})
 
@@ -423,12 +422,12 @@ func TestCompositeProvider_AddDataToContext(t *testing.T) {
 
 		newCtx, err := provider.AddDataToContext(ctx, inputData)
 
-		assert.NoError(t, err, "Should not return error for context provider")
+		require.NoError(t, err, "Should not return error for context provider")
 		assert.NotEqual(t, ctx, newCtx, "Context should be modified")
 
 		// Verify data was added correctly
 		data, err := provider.GetData(newCtx)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, "value", data["key"])
 	})
 
@@ -441,13 +440,13 @@ func TestCompositeProvider_AddDataToContext(t *testing.T) {
 
 		newCtx, err := provider.AddDataToContext(ctx, inputData)
 
-		assert.Error(t, err, "Should return error for static provider")
+		require.Error(t, err, "Should return error for static provider")
 		assert.Equal(t, ctx, newCtx, "Context should remain unchanged")
-		assert.True(t, errors.Is(err, ErrStaticProviderNoRuntimeUpdates))
+		require.ErrorIs(t, err, ErrStaticProviderNoRuntimeUpdates)
 
 		// Verify static data is still available
 		data, getErr := provider.GetData(ctx)
-		assert.NoError(t, getErr)
+		require.NoError(t, getErr)
 		assert.Equal(t, simpleData, data, "Static data should still be available")
 	})
 
@@ -463,12 +462,12 @@ func TestCompositeProvider_AddDataToContext(t *testing.T) {
 
 		newCtx, err := provider.AddDataToContext(ctx, inputData)
 
-		assert.NoError(t, err, "Should not return error when at least one provider succeeds")
+		require.NoError(t, err, "Should not return error when at least one provider succeeds")
 		assert.NotEqual(t, ctx, newCtx, "Context should be modified")
 
 		// Verify both static and context data are available
 		data, err := provider.GetData(newCtx)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		// Static data should be present
 		assert.Equal(t, simpleData["string"], data["string"], "Static data should be present")
@@ -489,7 +488,7 @@ func TestCompositeProvider_AddDataToContext(t *testing.T) {
 
 		newCtx, err := provider.AddDataToContext(ctx, inputData)
 
-		assert.Error(t, err, "Should return error when all non-static providers fail")
+		require.Error(t, err, "Should return error when all non-static providers fail")
 		assert.Equal(t, ctx, newCtx, "Context should remain unchanged")
 	})
 
@@ -506,12 +505,12 @@ func TestCompositeProvider_AddDataToContext(t *testing.T) {
 
 		newCtx, err := provider.AddDataToContext(ctx, inputData)
 
-		assert.NoError(t, err, "Should not return error when skipping nil providers")
+		require.NoError(t, err, "Should not return error when skipping nil providers")
 		assert.NotEqual(t, ctx, newCtx, "Context should be modified")
 
 		// Verify context data was added
 		data, err := provider.GetData(newCtx)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, "value", data["key"])
 	})
 
@@ -527,9 +526,9 @@ func TestCompositeProvider_AddDataToContext(t *testing.T) {
 
 		newCtx, err := provider.AddDataToContext(ctx, inputData)
 
-		assert.Error(t, err, "Should return error when all providers are static")
+		require.Error(t, err, "Should return error when all providers are static")
 		assert.Equal(t, ctx, newCtx, "Context should remain unchanged")
-		assert.True(t, errors.Is(err, ErrStaticProviderNoRuntimeUpdates),
+		require.ErrorIs(t, err, ErrStaticProviderNoRuntimeUpdates,
 			"Error should be StaticProviderNoRuntimeUpdates")
 	})
 }

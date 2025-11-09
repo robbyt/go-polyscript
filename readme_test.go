@@ -1,7 +1,6 @@
 package polyscript_test
 
 import (
-	"context"
 	"log/slog"
 	"os"
 	"testing"
@@ -44,7 +43,7 @@ func TestReadmeQuickStart(t *testing.T) {
 	)
 	require.NoError(t, err, "Should create evaluator successfully")
 
-	ctx := context.Background()
+	ctx := t.Context()
 	result, err := evaluator.Eval(ctx)
 	require.NoError(t, err, "Should evaluate successfully")
 	require.NotNil(t, result, "Result should not be nil")
@@ -80,7 +79,7 @@ func TestReadmeStaticProvider(t *testing.T) {
 	evaluator, err := polyscript.FromRisorStringWithData(script, inputData, logger.Handler())
 	require.NoError(t, err, "Should create evaluator successfully")
 
-	ctx := context.Background()
+	ctx := t.Context()
 	result, err := evaluator.Eval(ctx)
 	require.NoError(t, err, "Should evaluate successfully")
 
@@ -107,7 +106,7 @@ func TestReadmeContextProvider(t *testing.T) {
 	evaluator, err := polyscript.FromRisorString(script, logger.Handler())
 	require.NoError(t, err, "Should create evaluator successfully")
 
-	ctx := context.Background()
+	ctx := t.Context()
 	runtimeData := map[string]any{"name": "Billie Jean", "relationship": false}
 	enrichedCtx, err := evaluator.AddDataToContext(ctx, runtimeData)
 	require.NoError(t, err, "Should add data to context successfully")
@@ -152,7 +151,7 @@ func TestReadmeCombiningStaticAndDynamic(t *testing.T) {
 	require.NoError(t, err, "Should create evaluator with static data")
 
 	requestData := map[string]any{"name": "Robert"}
-	enrichedCtx, err := evaluator.AddDataToContext(context.Background(), requestData)
+	enrichedCtx, err := evaluator.AddDataToContext(t.Context(), requestData)
 	require.NoError(t, err, "Should add runtime data to context")
 
 	result, err := evaluator.Eval(enrichedCtx)
@@ -188,7 +187,7 @@ _ = result
 	)
 	require.NoError(t, err, "Should create Starlark evaluator")
 
-	result, err := evaluator.Eval(context.Background())
+	result, err := evaluator.Eval(t.Context())
 	require.NoError(t, err, "Should evaluate Starlark script")
 
 	resultMap, ok := result.Interface().(map[string]any)
@@ -211,7 +210,7 @@ func TestReadmeExtism(t *testing.T) {
 	)
 	require.NoError(t, err, "Should create Extism evaluator")
 
-	result, err := evaluator.Eval(context.Background())
+	result, err := evaluator.Eval(t.Context())
 	require.NoError(t, err, "Should evaluate WASM module")
 	require.NotNil(t, result, "Result should not be nil")
 
