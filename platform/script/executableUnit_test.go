@@ -238,10 +238,9 @@ func TestNewVersion(t *testing.T) {
 		// Verify version ID is set from content checksum
 		versionID := exe.GetID()
 		require.NotEmpty(t, versionID, "Expected version ID to be non-empty")
-		require.Equal(
+		require.Len(
 			t,
-			len(versionID),
-			checksumLength,
+			versionID, checksumLength,
 			"Expected version ID length to match checksum length",
 		)
 

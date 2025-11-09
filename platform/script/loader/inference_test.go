@@ -189,7 +189,7 @@ func TestInferLoader(t *testing.T) {
 			t.Run(tc.name, func(t *testing.T) {
 				result, err := InferLoader(tc.input)
 
-				assert.Error(t, err, "Expected error for unsupported type")
+				require.Error(t, err, "Expected error for unsupported type")
 				assert.Nil(t, result, "Result should be nil for unsupported type")
 				assert.Contains(t, err.Error(), "unsupported input type")
 			})

@@ -1,7 +1,6 @@
 package data
 
 import (
-	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -47,7 +46,7 @@ func TestStaticProvider_Creation(t *testing.T) {
 			ctx := t.Context()
 			result, err := provider.GetData(ctx)
 
-			assert.NoError(t, err, "GetData should never return an error")
+			require.NoError(t, err, "GetData should never return an error")
 
 			if tt.expectEmpty {
 				assert.Empty(t, result, "Result map should be empty")
@@ -96,7 +95,7 @@ func TestStaticProvider_GetData(t *testing.T) {
 
 			result, err := provider.GetData(ctx)
 
-			assert.NoError(t, err, "GetData should never return an error")
+			require.NoError(t, err, "GetData should never return an error")
 
 			if tt.inputData == nil {
 				assert.Empty(t, result, "Result map should be empty for nil input")
@@ -110,7 +109,7 @@ func TestStaticProvider_GetData(t *testing.T) {
 				result["newTestKey"] = "newTestValue"
 
 				newResult, err := provider.GetData(ctx)
-				assert.NoError(t, err, "GetData should never return an error")
+				require.NoError(t, err, "GetData should never return an error")
 				assert.NotContains(
 					t,
 					newResult,
@@ -135,14 +134,14 @@ func TestStaticProvider_AddDataToContext(t *testing.T) {
 
 		newCtx, err := provider.AddDataToContext(ctx, nil)
 
-		assert.Error(t, err, "StaticProvider should reject all attempts to add data")
+		require.Error(t, err, "StaticProvider should reject all attempts to add data")
 		assert.Equal(t, ctx, newCtx, "Context should remain unchanged")
-		assert.True(t, errors.Is(err, ErrStaticProviderNoRuntimeUpdates),
+		require.ErrorIs(t, err, ErrStaticProviderNoRuntimeUpdates,
 			"Error should be ErrStaticProviderNoRuntimeUpdates")
 
 		// Verify data is still available
 		data, getErr := provider.GetData(ctx)
-		assert.NoError(t, getErr)
+		require.NoError(t, getErr)
 		assert.Equal(t, simpleData, data)
 	})
 
@@ -152,9 +151,9 @@ func TestStaticProvider_AddDataToContext(t *testing.T) {
 
 		newCtx, err := provider.AddDataToContext(ctx, map[string]any{"new": "data"})
 
-		assert.Error(t, err, "StaticProvider should reject all attempts to add data")
+		require.Error(t, err, "StaticProvider should reject all attempts to add data")
 		assert.Equal(t, ctx, newCtx, "Context should remain unchanged")
-		assert.True(t, errors.Is(err, ErrStaticProviderNoRuntimeUpdates),
+		require.ErrorIs(t, err, ErrStaticProviderNoRuntimeUpdates,
 			"Error should be ErrStaticProviderNoRuntimeUpdates")
 	})
 
@@ -167,9 +166,9 @@ func TestStaticProvider_AddDataToContext(t *testing.T) {
 			map[string]any{"request": createTestRequestHelper()},
 		)
 
-		assert.Error(t, err, "StaticProvider should reject all attempts to add data")
+		require.Error(t, err, "StaticProvider should reject all attempts to add data")
 		assert.Equal(t, ctx, newCtx, "Context should remain unchanged")
-		assert.True(t, errors.Is(err, ErrStaticProviderNoRuntimeUpdates),
+		require.ErrorIs(t, err, ErrStaticProviderNoRuntimeUpdates,
 			"Error should be ErrStaticProviderNoRuntimeUpdates")
 	})
 
@@ -184,9 +183,9 @@ func TestStaticProvider_AddDataToContext(t *testing.T) {
 			map[string]any{"num": 42},
 		)
 
-		assert.Error(t, err, "StaticProvider should reject all attempts to add data")
+		require.Error(t, err, "StaticProvider should reject all attempts to add data")
 		assert.Equal(t, ctx, newCtx, "Context should remain unchanged")
-		assert.True(t, errors.Is(err, ErrStaticProviderNoRuntimeUpdates),
+		require.ErrorIs(t, err, ErrStaticProviderNoRuntimeUpdates,
 			"Error should be ErrStaticProviderNoRuntimeUpdates")
 	})
 }
@@ -201,7 +200,7 @@ func TestStaticProvider_ErrorIdentification(t *testing.T) {
 	_, err := provider.AddDataToContext(ctx, map[string]any{"data": "some data"})
 
 	// Test that errors.Is works correctly with the sentinel error
-	assert.True(t, errors.Is(err, ErrStaticProviderNoRuntimeUpdates),
+	require.ErrorIs(t, err, ErrStaticProviderNoRuntimeUpdates,
 		"Error should be identifiable with errors.Is")
 
 	// Test direct equality for legacy code
@@ -214,6 +213,6 @@ func TestStaticProvider_ErrorIdentification(t *testing.T) {
 
 	// Verify data is still available
 	data, getErr := provider.GetData(ctx)
-	assert.NoError(t, getErr, "GetData should never return an error")
+	require.NoError(t, getErr, "GetData should never return an error")
 	assert.Equal(t, simpleData, data, "Static data should be available after error")
 }

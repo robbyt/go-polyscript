@@ -228,7 +228,7 @@ main()
 				execContent, err := comp.Compile(reader)
 				require.Error(t, err, "Expected an error but got none")
 				require.Nil(t, execContent, "Expected execContent to be nil")
-				require.True(t, errors.Is(err, tt.err), "Expected error %v, got %v", tt.err, err)
+				require.ErrorIs(t, err, tt.err, "Expected error %v, got %v", tt.err, err)
 
 				// Verify mock expectations
 				if mockReader, ok := reader.(*mockScriptReaderCloser); ok {
@@ -245,7 +245,7 @@ main()
 			execContent, err := comp.Compile(nil)
 			require.Error(t, err, "Expected an error but got none")
 			require.Nil(t, execContent, "Expected execContent to be nil")
-			require.True(t, errors.Is(err, ErrContentNil), "Expected error to be ErrContentNil")
+			require.ErrorIs(t, err, ErrContentNil, "Expected error to be ErrContentNil")
 		})
 
 		t.Run("io error", func(t *testing.T) {
@@ -398,7 +398,7 @@ func TestCompileError(t *testing.T) {
 	execContent, err := comp.Compile(nil)
 	require.Error(t, err, "Expected an error but got none")
 	require.Nil(t, execContent, "Expected execContent to be nil")
-	require.True(t, errors.Is(err, ErrContentNil), "Expected error to be ErrContentNil")
+	require.ErrorIs(t, err, ErrContentNil, "Expected error to be ErrContentNil")
 }
 
 func TestCompileIOError(t *testing.T) {

@@ -46,7 +46,7 @@ func TestContextProvider_GetData(t *testing.T) {
 
 		result, err := provider.GetData(ctx)
 
-		assert.Error(t, err, "Should return error for empty context key")
+		require.Error(t, err, "Should return error for empty context key")
 		assert.Nil(t, result, "Result should be nil when error occurs")
 	})
 
@@ -56,7 +56,7 @@ func TestContextProvider_GetData(t *testing.T) {
 
 		result, err := provider.GetData(ctx)
 
-		assert.NoError(t, err, "Should not return error for nil context value")
+		require.NoError(t, err, "Should not return error for nil context value")
 		assert.NotNil(t, result, "Result should be an empty map, not nil")
 		assert.Empty(t, result, "Result map should be empty")
 
@@ -70,7 +70,7 @@ func TestContextProvider_GetData(t *testing.T) {
 
 		result, err := provider.GetData(ctx)
 
-		assert.NoError(t, err, "Should not return error for valid context")
+		require.NoError(t, err, "Should not return error for valid context")
 		assert.Equal(t, simpleData, result, "Result should match expected data")
 
 		// Verify data consistency
@@ -83,7 +83,7 @@ func TestContextProvider_GetData(t *testing.T) {
 
 		result, err := provider.GetData(ctx)
 
-		assert.NoError(t, err, "Should not return error for valid context")
+		require.NoError(t, err, "Should not return error for valid context")
 		assert.Equal(t, complexData, result, "Result should match expected data")
 
 		// Verify data consistency
@@ -108,7 +108,7 @@ func TestContextProvider_GetData(t *testing.T) {
 		ctx := context.WithValue(t.Context(), constants.EvalData, data)
 
 		result, err := provider.GetData(ctx)
-		assert.NoError(t, err, "Should not return error for valid context")
+		require.NoError(t, err, "Should not return error for valid context")
 
 		// Verify top-level keys exist
 		assert.Contains(t, result, "user", "Should contain user key")
@@ -142,7 +142,7 @@ func TestContextProvider_GetData(t *testing.T) {
 		ctx := context.WithValue(t.Context(), constants.EvalData, data)
 
 		result, err := provider.GetData(ctx)
-		assert.NoError(t, err, "Should not return error for valid context")
+		require.NoError(t, err, "Should not return error for valid context")
 
 		// Verify all types are preserved
 		assert.Equal(t, "value", result["string"], "String should match")
@@ -152,7 +152,7 @@ func TestContextProvider_GetData(t *testing.T) {
 		// Note that we can't assert directly on slices, but we can check length and contents
 		arr, ok := result["array"].([]string)
 		assert.True(t, ok, "Array should be preserved")
-		assert.Equal(t, 2, len(arr), "Array should have correct length")
+		assert.Len(t, arr, 2, "Array should have correct length")
 
 		nestedMap, ok := result["map"].(map[string]any)
 		assert.True(t, ok, "Nested map should be preserved")
@@ -165,7 +165,7 @@ func TestContextProvider_GetData(t *testing.T) {
 
 		result, err := provider.GetData(ctx)
 
-		assert.Error(t, err, "Should return error for invalid data type")
+		require.Error(t, err, "Should return error for invalid data type")
 		assert.Nil(t, result, "Result should be nil when error occurs")
 	})
 
@@ -175,7 +175,7 @@ func TestContextProvider_GetData(t *testing.T) {
 
 		result, err := provider.GetData(ctx)
 
-		assert.Error(t, err, "Should return error for invalid data type")
+		require.Error(t, err, "Should return error for invalid data type")
 		assert.Nil(t, result, "Result should be nil when error occurs")
 	})
 }
@@ -190,7 +190,7 @@ func TestContextProvider_AddDataToContext(t *testing.T) {
 
 		newCtx, err := provider.AddDataToContext(ctx, map[string]any{"key": "value"})
 
-		assert.Error(t, err, "Should return error for empty context key")
+		require.Error(t, err, "Should return error for empty context key")
 		assert.Equal(t, ctx, newCtx, "Context should remain unchanged")
 	})
 
@@ -200,11 +200,11 @@ func TestContextProvider_AddDataToContext(t *testing.T) {
 
 		newCtx, err := provider.AddDataToContext(ctx, nil)
 
-		assert.NoError(t, err, "Should not return error with nil data")
+		require.NoError(t, err, "Should not return error with nil data")
 		assert.NotEqual(t, ctx, newCtx, "Context should be modified even with nil data")
 
 		data, err := provider.GetData(newCtx)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Empty(t, data, "Data should be empty with nil input")
 	})
 
@@ -214,11 +214,11 @@ func TestContextProvider_AddDataToContext(t *testing.T) {
 
 		newCtx, err := provider.AddDataToContext(ctx, map[string]any{"key1": "value1", "key2": 123})
 
-		assert.NoError(t, err, "Should not return error with valid map data")
+		require.NoError(t, err, "Should not return error with valid map data")
 		assert.NotEqual(t, ctx, newCtx, "Context should be modified")
 
 		data, err := provider.GetData(newCtx)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		// Data should be at root level
 		assert.Equal(t, "value1", data["key1"], "Should contain key1 at root level")
@@ -233,11 +233,11 @@ func TestContextProvider_AddDataToContext(t *testing.T) {
 			map[string]any{"key1": "value1"},
 			map[string]any{"key2": "value2"})
 
-		assert.NoError(t, err, "Should not return error with multiple map items")
+		require.NoError(t, err, "Should not return error with multiple map items")
 		assert.NotEqual(t, ctx, newCtx, "Context should be modified")
 
 		data, err := provider.GetData(newCtx)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		// Data should be at root level
 		assert.Equal(t, "value1", data["key1"], "Should contain key1 at root level")
@@ -252,11 +252,11 @@ func TestContextProvider_AddDataToContext(t *testing.T) {
 		req := createTestRequestHelper()
 		newCtx, err := provider.AddDataToContext(ctx, map[string]any{"request": req})
 
-		assert.NoError(t, err, "Should not return error with HTTP request in map")
+		require.NoError(t, err, "Should not return error with HTTP request in map")
 		assert.NotEqual(t, ctx, newCtx, "Context should be modified")
 
 		data, err := provider.GetData(newCtx)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Contains(t, data, "request", "Should contain request key")
 
 		requestData, ok := data["request"].(map[string]any)
@@ -272,12 +272,12 @@ func TestContextProvider_AddDataToContext(t *testing.T) {
 		// Try to add data with an empty key
 		newCtx, err := provider.AddDataToContext(ctx, map[string]any{"": "value"})
 
-		assert.Error(t, err, "Should error with empty key")
+		require.Error(t, err, "Should error with empty key")
 		assert.Contains(t, err.Error(), "empty keys are not allowed")
 
 		// Context should be modified but the empty key should not be added
 		data, getErr := provider.GetData(newCtx)
-		assert.NoError(t, getErr)
+		require.NoError(t, getErr)
 		assert.NotContains(t, data, "", "Empty key should not be added")
 	})
 
@@ -297,10 +297,10 @@ func TestContextProvider_AddDataToContext(t *testing.T) {
 			},
 		})
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		data, getErr := provider.GetData(newCtx)
-		assert.NoError(t, getErr)
+		require.NoError(t, getErr)
 
 		// Navigate the nested structure
 		userMap, ok := data["user"].(map[string]any)
@@ -325,7 +325,7 @@ func TestContextProvider_ProcessValue(t *testing.T) {
 		provider := NewContextProvider(constants.EvalData)
 		result, err := provider.processValue(nil)
 
-		assert.NoError(t, err, "Should not error for nil value")
+		require.NoError(t, err, "Should not error for nil value")
 		assert.Nil(t, result, "Result should be nil")
 	})
 
@@ -334,23 +334,23 @@ func TestContextProvider_ProcessValue(t *testing.T) {
 
 		// Test string
 		result, err := provider.processValue("test string")
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, "test string", result)
 
 		// Test number
 		result, err = provider.processValue(42)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, 42, result)
 
 		// Test boolean
 		result, err = provider.processValue(true)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, true, result)
 
 		// Test slice
 		slice := []string{"one", "two"}
 		result, err = provider.processValue(slice)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, slice, result)
 	})
 
@@ -359,7 +359,7 @@ func TestContextProvider_ProcessValue(t *testing.T) {
 		var nilReq *http.Request = nil
 
 		result, err := provider.processValue(nilReq)
-		assert.NoError(t, err, "Should not error for nil HTTP request")
+		require.NoError(t, err, "Should not error for nil HTTP request")
 		assert.Nil(t, result, "Result should be nil")
 	})
 
@@ -369,14 +369,14 @@ func TestContextProvider_ProcessValue(t *testing.T) {
 
 		// Test *http.Request
 		result, err := provider.processValue(req)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		resultMap, ok := result.(map[string]any)
 		assert.True(t, ok, "Result should be a map")
 		assert.Equal(t, "GET", resultMap["Method"])
 
 		// Test http.Request (value)
 		result, err = provider.processValue(*req)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		resultMap, ok = result.(map[string]any)
 		assert.True(t, ok, "Result should be a map")
 		assert.Equal(t, "GET", resultMap["Method"])
@@ -390,7 +390,7 @@ func TestContextProvider_ProcessValue(t *testing.T) {
 		}
 
 		_, err := provider.processValue(mapWithEmptyKey)
-		assert.Error(t, err, "Should reject maps with empty keys")
+		require.Error(t, err, "Should reject maps with empty keys")
 		assert.Contains(t, err.Error(), "empty keys are not allowed")
 	})
 
@@ -407,7 +407,7 @@ func TestContextProvider_ProcessValue(t *testing.T) {
 		}
 
 		result, err := provider.processValue(nestedMap)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		// Navigate through the levels to verify all maps were processed
 		resultMap, ok := result.(map[string]any)
@@ -436,7 +436,7 @@ func TestContextProvider_ProcessValue(t *testing.T) {
 		}
 
 		_, err := provider.processValue(problematicMap)
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "empty keys are not allowed")
 	})
 }
@@ -455,7 +455,7 @@ func TestContextProvider_DataIntegration(t *testing.T) {
 
 		// Verify data
 		data, err := provider.GetData(newCtx)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		// Data should be available directly at root level
 		assert.Equal(t, "value", data["key"], "Should contain the correct value at root")
@@ -476,7 +476,7 @@ func TestContextProvider_DataIntegration(t *testing.T) {
 
 		// Verify both pieces of data exist
 		data, err := provider.GetData(newCtx)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		assert.Equal(t, "value", data["existing"], "Should preserve existing value")
 		assert.Equal(t, "value", data["new"], "Should add new value")
@@ -495,7 +495,7 @@ func TestContextProvider_DataIntegration(t *testing.T) {
 
 		// Get raw data from context
 		data, err := provider.GetData(newCtx)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		// Request should be converted to a map
 		requestData, ok := data["request"].(map[string]any)
@@ -531,7 +531,7 @@ func TestContextProvider_DataIntegration(t *testing.T) {
 
 		// Verify all data correctly merged
 		data, err := provider.GetData(newCtx)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		userMap, ok := data["user"].(map[string]any)
 		assert.True(t, ok, "User should be a map")
@@ -579,7 +579,7 @@ func TestContextProvider_DataIntegration(t *testing.T) {
 		badData := map[string]any{"": "value"}
 		_, err := provider.AddDataToContext(ctx, badData)
 
-		assert.Error(t, err, "Should reject empty keys")
+		require.Error(t, err, "Should reject empty keys")
 		assert.Contains(t, err.Error(), "empty keys are not allowed")
 	})
 }

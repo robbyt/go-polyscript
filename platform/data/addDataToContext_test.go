@@ -25,7 +25,7 @@ func TestAddDataToContextHelper(t *testing.T) {
 			map[string]any{"key": "value"},
 		)
 
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Equal(t, baseCtx, enrichedCtx, "Context should remain unchanged")
 	})
 
@@ -40,7 +40,7 @@ func TestAddDataToContextHelper(t *testing.T) {
 			map[string]any{"key": "value"},
 		)
 
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Equal(t, baseCtx, enrichedCtx, "Context should remain unchanged")
 		assert.Nil(t, enrichedCtx.Value(constants.EvalData), "Context should not have data added")
 	})
@@ -56,7 +56,7 @@ func TestAddDataToContextHelper(t *testing.T) {
 			map[string]any{"key": "value"},
 		)
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.NotEqual(t, baseCtx, enrichedCtx, "Context should be modified")
 
 		// Verify data was added to context
@@ -83,7 +83,7 @@ func TestAddDataToContextHelper(t *testing.T) {
 			map[string]any{"request": req},
 		)
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.NotEqual(t, baseCtx, enrichedCtx, "Context should be modified")
 
 		// Verify request data was added to context
@@ -109,7 +109,7 @@ func TestAddDataToContextHelper(t *testing.T) {
 		enrichedCtx, err := AddDataToContextHelper(baseCtx, logger, provider,
 			map[string]any{"key": "value"}, map[string]any{"request": req})
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.NotEqual(t, baseCtx, enrichedCtx, "Context should be modified")
 
 		// Verify data was added to context
@@ -141,7 +141,7 @@ func TestAddDataToContextHelper(t *testing.T) {
 			map[string]any{"": 42}, // Empty key should cause an error
 		)
 
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Equal(t, baseCtx, enrichedCtx, "Context should be unchanged when there's an error")
 
 		// No data should be added to context when there's an error
@@ -159,7 +159,7 @@ func TestAddDataToContextHelper(t *testing.T) {
 		enrichedCtx, err := AddDataToContextHelper(baseCtx, logger, provider,
 			map[string]any{"key": "value"})
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.NotEqual(t, baseCtx, enrichedCtx, "Context should be modified")
 
 		// Verify data was added to context
@@ -193,7 +193,7 @@ func TestAddDataToContextWithErrorHandling(t *testing.T) {
 		)
 
 		// Should return an error
-		assert.Error(t, err)
+		require.Error(t, err)
 
 		// Context should remain unchanged when there's an error
 		assert.Equal(t, baseCtx, enrichedCtx, "Context should be unchanged when there's an error")

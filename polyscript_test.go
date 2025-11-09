@@ -322,7 +322,7 @@ func TestEvalHelpers(t *testing.T) {
 		case int64:
 			assert.Equal(t, int64(5), v, "length should be 5")
 		case float64:
-			assert.Equal(t, float64(5), v, "length should be 5")
+			assert.InDelta(t, float64(5), v, 0.0001, "length should be 5")
 		default:
 			t.Errorf("length is unexpected type %T", v)
 		}
@@ -426,7 +426,7 @@ func TestEvalHelpers(t *testing.T) {
 		case int64:
 			assert.Equal(t, int64(12), v, "length should be 12")
 		case float64:
-			assert.Equal(t, float64(12), v, "length should be 12")
+			assert.InDelta(t, float64(12), v, 0.0001, "length should be 12")
 		default:
 			t.Errorf("length is unexpected type %T", v)
 		}
@@ -552,7 +552,7 @@ _ = result`
 		case int64:
 			assert.Equal(t, int64(30), v, "timeout should be 30")
 		case float64:
-			assert.Equal(t, float64(30), v, "timeout should be 30")
+			assert.InDelta(t, float64(30), v, 0.0001, "timeout should be 30")
 		default:
 			t.Errorf("timeout is unexpected type %T", v)
 		}

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/robbyt/go-polyscript/platform/script/loader/httpauth"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -22,7 +23,7 @@ func TestNewFromHTTP(t *testing.T) {
 			http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
 				_, err := w.Write([]byte(FunctionContent))
-				require.NoError(t, err)
+				assert.NoError(t, err)
 			}),
 		)
 		defer tlsServer.Close()
@@ -55,7 +56,7 @@ func TestNewFromHTTP(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, err := w.Write([]byte(FunctionContent))
-			require.NoError(t, err)
+			assert.NoError(t, err)
 		}))
 		defer server.Close()
 
@@ -163,7 +164,7 @@ func TestNewFromHTTPWithOptions(t *testing.T) {
 				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					w.WriteHeader(http.StatusOK)
 					_, err := w.Write([]byte(FunctionContent))
-					require.NoError(t, err)
+					assert.NoError(t, err)
 				}),
 			)
 			defer server.Close()
@@ -212,7 +213,7 @@ func TestFromHTTP_TLSConfig(t *testing.T) {
 			http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
 				_, err := w.Write([]byte(FunctionContent))
-				require.NoError(t, err)
+				assert.NoError(t, err)
 			}),
 		)
 		defer server.Close()
@@ -240,7 +241,7 @@ func TestFromHTTP_TLSConfig(t *testing.T) {
 			http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
 				_, err := w.Write([]byte(FunctionContent))
-				require.NoError(t, err)
+				assert.NoError(t, err)
 			}),
 		)
 		defer server.Close()
@@ -276,7 +277,7 @@ func TestFromHTTP_TLSConfig(t *testing.T) {
 			http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
 				_, err := w.Write([]byte(FunctionContent))
-				require.NoError(t, err)
+				assert.NoError(t, err)
 			}),
 		)
 		defer server.Close()
@@ -315,7 +316,7 @@ func TestFromHTTP_TLSConfig(t *testing.T) {
 			http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
 				_, err := w.Write([]byte(FunctionContent))
-				require.NoError(t, err)
+				assert.NoError(t, err)
 			}),
 		)
 		defer server.Close()
@@ -352,7 +353,7 @@ func TestFromHTTP_GetReader(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, err := w.Write([]byte(testScript))
-			require.NoError(t, err)
+			assert.NoError(t, err)
 		}))
 		defer server.Close()
 
@@ -371,7 +372,7 @@ func TestFromHTTP_GetReader(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusUnauthorized)
 			_, err := w.Write([]byte("Unauthorized"))
-			require.NoError(t, err)
+			assert.NoError(t, err)
 		}))
 		defer server.Close()
 
@@ -390,7 +391,7 @@ func TestFromHTTP_GetReader(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusNotFound)
 			_, err := w.Write([]byte("Not Found"))
-			require.NoError(t, err)
+			assert.NoError(t, err)
 		}))
 		defer server.Close()
 
@@ -436,7 +437,7 @@ func TestFromHTTP_GetReaderWithContext(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, err := w.Write([]byte(testScript))
-			require.NoError(t, err)
+			assert.NoError(t, err)
 		}))
 		defer server.Close()
 
@@ -457,7 +458,7 @@ func TestFromHTTP_GetReaderWithContext(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, err := w.Write([]byte(testScript))
-			require.NoError(t, err)
+			assert.NoError(t, err)
 		}))
 		defer server.Close()
 
@@ -492,7 +493,7 @@ func TestFromHTTP_GetReaderWithContext(t *testing.T) {
 			time.Sleep(100 * time.Millisecond)
 			w.WriteHeader(http.StatusOK)
 			_, err := w.Write([]byte(testScript))
-			require.NoError(t, err)
+			assert.NoError(t, err)
 		}))
 		defer server.Close()
 
@@ -530,7 +531,7 @@ func TestFromHTTP_String(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, err := w.Write([]byte("test script content"))
-			require.NoError(t, err)
+			assert.NoError(t, err)
 		}))
 		defer server.Close()
 
@@ -563,7 +564,7 @@ func TestFromHTTP_String(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusNotFound)
 			_, err := w.Write([]byte("Not Found"))
-			require.NoError(t, err)
+			assert.NoError(t, err)
 		}))
 		defer server.Close()
 
@@ -645,7 +646,7 @@ func TestFromHTTP_GetSourceURL(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, err := w.Write([]byte(FunctionContent))
-			require.NoError(t, err)
+			assert.NoError(t, err)
 		}))
 		defer server.Close()
 

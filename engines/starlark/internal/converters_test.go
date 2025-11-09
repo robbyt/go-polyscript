@@ -327,7 +327,7 @@ func TestConvertToStarlarkFormat(t *testing.T) {
 			}
 
 			require.NoError(t, err)
-			require.Equal(t, len(tt.expected), len(result))
+			require.Len(t, result, len(tt.expected))
 
 			// Get ctx value and verify it's a dict
 			ctxVal, ok := result[constants.Ctx].(*starlarkLib.Dict)
