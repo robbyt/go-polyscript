@@ -30,7 +30,7 @@ These examples follow a consistent pattern:
 
 In all examples, scripts access data using a `ctx` global variable:
 - Starlark: `name = ctx["name"]`
-- Risor: `name := ctx["name"]`
+- Risor: `let name = ctx["name"]`
 - Extism: Input data is passed to the WASM module
 
 ## Running the Examples

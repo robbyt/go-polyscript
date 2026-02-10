@@ -48,7 +48,7 @@ This pattern separates data preparation from script evaluation:
 
 ### Risor
 
-[Risor](https://github.com/risor-io/risor) is a modern embedded scripting language for Go with a focus on simplicity and performance.
+[Risor](https://github.com/deepnoodle-ai/risor) is a modern embedded scripting language for Go with a focus on simplicity and performance.
 
 ### Extism (WebAssembly)
 

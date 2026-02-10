@@ -1,16 +1,16 @@
 package compiler
 
 import (
-	risorCompiler "github.com/risor-io/risor/compiler"
+	"github.com/deepnoodle-ai/risor/v2/pkg/bytecode"
 	machineTypes "github.com/robbyt/go-polyscript/engines/types"
 )
 
 type executable struct {
 	scriptBodyBytes []byte
-	ByteCode        *risorCompiler.Code
+	ByteCode        *bytecode.Code
 }
 
-func newExecutable(scriptBodyBytes []byte, byteCode *risorCompiler.Code) *executable {
+func newExecutable(scriptBodyBytes []byte, byteCode *bytecode.Code) *executable {
 	if len(scriptBodyBytes) == 0 || byteCode == nil {
 		return nil
 	}
@@ -29,7 +29,7 @@ func (e *executable) GetByteCode() any {
 	return e.ByteCode
 }
 
-func (e *executable) GetRisorByteCode() *risorCompiler.Code {
+func (e *executable) GetRisorByteCode() *bytecode.Code {
 	return e.ByteCode
 }
 

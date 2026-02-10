@@ -4,19 +4,30 @@ import (
 	"testing"
 
 	"github.com/robbyt/go-polyscript/platform/constants"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// TestConvertToRisorOptions tests the convertToRisorOptions method
-func TestConvertToRisorOptions(t *testing.T) {
+func TestBuildRisorEnv(t *testing.T) {
 	t.Parallel()
 
-	// Test with empty data
-	options := ConvertToRisorOptions(constants.Ctx, map[string]any{})
-	require.Len(t, options, 1)
+	t.Run("empty data includes builtins", func(t *testing.T) {
+		env := BuildRisorEnv(constants.Ctx, map[string]any{})
+		require.NotNil(t, env)
+		// Should contain the ctx key
+		_, hasCtx := env[constants.Ctx]
+		assert.True(t, hasCtx, "env should contain the ctx key")
+		// Should contain standard builtins like len, type, etc.
+		_, hasLen := env["len"]
+		assert.True(t, hasLen, "env should contain standard builtins")
+	})
 
-	// Test with actual data
-	testData := map[string]any{"foo": "bar"}
-	options = ConvertToRisorOptions(constants.Ctx, testData)
-	require.Len(t, options, 1)
+	t.Run("includes input data under ctx key", func(t *testing.T) {
+		testData := map[string]any{"foo": "bar"}
+		env := BuildRisorEnv(constants.Ctx, testData)
+		require.NotNil(t, env)
+		ctxData, ok := env[constants.Ctx].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, "bar", ctxData["foo"])
+	})
 }

@@ -3,7 +3,7 @@ package compiler
 import (
 	"testing"
 
-	risorCompiler "github.com/risor-io/risor/compiler"
+	"github.com/deepnoodle-ai/risor/v2/pkg/bytecode"
 	machineTypes "github.com/robbyt/go-polyscript/engines/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -16,25 +16,25 @@ func TestExecutable(t *testing.T) {
 	// Test creation scenarios
 	t.Run("Creation", func(t *testing.T) {
 		t.Run("valid creation", func(t *testing.T) {
-			content := "print('Hello, World!')"
-			bytecode := &risorCompiler.Code{}
+			content := "'Hello, World!'"
+			bc := bytecode.NewCode(bytecode.CodeParams{})
 
-			exe := newExecutable([]byte(content), bytecode)
+			exe := newExecutable([]byte(content), bc)
 			require.NotNil(t, exe)
 			assert.Equal(t, content, exe.GetSource())
-			assert.Equal(t, bytecode, exe.GetByteCode())
-			assert.Equal(t, bytecode, exe.GetRisorByteCode())
+			assert.Equal(t, bc, exe.GetByteCode())
+			assert.Equal(t, bc, exe.GetRisorByteCode())
 			assert.Equal(t, machineTypes.Risor, exe.GetMachineType())
 		})
 
 		t.Run("nil content", func(t *testing.T) {
-			bytecode := &risorCompiler.Code{}
-			exe := newExecutable(nil, bytecode)
+			bc := bytecode.NewCode(bytecode.CodeParams{})
+			exe := newExecutable(nil, bc)
 			assert.Nil(t, exe)
 		})
 
 		t.Run("nil bytecode", func(t *testing.T) {
-			content := "print('test')"
+			content := "'test'"
 			exe := newExecutable([]byte(content), nil)
 			assert.Nil(t, exe)
 		})
@@ -47,9 +47,9 @@ func TestExecutable(t *testing.T) {
 
 	// Test getters
 	t.Run("Getters", func(t *testing.T) {
-		content := "print('Hello, World!')"
-		bytecode := &risorCompiler.Code{}
-		executable := newExecutable([]byte(content), bytecode)
+		content := "'Hello, World!'"
+		bc := bytecode.NewCode(bytecode.CodeParams{})
+		executable := newExecutable([]byte(content), bc)
 		require.NotNil(t, executable)
 
 		t.Run("GetSource", func(t *testing.T) {
@@ -59,16 +59,16 @@ func TestExecutable(t *testing.T) {
 
 		t.Run("GetByteCode", func(t *testing.T) {
 			code := executable.GetByteCode()
-			assert.Equal(t, bytecode, code)
+			assert.Equal(t, bc, code)
 
 			// Test type assertion
-			_, ok := code.(*risorCompiler.Code)
+			_, ok := code.(*bytecode.Code)
 			assert.True(t, ok)
 		})
 
 		t.Run("GetRisorByteCode", func(t *testing.T) {
 			code := executable.GetRisorByteCode()
-			assert.Equal(t, bytecode, code)
+			assert.Equal(t, bc, code)
 		})
 
 		t.Run("GetMachineType", func(t *testing.T) {

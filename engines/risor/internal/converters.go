@@ -1,22 +1,21 @@
 package internal
 
 import (
-	risorLib "github.com/risor-io/risor"
+	risor "github.com/deepnoodle-ai/risor/v2"
 )
 
-// ConvertToRisorOptions converts a Go map into Risor engine options object.
-// The input data will be wrapped in a single "ctx" object passed to the engine.
+// BuildRisorEnv builds the full Risor environment map with standard builtins and input data.
+// The input data is made available under the given ctxKey (typically "ctx").
 //
-// For example, if the inputData is {"foo": "bar", "baz": 123}, the output will be:
+// For example, if the inputData is {"foo": "bar", "baz": 123}, the output will be a map
+// containing all standard Risor builtins plus:
 //
-//	[]risorLib.Option{
-//	  risorLib.WithGlobal("ctx", map[string]any{
+//	"ctx": map[string]any{
 //	    "foo": "bar",
 //	    "baz": 123,
-//	  }),
 //	}
-func ConvertToRisorOptions(ctxKey string, inputData map[string]any) []risorLib.Option {
-	return []risorLib.Option{
-		risorLib.WithGlobal(ctxKey, inputData),
-	}
+func BuildRisorEnv(ctxKey string, inputData map[string]any) map[string]any {
+	env := risor.Builtins()
+	env[ctxKey] = inputData
+	return env
 }

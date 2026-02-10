@@ -10,7 +10,7 @@ import (
 func TestCompileSuccess(t *testing.T) {
 	scriptContent := `true`
 
-	code, err := Compile(&scriptContent)
+	code, err := Compile(&scriptContent, nil)
 	require.NoError(t, err)
 	require.NotNil(t, code)
 }
@@ -18,10 +18,10 @@ func TestCompileSuccess(t *testing.T) {
 // TestCompileSyntaxError tests the compilation failure due to syntax errors
 func TestCompileSyntaxError(t *testing.T) {
 	scriptContent := `
-		print("Hello, World!
+		"Hello, World!
 	`
 
-	code, err := Compile(&scriptContent)
+	code, err := Compile(&scriptContent, nil)
 	require.Error(t, err)
 	require.Nil(t, code)
 	require.ErrorIs(t, err, ErrCompileFailed)
@@ -30,7 +30,7 @@ func TestCompileSyntaxError(t *testing.T) {
 // TestCompileWithGlobals tests the compilation with custom global names
 func TestCompileWithGlobals(t *testing.T) {
 	scriptContent := `
-		print(request)
+		request
 	`
 
 	globals := []string{"request"}
@@ -41,7 +41,7 @@ func TestCompileWithGlobals(t *testing.T) {
 
 // TestCompileNilContent tests the handling of nil script content
 func TestCompileNilContent(t *testing.T) {
-	code, err := Compile(nil)
+	code, err := Compile(nil, nil)
 	require.Error(t, err)
 	require.Nil(t, code)
 	require.ErrorIs(t, err, ErrContentNil)
@@ -59,7 +59,7 @@ func TestCompileWithGlobalsNilContent(t *testing.T) {
 // TestCompileWithGlobalsSyntaxError tests the compilation failure due to syntax errors with globals
 func TestCompileWithGlobalsSyntaxError(t *testing.T) {
 	scriptContent := `
-		print(request
+		[request
 	`
 
 	globals := []string{"request"}

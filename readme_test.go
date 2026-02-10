@@ -18,14 +18,14 @@ func TestReadmeQuickStart(t *testing.T) {
 
 	script := `
 		// The ctx object from the Go inputData map
-		name := ctx.get("name")
+		let name = ctx.get("name")
 
-		p := "."
-		if ctx.get("excited") {
+		let p = "."
+		if (ctx.get("excited")) {
 			p = "!"
 		}
 
-		message := "Hello, " + name + p
+		let message = "Hello, " + name + p
 
 		// Return a map with our result
 		{
@@ -60,15 +60,15 @@ func TestReadmeStaticProvider(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
 	script := `
-		name := ctx.get("name")
-		excited := ctx.get("excited")
+		let name = ctx.get("name")
+		let excited = ctx.get("excited")
 
-		p := "."
-		if excited {
+		let p = "."
+		if (excited) {
 			p = "!"
 		}
 
-		message := "Hello, " + name + p
+		let message = "Hello, " + name + p
 
 		{
 			"greeting": message
@@ -94,8 +94,8 @@ func TestReadmeContextProvider(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
 	script := `
-		name := ctx.get("name")
-		relationship := ctx.get("relationship")
+		let name = ctx.get("name")
+		let relationship = ctx.get("relationship")
 
 		{
 			"name": name,
@@ -127,15 +127,15 @@ func TestReadmeCombiningStaticAndDynamic(t *testing.T) {
 
 	script := `
 		// Access both static and dynamic data
-		name := ctx.get("name")
-		excited := ctx.get("excited")
+		let name = ctx.get("name")
+		let excited = ctx.get("excited")
 
-		p := "."
-		if excited {
+		let p = "."
+		if (excited) {
 			p = "!"
 		}
 
-		message := "Hello, " + name + p
+		let message = "Hello, " + name + p
 
 		{
 			"greeting": message

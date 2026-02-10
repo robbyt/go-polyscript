@@ -105,7 +105,7 @@ func TestMachineEvaluators(t *testing.T) {
 		},
 		{
 			name:        "FromRisorString",
-			content:     `print("Hello, World!")`,
+			content:     `"Hello, World!"`,
 			machineType: types.Risor,
 			creator:     polyscript.FromRisorString,
 		},
@@ -141,7 +141,7 @@ func TestFromStringLoaders(t *testing.T) {
 		},
 		{
 			name:        "FromRisorString - Valid",
-			content:     `print("Hello, World!")`,
+			content:     `"Hello, World!"`,
 			creator:     polyscript.FromRisorString,
 			logHandler:  nil,
 			expectError: false,
@@ -285,7 +285,7 @@ func TestEvalHelpers(t *testing.T) {
 	t.Run("PrepareAndEval", func(t *testing.T) {
 		// Create a simple Risor evaluator
 		script := `
-            name := ctx["name"]
+            let name = ctx["name"]
             {
                 "message": "Hello, " + name + "!",
                 "length": len(name)
@@ -512,12 +512,12 @@ _ = result`
 		// Test script
 		risorScript := `
             // Access static data
-            version := ctx["app_version"]
-            timeout := ctx["config"]["timeout"]
-            
+            let version = ctx["app_version"]
+            let timeout = ctx["config"]["timeout"]
+
             // Access dynamic data
-            name := ctx["name"]
-            
+            let name = ctx["name"]
+
             {
                 "message": "Hello, " + name + " (v" + version + ")",
                 "timeout": timeout
