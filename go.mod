@@ -4,7 +4,7 @@ go 1.25.7
 
 require (
 	github.com/extism/go-sdk v1.7.1
-	github.com/risor-io/risor v1.8.1
+	github.com/risor-io/risor/v2 v2.1.0
 	github.com/stretchr/testify v1.11.1
 	github.com/tetratelabs/wazero v1.11.0
 	go.starlark.net v0.0.0-20260326113308-fadfc96def35
