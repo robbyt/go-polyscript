@@ -1,0 +1,13 @@
+goos: darwin
+goarch: arm64
+pkg: github.com/robbyt/go-polyscript/engines/benchmarks
+cpu: Apple M5 Max
+BenchmarkEvaluationPatterns/SingleExecution-18         	   24620	     48323 ns/op	  120751 B/op	     713 allocs/op
+BenchmarkEvaluationPatterns/CompileOnceRunMany-18      	   59073	     21435 ns/op	   67682 B/op	     252 allocs/op
+BenchmarkDataProviders/StaticProvider-18               	   56025	     22354 ns/op	   67382 B/op	     251 allocs/op
+BenchmarkDataProviders/ContextProvider-18              	   59650	     21604 ns/op	   66283 B/op	     243 allocs/op
+BenchmarkDataProviders/CompositeProvider-18            	   58615	     21966 ns/op	   67382 B/op	     253 allocs/op
+BenchmarkEngineComparison/RisorEngine-18               	   55406	     22121 ns/op	   67382 B/op	     251 allocs/op
+BenchmarkEngineComparison/StarlarkEngine-18            	  338401	      4119 ns/op	    7806 B/op	      71 allocs/op
+PASS
+ok  	github.com/robbyt/go-polyscript/engines/benchmarks	11.202s

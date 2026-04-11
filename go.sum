@@ -1,7 +1,7 @@
 github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc h1:U9qPSI2PIWSS1VwoXQT9A3Wy9MM3WgvqSxFWenqJduM=
 github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
-github.com/deepnoodle-ai/risor/v2 v2.0.1 h1:eK2sb06EOPnTs3mHqQfPIdObrkW8DVL2MK2zxa8v3U4=
-github.com/deepnoodle-ai/risor/v2 v2.0.1/go.mod h1:XwfyjmojSwk5HQkWsNhrkxu6MqpsXG1XGVNXyQ+c3Zo=
+github.com/deepnoodle-ai/risor/v2 v2.1.0 h1:2MasWe0uJUNIaKvmd0ru1a64eXGdGakV3KlrxPNUH9g=
+github.com/deepnoodle-ai/risor/v2 v2.1.0/go.mod h1:XwfyjmojSwk5HQkWsNhrkxu6MqpsXG1XGVNXyQ+c3Zo=
 github.com/deepnoodle-ai/wonton v0.0.26 h1:x8DBfbUbDJlouTgJBNopb5s05tc8QxJQmtBemtLrjcE=
 github.com/deepnoodle-ai/wonton v0.0.26/go.mod h1:oyogeHwAHPrVxZ7jtik55Jnj6CwC1jkF+PfHpCRlUGA=
 github.com/dylibso/observe-sdk/go v0.0.0-20240828172851-9145d8ad07e1 h1:idfl8M8rPW93NehFw5H1qqH8yG158t5POr+LX9avbJY=

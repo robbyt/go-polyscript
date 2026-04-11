@@ -3,7 +3,7 @@ module github.com/robbyt/go-polyscript
 go 1.26.2
 
 require (
-	github.com/deepnoodle-ai/risor/v2 v2.0.1
+	github.com/deepnoodle-ai/risor/v2 v2.1.0
 	github.com/extism/go-sdk v1.7.1
 	github.com/stretchr/testify v1.11.1
 	github.com/tetratelabs/wazero v1.11.0

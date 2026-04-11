@@ -539,9 +539,9 @@ function test() { return 42; }`,
 		},
 		{
 			name: "risor script with data access patterns",
-			input: `func process() {
-    service_name := ctx.get("service_name", "unknown")
-    version := ctx.get("version", "1.0.0") 
+			input: `function process() {
+    let service_name = ctx.get("service_name", "unknown")
+    let version = ctx.get("version", "1.0.0")
     return {"message": "Hello from Risor!", "version": version}
 }
 process()`,
