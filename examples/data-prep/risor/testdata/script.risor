@@ -1,42 +1,35 @@
-// Wrap everything in a function for Risor syntax
-func process() {
-    
-    // Access static config data (set at compile time)
-    app_version := ctx.get("app_version", "unknown")
-    environment := ctx.get("environment", "unknown")
-    config := ctx.get("config", {})
-    
-    // Get name from runtime data (added via AddDataToContext)
-    name := ctx.get("name", "Default")
-    
-    // Get timestamp from runtime data
-    timestamp := ctx.get("timestamp", "Unknown")
-    
-    // Process user data from runtime data
-    user_data := ctx.get("user_data", {})
-    user_role := user_data.get("role", "guest")
-    user_id := user_data.get("id", "unknown")
-    
-    // Access request data if available
-    request := ctx.get("request", {})
-    request_method := request.get("Method", "")
-    request_path := request.get("URL_Path", "")
-    
-    // Construct result dictionary
-    result := {}
-    result["greeting"] = "Hello, " + name + "!"
-    result["timestamp"] = timestamp
-    result["message"] = "Processed by " + user_role + " at " + timestamp
-    result["user_id"] = user_id
-    result["request_info"] = request_method + " " + request_path
-    result["app_info"] = {
-        "version": app_version,
-        "environment": environment,
-        "features": config.get("feature_flags", {})
-    }
-    
-    return result
+// Access static config data (set at compile time)
+let app_version = ctx.get("app_version", "unknown")
+let environment = ctx.get("environment", "unknown")
+let config = ctx.get("config", {})
+
+// Get name from runtime data (added via AddDataToContext)
+let name = ctx.get("name", "Default")
+
+// Get timestamp from runtime data
+let timestamp = ctx.get("timestamp", "Unknown")
+
+// Process user data from runtime data
+let user_data = ctx.get("user_data", {})
+let user_role = user_data.get("role", "guest")
+let user_id = user_data.get("id", "unknown")
+
+// Access request data if available
+let request = ctx.get("request", {})
+let request_method = request.get("Method", "")
+let request_path = request.get("URL_Path", "")
+
+// Construct result dictionary
+let result = {}
+result["greeting"] = "Hello, " + name + "!"
+result["timestamp"] = timestamp
+result["message"] = "Processed by " + user_role + " at " + timestamp
+result["user_id"] = user_id
+result["request_info"] = request_method + " " + request_path
+result["app_info"] = {
+    "version": app_version,
+    "environment": environment,
+    "features": config.get("feature_flags", {})
 }
 
-// Call the function and return its result
-process()
+result

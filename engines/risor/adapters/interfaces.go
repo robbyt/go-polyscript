@@ -1,7 +1,7 @@
 package adapters
 
-import risorCompiler "github.com/risor-io/risor/compiler"
+import "github.com/deepnoodle-ai/risor/v2/pkg/bytecode"
 
 type RisorExecutable struct {
-	GetRisorByteCode func() *risorCompiler.Code
+	GetRisorByteCode func() *bytecode.Code
 }

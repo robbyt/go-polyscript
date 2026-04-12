@@ -43,9 +43,9 @@ var quietHandler = slog.NewJSONHandler(io.Discard, &slog.HandlerOptions{Level: s
 func BenchmarkEvaluationPatterns(b *testing.B) {
 	// Simple script for benchmarking
 	scriptContent := `
-		name := ctx["name"]
-		message := "Hello, " + name + "!"
-		
+		let name = ctx["name"]
+		let message = "Hello, " + name + "!"
+
 		{
 			"greeting": message,
 			"length": len(message)
@@ -110,9 +110,9 @@ func BenchmarkEvaluationPatterns(b *testing.B) {
 func BenchmarkDataProviders(b *testing.B) {
 	// Simple script for benchmarking
 	scriptContent := `
-		name := ctx["name"]
-		message := "Hello, " + name + "!"
-		
+		let name = ctx["name"]
+		let message = "Hello, " + name + "!"
+
 		{
 			"greeting": message,
 			"length": len(message)
@@ -168,8 +168,8 @@ func BenchmarkDataProviders(b *testing.B) {
 		// For CompositeProvider use case, we can prepare the context separately
 		// We access the name directly from the context
 		compositeScript := `
-			name := ctx["name"]
-			message := "Hello, " + name + "!"
+			let name = ctx["name"]
+			let message = "Hello, " + name + "!"
 			{
 				"greeting": message,
 				"length": len(message)
@@ -214,9 +214,9 @@ func BenchmarkEngineComparison(b *testing.B) {
 
 	// Risor script
 	risorScript := `
-		name := ctx["name"]
-		message := "Hello, " + name + "!"
-		
+		let name = ctx["name"]
+		let message = "Hello, " + name + "!"
+
 		{
 			"greeting": message,
 			"length": len(message)

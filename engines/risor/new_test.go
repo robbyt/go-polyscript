@@ -16,11 +16,8 @@ import (
 )
 
 const testRisorScript = `
-// Simple Risor script that uses built-in print function
-print("Hello from Risor")
-
-// Define and call a simple function
-func greet(name) {
+// Define and call a greeting handler
+function greet(name) {
   return "Hello, " + name
 }
 

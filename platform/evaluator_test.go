@@ -117,8 +117,8 @@ func TestEvalDataPreparerInterface(t *testing.T) {
 	// The key name may be different in the new implementation
 	scriptData := map[string]any{"greeting": "Hello, World!"}
 	evaluator, err := polyscript.FromRisorStringWithData(`
-method := ctx["request"]["Method"] 
-greeting := ctx["greeting"]  // With new implementation, keys are at top level
+let method = ctx["request"]["Method"]
+let greeting = ctx["greeting"]
 method + " " + greeting
 `,
 		scriptData,

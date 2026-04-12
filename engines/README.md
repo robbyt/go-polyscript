@@ -69,8 +69,8 @@ data := map[string]any{
 }
 
 // Risor script access
-name := ctx["name"]           // "World"
-debug := ctx["config"]["debug"] // true
+let name = ctx["name"]           // "World"
+let debug = ctx["config"]["debug"] // true
 ```
 
 ### Starlark Engine: `ctx` Context Wrapper

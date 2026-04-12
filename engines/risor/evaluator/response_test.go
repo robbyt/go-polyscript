@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	rObj "github.com/risor-io/risor/object"
-	"github.com/risor-io/risor/op"
+	rObj "github.com/deepnoodle-ai/risor/v2/pkg/object"
+	"github.com/deepnoodle-ai/risor/v2/pkg/op"
 	"github.com/robbyt/go-polyscript/platform"
 	"github.com/robbyt/go-polyscript/platform/data"
 	"github.com/stretchr/testify/assert"
@@ -35,24 +35,22 @@ func (m *RisorObjectMock) Interface() any {
 	return args.Get(0)
 }
 
-func (m *RisorObjectMock) Hash() (uint32, error) {
-	args := m.Called()
-	return args.Get(0).(uint32), args.Error(1)
-}
-
 func (m *RisorObjectMock) String() string {
 	args := m.Called()
 	return args.String(0)
 }
 
-func (m *RisorObjectMock) Cost() int {
-	args := m.Called()
-	return args.Int(0)
+func (m *RisorObjectMock) Equals(other rObj.Object) bool {
+	args := m.Called(other)
+	return args.Bool(0)
 }
 
-func (m *RisorObjectMock) Equals(other rObj.Object) rObj.Object {
-	args := m.Called(other)
-	return args.Get(0).(rObj.Object)
+func (m *RisorObjectMock) Attrs() []rObj.AttrSpec {
+	args := m.Called()
+	if v := args.Get(0); v != nil {
+		return v.([]rObj.AttrSpec)
+	}
+	return nil
 }
 
 func (m *RisorObjectMock) GetAttr(name string) (rObj.Object, bool) {
@@ -70,14 +68,9 @@ func (m *RisorObjectMock) IsTruthy() bool {
 	return args.Bool(0)
 }
 
-func (m *RisorObjectMock) RunOperation(opType op.BinaryOpType, right rObj.Object) rObj.Object {
+func (m *RisorObjectMock) RunOperation(opType op.BinaryOpType, right rObj.Object) (rObj.Object, error) {
 	args := m.Called(opType, right)
-	return args.Get(0).(rObj.Object)
-}
-
-func (m *RisorObjectMock) Compare(other rObj.Object) (int, error) {
-	args := m.Called(other)
-	return args.Int(0), args.Error(1)
+	return args.Get(0).(rObj.Object), args.Error(1)
 }
 
 // TestResponseMethods tests all the methods of the EvaluatorResponse interface

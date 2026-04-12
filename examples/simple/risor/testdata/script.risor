@@ -1,6 +1,6 @@
 // Script has access to ctx variable passed from Go
-name := ctx["name"]
-message := "Hello, " + name + "!"
+let name = ctx["name"]
+let message = "Hello, " + name + "!"
 
 // Return a map with our result
 {

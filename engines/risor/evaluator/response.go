@@ -6,7 +6,7 @@ import (
 	"os"
 	"time"
 
-	risorObject "github.com/risor-io/risor/object"
+	risorObject "github.com/deepnoodle-ai/risor/v2/pkg/object"
 	"github.com/robbyt/go-polyscript/platform/data"
 )
 

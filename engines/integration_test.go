@@ -51,11 +51,11 @@ func TestEngineDataHandlingIntegration(t *testing.T) {
 			// Risor script that accesses data via ctx variable
 			risorScript := `
 // Access data through ctx variable
-name := ctx["name"]
-version := ctx["version"]
-debug := ctx["config"]["debug"]
-timeout := ctx["config"]["timeout"]
-tags := ctx["tags"]
+let name = ctx["name"]
+let version = ctx["version"]
+let debug = ctx["config"]["debug"]
+let timeout = ctx["config"]["timeout"]
+let tags = ctx["tags"]
 
 // Create result
 {
@@ -209,9 +209,9 @@ func TestEngineDataHandlingWithDynamicData(t *testing.T) {
 	t.Run("risor_dynamic_data", func(t *testing.T) {
 		risorScript := `
 // Access both static and dynamic data
-app_name := ctx["app_name"]
-user_id := ctx["user_id"]
-action := ctx["action"]
+let app_name = ctx["app_name"]
+let user_id = ctx["user_id"]
+let action = ctx["action"]
 
 {
 	"result": "processed",
@@ -349,8 +349,8 @@ func TestEngineDataStructureDocumentation(t *testing.T) {
 
 	t.Run("risor_documentation_example", func(t *testing.T) {
 		script := `
-name := ctx["name"]
-debug := ctx["config"]["debug"]
+let name = ctx["name"]
+let debug = ctx["config"]["debug"]
 
 {
 	"name": name,
@@ -439,8 +439,8 @@ func TestDataProviderPatterns(t *testing.T) {
 			"risor_context_provider",
 			func(t *testing.T) {
 				script := `
-config := ctx["config"]
-user_data := ctx["user_data"]
+let config = ctx["config"]
+let user_data = ctx["user_data"]
 
 {
 	"config": config,
@@ -596,9 +596,9 @@ _ = result
 
 		t.Run("risor_static_provider", func(t *testing.T) {
 			script := `
-app_name := ctx["config"]["app_name"]
-version := ctx["config"]["version"]
-max_retries := ctx["constants"]["max_retries"]
+let app_name = ctx["config"]["app_name"]
+let version = ctx["config"]["version"]
+let max_retries = ctx["constants"]["max_retries"]
 
 {
 	"app_name": app_name,
@@ -713,10 +713,10 @@ _ = result
 		t.Run( //nolint:dupl // Each engine test demonstrates different syntax and behavior
 			"risor_composite_provider", func(t *testing.T) {
 				script := `
-app_name := ctx["config"]["app_name"]
-version := ctx["config"]["version"]
-user_id := ctx["user_id"]
-request_id := ctx["request_id"]
+let app_name = ctx["config"]["app_name"]
+let version = ctx["config"]["version"]
+let user_id = ctx["user_id"]
+let request_id = ctx["request_id"]
 
 {
 	"app_name": app_name,
@@ -875,10 +875,10 @@ func TestHttpRequestDataAccess(t *testing.T) {
 			"risor_http_request", func(t *testing.T) {
 				script := `
 // HTTP request data as documented in platform/data/README.md
-request_method := ctx["request"]["Method"]
-url_path := ctx["request"]["URL_Path"]
-request_body := ctx["request"]["Body"]
-content_type := ctx["request"]["Headers"]["Content-Type"][0]
+let request_method = ctx["request"]["Method"]
+let url_path = ctx["request"]["URL_Path"]
+let request_body = ctx["request"]["Body"]
+let content_type = ctx["request"]["Headers"]["Content-Type"][0]
 
 {
 	"method": request_method,
@@ -1005,9 +1005,9 @@ _ = result
 
 		t.Run("risor_explicit_keys", func(t *testing.T) {
 			script := `
-request_data := ctx["request"]
-user_data := ctx["user"]
-config_data := ctx["config"]
+let request_data = ctx["request"]
+let user_data = ctx["user"]
+let config_data = ctx["config"]
 
 {
 	"has_request": request_data != nil,

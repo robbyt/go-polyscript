@@ -6,8 +6,9 @@ import (
 	"log/slog"
 	"time"
 
-	risorLib "github.com/risor-io/risor"
-	risorCompiler "github.com/risor-io/risor/compiler"
+	risor "github.com/deepnoodle-ai/risor/v2"
+	"github.com/deepnoodle-ai/risor/v2/pkg/bytecode"
+	risorObject "github.com/deepnoodle-ai/risor/v2/pkg/object"
 	"github.com/robbyt/go-polyscript/engines/risor/internal"
 	"github.com/robbyt/go-polyscript/internal/helpers"
 	"github.com/robbyt/go-polyscript/platform"
@@ -15,6 +16,10 @@ import (
 	"github.com/robbyt/go-polyscript/platform/data"
 	"github.com/robbyt/go-polyscript/platform/script"
 )
+
+// typeRegistry is initialized once at package level to avoid a data race in
+// risor v2's DefaultRegistry() lazy initialization.
+var typeRegistry = risorObject.DefaultRegistry()
 
 // Evaluator is an abstraction layer for evaluating bytecode on the Risor engine
 type Evaluator struct {
@@ -72,20 +77,26 @@ func (be *Evaluator) loadInputData(ctx context.Context) (map[string]any, error) 
 	return inputData, nil
 }
 
-// exec pulls the latest bytecode, and runs it with some input from options
+// exec runs the bytecode with the provided environment map
 func (be *Evaluator) exec(
 	ctx context.Context,
-	bytecode *risorCompiler.Code,
-	options ...risorLib.Option,
+	bc *bytecode.Code,
+	env map[string]any,
 ) (*execResult, error) {
 	startTime := time.Now()
-	result, err := risorLib.EvalCode(ctx, bytecode, options...)
+	result, err := risor.Run(ctx, bc, risor.WithEnv(env), risor.WithRawResult(), risor.WithTypeRegistry(typeRegistry))
 	execTime := time.Since(startTime)
 
 	if err != nil {
 		return nil, fmt.Errorf("risor execution error: %w", err)
 	}
-	return newEvalResult(be.logHandler, result, execTime, ""), nil
+
+	obj, ok := result.(risorObject.Object)
+	if !ok {
+		return nil, fmt.Errorf("unexpected result type from risor: %T", result)
+	}
+
+	return newEvalResult(be.logHandler, obj, execTime, ""), nil
 }
 
 // Eval evaluates the loaded bytecode and uses the provided EvalData to pass data in to the Risor engine execution
@@ -100,8 +111,8 @@ func (be *Evaluator) Eval(ctx context.Context) (platform.EvaluatorResponse, erro
 	}
 
 	// Get the bytecode from the executable unit
-	bytecode := be.execUnit.GetContent().GetByteCode()
-	if bytecode == nil {
+	rawBytecode := be.execUnit.GetContent().GetByteCode()
+	if rawBytecode == nil {
 		return nil, fmt.Errorf("bytecode is nil")
 	}
 
@@ -112,11 +123,11 @@ func (be *Evaluator) Eval(ctx context.Context) (platform.EvaluatorResponse, erro
 	}
 	logger = logger.With("exeID", exeID)
 
-	// 1. Type assert the bytecode into *risorCompiler.Code
-	risorByteCode, ok := bytecode.(*risorCompiler.Code)
+	// 1. Type assert the bytecode into *bytecode.Code
+	risorByteCode, ok := rawBytecode.(*bytecode.Code)
 	if !ok {
 		return nil, fmt.Errorf(
-			"unable to type assert bytecode into *risorCompiler.Code for ID: %s",
+			"unable to type assert bytecode into *bytecode.Code for ID: %s",
 			exeID,
 		)
 	}
@@ -127,11 +138,11 @@ func (be *Evaluator) Eval(ctx context.Context) (platform.EvaluatorResponse, erro
 		return nil, fmt.Errorf("failed to get input data: %w", err)
 	}
 
-	// 3. Convert to Risor engine format
-	runtimeData := internal.ConvertToRisorOptions(be.ctxKey, rawInputData)
+	// 3. Build the Risor environment with builtins and input data
+	runtimeEnv := internal.BuildRisorEnv(be.ctxKey, rawInputData)
 
 	// 4. Execute the program
-	result, err := be.exec(ctx, risorByteCode, runtimeData...)
+	result, err := be.exec(ctx, risorByteCode, runtimeEnv)
 	if err != nil {
 		return nil, fmt.Errorf("exec error: %w", err)
 	}

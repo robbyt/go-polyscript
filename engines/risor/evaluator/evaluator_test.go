@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	risorCompiler "github.com/risor-io/risor/compiler"
+	"github.com/deepnoodle-ai/risor/v2/pkg/bytecode"
 	"github.com/robbyt/go-polyscript/engines/risor/compiler"
 	"github.com/robbyt/go-polyscript/engines/types"
 	"github.com/robbyt/go-polyscript/internal/helpers"
@@ -116,19 +116,18 @@ func TestEvaluator_Evaluate(t *testing.T) {
 
 	// Define a test script that handles HTTP requests
 	testScript := `
-	func handle(request) {
-		if request == nil {
+	let handle = function(request) {
+		if (request == nil) {
 			return error("request is nil")
 		}
-		if request["Method"] == "POST" {
+		if (request["Method"] == "POST") {
 			return "post"
 		}
-		if request["URL_Path"] == "/hello" {
+		if (request["URL_Path"] == "/hello") {
 			return true
 		}
 		return false
 	}
-	print(ctx)
 	handle(ctx["request"])
 	`
 
@@ -257,7 +256,7 @@ func TestEvaluator_Evaluate(t *testing.T) {
 					return &script.ExecutableUnit{
 						ID: "",
 						Content: &MockContent{
-							Content: &risorCompiler.Code{},
+							Content: bytecode.NewCode(bytecode.CodeParams{}),
 						},
 					}
 				},

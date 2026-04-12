@@ -89,23 +89,23 @@ func TestCompiler_Compile(t *testing.T) {
 		}{
 			{
 				name:    "valid script",
-				script:  `print("Hello, World!")`,
+				script:  `"Hello, World!"`,
 				globals: []string{"request"},
 			},
 			{
 				name:    "with multiple globals",
-				script:  `print(request, response)`,
+				script:  `[request, response]`,
 				globals: []string{"request", "response"},
 			},
 			{
 				name: "complex valid script with global override",
 				script: `
 request = true
-func main() {
-    if request {
-        print("Yes")
+function main() {
+    if (request) {
+        "Yes"
     } else {
-        print("No")
+        "No"
     }
 }
 main()
@@ -115,11 +115,11 @@ main()
 			{
 				name: "complex valid script with condition",
 				script: `
-func main() {
-    if condition {
-        print("Yes")
+function main() {
+    if (condition) {
+        "Yes"
     } else {
-        print("No")
+        "No"
     }
 }
 main()
@@ -176,8 +176,8 @@ main()
 			err     error
 		}{
 			{
-				name:    "syntax error - missing closing parenthesis",
-				script:  `print("Hello, World!"`,
+				name:    "syntax error - unterminated string",
+				script:  `"Hello, World!`,
 				globals: []string{"request"},
 				err:     ErrValidationFailed,
 			},
@@ -189,13 +189,13 @@ main()
 			},
 			{
 				name:    "undefined global",
-				script:  `print(undefined_global)`,
+				script:  `undefined_global`,
 				globals: []string{"request"},
 				err:     ErrValidationFailed,
 			},
 			{
 				name:    "script using undefined global",
-				script:  `print(undefined)`,
+				script:  `undefined`,
 				globals: []string{"request"},
 				err:     ErrValidationFailed,
 			},
@@ -270,7 +270,7 @@ main()
 			require.NotNil(t, comp, "Expected compiler to be non-nil")
 
 			// Create a reader that will return an error on close
-			reader := newMockScriptReaderCloser(`print("Hello, World!")`)
+			reader := newMockScriptReaderCloser(`"Hello, World!"`)
 			reader.On("Close").Return(errors.New("test error")).Once()
 
 			execContent, err := comp.Compile(reader)
@@ -294,7 +294,7 @@ main()
 		require.NotNil(t, comp, "Expected compiler to be non-nil")
 
 		// Here we test that we can directly call the compile method with a byteslice
-		scriptBytes := []byte(`print("Hello, World!")`)
+		scriptBytes := []byte(`"Hello, World!"`)
 		executable, err := comp.compile(scriptBytes)
 		require.NoError(t, err, "Did not expect an error but got one")
 		require.NotNil(t, executable, "Expected execContent to be non-nil")
@@ -343,7 +343,7 @@ func TestCompilerOptions(t *testing.T) {
 		require.NotNil(t, comp)
 
 		// Test with a script using the globals
-		script := `print(request, response)`
+		script := `[request, response]`
 		reader := io.ReadCloser(newMockScriptReaderCloser(script))
 		if mockReader, ok := reader.(*mockScriptReaderCloser); ok {
 			mockReader.On("Close").Return(nil)
@@ -361,7 +361,7 @@ func TestCompilerOptions(t *testing.T) {
 		require.NotNil(t, comp)
 
 		// Simple script that doesn't require globals
-		script := `print("Hello")`
+		script := `"Hello"`
 		reader := io.ReadCloser(newMockScriptReaderCloser(script))
 		if mockReader, ok := reader.(*mockScriptReaderCloser); ok {
 			mockReader.On("Close").Return(nil)
@@ -407,7 +407,7 @@ func TestCompileWithBytecode(t *testing.T) {
 	require.NotNil(t, comp, "Expected compiler to be non-nil")
 
 	// Here we test that we can directly call the compile method with a byteslice
-	scriptBytes := []byte(`print("Hello, World!")`)
+	scriptBytes := []byte(`"Hello, World!"`)
 	executable, err := comp.compile(scriptBytes)
 	require.NoError(t, err, "Did not expect an error but got one")
 	require.NotNil(t, executable, "Expected execContent to be non-nil")
@@ -452,7 +452,7 @@ func TestCompileCloseError(t *testing.T) {
 	require.NotNil(t, comp, "Expected compiler to be non-nil")
 
 	// Create a reader that will return an error on close
-	reader := newMockScriptReaderCloser(`print("Hello, World!")`)
+	reader := newMockScriptReaderCloser(`"Hello, World!"`)
 	reader.On("Close").Return(errors.New("test error")).Once()
 
 	execContent, err := comp.Compile(reader)

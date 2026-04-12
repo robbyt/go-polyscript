@@ -20,7 +20,7 @@ go-polyscript democratizes different scripting engines by abstracting the loadin
 
 ## Engines Implemented
 
-- **Risor**: A Python-like scripting language designed for embedding in Go applications
+- **Risor**: A fast scripting language designed for embedding in Go applications
 - **Starlark**: Google's deterministic configuration language (used in Bazel, and others)
 - **Extism**: Pure Go runtime and plugin system for executing WASM
 
@@ -51,15 +51,15 @@ func main() {
 
 	script := `
 		// The ctx object from the Go inputData map
-		name := ctx.get("name")
+		let name = ctx.get("name")
 
-		p := "."
-		if ctx.get("excited") {
+		let p = "."
+		if (ctx.get("excited")) {
 			p = "!"
 		}
-		
-		message := "Hello, " + name + p
-		
+
+		let message = "Hello, " + name + p
+
 		// Return a map with our result
 		{
 			"greeting": message,
