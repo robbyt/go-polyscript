@@ -15,6 +15,7 @@ import (
 //	    "baz": 123,
 //	}
 func BuildRisorEnv(ctxKey string, inputData map[string]any) map[string]any {
+	// Builtins() returns a fresh map on each call, so mutating env is safe.
 	env := risor.Builtins()
 	env[ctxKey] = inputData
 	return env
