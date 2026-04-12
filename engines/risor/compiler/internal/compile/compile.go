@@ -20,12 +20,12 @@ func Compile(scriptContent *string, cfg *risorCompiler.Config) (*bytecode.Code, 
 
 	ast, err := risorParser.Parse(context.Background(), *scriptContent, nil)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %s", ErrCompileFailed, err.Error())
+		return nil, fmt.Errorf("%w: %w", ErrCompileFailed, err)
 	}
 
 	bc, err := risorCompiler.Compile(ast, cfg)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %s", ErrCompileFailed, err.Error())
+		return nil, fmt.Errorf("%w: %w", ErrCompileFailed, err)
 	}
 
 	return bc, nil
