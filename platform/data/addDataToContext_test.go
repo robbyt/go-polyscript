@@ -174,6 +174,36 @@ func TestAddDataToContextHelper(t *testing.T) {
 	})
 }
 
+// TestAddDataToContextFromProvider tests the convenience wrapper
+func TestAddDataToContextFromProvider(t *testing.T) {
+	t.Parallel()
+
+	logger := slog.Default()
+
+	t.Run("nil provider returns error", func(t *testing.T) {
+		ctx := t.Context()
+		result, err := AddDataToContextFromProvider(ctx, logger, nil, map[string]any{"key": "value"})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "no data provider available")
+		assert.Equal(t, ctx, result)
+	})
+
+	t.Run("valid provider delegates to helper", func(t *testing.T) {
+		provider := NewContextProvider(constants.EvalData)
+		ctx := t.Context()
+
+		result, err := AddDataToContextFromProvider(ctx, logger, provider, map[string]any{"key": "value"})
+		require.NoError(t, err)
+		assert.NotEqual(t, ctx, result)
+
+		data := result.Value(constants.EvalData)
+		require.NotNil(t, data)
+		contextMap, ok := data.(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, "value", contextMap["key"])
+	})
+}
+
 // TestAddDataToContextWithErrorHandling tests error propagation in the AddDataToContextHelper
 func TestAddDataToContextWithErrorHandling(t *testing.T) {
 	t.Parallel()

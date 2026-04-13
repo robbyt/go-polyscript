@@ -203,17 +203,5 @@ func (be *Evaluator) AddDataToContext(
 	ctx context.Context,
 	d ...map[string]any,
 ) (context.Context, error) {
-	logger := be.logger.WithGroup("AddDataToContext")
-
-	// Use the shared helper function for context preparation
-	if be.execUnit == nil || be.execUnit.GetDataProvider() == nil {
-		return ctx, fmt.Errorf("no data provider available")
-	}
-
-	return data.AddDataToContextHelper(
-		ctx,
-		logger,
-		be.execUnit.GetDataProvider(),
-		d...,
-	)
+	return data.AddDataToContextFromProvider(ctx, be.logger.WithGroup("AddDataToContext"), be.getDataProvider(), d...)
 }

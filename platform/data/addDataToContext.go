@@ -43,3 +43,18 @@ func AddDataToContextHelper(
 
 	return enrichedCtx, err
 }
+
+// AddDataToContextFromProvider is a convenience wrapper that handles a nil provider
+// by returning a clear error, then delegates to AddDataToContextHelper.
+// This consolidates the nil-check + delegation pattern duplicated across all engine evaluators.
+func AddDataToContextFromProvider(
+	ctx context.Context,
+	logger *slog.Logger,
+	provider Provider,
+	d ...map[string]any,
+) (context.Context, error) {
+	if provider == nil {
+		return ctx, fmt.Errorf("no data provider available")
+	}
+	return AddDataToContextHelper(ctx, logger, provider, d...)
+}
