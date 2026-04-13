@@ -226,9 +226,9 @@ func TestEval_NoGoroutineLeak(t *testing.T) {
 	runtime.GC()
 	before := runtime.NumGoroutine()
 
-	// Run 100 evaluations with context.Background() (never cancelled)
+	// Run 100 evaluations with a context that won't be cancelled during Eval()
 	for range 100 {
-		ctx := context.WithValue(context.Background(), constants.EvalData, map[string]any{})
+		ctx := context.WithValue(t.Context(), constants.EvalData, map[string]any{})
 		_, err := evaluator.Eval(ctx)
 		require.NoError(t, err)
 	}
