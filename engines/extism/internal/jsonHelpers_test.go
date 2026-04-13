@@ -8,64 +8,45 @@ import (
 )
 
 func TestFixJSONNumberTypes(t *testing.T) {
+	t.Parallel()
+
 	t.Run("handles nil input", func(t *testing.T) {
 		result := FixJSONNumberTypes(nil)
 		assert.Nil(t, result)
 	})
 
 	t.Run("handles primitive types", func(t *testing.T) {
-		// Test string
-		str := "test string"
-		result := FixJSONNumberTypes(str)
-		assert.Equal(t, str, result)
-
-		// Test bool
-		boolVal := true
-		result = FixJSONNumberTypes(boolVal)
-		assert.Equal(t, boolVal, result)
+		assert.Equal(t, "test string", FixJSONNumberTypes("test string"))
+		assert.Equal(t, true, FixJSONNumberTypes(true))
+		assert.Equal(t, 42, FixJSONNumberTypes(42))
 	})
 
-	t.Run("converts count fields to integers", func(t *testing.T) {
-		// Create a map with json.Number values
+	t.Run("converts integer numbers to int regardless of field name", func(t *testing.T) {
 		data := map[string]any{
 			"item_count": json.Number("42"),
 			"count":      json.Number("100"),
+			"user_id":    json.Number("123"),
+			"productId":  json.Number("456"),
+			"quantity":   json.Number("7"),
+			"status":     json.Number("0"),
 		}
 
 		result := FixJSONNumberTypes(data)
 		mapResult, ok := result.(map[string]any)
-		assert.True(t, ok, "Result should be a map")
+		assert.True(t, ok)
 
-		// Check that the values were converted to integers
-		assert.Equal(t, int(42), mapResult["item_count"])
-		assert.Equal(t, int(100), mapResult["count"])
-		assert.IsType(t, int(0), mapResult["item_count"])
-		assert.IsType(t, int(0), mapResult["count"])
-	})
-
-	t.Run("converts ID fields to integers", func(t *testing.T) {
-		// Create a map with json.Number values
-		data := map[string]any{
-			"user_id":     json.Number("123"),
-			"productId":   json.Number("456"),
-			"category_id": json.Number("789"),
+		for k, v := range mapResult {
+			assert.IsType(t, int(0), v, "field %q should be int", k)
 		}
-
-		result := FixJSONNumberTypes(data)
-		mapResult, ok := result.(map[string]any)
-		assert.True(t, ok, "Result should be a map")
-
-		// Check that the values were converted to integers
-		assert.Equal(t, int(123), mapResult["user_id"])
-		assert.Equal(t, int(456), mapResult["productId"])
-		assert.Equal(t, int(789), mapResult["category_id"])
-		assert.IsType(t, int(0), mapResult["user_id"])
-		assert.IsType(t, int(0), mapResult["productId"])
-		assert.IsType(t, int(0), mapResult["category_id"])
+		assert.Equal(t, 42, mapResult["item_count"])
+		assert.Equal(t, 100, mapResult["count"])
+		assert.Equal(t, 123, mapResult["user_id"])
+		assert.Equal(t, 456, mapResult["productId"])
+		assert.Equal(t, 7, mapResult["quantity"])
+		assert.Equal(t, 0, mapResult["status"])
 	})
 
-	t.Run("converts other number fields to float64", func(t *testing.T) {
-		// Create a map with json.Number values for non-integer fields
+	t.Run("converts decimal numbers to float64", func(t *testing.T) {
 		data := map[string]any{
 			"price":      json.Number("19.99"),
 			"rating":     json.Number("4.5"),
@@ -74,19 +55,17 @@ func TestFixJSONNumberTypes(t *testing.T) {
 
 		result := FixJSONNumberTypes(data)
 		mapResult, ok := result.(map[string]any)
-		assert.True(t, ok, "Result should be a map")
+		assert.True(t, ok)
 
-		// Check that the values were converted to float64
-		assert.InDelta(t, float64(19.99), mapResult["price"], 0.0001)
-		assert.InDelta(t, float64(4.5), mapResult["rating"], 0.0001)
-		assert.InDelta(t, float64(75.5), mapResult["percentage"], 0.0001)
+		assert.InDelta(t, 19.99, mapResult["price"], 0.0001)
+		assert.InDelta(t, 4.5, mapResult["rating"], 0.0001)
+		assert.InDelta(t, 75.5, mapResult["percentage"], 0.0001)
 		assert.IsType(t, float64(0), mapResult["price"])
 		assert.IsType(t, float64(0), mapResult["rating"])
 		assert.IsType(t, float64(0), mapResult["percentage"])
 	})
 
 	t.Run("handles nested maps", func(t *testing.T) {
-		// Create a map with nested maps
 		data := map[string]any{
 			"user": map[string]any{
 				"user_id": json.Number("123"),
@@ -100,24 +79,21 @@ func TestFixJSONNumberTypes(t *testing.T) {
 
 		result := FixJSONNumberTypes(data)
 		mapResult, ok := result.(map[string]any)
-		assert.True(t, ok, "Result should be a map")
+		assert.True(t, ok)
 
-		// Check top level integer conversion
-		assert.Equal(t, int(10), mapResult["item_count"])
+		assert.Equal(t, 10, mapResult["item_count"])
 
-		// Check nested map conversions
 		user, ok := mapResult["user"].(map[string]any)
-		assert.True(t, ok, "user should be a map")
-		assert.Equal(t, int(123), user["user_id"])
+		assert.True(t, ok)
+		assert.Equal(t, 123, user["user_id"])
 
 		stats, ok := user["stats"].(map[string]any)
-		assert.True(t, ok, "stats should be a map")
-		assert.Equal(t, int(42), stats["login_count"])
-		assert.InDelta(t, float64(95.5), stats["score"], 0.0001)
+		assert.True(t, ok)
+		assert.Equal(t, 42, stats["login_count"])
+		assert.InDelta(t, 95.5, stats["score"], 0.0001)
 	})
 
-	t.Run("handles slices", func(t *testing.T) {
-		// Create a slice with json.Number values
+	t.Run("converts numbers in slices", func(t *testing.T) {
 		data := []any{
 			json.Number("1"),
 			json.Number("2.5"),
@@ -130,23 +106,23 @@ func TestFixJSONNumberTypes(t *testing.T) {
 
 		result := FixJSONNumberTypes(data)
 		sliceResult, ok := result.([]any)
-		assert.True(t, ok, "Result should be a slice")
+		assert.True(t, ok)
 
-		// Values in the slice should remain as json.Number
-		// since they don't have field names to determine type
-		assert.IsType(t, json.Number(""), sliceResult[0])
-		assert.IsType(t, json.Number(""), sliceResult[1])
+		// Numbers in slices are now converted
+		assert.Equal(t, 1, sliceResult[0])
+		assert.IsType(t, int(0), sliceResult[0])
+		assert.InDelta(t, 2.5, sliceResult[1], 0.0001)
+		assert.IsType(t, float64(0), sliceResult[1])
 		assert.Equal(t, "test", sliceResult[2])
 
-		// Check the map in the slice
+		// Nested map in slice
 		itemMap, ok := sliceResult[3].(map[string]any)
-		assert.True(t, ok, "Item at index 3 should be a map")
-		assert.Equal(t, int(123), itemMap["item_id"])
-		assert.InDelta(t, float64(9.99), itemMap["price"], 0.0001)
+		assert.True(t, ok)
+		assert.Equal(t, 123, itemMap["item_id"])
+		assert.InDelta(t, 9.99, itemMap["price"], 0.0001)
 	})
 
-	t.Run("handles nested slices", func(t *testing.T) {
-		// Create a map with nested slices
+	t.Run("handles nested slices in maps", func(t *testing.T) {
 		data := map[string]any{
 			"products": []any{
 				map[string]any{
@@ -163,42 +139,104 @@ func TestFixJSONNumberTypes(t *testing.T) {
 
 		result := FixJSONNumberTypes(data)
 		mapResult, ok := result.(map[string]any)
-		assert.True(t, ok, "Result should be a map")
+		assert.True(t, ok)
 
-		// Check top level count conversion
-		assert.Equal(t, int(2), mapResult["total_count"])
+		assert.Equal(t, 2, mapResult["total_count"])
 
-		// Check nested slice
 		products, ok := mapResult["products"].([]any)
-		assert.True(t, ok, "products should be a slice")
+		assert.True(t, ok)
 		assert.Len(t, products, 2)
 
-		// Check first product
 		product1, ok := products[0].(map[string]any)
-		assert.True(t, ok, "First product should be a map")
-		assert.Equal(t, int(1), product1["product_id"])
-		assert.InDelta(t, float64(19.99), product1["price"], 0.0001)
+		assert.True(t, ok)
+		assert.Equal(t, 1, product1["product_id"])
+		assert.InDelta(t, 19.99, product1["price"], 0.0001)
 
-		// Check second product
 		product2, ok := products[1].(map[string]any)
-		assert.True(t, ok, "Second product should be a map")
-		assert.Equal(t, int(2), product2["product_id"])
-		assert.InDelta(t, float64(29.99), product2["price"], 0.0001)
+		assert.True(t, ok)
+		assert.Equal(t, 2, product2["product_id"])
+		assert.InDelta(t, 29.99, product2["price"], 0.0001)
 	})
 
 	t.Run("handles invalid numbers gracefully", func(t *testing.T) {
-		// Create a map with invalid json.Number
 		data := map[string]any{
-			"item_count": json.Number("not-a-number"),
-			"price":      json.Number("also-not-a-number"),
+			"bad_int":   json.Number("not-a-number"),
+			"bad_float": json.Number("also-not-a-number"),
 		}
 
 		result := FixJSONNumberTypes(data)
 		mapResult, ok := result.(map[string]any)
-		assert.True(t, ok, "Result should be a map")
+		assert.True(t, ok)
 
-		// Values should remain as json.Number since conversion failed
-		assert.IsType(t, json.Number(""), mapResult["item_count"])
-		assert.IsType(t, json.Number(""), mapResult["price"])
+		// Invalid numbers remain as json.Number
+		assert.IsType(t, json.Number(""), mapResult["bad_int"])
+		assert.IsType(t, json.Number(""), mapResult["bad_float"])
 	})
+
+	t.Run("handles large integers", func(t *testing.T) {
+		data := map[string]any{
+			"big": json.Number("9223372036854775807"), // max int64
+		}
+
+		result := FixJSONNumberTypes(data)
+		mapResult, ok := result.(map[string]any)
+		assert.True(t, ok)
+		assert.Equal(t, 9223372036854775807, mapResult["big"])
+		assert.IsType(t, int(0), mapResult["big"])
+	})
+
+	t.Run("handles mixed types in map", func(t *testing.T) {
+		data := map[string]any{
+			"name":    "test",
+			"active":  true,
+			"count":   json.Number("5"),
+			"rate":    json.Number("3.14"),
+			"tags":    []any{"a", "b"},
+			"nested":  map[string]any{"x": json.Number("1")},
+			"nothing": nil,
+		}
+
+		result := FixJSONNumberTypes(data)
+		mapResult, ok := result.(map[string]any)
+		assert.True(t, ok)
+
+		assert.Equal(t, "test", mapResult["name"])
+		assert.Equal(t, true, mapResult["active"])
+		assert.Equal(t, 5, mapResult["count"])
+		assert.InDelta(t, 3.14, mapResult["rate"], 0.0001)
+		assert.Equal(t, []any{"a", "b"}, mapResult["tags"])
+		nested, ok := mapResult["nested"].(map[string]any)
+		assert.True(t, ok)
+		assert.Equal(t, 1, nested["x"])
+		assert.Nil(t, mapResult["nothing"])
+	})
+}
+
+func TestConvertJSONNumber(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		input    json.Number
+		expected any
+	}{
+		{"integer", json.Number("42"), int(42)},
+		{"zero", json.Number("0"), int(0)},
+		{"negative integer", json.Number("-10"), int(-10)},
+		{"float", json.Number("3.14"), float64(3.14)},
+		{"negative float", json.Number("-2.5"), float64(-2.5)},
+		{"invalid", json.Number("xyz"), json.Number("xyz")},
+	}
+
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			result := convertJSONNumber(tc.input)
+			if f, ok := tc.expected.(float64); ok {
+				assert.InDelta(t, f, result, 0.0001)
+			} else {
+				assert.Equal(t, tc.expected, result)
+			}
+		})
+	}
 }
