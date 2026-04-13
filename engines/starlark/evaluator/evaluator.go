@@ -112,11 +112,12 @@ func (be *Evaluator) exec(
 		},
 	}
 
-	// Set up cancellation from context
-	go func() {
-		<-ctx.Done()
+	// Set up cancellation from context using AfterFunc to avoid goroutine leak
+	// when context is never cancelled (e.g., context.Background())
+	stop := context.AfterFunc(ctx, func() {
 		thread.Cancel(ctx.Err().Error())
-	}()
+	})
+	defer stop()
 
 	// Execute the program
 	finalGlobals, err := prog.Init(thread, globals)

@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http/httptest"
 	"os"
+	"runtime"
 	"testing"
 
 	"github.com/robbyt/go-polyscript/engines/starlark/compiler"
@@ -213,6 +214,31 @@ invalid_func()
 			require.Equal(t, "starlark.Evaluator", evaluator.String())
 		})
 	})
+}
+
+// TestEval_NoGoroutineLeak verifies that Eval() with a non-cancellable context does not leak goroutines
+func TestEval_NoGoroutineLeak(t *testing.T) {
+	t.Parallel()
+	scriptContent := `_ = 1 + 1`
+	_, evaluator := evalBuilder(t, scriptContent)
+
+	// Record baseline goroutine count
+	runtime.GC()
+	before := runtime.NumGoroutine()
+
+	// Run 100 evaluations with a context that won't be cancelled during Eval()
+	for range 100 {
+		ctx := context.WithValue(t.Context(), constants.EvalData, map[string]any{})
+		_, err := evaluator.Eval(ctx)
+		require.NoError(t, err)
+	}
+
+	// Allow goroutines to settle
+	runtime.GC()
+	after := runtime.NumGoroutine()
+
+	growth := after - before
+	require.Less(t, growth, 5, "goroutine count grew by %d after 100 Eval() calls; suspected leak", growth)
 }
 
 // TestEvaluator_AddDataToContext tests the AddDataToContext method with various scenarios
