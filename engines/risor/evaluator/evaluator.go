@@ -52,29 +52,18 @@ func (be *Evaluator) String() string {
 	return "risor.Evaluator"
 }
 
+// getDataProvider returns the data provider from the executable unit, or nil if unavailable.
+func (be *Evaluator) getDataProvider() data.Provider {
+	if be.execUnit == nil {
+		return nil
+	}
+	return be.execUnit.GetDataProvider()
+}
+
 // loadInputData retrieves input data using the data provider in the executable unit.
 // Returns a map that will be used as input for the Risor engine.
 func (be *Evaluator) loadInputData(ctx context.Context) (map[string]any, error) {
-	logger := be.logger.WithGroup("loadInputData")
-
-	// If no executable unit or data provider, return empty map
-	if be.execUnit == nil || be.execUnit.GetDataProvider() == nil {
-		logger.WarnContext(ctx, "no data provider available, using empty data")
-		return make(map[string]any), nil
-	}
-
-	// Get input data from provider
-	inputData, err := be.execUnit.GetDataProvider().GetData(ctx)
-	if err != nil {
-		logger.ErrorContext(ctx, "failed to get input data from provider", "error", err)
-		return nil, err
-	}
-
-	if len(inputData) == 0 {
-		logger.WarnContext(ctx, "empty input data returned from provider")
-	}
-	logger.DebugContext(ctx, "input data loaded from provider", "inputData", inputData)
-	return inputData, nil
+	return data.LoadInputData(ctx, be.logger.WithGroup("loadInputData"), be.getDataProvider())
 }
 
 // exec runs the bytecode with the provided environment map
@@ -172,17 +161,5 @@ func (be *Evaluator) AddDataToContext(
 	ctx context.Context,
 	d ...map[string]any,
 ) (context.Context, error) {
-	logger := be.logger.WithGroup("AddDataToContext")
-
-	// Use the shared helper function for context preparation
-	if be.execUnit == nil || be.execUnit.GetDataProvider() == nil {
-		return ctx, fmt.Errorf("no data provider available")
-	}
-
-	return data.AddDataToContextHelper(
-		ctx,
-		logger,
-		be.execUnit.GetDataProvider(),
-		d...,
-	)
+	return data.AddDataToContextFromProvider(ctx, be.logger.WithGroup("AddDataToContext"), be.getDataProvider(), d...)
 }
