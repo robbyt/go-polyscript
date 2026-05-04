@@ -52,4 +52,22 @@ func TestLoadInputData(t *testing.T) {
 		assert.Empty(t, result)
 		provider.AssertExpectations(t)
 	})
+
+	t.Run("nil logger does not panic", func(t *testing.T) {
+		provider := new(MockProvider)
+		expected := map[string]any{"key": "value"}
+		provider.On("GetData", mock.Anything).Return(expected, nil)
+
+		result, err := LoadInputData(t.Context(), nil, provider)
+		require.NoError(t, err)
+		assert.Equal(t, expected, result)
+		provider.AssertExpectations(t)
+	})
+
+	t.Run("nil logger and nil provider does not panic", func(t *testing.T) {
+		result, err := LoadInputData(t.Context(), nil, nil)
+		require.NoError(t, err)
+		assert.Empty(t, result)
+		assert.NotNil(t, result)
+	})
 }

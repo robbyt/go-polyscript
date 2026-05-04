@@ -13,6 +13,10 @@ func LoadInputData(
 	logger *slog.Logger,
 	provider Provider,
 ) (map[string]any, error) {
+	if logger == nil {
+		logger = slog.Default()
+	}
+
 	// If no data provider, return empty map
 	if provider == nil {
 		logger.WarnContext(ctx, "no data provider available, using empty data")
