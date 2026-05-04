@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http/httptest"
 	"os"
+	"runtime"
 	"testing"
 
 	"github.com/robbyt/go-polyscript/engines/starlark/compiler"
@@ -213,6 +214,35 @@ invalid_func()
 			require.Equal(t, "starlark.Evaluator", evaluator.String())
 		})
 	})
+}
+
+// TestEval_NoGoroutineLeak verifies that Eval() with a non-cancellable context does not leak goroutines.
+// Not parallelised on purpose — runtime.NumGoroutine() reads the process-wide goroutine count, so
+// concurrent tests would perturb the baseline and make the assertion flaky.
+func TestEval_NoGoroutineLeak(t *testing.T) {
+	scriptContent := `_ = 1 + 1`
+	_, evaluator := evalBuilder(t, scriptContent)
+
+	// Record baseline goroutine count
+	runtime.GC()
+	before := runtime.NumGoroutine()
+
+	// Use context.Background() so ctx.Done() is nil — this is the exact scenario
+	// where a bare goroutine waiting on <-ctx.Done() would block forever and leak.
+	// t.Context() would defeat the test by giving a cancellable context.
+	for range 100 {
+		//nolint:usetesting // intentional — see comment above
+		ctx := context.WithValue(context.Background(), constants.EvalData, map[string]any{})
+		_, err := evaluator.Eval(ctx)
+		require.NoError(t, err)
+	}
+
+	// Allow goroutines to settle
+	runtime.GC()
+	after := runtime.NumGoroutine()
+
+	growth := after - before
+	require.Less(t, growth, 5, "goroutine count grew by %d after 100 Eval() calls; suspected leak", growth)
 }
 
 // TestEvaluator_AddDataToContext tests the AddDataToContext method with various scenarios
