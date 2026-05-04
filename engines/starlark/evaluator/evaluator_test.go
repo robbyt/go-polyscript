@@ -216,9 +216,10 @@ invalid_func()
 	})
 }
 
-// TestEval_NoGoroutineLeak verifies that Eval() with a non-cancellable context does not leak goroutines
+// TestEval_NoGoroutineLeak verifies that Eval() with a non-cancellable context does not leak goroutines.
+// Not parallelised on purpose — runtime.NumGoroutine() reads the process-wide goroutine count, so
+// concurrent tests would perturb the baseline and make the assertion flaky.
 func TestEval_NoGoroutineLeak(t *testing.T) {
-	t.Parallel()
 	scriptContent := `_ = 1 + 1`
 	_, evaluator := evalBuilder(t, scriptContent)
 
@@ -226,9 +227,10 @@ func TestEval_NoGoroutineLeak(t *testing.T) {
 	runtime.GC()
 	before := runtime.NumGoroutine()
 
-	// Run 100 evaluations with a context that won't be cancelled during Eval()
+	// Use context.Background() so ctx.Done() is nil — this is the exact scenario
+	// where a bare goroutine waiting on <-ctx.Done() would block forever and leak.
 	for range 100 {
-		ctx := context.WithValue(t.Context(), constants.EvalData, map[string]any{})
+		ctx := context.WithValue(context.Background(), constants.EvalData, map[string]any{})
 		_, err := evaluator.Eval(ctx)
 		require.NoError(t, err)
 	}
