@@ -2,6 +2,8 @@ package internal
 
 import (
 	"encoding/json"
+	"math"
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -173,16 +175,35 @@ func TestFixJSONNumberTypes(t *testing.T) {
 		assert.IsType(t, json.Number(""), mapResult["bad_float"])
 	})
 
-	t.Run("handles large integers", func(t *testing.T) {
+	t.Run("handles maximum int64 value", func(t *testing.T) {
 		data := map[string]any{
-			"big": json.Number("9223372036854775807"), // max int64
+			"big": json.Number(strconv.FormatInt(math.MaxInt64, 10)),
 		}
 
 		result := FixJSONNumberTypes(data)
 		mapResult, ok := result.(map[string]any)
 		assert.True(t, ok)
-		assert.Equal(t, 9223372036854775807, mapResult["big"])
-		assert.IsType(t, int(0), mapResult["big"])
+
+		// On 64-bit platforms int spans the full int64 range, so we keep int.
+		// On 32-bit, int64 max overflows int and we fall back to int64.
+		if strconv.IntSize == 64 {
+			assert.IsType(t, int(0), mapResult["big"])
+			assert.Equal(t, math.MaxInt, mapResult["big"])
+		} else {
+			assert.IsType(t, int64(0), mapResult["big"])
+			assert.Equal(t, int64(math.MaxInt64), mapResult["big"])
+		}
+	})
+
+	t.Run("number too large for int64 falls back to float64", func(t *testing.T) {
+		data := map[string]any{
+			"huge": json.Number("99999999999999999999"), // exceeds int64
+		}
+
+		result := FixJSONNumberTypes(data)
+		mapResult, ok := result.(map[string]any)
+		assert.True(t, ok)
+		assert.IsType(t, float64(0), mapResult["huge"])
 	})
 
 	t.Run("handles mixed types in map", func(t *testing.T) {
