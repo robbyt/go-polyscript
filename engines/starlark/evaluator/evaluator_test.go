@@ -229,7 +229,9 @@ func TestEval_NoGoroutineLeak(t *testing.T) {
 
 	// Use context.Background() so ctx.Done() is nil — this is the exact scenario
 	// where a bare goroutine waiting on <-ctx.Done() would block forever and leak.
+	// t.Context() would defeat the test by giving a cancellable context.
 	for range 100 {
+		//nolint:usetesting // intentional — see comment above
 		ctx := context.WithValue(context.Background(), constants.EvalData, map[string]any{})
 		_, err := evaluator.Eval(ctx)
 		require.NoError(t, err)
