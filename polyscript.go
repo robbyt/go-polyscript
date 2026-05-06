@@ -65,7 +65,9 @@ import (
 // ----------------------------------------------------------------------------
 
 // Engine is the sealed type set used as the type argument to [New]. The three
-// concrete engines are [Risor], [Starlark], and [Extism].
+// concrete engines are [Risor], [Starlark], and [Extism]. The single
+// unexported method is a marker that prevents external packages from adding
+// their own engine types, so [Option] specialization stays exhaustive.
 type Engine interface {
 	polyscriptEngine()
 }
@@ -73,16 +75,19 @@ type Engine interface {
 // Risor selects the Risor scripting engine.
 type Risor struct{}
 
+// polyscriptEngine is a sealed marker; intentionally empty.
 func (Risor) polyscriptEngine() {}
 
 // Starlark selects the Starlark configuration language engine.
 type Starlark struct{}
 
+// polyscriptEngine is a sealed marker; intentionally empty.
 func (Starlark) polyscriptEngine() {}
 
 // Extism selects the Extism (WebAssembly) engine.
 type Extism struct{}
 
+// polyscriptEngine is a sealed marker; intentionally empty.
 func (Extism) polyscriptEngine() {}
 
 // ----------------------------------------------------------------------------
