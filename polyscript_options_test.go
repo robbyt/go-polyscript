@@ -258,20 +258,20 @@ func TestDeprecatedConstructorsStillWork(t *testing.T) {
 	t.Parallel()
 
 	t.Run("FromRisorString", func(t *testing.T) {
-		eval, err := polyscript.FromRisorString(`"ok"`, nil) //nolint:staticcheck // SA1019: pinning deprecated path
+		eval, err := polyscript.FromRisorString(`"ok"`, nil)
 		require.NoError(t, err)
 		require.NotNil(t, eval)
 	})
 
 	t.Run("FromRisorStringWithData", func(t *testing.T) {
-		eval, err := polyscript.FromRisorStringWithData( //nolint:staticcheck // SA1019: pinning deprecated path
+		eval, err := polyscript.FromRisorStringWithData(
 			`{"k": ctx["k"]}`, map[string]any{"k": "v"}, nil)
 		require.NoError(t, err)
 		require.NotNil(t, eval)
 	})
 
 	t.Run("FromExtismBytesWithData", func(t *testing.T) {
-		eval, err := polyscript.FromExtismBytesWithData( //nolint:staticcheck // SA1019: pinning deprecated path
+		eval, err := polyscript.FromExtismBytesWithData(
 			wasmdata.TestModule,
 			map[string]any{"input": "World"},
 			nil,

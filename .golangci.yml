@@ -56,6 +56,13 @@ linters:
       os-temp-dir: true
       context-background: true
       context-todo: true
+  exclusions:
+    rules:
+      # Test files are allowed to call functions marked Deprecated, so the
+      # deprecation contract can be exercised during the deprecation window.
+      - path: '(.+)_test\.go'
+        linters: [staticcheck]
+        text: 'SA1019'
 
 formatters:
   enable:
