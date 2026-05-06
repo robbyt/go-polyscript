@@ -1030,8 +1030,8 @@ let config_data = ctx["config"]
 			scriptLoader, err := loader.NewFromString(script)
 			require.NoError(t, err)
 			evaluator, err := risorEngine.FromRisorLoader(scriptLoader,
-					risorEngine.WithLogHandler(handler),
-					risorEngine.WithDataProvider(ctxProvider))
+				risorEngine.WithLogHandler(handler),
+				risorEngine.WithDataProvider(ctxProvider))
 			require.NoError(t, err)
 
 			// Use explicit keys as recommended in the documentation

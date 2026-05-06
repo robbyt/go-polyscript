@@ -2,7 +2,6 @@ package extism
 
 import (
 	"bytes"
-	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -45,7 +44,7 @@ func TestFromExtismLoader_RequiresEntryPoint(t *testing.T) {
 	eval, err := FromExtismLoader(mockLoader)
 	require.Error(t, err)
 	require.Nil(t, eval)
-	assert.ErrorIs(t, err, ErrEntryPointRequired)
+	require.ErrorIs(t, err, ErrEntryPointRequired)
 	// Loader must not be touched when entry-point validation fails.
 	mockLoader.AssertNotCalled(t, "GetReader")
 	mockLoader.AssertNotCalled(t, "GetSourceURL")
@@ -56,7 +55,7 @@ func TestFromExtismLoader_EmptyEntryPointStillRejected(t *testing.T) {
 	eval, err := FromExtismLoader(mockLoader, WithEntryPoint(""))
 	require.Error(t, err)
 	require.Nil(t, eval)
-	assert.ErrorIs(t, err, ErrEntryPointRequired)
+	require.ErrorIs(t, err, ErrEntryPointRequired)
 }
 
 func TestFromExtismLoader_NoOptionsBeyondEntryPoint(t *testing.T) {
@@ -184,7 +183,7 @@ func TestFromExtismLoader_RunsEndToEnd(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, eval)
 
-	res, err := eval.Eval(context.Background())
+	res, err := eval.Eval(t.Context())
 	require.NoError(t, err)
 	got, ok := res.Interface().(map[string]any)
 	require.True(t, ok)

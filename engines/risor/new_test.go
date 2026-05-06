@@ -2,7 +2,6 @@ package risor
 
 import (
 	"bytes"
-	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -161,7 +160,7 @@ func TestFromRisorLoader_RunsEndToEnd(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, eval)
 
-	res, err := eval.Eval(context.Background())
+	res, err := eval.Eval(t.Context())
 	require.NoError(t, err)
 	assert.Equal(t, "Hello, World", res.Interface())
 }
