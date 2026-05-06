@@ -9,7 +9,9 @@ A unified abstraction package for loading and running various scripting language
 
 ## Overview
 
-go-polyscript democratizes different scripting engines by abstracting the loading, data handling, runtime, and results handling, allowing for interchangeability of scripting languages. This package provides interfaces and implementations for "engines", "executables", "evaluators" and the final "result". There are several tiers of public APIs, each with increasing complexity and configurability. `polyscript.go` in the root exposes the most common use cases, but is also the most opinionated.
+go-polyscript democratizes different scripting engines by abstracting the loading, data handling, runtime, and results handling, allowing for interchangeability of scripting languages. The library provides interfaces and implementations for "engines", "executables", "evaluators", and the final "result".
+
+The top-level package (`polyscript.go`) exposes a single generic constructor — `polyscript.New[E]` — that handles the common cases for all three engines. For finer-grained control (custom compilers, custom data providers, etc.), the per-engine sub-packages under `engines/` are also exported.
 
 ## Features
 
@@ -73,11 +75,98 @@ func main() {
 }
 ```
 
-The top-level API is `polyscript.New[E]` where `E` selects the engine — `polyscript.Risor`, `polyscript.Starlark`, or `polyscript.Extism`. The constructor takes a `Source` (built with `FromString`, `FromBytes`, `FromFile`, or `FromLoader`) and zero or more `Option[E]`s. Engine-specific options like `WithEntryPoint` are bound to a single engine at compile time, so passing them to the wrong engine is a compile error rather than a silent no-op.
-
-> **Note on type arguments.** `WithStaticData` and `WithLogHandler` are generic helpers that work for any engine. Go's current type inference can't always infer `E` for them when the surrounding `New[E]` call has a non-variadic `Source` parameter, so these helpers usually need an explicit type argument: `polyscript.WithStaticData[polyscript.Risor](data)`. `WithEntryPoint` is bound to `Extism` and never needs one.
-
 The older `FromRisorString*`, `FromStarlark*`, and `FromExtism*` constructors still work but are deprecated and slated for removal in v1.
+
+## API at a glance
+
+`polyscript.New[E]` is the single entry point. `E` selects the engine, the first argument is a `Source`, and the remaining arguments are `Option[E]`s.
+
+### Engines
+
+| Type                  | Use it for                              |
+| --------------------- | --------------------------------------- |
+| `polyscript.Risor`    | Risor scripts                           |
+| `polyscript.Starlark` | Starlark configuration scripts          |
+| `polyscript.Extism`   | WebAssembly modules via the Extism PDK  |
+
+### Sources
+
+| Builder                            | Backed by                                                                |
+| ---------------------------------- | ------------------------------------------------------------------------ |
+| `polyscript.FromString(s)`         | An in-memory script string                                               |
+| `polyscript.FromBytes(b)`          | An in-memory byte slice (typically WASM); the slice is copied            |
+| `polyscript.FromFile(path)`        | An absolute path on disk                                                 |
+| `polyscript.FromLoader(l)`         | Any custom `loader.Loader` (e.g. an HTTP loader; see [Loading Scripts](#loading-scripts)) |
+
+### Options
+
+| Option                             | Applies to              | Effect                                                              |
+| ---------------------------------- | ----------------------- | ------------------------------------------------------------------- |
+| `WithStaticData[E](map)`           | All engines             | Bakes a fixed data map into the evaluator at construction time      |
+| `WithLogHandler[E](handler)`       | All engines             | Routes diagnostic logs through the given `slog.Handler`             |
+| `WithEntryPoint(name)`             | `Extism` only (compile-time enforced) | Sets the WASM function name to invoke; required for Extism |
+
+> **Note on type arguments.** `WithStaticData` and `WithLogHandler` are generic over the engine. Go's current type inference can't always infer `E` for them when the surrounding `New[E]` call has a non-variadic `Source` parameter, so these helpers usually need an explicit type argument: `polyscript.WithStaticData[polyscript.Risor](data)`. `WithEntryPoint` is bound to `Extism` and never needs one — passing it to `New[polyscript.Risor]` or `New[polyscript.Starlark]` is a compile error rather than a silent no-op.
+
+## Loading Scripts
+
+`FromString` is the easiest source for embedded scripts. For other locations:
+
+### From a file on disk
+
+```go
+evaluator, _ := polyscript.New[polyscript.Risor](
+	polyscript.FromFile("/etc/polyscript/hello.risor"),
+)
+```
+
+The path must be absolute. For relative paths, resolve them with `filepath.Abs` first.
+
+### From an HTTP endpoint
+
+`FromLoader` wraps any `loader.Loader`, including the HTTP loader that ships with go-polyscript:
+
+```go
+import (
+	"time"
+
+	"github.com/robbyt/go-polyscript"
+	"github.com/robbyt/go-polyscript/platform/script/loader"
+)
+
+httpOpts := loader.DefaultHTTPOptions().
+	WithTimeout(10 * time.Second).
+	WithBearerAuth("my-api-token")
+
+httpLoader, err := loader.NewFromHTTPWithOptions(
+	"https://scripts.example.com/greet.risor",
+	httpOpts,
+)
+if err != nil {
+	return err
+}
+
+evaluator, err := polyscript.New[polyscript.Risor](polyscript.FromLoader(httpLoader))
+```
+
+### Capturing diagnostic logs
+
+```go
+import (
+	"log/slog"
+	"os"
+
+	"github.com/robbyt/go-polyscript"
+)
+
+handler := slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelDebug})
+
+evaluator, _ := polyscript.New[polyscript.Risor](
+	polyscript.FromString(script),
+	polyscript.WithLogHandler[polyscript.Risor](handler),
+	polyscript.WithStaticData[polyscript.Risor](data),
+)
+```
 
 ## Working with Data Providers
 
