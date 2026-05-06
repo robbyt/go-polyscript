@@ -165,6 +165,9 @@ func TestFromRisorLoader_RunsEndToEnd(t *testing.T) {
 	assert.Equal(t, "Hello, World", res.Interface())
 }
 
+// Note: mutates slog.Default via SetDefault — must not call t.Parallel().
+// Across packages it is safe because `go test ./...` runs each package in
+// its own process (each with its own slog.Default).
 func TestFromRisorLoader_DefaultsToSlogDefault(t *testing.T) {
 	// Without WithLogHandler, the evaluator should inherit from slog.Default().
 	prev := slog.Default()

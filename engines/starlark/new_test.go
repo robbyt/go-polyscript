@@ -165,6 +165,9 @@ _ = result
 	assert.Equal(t, "Hello, World", res.Interface())
 }
 
+// Note: mutates slog.Default via SetDefault — must not call t.Parallel().
+// Across packages it is safe because `go test ./...` runs each package in
+// its own process (each with its own slog.Default).
 func TestFromStarlarkLoader_DefaultsToSlogDefault(t *testing.T) {
 	prev := slog.Default()
 	t.Cleanup(func() { slog.SetDefault(prev) })

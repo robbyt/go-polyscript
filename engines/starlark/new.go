@@ -39,7 +39,11 @@ func FromStarlarkLoader(ldr loader.Loader, opts ...Option) (*evaluator.Evaluator
 
 	provider := resolveProvider(cfg)
 
-	compiler, err := NewCompiler(compiler.WithCtxGlobal())
+	compilerOpts := []compiler.FunctionalOption{compiler.WithCtxGlobal()}
+	if cfg.handler != nil {
+		compilerOpts = append(compilerOpts, compiler.WithLogHandler(cfg.handler))
+	}
+	comp, err := NewCompiler(compilerOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Starlark compiler: %w", err)
 	}
@@ -49,7 +53,7 @@ func FromStarlarkLoader(ldr loader.Loader, opts ...Option) (*evaluator.Evaluator
 		execUnitID = u.String()
 	}
 
-	execUnit, err := script.NewExecutableUnit(cfg.handler, execUnitID, ldr, compiler, provider)
+	execUnit, err := script.NewExecutableUnit(cfg.handler, execUnitID, ldr, comp, provider)
 	if err != nil {
 		return nil, err
 	}
