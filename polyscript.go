@@ -64,34 +64,26 @@ import (
 // Engine markers
 // ----------------------------------------------------------------------------
 
-// Engine is the sealed type set used as the type argument to [New]. The three
-// concrete engines are [Risor], [Starlark], and [Extism]. The single
-// unexported method is a marker that prevents external packages from adding
-// their own engine types, so [Option] specialization stays exhaustive.
+// Engine is the type-set constraint used as the type argument to [New]. It is
+// satisfied by exactly three concrete types: [Risor], [Starlark], and
+// [Extism]. Using a type-set constraint means Engine is a compile-time
+// gate — callers that try to instantiate [New] with any other type
+// (including pointer types like *Risor) get a build error.
+//
+// Engine is a constraint, not a regular interface; values cannot be assigned
+// to it.
 type Engine interface {
-	polyscriptEngine()
+	Risor | Starlark | Extism
 }
 
 // Risor selects the Risor scripting engine.
 type Risor struct{}
 
-func (Risor) polyscriptEngine() {
-	// sealed marker; intentionally empty
-}
-
 // Starlark selects the Starlark configuration language engine.
 type Starlark struct{}
 
-func (Starlark) polyscriptEngine() {
-	// sealed marker; intentionally empty
-}
-
 // Extism selects the Extism (WebAssembly) engine.
 type Extism struct{}
-
-func (Extism) polyscriptEngine() {
-	// sealed marker; intentionally empty
-}
 
 // ----------------------------------------------------------------------------
 // Sources
@@ -218,12 +210,13 @@ func WithEntryPoint(name string) Option[Extism] {
 //	eval, err := polyscript.New[polyscript.Extism](
 //	    polyscript.FromBytes(wasmBytes),
 //	    polyscript.WithEntryPoint("greet"),
-//	    polyscript.WithStaticData(map[string]any{"input": "World"}),
+//	    polyscript.WithStaticData[polyscript.Extism](map[string]any{"input": "World"}),
 //	)
 //
-// Shared options ([WithStaticData], [WithLogHandler]) work for any engine.
-// [WithEntryPoint] is bound to [Extism]; passing it to [Risor] or [Starlark]
-// is a compile error.
+// Shared options ([WithStaticData], [WithLogHandler]) work for any engine but
+// usually need an explicit type argument; see "A note on type arguments" in
+// the package doc. [WithEntryPoint] is bound to [Extism]; passing it to
+// [Risor] or [Starlark] is a compile error.
 func New[E Engine](src Source, opts ...Option[E]) (platform.Evaluator, error) {
 	cfg := &config{}
 	for _, o := range opts {

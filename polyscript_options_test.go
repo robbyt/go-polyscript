@@ -251,37 +251,6 @@ func TestFromBytesIsolatesCallerSlice(t *testing.T) {
 	assert.Equal(t, "Hello, World!", got["greeting"])
 }
 
-// Deprecated constructors still work. This pins the deprecation contract for
-// the duration of the deprecation window; remove when those functions are
-// finally deleted in the v1 cleanup.
-func TestDeprecatedConstructorsStillWork(t *testing.T) {
-	t.Parallel()
-
-	t.Run("FromRisorString", func(t *testing.T) {
-		eval, err := polyscript.FromRisorString(`"ok"`, nil)
-		require.NoError(t, err)
-		require.NotNil(t, eval)
-	})
-
-	t.Run("FromRisorStringWithData", func(t *testing.T) {
-		eval, err := polyscript.FromRisorStringWithData(
-			`{"k": ctx["k"]}`, map[string]any{"k": "v"}, nil)
-		require.NoError(t, err)
-		require.NotNil(t, eval)
-	})
-
-	t.Run("FromExtismBytesWithData", func(t *testing.T) {
-		eval, err := polyscript.FromExtismBytesWithData(
-			wasmdata.TestModule,
-			map[string]any{"input": "World"},
-			nil,
-			wasmdata.EntrypointGreet,
-		)
-		require.NoError(t, err)
-		require.NotNil(t, eval)
-	})
-}
-
 func TestSourceErrorPropagation(t *testing.T) {
 	t.Parallel()
 

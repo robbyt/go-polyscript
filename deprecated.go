@@ -22,7 +22,7 @@ import (
 //
 //	eval, err := polyscript.New[polyscript.Extism](
 //	    polyscript.FromFile(filePath),
-//	    polyscript.WithLogHandler(logHandler),
+//	    polyscript.WithLogHandler[polyscript.Extism](logHandler),
 //	    polyscript.WithEntryPoint(entryPoint),
 //	)
 func FromExtismFile(
