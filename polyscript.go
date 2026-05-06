@@ -75,20 +75,23 @@ type Engine interface {
 // Risor selects the Risor scripting engine.
 type Risor struct{}
 
-// polyscriptEngine is a sealed marker; intentionally empty.
-func (Risor) polyscriptEngine() {}
+func (Risor) polyscriptEngine() {
+	// sealed marker; intentionally empty
+}
 
 // Starlark selects the Starlark configuration language engine.
 type Starlark struct{}
 
-// polyscriptEngine is a sealed marker; intentionally empty.
-func (Starlark) polyscriptEngine() {}
+func (Starlark) polyscriptEngine() {
+	// sealed marker; intentionally empty
+}
 
 // Extism selects the Extism (WebAssembly) engine.
 type Extism struct{}
 
-// polyscriptEngine is a sealed marker; intentionally empty.
-func (Extism) polyscriptEngine() {}
+func (Extism) polyscriptEngine() {
+	// sealed marker; intentionally empty
+}
 
 // ----------------------------------------------------------------------------
 // Sources
