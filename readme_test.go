@@ -30,9 +30,9 @@ func TestReadmeQuickStart(t *testing.T) {
 		}
 	`
 
-	evaluator, err := polyscript.Risor(
+	evaluator, err := polyscript.New[polyscript.Risor](
 		polyscript.FromString(script),
-		polyscript.WithStaticData(map[string]any{"name": "World"}),
+		polyscript.WithStaticData[polyscript.Risor](map[string]any{"name": "World"}),
 	)
 	require.NoError(t, err, "Should create evaluator successfully")
 
@@ -65,9 +65,9 @@ func TestReadmeStaticProvider(t *testing.T) {
 		}
 	`
 
-	evaluator, err := polyscript.Risor(
+	evaluator, err := polyscript.New[polyscript.Risor](
 		polyscript.FromString(script),
-		polyscript.WithStaticData(map[string]any{"name": "cats", "excited": true}),
+		polyscript.WithStaticData[polyscript.Risor](map[string]any{"name": "cats", "excited": true}),
 	)
 	require.NoError(t, err, "Should create evaluator successfully")
 
@@ -92,7 +92,7 @@ func TestReadmeContextProvider(t *testing.T) {
 		}
 	`
 
-	evaluator, err := polyscript.Risor(polyscript.FromString(script))
+	evaluator, err := polyscript.New[polyscript.Risor](polyscript.FromString(script))
 	require.NoError(t, err, "Should create evaluator successfully")
 
 	runtimeData := map[string]any{"name": "Billie Jean", "relationship": false}
@@ -133,9 +133,9 @@ func TestReadmeCombiningStaticAndDynamic(t *testing.T) {
 		"excited": true,
 	}
 
-	evaluator, err := polyscript.Risor(
+	evaluator, err := polyscript.New[polyscript.Risor](
 		polyscript.FromString(script),
-		polyscript.WithStaticData(staticData),
+		polyscript.WithStaticData[polyscript.Risor](staticData),
 	)
 	require.NoError(t, err, "Should create evaluator with static data")
 
@@ -166,9 +166,9 @@ result = {"greeting": message, "length": len(message)}
 _ = result
 `
 
-	evaluator, err := polyscript.Starlark(
+	evaluator, err := polyscript.New[polyscript.Starlark](
 		polyscript.FromString(scriptContent),
-		polyscript.WithStaticData(map[string]any{"name": "World"}),
+		polyscript.WithStaticData[polyscript.Starlark](map[string]any{"name": "World"}),
 	)
 	require.NoError(t, err, "Should create Starlark evaluator")
 
@@ -184,10 +184,10 @@ _ = result
 func TestReadmeExtism(t *testing.T) {
 	t.Parallel()
 
-	evaluator, err := polyscript.Extism(
+	evaluator, err := polyscript.New[polyscript.Extism](
 		polyscript.FromBytes(wasmdata.TestModule),
 		polyscript.WithEntryPoint(wasmdata.EntrypointGreet),
-		polyscript.WithStaticData(map[string]any{"input": "World"}),
+		polyscript.WithStaticData[polyscript.Extism](map[string]any{"input": "World"}),
 	)
 	require.NoError(t, err, "Should create Extism evaluator")
 

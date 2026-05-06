@@ -63,9 +63,9 @@ func main() {
 		}
 	`
 
-	evaluator, _ := polyscript.Risor(
+	evaluator, _ := polyscript.New[polyscript.Risor](
 		polyscript.FromString(script),
-		polyscript.WithStaticData(map[string]any{"name": "World"}),
+		polyscript.WithStaticData[polyscript.Risor](map[string]any{"name": "World"}),
 	)
 
 	result, _ := evaluator.Eval(context.Background())
@@ -73,7 +73,9 @@ func main() {
 }
 ```
 
-The top-level API is built around three engine constructors — `polyscript.Risor`, `polyscript.Starlark`, `polyscript.Extism` — each accepting a `Source` (built with `FromString`, `FromBytes`, `FromFile`, or `FromLoader`) plus zero or more `Option`s (`WithStaticData`, `WithLogHandler`, `WithEntryPoint`).
+The top-level API is `polyscript.New[E]` where `E` selects the engine — `polyscript.Risor`, `polyscript.Starlark`, or `polyscript.Extism`. The constructor takes a `Source` (built with `FromString`, `FromBytes`, `FromFile`, or `FromLoader`) and zero or more `Option[E]`s. Engine-specific options like `WithEntryPoint` are bound to a single engine at compile time, so passing them to the wrong engine is a compile error rather than a silent no-op.
+
+> **Note on type arguments.** `WithStaticData` and `WithLogHandler` are generic helpers that work for any engine. Go's current type inference can't always infer `E` for them when the surrounding `New[E]` call has a non-variadic `Source` parameter, so these helpers usually need an explicit type argument: `polyscript.WithStaticData[polyscript.Risor](data)`. `WithEntryPoint` is bound to `Extism` and never needs one.
 
 The older `FromRisorString*`, `FromStarlark*`, and `FromExtism*` constructors still work but are deprecated and slated for removal in v1.
 
@@ -86,9 +88,9 @@ To send input data to a script, use a "data provider" implementation. There are 
 For example, attaching `WithStaticData` to a Risor evaluator wires up a `StaticProvider` internally to send the static data map into the evaluator during creation.
 
 ```go
-evaluator, _ := polyscript.Risor(
+evaluator, _ := polyscript.New[polyscript.Risor](
 	polyscript.FromString(script),
-	polyscript.WithStaticData(map[string]any{"name": "cats", "excited": true}),
+	polyscript.WithStaticData[polyscript.Risor](map[string]any{"name": "cats", "excited": true}),
 )
 ```
 
@@ -97,7 +99,7 @@ evaluator, _ := polyscript.Risor(
 A constructor created without `WithStaticData` uses a `ContextProvider`, so dynamic per-request data can be threaded in through the context.
 
 ```go
-evaluator, _ := polyscript.Risor(polyscript.FromString(script))
+evaluator, _ := polyscript.New[polyscript.Risor](polyscript.FromString(script))
 
 runtimeData := map[string]any{"name": "Billie Jean", "relationship": false}
 enrichedCtx, _ := evaluator.AddDataToContext(context.Background(), runtimeData)
@@ -117,9 +119,9 @@ staticData := map[string]any{
 }
 
 // Create the evaluator with the static data
-evaluator, _ := polyscript.Risor(
+evaluator, _ := polyscript.New[polyscript.Risor](
 	polyscript.FromString(script),
-	polyscript.WithStaticData(staticData),
+	polyscript.WithStaticData[polyscript.Risor](staticData),
 )
 
 // For each request, prepare dynamic data
@@ -172,9 +174,9 @@ result = {"greeting": message, "length": len(message)}
 _ = result
 `
 
-evaluator, _ := polyscript.Starlark(
+evaluator, _ := polyscript.New[polyscript.Starlark](
 	polyscript.FromString(scriptContent),
-	polyscript.WithStaticData(map[string]any{"name": "World"}),
+	polyscript.WithStaticData[polyscript.Starlark](map[string]any{"name": "World"}),
 )
 
 // Execute with a context
@@ -195,7 +197,7 @@ import (
 )
 
 func main() {
-	evaluator, _ := polyscript.Extism(
+	evaluator, _ := polyscript.New[polyscript.Extism](
 		// pre-compiled WASM example module
 		polyscript.FromBytes(wasmdata.TestModule),
 
@@ -204,7 +206,7 @@ func main() {
 
 		// the go-polyscript Extism engine will encode the static data into
 		// JSON and send it to the WASM application
-		polyscript.WithStaticData(map[string]any{"input": "World"}),
+		polyscript.WithStaticData[polyscript.Extism](map[string]any{"input": "World"}),
 	)
 
 	// Execute, and print the result
