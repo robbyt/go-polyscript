@@ -1,8 +1,8 @@
 package extism
 
 import (
+	"errors"
 	"fmt"
-	"log/slog"
 
 	"github.com/robbyt/go-polyscript/engines/extism/compiler"
 	"github.com/robbyt/go-polyscript/engines/extism/evaluator"
@@ -12,52 +12,60 @@ import (
 	"github.com/robbyt/go-polyscript/platform/script/loader"
 )
 
-// FromExtismLoader creates an Extism evaluator from a loader with dynamic data only (ContextProvider)
-//
-// Input parameters:
-// - l: loader implementation for loading the WASM content
-// - logHandler: logger handler for logging
-// - entryPoint: entry point for the WASM module (which function to call in the WASM file)
-//
-// Returns an evaluator, which implements the evaluation.Evaluator interface.
-func FromExtismLoader(
-	logHandler slog.Handler,
-	ldr loader.Loader,
-	entryPoint string,
-) (*evaluator.Evaluator, error) {
-	return NewEvaluator(
-		logHandler,
-		ldr,
-		data.NewContextProvider(constants.EvalData),
-		entryPoint,
-	)
-}
+// ErrEntryPointRequired is returned by [FromExtismLoader] when no entry
+// point name was supplied via [WithEntryPoint].
+var ErrEntryPointRequired = errors.New("extism: entry point is required (use WithEntryPoint)")
 
-// FromExtismLoaderWithData creates an Extism evaluator with both static and dynamic data capabilities.
+// FromExtismLoader builds an Extism (WASM) evaluator from a module loader.
 //
-// Input parameters:
-// - l: loader implementation for loading the WASM content
-// - staticData: map of initial static data to be passed to the WASM module
-// - logHandler: logger handler for logging
-// - entryPoint: entry point for the WASM module (which function to call in the WASM file)
+// The constructor is the single public entry point for building an Extism
+// evaluator from this package. Configure it with the With* options:
 //
-// Returns an evaluator, which implements the evaluation.Evaluator interface.
-func FromExtismLoaderWithData(
-	logHandler slog.Handler,
-	ldr loader.Loader,
-	staticData map[string]any,
-	entryPoint string,
-) (*evaluator.Evaluator, error) {
-	staticProvider := data.NewStaticProvider(staticData)
-	dynamicProvider := data.NewContextProvider(constants.EvalData)
-	compositeProvider := data.NewCompositeProvider(staticProvider, dynamicProvider)
+//	eval, err := extism.FromExtismLoader(
+//	    ldr,
+//	    extism.WithEntryPoint("greet"),
+//	    extism.WithLogHandler(slog.Default().Handler()),
+//	    extism.WithStaticData(map[string]any{"input": "World"}),
+//	)
+//
+// [WithEntryPoint] is required and identifies the exported WASM function
+// to invoke; [FromExtismLoader] returns [ErrEntryPointRequired] if it is
+// missing.
+//
+// Logging falls back to [slog.Default] when [WithLogHandler] is omitted.
+//
+// If both [WithStaticData] and [WithDataProvider] are supplied,
+// [WithDataProvider] takes precedence — pass exactly one of them per
+// call to keep intent unambiguous.
+func FromExtismLoader(ldr loader.Loader, opts ...Option) (*evaluator.Evaluator, error) {
+	cfg := &config{}
+	for _, opt := range opts {
+		if opt != nil {
+			opt(cfg)
+		}
+	}
+	if cfg.entryPoint == "" {
+		return nil, ErrEntryPointRequired
+	}
 
-	return NewEvaluator(
-		logHandler,
-		ldr,
-		compositeProvider,
-		entryPoint,
-	)
+	provider := resolveProvider(cfg)
+
+	compiler, err := NewCompiler(compiler.WithEntryPoint(cfg.entryPoint))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Extism compiler: %w", err)
+	}
+
+	execUnitID := ""
+	if u := ldr.GetSourceURL(); u != nil {
+		execUnitID = u.String()
+	}
+
+	execUnit, err := script.NewExecutableUnit(cfg.handler, execUnitID, ldr, compiler, provider)
+	if err != nil {
+		return nil, err
+	}
+
+	return evaluator.New(cfg.handler, execUnit), nil
 }
 
 // NewCompiler creates a new Extism compiler using the functional options pattern.
@@ -66,40 +74,17 @@ func NewCompiler(opts ...compiler.FunctionalOption) (*compiler.Compiler, error) 
 	return compiler.New(opts...)
 }
 
-// NewEvaluator creates an Extism evaluator with WASM code loaded, and ready for execution.
-// Returns a Evaluator, which implements the evaluation.Evaluator interface.
-func NewEvaluator(
-	logHandler slog.Handler,
-	ldr loader.Loader,
-	dataProvider data.Provider,
-	entryPoint string,
-) (*evaluator.Evaluator, error) {
-	if dataProvider == nil {
-		return nil, fmt.Errorf("provider is nil")
+// resolveProvider builds the data.Provider used by the evaluator. An
+// explicit WithDataProvider wins; otherwise WithStaticData composes a
+// StaticProvider with the standard ContextProvider; otherwise a bare
+// ContextProvider.
+func resolveProvider(cfg *config) data.Provider {
+	if cfg.dataProvider != nil {
+		return cfg.dataProvider
 	}
-
-	compiler, err := NewCompiler(compiler.WithEntryPoint(entryPoint))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create Extism compiler: %w", err)
+	ctxProvider := data.NewContextProvider(constants.EvalData)
+	if cfg.staticData == nil {
+		return ctxProvider
 	}
-
-	execUnitID := ""
-	sourceURL := ldr.GetSourceURL()
-	if sourceURL != nil {
-		execUnitID = sourceURL.String()
-	}
-
-	// Create executable unit (to compile and prepare the script)
-	execUnit, err := script.NewExecutableUnit(
-		logHandler,
-		execUnitID,
-		ldr,
-		compiler,
-		dataProvider,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	return evaluator.New(logHandler, execUnit), nil
+	return data.NewCompositeProvider(data.NewStaticProvider(cfg.staticData), ctxProvider)
 }

@@ -233,7 +233,9 @@ func TestCompilerOptionsDetailed(t *testing.T) {
 			c := &Compiler{}
 			c.applyDefaults()
 
-			require.NotNil(t, c.logHandler)
+			// Handler/logger defaults are now deferred to helpers.SetupLogger,
+			// so applyDefaults leaves them nil.
+			require.Nil(t, c.logHandler)
 			require.Nil(t, c.logger)
 			require.NotNil(t, c.globals)
 			require.Empty(t, c.globals)
@@ -280,15 +282,16 @@ func TestCompilerOptionsDetailed(t *testing.T) {
 				require.NoError(t, err)
 			})
 
-			t.Run("missing logger", func(t *testing.T) {
+			t.Run("nil handler and logger is now valid", func(t *testing.T) {
+				// helpers.SetupLogger inherits from slog.Default() at log time,
+				// so a Compiler with neither field set is valid.
 				c := &Compiler{}
 				c.applyDefaults()
 				c.logHandler = nil
 				c.logger = nil
 
 				err := c.validate()
-				require.Error(t, err)
-				require.Contains(t, err.Error(), "either log handler or logger must be specified")
+				require.NoError(t, err)
 			})
 
 			t.Run("with log handler only", func(t *testing.T) {

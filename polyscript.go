@@ -239,20 +239,32 @@ func New[E Engine](src Source, opts ...Option[E]) (platform.Evaluator, error) {
 
 	switch any(e).(type) {
 	case Risor:
-		if cfg.staticData != nil {
-			return risorMachine.FromRisorLoaderWithData(cfg.handler, ldr, cfg.staticData)
+		var opts []risorMachine.Option
+		if cfg.handler != nil {
+			opts = append(opts, risorMachine.WithLogHandler(cfg.handler))
 		}
-		return risorMachine.FromRisorLoader(cfg.handler, ldr)
+		if cfg.staticData != nil {
+			opts = append(opts, risorMachine.WithStaticData(cfg.staticData))
+		}
+		return risorMachine.FromRisorLoader(ldr, opts...)
 	case Starlark:
-		if cfg.staticData != nil {
-			return starlarkMachine.FromStarlarkLoaderWithData(cfg.handler, ldr, cfg.staticData)
+		var opts []starlarkMachine.Option
+		if cfg.handler != nil {
+			opts = append(opts, starlarkMachine.WithLogHandler(cfg.handler))
 		}
-		return starlarkMachine.FromStarlarkLoader(cfg.handler, ldr)
+		if cfg.staticData != nil {
+			opts = append(opts, starlarkMachine.WithStaticData(cfg.staticData))
+		}
+		return starlarkMachine.FromStarlarkLoader(ldr, opts...)
 	case Extism:
-		if cfg.staticData != nil {
-			return extismMachine.FromExtismLoaderWithData(cfg.handler, ldr, cfg.staticData, cfg.entryPoint)
+		opts := []extismMachine.Option{extismMachine.WithEntryPoint(cfg.entryPoint)}
+		if cfg.handler != nil {
+			opts = append(opts, extismMachine.WithLogHandler(cfg.handler))
 		}
-		return extismMachine.FromExtismLoader(cfg.handler, ldr, cfg.entryPoint)
+		if cfg.staticData != nil {
+			opts = append(opts, extismMachine.WithStaticData(cfg.staticData))
+		}
+		return extismMachine.FromExtismLoader(ldr, opts...)
 	default:
 		return nil, fmt.Errorf("polyscript.New: unsupported engine type %T", e)
 	}

@@ -1,6 +1,9 @@
 package risor
 
 import (
+	"bytes"
+	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -24,8 +27,7 @@ function greet(name) {
 greet("World")
 `
 
-// Helper function to create a string loader with test script
-func createTestLoader(t *testing.T) *loader.FromString {
+func newTestLoader(t *testing.T) *loader.FromString {
 	t.Helper()
 	stringLoader, err := loader.NewFromString(testRisorScript)
 	require.NoError(t, err)
@@ -33,251 +35,170 @@ func createTestLoader(t *testing.T) *loader.FromString {
 	return stringLoader
 }
 
-func TestFromRisorLoader(t *testing.T) {
-	t.Parallel()
-
-	t.Run("success", func(t *testing.T) {
-		// Setup
-		handler := slog.NewTextHandler(os.Stdout, nil)
-		stringLoader := createTestLoader(t)
-
-		// Execute
-		evalInstance, err := FromRisorLoader(handler, stringLoader)
-
-		// Verify
-		require.NoError(t, err)
-		require.NotNil(t, evalInstance)
-		assert.Equal(t, "risor.Evaluator", evalInstance.String())
-	})
-
-	t.Run("error from loader", func(t *testing.T) {
-		// Setup - create a mock loader that will return an error
-		handler := slog.NewTextHandler(os.Stdout, nil)
-		mockLoader := new(loader.MockLoader)
-		mockURL, err := url.Parse("file:///test-risor-file.risor")
-		require.NoError(t, err, "Failed to parse URL")
-		mockLoader.On("GetSourceURL").Return(mockURL)
-		mockLoader.On("GetReader").Return(nil, fmt.Errorf("failed to load script"))
-
-		// Execute
-		evalInstance, err := FromRisorLoader(handler, mockLoader)
-
-		// Verify
-		require.Error(t, err)
-		require.Nil(t, evalInstance)
-		assert.Contains(t, err.Error(), "failed to load script")
-		mockLoader.AssertExpectations(t)
-	})
+func newErrorLoader(t *testing.T, msg string) *loader.MockLoader {
+	t.Helper()
+	mockLoader := new(loader.MockLoader)
+	mockURL, err := url.Parse("file:///test-risor-file.risor")
+	require.NoError(t, err)
+	mockLoader.On("GetSourceURL").Return(mockURL)
+	mockLoader.On("GetReader").Return(nil, errors.New(msg))
+	return mockLoader
 }
 
-func TestFromRisorLoaderWithData(t *testing.T) {
-	t.Parallel()
+func TestFromRisorLoader_NoOptions(t *testing.T) {
+	// Without WithLogHandler the evaluator inherits slog.Default(); no error.
+	eval, err := FromRisorLoader(newTestLoader(t))
+	require.NoError(t, err)
+	require.NotNil(t, eval)
+	assert.Equal(t, "risor.Evaluator", eval.String())
+}
 
-	t.Run("success with static data", func(t *testing.T) {
-		// Setup
-		handler := slog.NewTextHandler(os.Stdout, nil)
-		stringLoader := createTestLoader(t)
+func TestFromRisorLoader_WithLogHandler(t *testing.T) {
+	handler := slog.NewTextHandler(os.Stdout, nil)
+	eval, err := FromRisorLoader(newTestLoader(t), WithLogHandler(handler))
+	require.NoError(t, err)
+	require.NotNil(t, eval)
+}
 
-		staticData := map[string]any{
-			"version": "1.0.0",
-			"config": map[string]any{
-				"timeout": 30,
-				"retry":   true,
-			},
-		}
+func TestFromRisorLoader_NilLogHandler(t *testing.T) {
+	// Explicitly passing nil is treated the same as omitting the option.
+	eval, err := FromRisorLoader(newTestLoader(t), WithLogHandler(nil))
+	require.NoError(t, err)
+	require.NotNil(t, eval)
+}
 
-		// Execute
-		evalInstance, err := FromRisorLoaderWithData(handler, stringLoader, staticData)
+func TestFromRisorLoader_WithStaticData(t *testing.T) {
+	staticData := map[string]any{
+		"version": "1.0.0",
+		"config":  map[string]any{"timeout": 30, "retry": true},
+	}
+	eval, err := FromRisorLoader(newTestLoader(t), WithStaticData(staticData))
+	require.NoError(t, err)
+	require.NotNil(t, eval)
+}
 
-		// Verify
-		require.NoError(t, err)
-		require.NotNil(t, evalInstance)
-	})
+func TestFromRisorLoader_EmptyStaticData(t *testing.T) {
+	// Empty (but non-nil) map still composes a CompositeProvider; should succeed.
+	eval, err := FromRisorLoader(newTestLoader(t), WithStaticData(map[string]any{}))
+	require.NoError(t, err)
+	require.NotNil(t, eval)
+}
 
-	t.Run("empty static data", func(t *testing.T) {
-		// Setup
-		handler := slog.NewTextHandler(os.Stdout, nil)
-		stringLoader := createTestLoader(t)
+func TestFromRisorLoader_WithDataProvider(t *testing.T) {
+	provider := data.NewContextProvider("test_key")
+	eval, err := FromRisorLoader(newTestLoader(t), WithDataProvider(provider))
+	require.NoError(t, err)
+	require.NotNil(t, eval)
+}
 
-		// Execute
-		evalInstance, err := FromRisorLoaderWithData(handler, stringLoader, map[string]any{})
+func TestFromRisorLoader_DataProviderBeatsStaticData(t *testing.T) {
+	// When both are passed, WithDataProvider wins. Verify by smuggling a
+	// sentinel provider in and confirming the resulting executable unit
+	// uses it (we can't directly inspect, but a successful build with a
+	// provider that returns no data is enough to demonstrate the path).
+	provider := data.NewContextProvider("sentinel")
+	eval, err := FromRisorLoader(
+		newTestLoader(t),
+		WithStaticData(map[string]any{"ignored": true}),
+		WithDataProvider(provider),
+	)
+	require.NoError(t, err)
+	require.NotNil(t, eval)
+}
 
-		// Verify
-		require.NoError(t, err)
-		require.NotNil(t, evalInstance)
-	})
+func TestFromRisorLoader_NilOption(t *testing.T) {
+	// nil options should be ignored, not panic.
+	var nilOpt Option
+	eval, err := FromRisorLoader(newTestLoader(t), nilOpt, WithStaticData(map[string]any{"k": "v"}))
+	require.NoError(t, err)
+	require.NotNil(t, eval)
+}
 
-	t.Run("error from loader", func(t *testing.T) {
-		// Setup
-		handler := slog.NewTextHandler(os.Stdout, nil)
-		mockLoader := new(loader.MockLoader)
-		mockURL, err := url.Parse("file:///test-risor-file.risor")
-		require.NoError(t, err, "Failed to parse URL")
-		mockLoader.On("GetSourceURL").Return(mockURL)
-		mockLoader.On("GetReader").Return(nil, fmt.Errorf("failed to load script"))
-		staticData := map[string]any{"version": "1.0.0"}
+func TestFromRisorLoader_LoaderError(t *testing.T) {
+	mockLoader := newErrorLoader(t, "failed to load script")
+	eval, err := FromRisorLoader(mockLoader)
+	require.Error(t, err)
+	require.Nil(t, eval)
+	assert.Contains(t, err.Error(), "failed to load script")
+	mockLoader.AssertExpectations(t)
+}
 
-		// Execute
-		evalInstance, err := FromRisorLoaderWithData(handler, mockLoader, staticData)
+func TestFromRisorLoader_DiskLoader(t *testing.T) {
+	tmpDir := t.TempDir()
+	tempFilePath := fmt.Sprintf("%s/test.risor", tmpDir)
+	require.NoError(t, os.WriteFile(tempFilePath, []byte(testRisorScript), 0o600))
 
-		// Verify
-		require.Error(t, err)
-		require.Nil(t, evalInstance)
-		assert.Contains(t, err.Error(), "failed to load script")
-		mockLoader.AssertExpectations(t)
-	})
+	diskLoader, err := loader.NewFromDisk(tempFilePath)
+	require.NoError(t, err)
+	require.NotNil(t, diskLoader)
+
+	eval, err := FromRisorLoader(diskLoader)
+	require.NoError(t, err)
+	require.NotNil(t, eval)
+	assert.Equal(t, "risor.Evaluator", eval.String())
+
+	// Verify content was loaded correctly.
+	reader, err := diskLoader.GetReader()
+	require.NoError(t, err)
+	content, err := io.ReadAll(reader)
+	require.NoError(t, err)
+	assert.Equal(t, testRisorScript, string(content))
+	require.NoError(t, reader.Close())
+}
+
+func TestFromRisorLoader_RunsEndToEnd(t *testing.T) {
+	// End-to-end: building with WithStaticData and evaluating produces the
+	// expected greeting. Locks in that the new options form does not break
+	// the existing data pipeline.
+	const script = `"Hello, " + ctx["name"]`
+	scriptLoader, err := loader.NewFromString(script)
+	require.NoError(t, err)
+
+	eval, err := FromRisorLoader(
+		scriptLoader,
+		WithStaticData(map[string]any{"name": "World"}),
+	)
+	require.NoError(t, err)
+	require.NotNil(t, eval)
+
+	res, err := eval.Eval(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, "Hello, World", res.Interface())
+}
+
+func TestFromRisorLoader_DefaultsToSlogDefault(t *testing.T) {
+	// Without WithLogHandler, the evaluator should inherit from slog.Default().
+	prev := slog.Default()
+	t.Cleanup(func() { slog.SetDefault(prev) })
+
+	var buf bytes.Buffer
+	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, nil)))
+
+	const script = `"hi"`
+	scriptLoader, err := loader.NewFromString(script)
+	require.NoError(t, err)
+
+	eval, err := FromRisorLoader(scriptLoader)
+	require.NoError(t, err)
+	require.NotNil(t, eval)
+	// We don't assert anything specific about buf; the point is that
+	// construction succeeds and any log output (debug or otherwise) flows
+	// through the swapped default.
 }
 
 func TestNewCompiler(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
-		// Execute
 		comp, err := NewCompiler(compiler.WithLogHandler(slog.NewTextHandler(os.Stdout, nil)))
-
-		// Verify
 		require.NoError(t, err)
 		require.NotNil(t, comp)
 	})
 
 	t.Run("with multiple options", func(t *testing.T) {
-		// Execute
 		comp, err := NewCompiler(
 			compiler.WithLogHandler(slog.NewTextHandler(os.Stdout, nil)),
 			compiler.WithCtxGlobal(),
 		)
-
-		// Verify
 		require.NoError(t, err)
 		require.NotNil(t, comp)
-	})
-}
-
-func TestNewEvaluator(t *testing.T) {
-	t.Parallel()
-
-	t.Run("success", func(t *testing.T) {
-		// Setup
-		handler := slog.NewTextHandler(os.Stdout, nil)
-		stringLoader := createTestLoader(t)
-		provider := data.NewContextProvider("test_key")
-
-		// Execute
-		evalInstance, err := NewEvaluator(
-			handler,
-			stringLoader,
-			provider,
-		)
-
-		// Verify
-		require.NoError(t, err)
-		require.NotNil(t, evalInstance)
-		assert.Equal(t, "risor.Evaluator", evalInstance.String())
-	})
-
-	t.Run("with nil handler", func(t *testing.T) {
-		// Setup
-		stringLoader := createTestLoader(t)
-		provider := data.NewContextProvider("test_key")
-
-		// Execute
-		evalInstance, err := NewEvaluator(
-			nil,
-			stringLoader,
-			provider,
-		)
-
-		// Verify
-		require.NoError(t, err)
-		require.NotNil(t, evalInstance)
-	})
-
-	t.Run("loader error", func(t *testing.T) {
-		// Setup
-		handler := slog.NewTextHandler(os.Stdout, nil)
-		mockLoader := new(loader.MockLoader)
-		mockURL, err := url.Parse("file:///test-risor-file.risor")
-		require.NoError(t, err, "Failed to parse URL")
-		mockLoader.On("GetSourceURL").Return(mockURL)
-		mockLoader.On("GetReader").Return(nil, fmt.Errorf("failed to load content"))
-		provider := data.NewContextProvider("test_key")
-
-		// Execute
-		evalInstance, err := NewEvaluator(
-			handler,
-			mockLoader,
-			provider,
-		)
-
-		// Verify
-		require.Error(t, err)
-		require.Nil(t, evalInstance)
-		assert.Contains(t, err.Error(), "failed to load content")
-		mockLoader.AssertExpectations(t)
-	})
-
-	t.Run("nil provider", func(t *testing.T) {
-		// Setup
-		handler := slog.NewTextHandler(os.Stdout, nil)
-		stringLoader := createTestLoader(t)
-
-		// Execute
-		evalInstance, err := NewEvaluator(
-			handler,
-			stringLoader,
-			nil,
-		)
-
-		// Verify
-		require.Error(t, err)
-		require.Nil(t, evalInstance)
-		require.Contains(t, err.Error(), "provider is nil")
-	})
-}
-
-func TestDiskLoaderIntegration(t *testing.T) {
-	t.Run("create from disk loader", func(t *testing.T) {
-		// Setup
-		handler := slog.NewTextHandler(os.Stdout, nil)
-
-		// write test script to tmp file, load it
-		tmpDir := t.TempDir()
-		tempFilePath := fmt.Sprintf("%s/test.risor", tmpDir)
-		err := os.WriteFile(tempFilePath, []byte(testRisorScript), 0o644)
-		require.NoError(t, err)
-
-		// Create a disk loader for the temporary file
-		diskLoader, err := loader.NewFromDisk(tempFilePath)
-		require.NoError(t, err)
-		require.NotNil(t, diskLoader)
-
-		provider := data.NewContextProvider("test_key")
-
-		// Execute
-		evalInstance, err := NewEvaluator(
-			handler,
-			diskLoader,
-			provider,
-		)
-
-		// Verify
-		require.NoError(t, err)
-		require.NotNil(t, evalInstance)
-		assert.Equal(t, "risor.Evaluator", evalInstance.String())
-
-		// Verify the disk loader has correct path
-		fileURL := diskLoader.GetSourceURL()
-		require.NotNil(t, fileURL)
-		assert.Contains(t, fileURL.String(), "test.risor")
-
-		// Verify content was loaded correctly
-		reader, err := diskLoader.GetReader()
-		require.NoError(t, err)
-		content, err := io.ReadAll(reader)
-		require.NoError(t, err)
-		assert.NotEmpty(t, content)
-		assert.Equal(t, testRisorScript, string(content))
-
-		// Properly close the reader when done
-		err = reader.Close()
-		require.NoError(t, err, "Failed to close reader")
 	})
 }

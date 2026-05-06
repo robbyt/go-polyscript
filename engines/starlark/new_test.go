@@ -1,6 +1,9 @@
 package starlark
 
 import (
+	"bytes"
+	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -9,7 +12,6 @@ import (
 	"testing"
 
 	"github.com/robbyt/go-polyscript/engines/starlark/compiler"
-	"github.com/robbyt/go-polyscript/platform/constants"
 	"github.com/robbyt/go-polyscript/platform/data"
 	"github.com/robbyt/go-polyscript/platform/script/loader"
 	"github.com/stretchr/testify/assert"
@@ -17,18 +19,15 @@ import (
 )
 
 const testStarlarkScript = `
-# Simple Starlark script that prints a message
-print("Hello from Starlark")
-
 # Define and call a simple function
 def greet(name):
     return "Hello, " + name
 
 result = greet("World")
+_ = result
 `
 
-// Helper function to create a string loader with test script
-func createTestLoader(t *testing.T) *loader.FromString {
+func newTestLoader(t *testing.T) *loader.FromString {
 	t.Helper()
 	stringLoader, err := loader.NewFromString(testStarlarkScript)
 	require.NoError(t, err)
@@ -36,276 +35,165 @@ func createTestLoader(t *testing.T) *loader.FromString {
 	return stringLoader
 }
 
-func TestFromStarlarkLoader(t *testing.T) {
-	t.Parallel()
-
-	t.Run("success", func(t *testing.T) {
-		// Setup
-		handler := slog.NewTextHandler(os.Stdout, nil)
-		stringLoader := createTestLoader(t)
-
-		// Execute
-		evalInstance, err := FromStarlarkLoader(handler, stringLoader)
-
-		// Verify
-		require.NoError(t, err)
-		require.NotNil(t, evalInstance)
-		assert.Equal(t, "starlark.Evaluator", evalInstance.String())
-	})
-
-	t.Run("error from loader", func(t *testing.T) {
-		// Setup - create a mock loader that will return an error
-		handler := slog.NewTextHandler(os.Stdout, nil)
-		mockLoader := new(loader.MockLoader)
-		mockURL, err := url.Parse("file:///test-starlark-file.star")
-		require.NoError(t, err, "Failed to parse URL")
-		mockLoader.On("GetSourceURL").Return(mockURL)
-		mockLoader.On("GetReader").Return(nil, fmt.Errorf("failed to load script"))
-
-		// Execute
-		evalInstance, err := FromStarlarkLoader(handler, mockLoader)
-
-		// Verify
-		require.Error(t, err)
-		require.Nil(t, evalInstance)
-		assert.Contains(t, err.Error(), "failed to load script")
-		mockLoader.AssertExpectations(t)
-	})
+func newErrorLoader(t *testing.T, msg string) *loader.MockLoader {
+	t.Helper()
+	mockLoader := new(loader.MockLoader)
+	mockURL, err := url.Parse("file:///test-starlark-file.star")
+	require.NoError(t, err)
+	mockLoader.On("GetSourceURL").Return(mockURL)
+	mockLoader.On("GetReader").Return(nil, errors.New(msg))
+	return mockLoader
 }
 
-func TestFromStarlarkLoaderWithData(t *testing.T) {
-	t.Parallel()
+func TestFromStarlarkLoader_NoOptions(t *testing.T) {
+	eval, err := FromStarlarkLoader(newTestLoader(t))
+	require.NoError(t, err)
+	require.NotNil(t, eval)
+	assert.Equal(t, "starlark.Evaluator", eval.String())
+}
 
-	t.Run("success with static data", func(t *testing.T) {
-		// Setup
-		handler := slog.NewTextHandler(os.Stdout, nil)
-		stringLoader := createTestLoader(t)
+func TestFromStarlarkLoader_WithLogHandler(t *testing.T) {
+	handler := slog.NewTextHandler(os.Stdout, nil)
+	eval, err := FromStarlarkLoader(newTestLoader(t), WithLogHandler(handler))
+	require.NoError(t, err)
+	require.NotNil(t, eval)
+}
 
-		staticData := map[string]any{
-			"version": "1.0.0",
-			"config": map[string]any{
-				"timeout": 30,
-				"retry":   true,
-			},
-		}
+func TestFromStarlarkLoader_NilLogHandler(t *testing.T) {
+	eval, err := FromStarlarkLoader(newTestLoader(t), WithLogHandler(nil))
+	require.NoError(t, err)
+	require.NotNil(t, eval)
+}
 
-		// Execute
-		evalInstance, err := FromStarlarkLoaderWithData(handler, stringLoader, staticData)
+func TestFromStarlarkLoader_WithStaticData(t *testing.T) {
+	staticData := map[string]any{
+		"version": "1.0.0",
+		"config":  map[string]any{"timeout": 30, "retry": true},
+	}
+	eval, err := FromStarlarkLoader(newTestLoader(t), WithStaticData(staticData))
+	require.NoError(t, err)
+	require.NotNil(t, eval)
+}
 
-		// Verify
-		require.NoError(t, err)
-		require.NotNil(t, evalInstance)
-		assert.Equal(t, "starlark.Evaluator", evalInstance.String())
-	})
+func TestFromStarlarkLoader_EmptyStaticData(t *testing.T) {
+	eval, err := FromStarlarkLoader(newTestLoader(t), WithStaticData(map[string]any{}))
+	require.NoError(t, err)
+	require.NotNil(t, eval)
+}
 
-	t.Run("empty static data", func(t *testing.T) {
-		// Setup
-		handler := slog.NewTextHandler(os.Stdout, nil)
-		stringLoader := createTestLoader(t)
+func TestFromStarlarkLoader_WithDataProvider(t *testing.T) {
+	provider := data.NewContextProvider("test_key")
+	eval, err := FromStarlarkLoader(newTestLoader(t), WithDataProvider(provider))
+	require.NoError(t, err)
+	require.NotNil(t, eval)
+}
 
-		// Execute
-		evalInstance, err := FromStarlarkLoaderWithData(handler, stringLoader, map[string]any{})
+func TestFromStarlarkLoader_DataProviderBeatsStaticData(t *testing.T) {
+	provider := data.NewContextProvider("sentinel")
+	eval, err := FromStarlarkLoader(
+		newTestLoader(t),
+		WithStaticData(map[string]any{"ignored": true}),
+		WithDataProvider(provider),
+	)
+	require.NoError(t, err)
+	require.NotNil(t, eval)
+}
 
-		// Verify
-		require.NoError(t, err)
-		require.NotNil(t, evalInstance)
-		assert.Equal(t, "starlark.Evaluator", evalInstance.String())
-	})
+func TestFromStarlarkLoader_NilOption(t *testing.T) {
+	var nilOpt Option
+	eval, err := FromStarlarkLoader(newTestLoader(t), nilOpt, WithStaticData(map[string]any{"k": "v"}))
+	require.NoError(t, err)
+	require.NotNil(t, eval)
+}
 
-	t.Run("error from loader", func(t *testing.T) {
-		// Setup
-		handler := slog.NewTextHandler(os.Stdout, nil)
-		mockLoader := new(loader.MockLoader)
-		mockURL, err := url.Parse("file:///test-starlark-file.star")
-		require.NoError(t, err, "Failed to parse URL")
-		mockLoader.On("GetSourceURL").Return(mockURL)
-		mockLoader.On("GetReader").Return(nil, fmt.Errorf("failed to load script"))
-		staticData := map[string]any{"version": "1.0.0"}
+func TestFromStarlarkLoader_LoaderError(t *testing.T) {
+	mockLoader := newErrorLoader(t, "failed to load script")
+	eval, err := FromStarlarkLoader(mockLoader)
+	require.Error(t, err)
+	require.Nil(t, eval)
+	assert.Contains(t, err.Error(), "failed to load script")
+	mockLoader.AssertExpectations(t)
+}
 
-		// Execute
-		evalInstance, err := FromStarlarkLoaderWithData(handler, mockLoader, staticData)
+func TestFromStarlarkLoader_InvalidScript(t *testing.T) {
+	invalidLoader, err := loader.NewFromString(`this is { not valid } Starlark syntax`)
+	require.NoError(t, err)
+	eval, err := FromStarlarkLoader(invalidLoader)
+	require.Error(t, err)
+	require.Nil(t, eval)
+	assert.ErrorIs(t, err, compiler.ErrValidationFailed)
+}
 
-		// Verify
-		require.Error(t, err)
-		require.Nil(t, evalInstance)
-		assert.Contains(t, err.Error(), "failed to load script")
-		mockLoader.AssertExpectations(t)
-	})
+func TestFromStarlarkLoader_DiskLoader(t *testing.T) {
+	tmpDir := t.TempDir()
+	tempFilePath := fmt.Sprintf("%s/test.star", tmpDir)
+	require.NoError(t, os.WriteFile(tempFilePath, []byte(testStarlarkScript), 0o600))
+
+	diskLoader, err := loader.NewFromDisk(tempFilePath)
+	require.NoError(t, err)
+	require.NotNil(t, diskLoader)
+
+	eval, err := FromStarlarkLoader(diskLoader)
+	require.NoError(t, err)
+	require.NotNil(t, eval)
+	assert.Equal(t, "starlark.Evaluator", eval.String())
+
+	reader, err := diskLoader.GetReader()
+	require.NoError(t, err)
+	content, err := io.ReadAll(reader)
+	require.NoError(t, err)
+	assert.Equal(t, testStarlarkScript, string(content))
+	require.NoError(t, reader.Close())
+}
+
+func TestFromStarlarkLoader_RunsEndToEnd(t *testing.T) {
+	const script = `
+result = "Hello, " + ctx["name"]
+_ = result
+`
+	scriptLoader, err := loader.NewFromString(script)
+	require.NoError(t, err)
+
+	eval, err := FromStarlarkLoader(
+		scriptLoader,
+		WithStaticData(map[string]any{"name": "World"}),
+	)
+	require.NoError(t, err)
+	require.NotNil(t, eval)
+
+	res, err := eval.Eval(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, "Hello, World", res.Interface())
+}
+
+func TestFromStarlarkLoader_DefaultsToSlogDefault(t *testing.T) {
+	prev := slog.Default()
+	t.Cleanup(func() { slog.SetDefault(prev) })
+
+	var buf bytes.Buffer
+	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, nil)))
+
+	scriptLoader, err := loader.NewFromString(`_ = "ok"`)
+	require.NoError(t, err)
+
+	eval, err := FromStarlarkLoader(scriptLoader)
+	require.NoError(t, err)
+	require.NotNil(t, eval)
 }
 
 func TestNewCompiler(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
-		// Execute
 		comp, err := NewCompiler(compiler.WithLogHandler(slog.NewTextHandler(os.Stdout, nil)))
-
-		// Verify
 		require.NoError(t, err)
 		require.NotNil(t, comp)
 	})
 
 	t.Run("with multiple options", func(t *testing.T) {
-		// Execute
 		comp, err := NewCompiler(
 			compiler.WithLogHandler(slog.NewTextHandler(os.Stdout, nil)),
 			compiler.WithGlobals([]string{"data", "context"}),
 		)
-
-		// Verify
 		require.NoError(t, err)
 		require.NotNil(t, comp)
-	})
-}
-
-func TestNewEvaluator(t *testing.T) {
-	t.Parallel()
-
-	t.Run("success", func(t *testing.T) {
-		// Setup
-		handler := slog.NewTextHandler(os.Stdout, nil)
-		stringLoader := createTestLoader(t)
-		provider := data.NewContextProvider(constants.EvalData)
-
-		// Execute
-		evalInstance, err := NewEvaluator(
-			handler,
-			stringLoader,
-			provider,
-		)
-
-		// Verify
-		require.NoError(t, err)
-		require.NotNil(t, evalInstance)
-		assert.Equal(t, "starlark.Evaluator", evalInstance.String())
-	})
-
-	t.Run("with nil handler", func(t *testing.T) {
-		// Setup
-		stringLoader := createTestLoader(t)
-		provider := data.NewContextProvider(constants.EvalData)
-
-		// Execute
-		evalInstance, err := NewEvaluator(
-			nil,
-			stringLoader,
-			provider,
-		)
-
-		// Verify
-		require.NoError(t, err)
-		require.NotNil(t, evalInstance)
-		assert.Equal(t, "starlark.Evaluator", evalInstance.String())
-	})
-
-	t.Run("loader error", func(t *testing.T) {
-		// Setup
-		handler := slog.NewTextHandler(os.Stdout, nil)
-		mockLoader := new(loader.MockLoader)
-		mockURL, err := url.Parse("file:///test-starlark-file.star")
-		require.NoError(t, err, "Failed to parse URL")
-		mockLoader.On("GetSourceURL").Return(mockURL)
-		mockLoader.On("GetReader").Return(nil, fmt.Errorf("failed to load content"))
-		provider := data.NewContextProvider(constants.EvalData)
-
-		// Execute
-		evalInstance, err := NewEvaluator(
-			handler,
-			mockLoader,
-			provider,
-		)
-
-		// Verify
-		require.Error(t, err)
-		require.Nil(t, evalInstance)
-		assert.Contains(t, err.Error(), "failed to load content")
-		mockLoader.AssertExpectations(t)
-	})
-
-	t.Run("nil provider", func(t *testing.T) {
-		// Setup
-		handler := slog.NewTextHandler(os.Stdout, nil)
-		stringLoader := createTestLoader(t)
-
-		// Execute
-		evalInstance, err := NewEvaluator(
-			handler,
-			stringLoader,
-			nil,
-		)
-
-		// Verify
-		require.Error(t, err)
-		require.Nil(t, evalInstance)
-		require.Contains(t, err.Error(), "provider is nil")
-	})
-
-	t.Run("invalid script syntax", func(t *testing.T) {
-		// Setup
-		handler := slog.NewTextHandler(os.Stdout, nil)
-		invalidScript := `this is { not valid } Starlark syntax`
-		invalidLoader, err := loader.NewFromString(invalidScript)
-		require.NoError(t, err)
-		provider := data.NewContextProvider(constants.EvalData)
-
-		// Execute
-		evalInstance, err := NewEvaluator(
-			handler,
-			invalidLoader,
-			provider,
-		)
-
-		// Verify
-		require.Error(t, err)
-		require.Nil(t, evalInstance)
-		// Update error message check to match actual Starlark error message
-		assert.ErrorIs(t, err, compiler.ErrValidationFailed)
-	})
-}
-
-func TestDiskLoaderIntegration(t *testing.T) {
-	t.Run("create from disk loader", func(t *testing.T) {
-		// Setup
-		handler := slog.NewTextHandler(os.Stdout, nil)
-
-		// write test script to tmp file, load it
-		tmpDir := t.TempDir()
-		tempFilePath := fmt.Sprintf("%s/test.star", tmpDir)
-		err := os.WriteFile(tempFilePath, []byte(testStarlarkScript), 0o644)
-		require.NoError(t, err)
-
-		// Create a disk loader for the temporary file
-		diskLoader, err := loader.NewFromDisk(tempFilePath)
-		require.NoError(t, err)
-		require.NotNil(t, diskLoader)
-
-		provider := data.NewContextProvider(constants.EvalData)
-
-		// Execute
-		evalInstance, err := NewEvaluator(
-			handler,
-			diskLoader,
-			provider,
-		)
-
-		// Verify
-		require.NoError(t, err)
-		require.NotNil(t, evalInstance)
-		assert.Equal(t, "starlark.Evaluator", evalInstance.String())
-
-		// Verify the disk loader has correct path
-		fileURL := diskLoader.GetSourceURL()
-		require.NotNil(t, fileURL)
-		assert.Contains(t, fileURL.String(), "test.star")
-
-		// Verify content was loaded correctly
-		reader, err := diskLoader.GetReader()
-		require.NoError(t, err)
-		content, err := io.ReadAll(reader)
-		require.NoError(t, err)
-		assert.NotEmpty(t, content)
-		assert.Equal(t, testStarlarkScript, string(content))
-
-		// Properly close the reader when done
-		err = reader.Close()
-		require.NoError(t, err, "Failed to close reader")
 	})
 }

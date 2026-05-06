@@ -3,7 +3,6 @@ package compiler
 import (
 	"fmt"
 	"log/slog"
-	"os"
 	"slices"
 
 	"github.com/robbyt/go-polyscript/internal/helpers"
@@ -75,24 +74,18 @@ func (c *Compiler) setupLogger() {
 	}
 }
 
-// validate checks if the compiler configuration is valid
+// validate checks if the compiler configuration is valid.
+//
+// A nil logHandler/logger pair is allowed; helpers.SetupLogger will inherit
+// from slog.Default() when both are unset.
 func (c *Compiler) validate() error {
-	// Ensure we have either a logger or a handler
-	if c.logHandler == nil && c.logger == nil {
-		return fmt.Errorf("either log handler or logger must be specified")
-	}
-
 	return nil
 }
 
-// applyDefaults sets the default values for a compiler
+// applyDefaults sets the default values for a compiler.
+// Logging defaults are deferred to helpers.SetupLogger so a single source
+// of truth (slog.Default) governs the fallback handler.
 func (c *Compiler) applyDefaults() {
-	// Default to stderr for logging if neither handler nor logger specified
-	if c.logHandler == nil && c.logger == nil {
-		c.logHandler = slog.NewTextHandler(os.Stderr, nil)
-	}
-
-	// Default to empty globals if not specified
 	if c.globals == nil {
 		c.globals = []string{}
 	}

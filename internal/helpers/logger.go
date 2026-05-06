@@ -2,39 +2,31 @@ package helpers
 
 import (
 	"log/slog"
-	"os"
 )
 
-// SetupLogger creates a properly configured logger for script engine implementations.
-// If the provided handler is nil, it creates a default handler with appropriate grouping.
+// SetupLogger creates a configured logger and handler for an engine implementation.
+//
+// If handler is nil, the slog default handler ([slog.Default]) is used. This lets
+// hosts wire one configuration (level, format, sink) globally and have the engine
+// inherit it. Hosts that want a different handler should pass one explicitly.
 //
 // Parameters:
-//   - handler: The slog.Handler to use, or nil for defaults
-//   - vmName: The name of the script engine (e.g., "starlark", "risor")
-//   - groupName: Optional additional group name within the engine
+//   - handler: handler to use, or nil to inherit from slog.Default()
+//   - engineName: short engine identifier added as a slog group (e.g. "risor")
+//   - groupName: optional sub-group within the engine
 //
-// Returns:
-//   - The configured handler
-//   - A logger created from the handler
+// Returns the resolved handler and a logger built from it.
 func SetupLogger(
 	handler slog.Handler,
 	engineName string,
 	groupName string,
 ) (slog.Handler, *slog.Logger) {
 	if handler == nil {
-		defaultHandler := slog.NewTextHandler(os.Stdout, nil)
-		handler = defaultHandler.WithGroup(engineName)
-		// Create a logger from the handler
-		defaultLogger := slog.New(handler)
-		defaultLogger.Debug("Handler is nil, using the default logger configuration.")
+		handler = slog.Default().Handler().WithGroup(engineName)
 	}
 
-	var logger *slog.Logger
 	if groupName != "" {
-		logger = slog.New(handler.WithGroup(groupName))
-	} else {
-		logger = slog.New(handler)
+		return handler, slog.New(handler.WithGroup(groupName))
 	}
-
-	return handler, logger
+	return handler, slog.New(handler)
 }

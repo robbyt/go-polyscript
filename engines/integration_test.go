@@ -452,7 +452,9 @@ let user_data = ctx["user_data"]
 				ctxProvider := data.NewContextProvider(constants.EvalData)
 				scriptLoader, err := loader.NewFromString(script)
 				require.NoError(t, err)
-				evaluator, err := risorEngine.NewEvaluator(handler, scriptLoader, ctxProvider)
+				evaluator, err := risorEngine.FromRisorLoader(scriptLoader,
+					risorEngine.WithLogHandler(handler),
+					risorEngine.WithDataProvider(ctxProvider))
 				require.NoError(t, err)
 
 				// Add data using context provider
@@ -508,7 +510,9 @@ _ = result
 				ctxProvider := data.NewContextProvider(constants.EvalData)
 				scriptLoader, err := loader.NewFromString(script)
 				require.NoError(t, err)
-				evaluator, err := starlarkEngine.NewEvaluator(handler, scriptLoader, ctxProvider)
+				evaluator, err := starlarkEngine.FromStarlarkLoader(scriptLoader,
+					starlarkEngine.WithLogHandler(handler),
+					starlarkEngine.WithDataProvider(ctxProvider))
 				require.NoError(t, err)
 
 				// Add data using context provider
@@ -550,11 +554,10 @@ _ = result
 			ctxProvider := data.NewContextProvider(constants.EvalData)
 			scriptLoader, err := loader.NewFromBytes(wasmdata.TestModule)
 			require.NoError(t, err)
-			evaluator, err := extismEngine.NewEvaluator(
-				handler,
-				scriptLoader,
-				ctxProvider,
-				wasmdata.EntrypointGreet,
+			evaluator, err := extismEngine.FromExtismLoader(scriptLoader,
+				extismEngine.WithLogHandler(handler),
+				extismEngine.WithDataProvider(ctxProvider),
+				extismEngine.WithEntryPoint(wasmdata.EntrypointGreet),
 			)
 			require.NoError(t, err)
 
@@ -611,7 +614,9 @@ let max_retries = ctx["constants"]["max_retries"]
 			staticProvider := data.NewStaticProvider(staticData)
 			scriptLoader, err := loader.NewFromString(script)
 			require.NoError(t, err)
-			evaluator, err := risorEngine.NewEvaluator(handler, scriptLoader, staticProvider)
+			evaluator, err := risorEngine.FromRisorLoader(scriptLoader,
+				risorEngine.WithLogHandler(handler),
+				risorEngine.WithDataProvider(staticProvider))
 			require.NoError(t, err)
 
 			// Execute without additional context data
@@ -646,7 +651,9 @@ _ = result
 			staticProvider := data.NewStaticProvider(staticData)
 			scriptLoader, err := loader.NewFromString(script)
 			require.NoError(t, err)
-			evaluator, err := starlarkEngine.NewEvaluator(handler, scriptLoader, staticProvider)
+			evaluator, err := starlarkEngine.FromStarlarkLoader(scriptLoader,
+				starlarkEngine.WithLogHandler(handler),
+				starlarkEngine.WithDataProvider(staticProvider))
 			require.NoError(t, err)
 
 			// Execute without additional context data
@@ -673,11 +680,10 @@ _ = result
 			})
 			scriptLoader, err := loader.NewFromBytes(wasmdata.TestModule)
 			require.NoError(t, err)
-			evaluator, err := extismEngine.NewEvaluator(
-				handler,
-				scriptLoader,
-				staticProvider,
-				wasmdata.EntrypointGreet,
+			evaluator, err := extismEngine.FromExtismLoader(scriptLoader,
+				extismEngine.WithLogHandler(handler),
+				extismEngine.WithDataProvider(staticProvider),
+				extismEngine.WithEntryPoint(wasmdata.EntrypointGreet),
 			)
 			require.NoError(t, err)
 
@@ -728,7 +734,9 @@ let request_id = ctx["request_id"]
 
 				scriptLoader, err := loader.NewFromString(script)
 				require.NoError(t, err)
-				evaluator, err := risorEngine.NewEvaluator(handler, scriptLoader, compositeProvider)
+				evaluator, err := risorEngine.FromRisorLoader(scriptLoader,
+					risorEngine.WithLogHandler(handler),
+					risorEngine.WithDataProvider(compositeProvider))
 				require.NoError(t, err)
 
 				// Add runtime data to context
@@ -773,11 +781,9 @@ _ = result
 
 				scriptLoader, err := loader.NewFromString(script)
 				require.NoError(t, err)
-				evaluator, err := starlarkEngine.NewEvaluator(
-					handler,
-					scriptLoader,
-					compositeProvider,
-				)
+				evaluator, err := starlarkEngine.FromStarlarkLoader(scriptLoader,
+					starlarkEngine.WithLogHandler(handler),
+					starlarkEngine.WithDataProvider(compositeProvider))
 				require.NoError(t, err)
 
 				// Add runtime data to context
@@ -820,11 +826,10 @@ _ = result
 
 			scriptLoader, err := loader.NewFromBytes(wasmdata.TestModule)
 			require.NoError(t, err)
-			evaluator, err := extismEngine.NewEvaluator(
-				handler,
-				scriptLoader,
-				compositeProvider,
-				wasmdata.EntrypointGreet,
+			evaluator, err := extismEngine.FromExtismLoader(scriptLoader,
+				extismEngine.WithLogHandler(handler),
+				extismEngine.WithDataProvider(compositeProvider),
+				extismEngine.WithEntryPoint(wasmdata.EntrypointGreet),
 			)
 			require.NoError(t, err)
 
@@ -892,7 +897,9 @@ let content_type = ctx["request"]["Headers"]["Content-Type"][0]
 				ctxProvider := data.NewContextProvider(constants.EvalData)
 				scriptLoader, err := loader.NewFromString(script)
 				require.NoError(t, err)
-				evaluator, err := risorEngine.NewEvaluator(handler, scriptLoader, ctxProvider)
+				evaluator, err := risorEngine.FromRisorLoader(scriptLoader,
+					risorEngine.WithLogHandler(handler),
+					risorEngine.WithDataProvider(ctxProvider))
 				require.NoError(t, err)
 
 				// Add HTTP request data with explicit key (as documented)
@@ -939,7 +946,9 @@ _ = result
 				ctxProvider := data.NewContextProvider(constants.EvalData)
 				scriptLoader, err := loader.NewFromString(script)
 				require.NoError(t, err)
-				evaluator, err := starlarkEngine.NewEvaluator(handler, scriptLoader, ctxProvider)
+				evaluator, err := starlarkEngine.FromStarlarkLoader(scriptLoader,
+					starlarkEngine.WithLogHandler(handler),
+					starlarkEngine.WithDataProvider(ctxProvider))
 				require.NoError(t, err)
 
 				// Add HTTP request data with explicit key (as documented)
@@ -969,11 +978,10 @@ _ = result
 			ctxProvider := data.NewContextProvider(constants.EvalData)
 			scriptLoader, err := loader.NewFromBytes(wasmdata.TestModule)
 			require.NoError(t, err)
-			evaluator, err := extismEngine.NewEvaluator(
-				handler,
-				scriptLoader,
-				ctxProvider,
-				wasmdata.EntrypointGreet,
+			evaluator, err := extismEngine.FromExtismLoader(scriptLoader,
+				extismEngine.WithLogHandler(handler),
+				extismEngine.WithDataProvider(ctxProvider),
+				extismEngine.WithEntryPoint(wasmdata.EntrypointGreet),
 			)
 			require.NoError(t, err)
 
@@ -1021,7 +1029,9 @@ let config_data = ctx["config"]
 			ctxProvider := data.NewContextProvider(constants.EvalData)
 			scriptLoader, err := loader.NewFromString(script)
 			require.NoError(t, err)
-			evaluator, err := risorEngine.NewEvaluator(handler, scriptLoader, ctxProvider)
+			evaluator, err := risorEngine.FromRisorLoader(scriptLoader,
+					risorEngine.WithLogHandler(handler),
+					risorEngine.WithDataProvider(ctxProvider))
 			require.NoError(t, err)
 
 			// Use explicit keys as recommended in the documentation

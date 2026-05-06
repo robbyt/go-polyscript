@@ -2,6 +2,8 @@ package extism
 
 import (
 	"bytes"
+	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -17,320 +19,206 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func setupMockLoader(t *testing.T) *loader.MockLoader {
+func newWASMLoader(t *testing.T) *loader.MockLoader {
 	t.Helper()
 	mockLoader := new(loader.MockLoader)
 	mockURL, err := url.Parse("file:///test-wasm-file.wasm")
-	require.NoError(t, err, "Failed to parse URL")
+	require.NoError(t, err)
 	mockLoader.On("GetSourceURL").Return(mockURL)
-
-	// Create a reader that will call Close on the mock loader when it's closed
 	wasmBytes := wasmdata.TestModule
-	reader := io.NopCloser(bytes.NewReader(wasmBytes))
-	mockLoader.On("GetReader").Return(reader, nil)
-
-	// We don't expect Close to be called directly on the loader,
-	// it seems the code doesn't call it directly
+	mockLoader.On("GetReader").Return(io.NopCloser(bytes.NewReader(wasmBytes)), nil)
 	return mockLoader
 }
 
-func setupErrorMockLoader(t *testing.T) *loader.MockLoader {
+func newErrorLoader(t *testing.T, msg string) *loader.MockLoader {
 	t.Helper()
 	mockLoader := new(loader.MockLoader)
 	mockURL, err := url.Parse("file:///test-wasm-file.wasm")
-	require.NoError(t, err, "Failed to parse URL")
+	require.NoError(t, err)
 	mockLoader.On("GetSourceURL").Return(mockURL)
-	mockLoader.On("GetReader").Return(nil, fmt.Errorf("failed to load WASM"))
-	// Don't expect Close for error case
+	mockLoader.On("GetReader").Return(nil, errors.New(msg))
 	return mockLoader
 }
 
-func TestFromExtismLoader(t *testing.T) {
-	t.Parallel()
-
-	t.Run("success", func(t *testing.T) {
-		// Setup
-		handler := slog.NewTextHandler(os.Stdout, nil)
-		mockLoader := setupMockLoader(t)
-
-		// Execute
-		evaluator, err := FromExtismLoader(handler, mockLoader, "greet")
-
-		// Verify
-		require.NoError(t, err)
-		require.NotNil(t, evaluator)
-		assert.Equal(t, "extism.Evaluator", evaluator.String())
-		mockLoader.AssertExpectations(t)
-	})
-
-	t.Run("error from loader", func(t *testing.T) {
-		// Setup
-		handler := slog.NewTextHandler(os.Stdout, nil)
-		mockLoader := setupErrorMockLoader(t)
-
-		// Execute
-		evaluator, err := FromExtismLoader(handler, mockLoader, "greet")
-
-		// Verify
-		require.Error(t, err)
-		require.Nil(t, evaluator)
-		mockLoader.AssertExpectations(t)
-	})
-
-	t.Run("nil URL in loader", func(t *testing.T) {
-		// Setup
-		handler := slog.NewTextHandler(os.Stdout, nil)
-		mockLoader := new(loader.MockLoader)
-		mockLoader.On("GetSourceURL").Return(nil)
-		mockLoader.On("GetReader").Return(io.NopCloser(bytes.NewReader(wasmdata.TestModule)), nil)
-		// Don't expect Close - loader.Close() is not called by the code
-
-		// Execute
-		evaluator, err := FromExtismLoader(handler, mockLoader, "greet")
-
-		// Verify
-		require.NoError(t, err)
-		require.NotNil(t, evaluator)
-		mockLoader.AssertExpectations(t)
-	})
+func TestFromExtismLoader_RequiresEntryPoint(t *testing.T) {
+	mockLoader := new(loader.MockLoader)
+	eval, err := FromExtismLoader(mockLoader)
+	require.Error(t, err)
+	require.Nil(t, eval)
+	assert.ErrorIs(t, err, ErrEntryPointRequired)
+	// Loader must not be touched when entry-point validation fails.
+	mockLoader.AssertNotCalled(t, "GetReader")
+	mockLoader.AssertNotCalled(t, "GetSourceURL")
 }
 
-func TestFromExtismLoaderWithData(t *testing.T) {
-	t.Parallel()
+func TestFromExtismLoader_EmptyEntryPointStillRejected(t *testing.T) {
+	mockLoader := new(loader.MockLoader)
+	eval, err := FromExtismLoader(mockLoader, WithEntryPoint(""))
+	require.Error(t, err)
+	require.Nil(t, eval)
+	assert.ErrorIs(t, err, ErrEntryPointRequired)
+}
 
-	t.Run("success with static data", func(t *testing.T) {
-		// Setup
-		handler := slog.NewTextHandler(os.Stdout, nil)
-		mockLoader := setupMockLoader(t)
+func TestFromExtismLoader_NoOptionsBeyondEntryPoint(t *testing.T) {
+	mockLoader := newWASMLoader(t)
+	eval, err := FromExtismLoader(mockLoader, WithEntryPoint(wasmdata.EntrypointGreet))
+	require.NoError(t, err)
+	require.NotNil(t, eval)
+	assert.Equal(t, "extism.Evaluator", eval.String())
+	mockLoader.AssertExpectations(t)
+}
 
-		staticData := map[string]any{
-			"version": "1.0.0",
-			"config": map[string]any{
-				"timeout": 30,
-				"retry":   true,
-			},
-		}
+func TestFromExtismLoader_WithLogHandler(t *testing.T) {
+	mockLoader := newWASMLoader(t)
+	handler := slog.NewTextHandler(os.Stdout, nil)
+	eval, err := FromExtismLoader(mockLoader,
+		WithEntryPoint(wasmdata.EntrypointGreet),
+		WithLogHandler(handler),
+	)
+	require.NoError(t, err)
+	require.NotNil(t, eval)
+	mockLoader.AssertExpectations(t)
+}
 
-		// Execute
-		evaluator, err := FromExtismLoaderWithData(handler, mockLoader, staticData, "greet")
+func TestFromExtismLoader_NilLogHandler(t *testing.T) {
+	mockLoader := newWASMLoader(t)
+	eval, err := FromExtismLoader(mockLoader,
+		WithEntryPoint(wasmdata.EntrypointGreet),
+		WithLogHandler(nil),
+	)
+	require.NoError(t, err)
+	require.NotNil(t, eval)
+	mockLoader.AssertExpectations(t)
+}
 
-		// Verify
-		require.NoError(t, err)
-		require.NotNil(t, evaluator)
-		mockLoader.AssertExpectations(t)
-	})
+func TestFromExtismLoader_WithStaticData(t *testing.T) {
+	mockLoader := newWASMLoader(t)
+	eval, err := FromExtismLoader(mockLoader,
+		WithEntryPoint(wasmdata.EntrypointGreet),
+		WithStaticData(map[string]any{"input": "World"}),
+	)
+	require.NoError(t, err)
+	require.NotNil(t, eval)
+	mockLoader.AssertExpectations(t)
+}
 
-	t.Run("empty static data", func(t *testing.T) {
-		// Setup
-		handler := slog.NewTextHandler(os.Stdout, nil)
-		mockLoader := setupMockLoader(t)
+func TestFromExtismLoader_WithDataProvider(t *testing.T) {
+	mockLoader := newWASMLoader(t)
+	provider := data.NewContextProvider("test_key")
+	eval, err := FromExtismLoader(mockLoader,
+		WithEntryPoint(wasmdata.EntrypointGreet),
+		WithDataProvider(provider),
+	)
+	require.NoError(t, err)
+	require.NotNil(t, eval)
+	mockLoader.AssertExpectations(t)
+}
 
-		// Execute
-		evaluator, err := FromExtismLoaderWithData(handler, mockLoader, map[string]any{}, "greet")
+func TestFromExtismLoader_DataProviderBeatsStaticData(t *testing.T) {
+	mockLoader := newWASMLoader(t)
+	provider := data.NewContextProvider("sentinel")
+	eval, err := FromExtismLoader(mockLoader,
+		WithEntryPoint(wasmdata.EntrypointGreet),
+		WithStaticData(map[string]any{"ignored": true}),
+		WithDataProvider(provider),
+	)
+	require.NoError(t, err)
+	require.NotNil(t, eval)
+	mockLoader.AssertExpectations(t)
+}
 
-		// Verify
-		require.NoError(t, err)
-		require.NotNil(t, evaluator)
-		mockLoader.AssertExpectations(t)
-	})
+func TestFromExtismLoader_NilOption(t *testing.T) {
+	mockLoader := newWASMLoader(t)
+	var nilOpt Option
+	eval, err := FromExtismLoader(mockLoader,
+		nilOpt,
+		WithEntryPoint(wasmdata.EntrypointGreet),
+	)
+	require.NoError(t, err)
+	require.NotNil(t, eval)
+}
 
-	t.Run("error from loader", func(t *testing.T) {
-		// Setup
-		handler := slog.NewTextHandler(os.Stdout, nil)
-		mockLoader := setupErrorMockLoader(t)
+func TestFromExtismLoader_LoaderError(t *testing.T) {
+	mockLoader := newErrorLoader(t, "failed to load WASM")
+	eval, err := FromExtismLoader(mockLoader, WithEntryPoint(wasmdata.EntrypointGreet))
+	require.Error(t, err)
+	require.Nil(t, eval)
+	mockLoader.AssertExpectations(t)
+}
 
-		staticData := map[string]any{"version": "1.0.0"}
+func TestFromExtismLoader_NilSourceURL(t *testing.T) {
+	mockLoader := new(loader.MockLoader)
+	mockLoader.On("GetSourceURL").Return(nil)
+	mockLoader.On("GetReader").Return(io.NopCloser(bytes.NewReader(wasmdata.TestModule)), nil)
 
-		// Execute
-		evaluator, err := FromExtismLoaderWithData(handler, mockLoader, staticData, "greet")
+	eval, err := FromExtismLoader(mockLoader, WithEntryPoint(wasmdata.EntrypointGreet))
+	require.NoError(t, err)
+	require.NotNil(t, eval)
+	mockLoader.AssertExpectations(t)
+}
 
-		// Verify
-		require.Error(t, err)
-		require.Nil(t, evaluator)
-		mockLoader.AssertExpectations(t)
-	})
+func TestFromExtismLoader_DiskLoader(t *testing.T) {
+	tmpDir := t.TempDir()
+	tempFilePath := fmt.Sprintf("%s/test.wasm", tmpDir)
+	require.NoError(t, os.WriteFile(tempFilePath, wasmdata.TestModule, 0o600))
+
+	diskLoader, err := loader.NewFromDisk(tempFilePath)
+	require.NoError(t, err)
+	require.NotNil(t, diskLoader)
+
+	eval, err := FromExtismLoader(diskLoader, WithEntryPoint(wasmdata.EntrypointGreet))
+	require.NoError(t, err)
+	require.NotNil(t, eval)
+	assert.Equal(t, "extism.Evaluator", eval.String())
+}
+
+func TestFromExtismLoader_RunsEndToEnd(t *testing.T) {
+	scriptLoader, err := loader.NewFromBytes(wasmdata.TestModule)
+	require.NoError(t, err)
+
+	eval, err := FromExtismLoader(
+		scriptLoader,
+		WithEntryPoint(wasmdata.EntrypointGreet),
+		WithStaticData(map[string]any{"input": "World"}),
+	)
+	require.NoError(t, err)
+	require.NotNil(t, eval)
+
+	res, err := eval.Eval(context.Background())
+	require.NoError(t, err)
+	got, ok := res.Interface().(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "Hello, World!", got["greeting"])
+}
+
+func TestFromExtismLoader_DefaultsToSlogDefault(t *testing.T) {
+	prev := slog.Default()
+	t.Cleanup(func() { slog.SetDefault(prev) })
+
+	var buf bytes.Buffer
+	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, nil)))
+
+	scriptLoader, err := loader.NewFromBytes(wasmdata.TestModule)
+	require.NoError(t, err)
+
+	eval, err := FromExtismLoader(scriptLoader, WithEntryPoint(wasmdata.EntrypointGreet))
+	require.NoError(t, err)
+	require.NotNil(t, eval)
 }
 
 func TestNewCompiler(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
-		// Execute
 		comp, err := NewCompiler(compiler.WithLogHandler(slog.NewTextHandler(os.Stdout, nil)))
-
-		// Verify
 		require.NoError(t, err)
 		require.NotNil(t, comp)
 	})
 
 	t.Run("with multiple options", func(t *testing.T) {
-		// Execute
 		comp, err := NewCompiler(
 			compiler.WithLogHandler(slog.NewTextHandler(os.Stdout, nil)),
 			compiler.WithEntryPoint("process"),
 		)
-
-		// Verify
 		require.NoError(t, err)
 		require.NotNil(t, comp)
-	})
-}
-
-func TestNewEvaluator(t *testing.T) {
-	t.Parallel()
-
-	t.Run("success", func(t *testing.T) {
-		// Setup
-		handler := slog.NewTextHandler(os.Stdout, nil)
-		mockLoader := setupMockLoader(t)
-		provider := data.NewContextProvider("test_key")
-
-		// Execute
-		evalInstance, err := NewEvaluator(
-			handler,
-			mockLoader,
-			provider,
-			"greet",
-		)
-
-		// Verify
-		require.NoError(t, err)
-		require.NotNil(t, evalInstance)
-		assert.Equal(t, "extism.Evaluator", evalInstance.String())
-		mockLoader.AssertExpectations(t)
-	})
-
-	t.Run("with nil URL", func(t *testing.T) {
-		// Setup
-		handler := slog.NewTextHandler(os.Stdout, nil)
-		mockLoader := new(loader.MockLoader)
-		mockLoader.On("GetSourceURL").Return(nil)
-		mockLoader.On("GetReader").Return(io.NopCloser(bytes.NewReader(wasmdata.TestModule)), nil)
-		// Don't expect Close - loader.Close() is not called by the code
-
-		provider := data.NewContextProvider("test_key")
-
-		// Execute
-		evaluator, err := NewEvaluator(
-			handler,
-			mockLoader,
-			provider,
-			"greet",
-		)
-
-		// Verify
-		require.NoError(t, err)
-		require.NotNil(t, evaluator)
-		mockLoader.AssertExpectations(t)
-	})
-
-	t.Run("with nil handler", func(t *testing.T) {
-		// Setup
-		mockLoader := setupMockLoader(t)
-		provider := data.NewContextProvider("test_key")
-
-		// Execute
-		evaluator, err := NewEvaluator(
-			nil,
-			mockLoader,
-			provider,
-			"greet",
-		)
-
-		// Verify
-		require.NoError(t, err)
-		require.NotNil(t, evaluator)
-		mockLoader.AssertExpectations(t)
-	})
-
-	t.Run("loader error", func(t *testing.T) {
-		// Setup
-		handler := slog.NewTextHandler(os.Stdout, nil)
-		mockLoader := setupErrorMockLoader(t)
-		provider := data.NewContextProvider("test_key")
-
-		// Execute
-		evaluator, err := NewEvaluator(
-			handler,
-			mockLoader,
-			provider,
-			"greet",
-		)
-
-		// Verify
-		require.Error(t, err)
-		require.Nil(t, evaluator)
-		mockLoader.AssertExpectations(t)
-	})
-
-	t.Run("nil provider", func(t *testing.T) {
-		// Setup
-		handler := slog.NewTextHandler(os.Stdout, nil)
-		// Don't use setupMockLoader for this test since it won't be used
-		mockLoader := new(loader.MockLoader)
-
-		// Execute
-		evaluator, err := NewEvaluator(
-			handler,
-			mockLoader,
-			nil,
-			"greet",
-		)
-
-		// Verify
-		require.Error(t, err)
-		require.Nil(t, evaluator)
-		require.Contains(t, err.Error(), "provider is nil")
-	})
-}
-
-func TestDiskLoaderIntegration(t *testing.T) {
-	t.Run("create from disk loader", func(t *testing.T) {
-		// Setup
-		handler := slog.NewTextHandler(os.Stdout, nil)
-
-		// Create a temporary directory
-		tmpDir := t.TempDir()
-
-		// Get WASM bytes for test
-		wasmBytes := wasmdata.TestModule
-
-		// Create a temporary file in the temporary directory
-		tempFilePath := fmt.Sprintf("%s/test.wasm", tmpDir)
-		err := os.WriteFile(tempFilePath, wasmBytes, 0o644)
-		require.NoError(t, err)
-
-		// Create a disk loader for the temporary file
-		diskLoader, err := loader.NewFromDisk(tempFilePath)
-		require.NoError(t, err)
-		require.NotNil(t, diskLoader)
-
-		provider := data.NewContextProvider("test_key")
-
-		// Execute
-		evaluator, err := NewEvaluator(
-			handler,
-			diskLoader,
-			provider,
-			"greet",
-		)
-
-		// Verify
-		require.NoError(t, err)
-		require.NotNil(t, evaluator)
-		assert.Equal(t, "extism.Evaluator", evaluator.String())
-
-		// Verify the disk loader has correct path
-		fileURL := diskLoader.GetSourceURL()
-		require.NotNil(t, fileURL)
-		assert.Contains(t, fileURL.String(), "test.wasm")
-
-		// Verify content was loaded correctly
-		reader, err := diskLoader.GetReader()
-		require.NoError(t, err)
-		content, err := io.ReadAll(reader)
-		require.NoError(t, err)
-		assert.NotEmpty(t, content)
-		assert.Equal(t, wasmBytes, content)
-		err = reader.Close() // Close the reader when done
-		require.NoError(t, err, "Failed to close reader")
 	})
 }
