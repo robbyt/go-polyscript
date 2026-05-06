@@ -24,11 +24,10 @@ func runStarlarkExample(logger *slog.Logger) (map[string]any, error) {
 		"name": "World",
 	}
 
-	// Create evaluator using the new simplified interface
-	evaluator, err := polyscript.FromStarlarkStringWithData(
-		starlarkScript,
-		input,
-		logger.Handler(),
+	evaluator, err := polyscript.New[polyscript.Starlark](
+		polyscript.FromString(starlarkScript),
+		polyscript.WithStaticData[polyscript.Starlark](input),
+		polyscript.WithLogHandler[polyscript.Starlark](logger.Handler()),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create evaluator: %w", err)

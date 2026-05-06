@@ -24,12 +24,10 @@ func runRisorExample(logger *slog.Logger) (map[string]any, error) {
 		"name": "World",
 	}
 
-	// Create evaluator using the new simplified interface
-	// With data pattern now automatically includes what was previously set via globals
-	evaluator, err := polyscript.FromRisorStringWithData(
-		risorScript,
-		input,
-		logger.Handler(),
+	evaluator, err := polyscript.New[polyscript.Risor](
+		polyscript.FromString(risorScript),
+		polyscript.WithStaticData[polyscript.Risor](input),
+		polyscript.WithLogHandler[polyscript.Risor](logger.Handler()),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create evaluator: %w", err)

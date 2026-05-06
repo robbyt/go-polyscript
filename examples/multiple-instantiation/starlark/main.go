@@ -24,11 +24,9 @@ func createEvaluator(logger *slog.Logger) (StarlarkEvaluator, error) {
 		logger = slog.Default()
 	}
 
-	// Create evaluator using the new simplified interface
-	// This provides a dynamic context provider automatically
-	evaluator, err := polyscript.FromStarlarkString(
-		starlarkScript,
-		logger.Handler(),
+	evaluator, err := polyscript.New[polyscript.Starlark](
+		polyscript.FromString(starlarkScript),
+		polyscript.WithLogHandler[polyscript.Starlark](logger.Handler()),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create evaluator: %w", err)
