@@ -40,17 +40,13 @@ package main
 import (
 	"context"
 	"fmt"
-	"log/slog"
-	"os"
 
 	"github.com/robbyt/go-polyscript"
 )
 
 func main() {
-	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-
 	script := `
-		// The ctx object from the Go inputData map
+		// The ctx object holds the input data map
 		let name = ctx.get("name")
 
 		let p = "."
@@ -67,19 +63,19 @@ func main() {
 		}
 	`
 
-	inputData := map[string]any{"name": "World"}
-	
-	evaluator, _ := polyscript.FromRisorStringWithData(
-		script,
-		inputData,
-		logger.Handler(),
+	evaluator, _ := polyscript.Risor(
+		polyscript.FromString(script),
+		polyscript.WithStaticData(map[string]any{"name": "World"}),
 	)
-	
-	ctx := context.Background()
-	result, _ := evaluator.Eval(ctx)
+
+	result, _ := evaluator.Eval(context.Background())
 	fmt.Printf("Result: %v\n", result.Interface())
 }
 ```
+
+The top-level API is built around three engine constructors — `polyscript.Risor`, `polyscript.Starlark`, `polyscript.Extism` — each accepting a `Source` (built with `FromString`, `FromBytes`, `FromFile`, or `FromLoader`) plus zero or more `Option`s (`WithStaticData`, `WithLogHandler`, `WithEntryPoint`).
+
+The older `FromRisorString*`, `FromStarlark*`, and `FromExtism*` constructors still work but are deprecated and slated for removal in v1.
 
 ## Working with Data Providers
 
@@ -87,23 +83,24 @@ To send input data to a script, use a "data provider" implementation. There are 
 
 ### StaticProvider
 
-For example, when working with Risor, the `FromRisorStringWithData` constructor function uses a `StaticProvider` to send the static data map into the evaluator during creation.
+For example, attaching `WithStaticData` to a Risor evaluator wires up a `StaticProvider` internally to send the static data map into the evaluator during creation.
 
 ```go
-inputData := map[string]any{"name": "cats", "excited": true}
-evaluator, _ := polyscript.FromRisorStringWithData(script, inputData, logger.Handler())
+evaluator, _ := polyscript.Risor(
+	polyscript.FromString(script),
+	polyscript.WithStaticData(map[string]any{"name": "cats", "excited": true}),
+)
 ```
 
 ### ContextProvider
 
-In the previous example, the `StaticProvider` was used for sending constant values into the evaluator instance. To send dynamic thread-safe dynamic data, use the `ContextProvider`.
+A constructor created without `WithStaticData` uses a `ContextProvider`, so dynamic per-request data can be threaded in through the context.
 
 ```go
-evaluator, _ := polyscript.FromRisorString(script, logger.Handler())
+evaluator, _ := polyscript.Risor(polyscript.FromString(script))
 
-ctx := context.Background()
 runtimeData := map[string]any{"name": "Billie Jean", "relationship": false}
-enrichedCtx, _ := evaluator.AddDataToContext(ctx, runtimeData)
+enrichedCtx, _ := evaluator.AddDataToContext(context.Background(), runtimeData)
 
 // Execute with the "enriched" context containing the link to the input data
 result, _ := evaluator.Eval(enrichedCtx)
@@ -111,7 +108,7 @@ result, _ := evaluator.Eval(enrichedCtx)
 
 ### Combining Static and Dynamic Runtime Data
 
-Use the following pattern for fixed configuration values and threadsafe per-request data. Initial loading, parsing and instantiating the script is relatively slow, so the example below shows how to setup the script once with static data, and then reuse it multiple times with dynamic runtime data.
+Use the following pattern for fixed configuration values and per-request data. Initial loading, parsing, and instantiating the script is relatively slow, so the example below shows how to set up the script once with static data and then reuse it many times with dynamic runtime data.
 
 ```go
 staticData := map[string]any{
@@ -120,7 +117,10 @@ staticData := map[string]any{
 }
 
 // Create the evaluator with the static data
-evaluator, _ := polyscript.FromRisorStringWithData(script, staticData, logger.Handler())
+evaluator, _ := polyscript.Risor(
+	polyscript.FromString(script),
+	polyscript.WithStaticData(staticData),
+)
 
 // For each request, prepare dynamic data
 requestData := map[string]any{"name": "Robert"}
@@ -172,11 +172,9 @@ result = {"greeting": message, "length": len(message)}
 _ = result
 `
 
-staticData := map[string]any{"name": "World"}
-evaluator, _ := polyscript.FromStarlarkStringWithData(
-    scriptContent,
-    staticData,
-    logger.Handler(),
+evaluator, _ := polyscript.Starlark(
+	polyscript.FromString(scriptContent),
+	polyscript.WithStaticData(map[string]any{"name": "World"}),
 )
 
 // Execute with a context
@@ -191,29 +189,22 @@ Extism uses the Wazero WASM runtime for providing WASI abstractions, and an easy
 import (
 	"context"
 	"fmt"
-	"log/slog"
-	"os"
 
 	"github.com/robbyt/go-polyscript"
 	"github.com/robbyt/go-polyscript/engines/extism/wasmdata"
 )
 
 func main() {
-	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-
-	// Create an Extism evaluator with static data
-	staticData := map[string]any{"input": "World"}
-	evaluator, _ := polyscript.FromExtismBytesWithData(
+	evaluator, _ := polyscript.Extism(
 		// pre-compiled WASM example module
-		wasmdata.TestModule,
+		polyscript.FromBytes(wasmdata.TestModule),
+
+		// main entrypoint function in the WASM module
+		polyscript.WithEntryPoint(wasmdata.EntrypointGreet),
 
 		// the go-polyscript Extism engine will encode the static data into
 		// JSON and send it to the WASM application
-		staticData,
-		logger.Handler(),
-
-		// main entrypoint function in the WASM module
-		wasmdata.EntrypointGreet,
+		polyscript.WithStaticData(map[string]any{"input": "World"}),
 	)
 
 	// Execute, and print the result

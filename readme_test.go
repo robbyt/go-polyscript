@@ -1,8 +1,6 @@
 package polyscript_test
 
 import (
-	"log/slog"
-	"os"
 	"testing"
 
 	"github.com/robbyt/go-polyscript"
@@ -14,10 +12,8 @@ import (
 func TestReadmeQuickStart(t *testing.T) {
 	t.Parallel()
 
-	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-
 	script := `
-		// The ctx object from the Go inputData map
+		// The ctx object holds the input data map
 		let name = ctx.get("name")
 
 		let p = "."
@@ -34,17 +30,13 @@ func TestReadmeQuickStart(t *testing.T) {
 		}
 	`
 
-	inputData := map[string]any{"name": "World"}
-
-	evaluator, err := polyscript.FromRisorStringWithData(
-		script,
-		inputData,
-		logger.Handler(),
+	evaluator, err := polyscript.Risor(
+		polyscript.FromString(script),
+		polyscript.WithStaticData(map[string]any{"name": "World"}),
 	)
 	require.NoError(t, err, "Should create evaluator successfully")
 
-	ctx := t.Context()
-	result, err := evaluator.Eval(ctx)
+	result, err := evaluator.Eval(t.Context())
 	require.NoError(t, err, "Should evaluate successfully")
 	require.NotNil(t, result, "Result should not be nil")
 
@@ -56,8 +48,6 @@ func TestReadmeQuickStart(t *testing.T) {
 
 func TestReadmeStaticProvider(t *testing.T) {
 	t.Parallel()
-
-	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
 	script := `
 		let name = ctx.get("name")
@@ -75,12 +65,13 @@ func TestReadmeStaticProvider(t *testing.T) {
 		}
 	`
 
-	inputData := map[string]any{"name": "cats", "excited": true}
-	evaluator, err := polyscript.FromRisorStringWithData(script, inputData, logger.Handler())
+	evaluator, err := polyscript.Risor(
+		polyscript.FromString(script),
+		polyscript.WithStaticData(map[string]any{"name": "cats", "excited": true}),
+	)
 	require.NoError(t, err, "Should create evaluator successfully")
 
-	ctx := t.Context()
-	result, err := evaluator.Eval(ctx)
+	result, err := evaluator.Eval(t.Context())
 	require.NoError(t, err, "Should evaluate successfully")
 
 	resultMap, ok := result.Interface().(map[string]any)
@@ -90,8 +81,6 @@ func TestReadmeStaticProvider(t *testing.T) {
 
 func TestReadmeContextProvider(t *testing.T) {
 	t.Parallel()
-
-	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
 	script := `
 		let name = ctx.get("name")
@@ -103,12 +92,11 @@ func TestReadmeContextProvider(t *testing.T) {
 		}
 	`
 
-	evaluator, err := polyscript.FromRisorString(script, logger.Handler())
+	evaluator, err := polyscript.Risor(polyscript.FromString(script))
 	require.NoError(t, err, "Should create evaluator successfully")
 
-	ctx := t.Context()
 	runtimeData := map[string]any{"name": "Billie Jean", "relationship": false}
-	enrichedCtx, err := evaluator.AddDataToContext(ctx, runtimeData)
+	enrichedCtx, err := evaluator.AddDataToContext(t.Context(), runtimeData)
 	require.NoError(t, err, "Should add data to context successfully")
 
 	result, err := evaluator.Eval(enrichedCtx)
@@ -122,8 +110,6 @@ func TestReadmeContextProvider(t *testing.T) {
 
 func TestReadmeCombiningStaticAndDynamic(t *testing.T) {
 	t.Parallel()
-
-	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
 	script := `
 		// Access both static and dynamic data
@@ -147,7 +133,10 @@ func TestReadmeCombiningStaticAndDynamic(t *testing.T) {
 		"excited": true,
 	}
 
-	evaluator, err := polyscript.FromRisorStringWithData(script, staticData, logger.Handler())
+	evaluator, err := polyscript.Risor(
+		polyscript.FromString(script),
+		polyscript.WithStaticData(staticData),
+	)
 	require.NoError(t, err, "Should create evaluator with static data")
 
 	requestData := map[string]any{"name": "Robert"}
@@ -165,8 +154,6 @@ func TestReadmeCombiningStaticAndDynamic(t *testing.T) {
 func TestReadmeStarlark(t *testing.T) {
 	t.Parallel()
 
-	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-
 	scriptContent := `
 # Starlark has access to ctx variable
 name = ctx["name"]
@@ -179,11 +166,9 @@ result = {"greeting": message, "length": len(message)}
 _ = result
 `
 
-	staticData := map[string]any{"name": "World"}
-	evaluator, err := polyscript.FromStarlarkStringWithData(
-		scriptContent,
-		staticData,
-		logger.Handler(),
+	evaluator, err := polyscript.Starlark(
+		polyscript.FromString(scriptContent),
+		polyscript.WithStaticData(map[string]any{"name": "World"}),
 	)
 	require.NoError(t, err, "Should create Starlark evaluator")
 
@@ -199,14 +184,10 @@ _ = result
 func TestReadmeExtism(t *testing.T) {
 	t.Parallel()
 
-	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-
-	staticData := map[string]any{"input": "World"}
-	evaluator, err := polyscript.FromExtismBytesWithData(
-		wasmdata.TestModule,
-		staticData,
-		logger.Handler(),
-		wasmdata.EntrypointGreet,
+	evaluator, err := polyscript.Extism(
+		polyscript.FromBytes(wasmdata.TestModule),
+		polyscript.WithEntryPoint(wasmdata.EntrypointGreet),
+		polyscript.WithStaticData(map[string]any{"input": "World"}),
 	)
 	require.NoError(t, err, "Should create Extism evaluator")
 
