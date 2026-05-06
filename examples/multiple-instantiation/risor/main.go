@@ -24,11 +24,9 @@ func createEvaluator(logger *slog.Logger) (RisorEvaluator, error) {
 		logger = slog.Default()
 	}
 
-	// Create evaluator using the new simplified interface
-	// This provides a dynamic context provider automatically
-	evaluator, err := polyscript.FromRisorString(
-		risorScript,
-		logger.Handler(),
+	evaluator, err := polyscript.New[polyscript.Risor](
+		polyscript.FromString(risorScript),
+		polyscript.WithLogHandler[polyscript.Risor](logger.Handler()),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create evaluator: %w", err)

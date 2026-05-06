@@ -25,12 +25,10 @@ func createRisorEvaluator(
 	scriptContent string,
 	staticData map[string]any,
 ) (RisorEvaluator, error) {
-	// Create evaluator using the new simplified interface
-	// This automatically sets up a composite provider with both static and dynamic data
-	return polyscript.FromRisorStringWithData(
-		scriptContent,
-		staticData,
-		logger.Handler(),
+	return polyscript.New[polyscript.Risor](
+		polyscript.FromString(scriptContent),
+		polyscript.WithStaticData[polyscript.Risor](staticData),
+		polyscript.WithLogHandler[polyscript.Risor](logger.Handler()),
 	)
 }
 

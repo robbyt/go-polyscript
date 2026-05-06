@@ -22,12 +22,11 @@ func runExtismExample(logger *slog.Logger) (map[string]any, error) {
 		"input": "World",
 	}
 
-	// Create evaluator using embedded WASM
-	evaluator, err := polyscript.FromExtismBytesWithData(
-		wasmdata.TestModule,
-		inputData,
-		logger.Handler(),
-		wasmdata.EntrypointGreet,
+	evaluator, err := polyscript.New[polyscript.Extism](
+		polyscript.FromBytes(wasmdata.TestModule),
+		polyscript.WithEntryPoint(wasmdata.EntrypointGreet),
+		polyscript.WithStaticData[polyscript.Extism](inputData),
+		polyscript.WithLogHandler[polyscript.Extism](logger.Handler()),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create evaluator: %w", err)

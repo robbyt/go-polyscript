@@ -22,12 +22,10 @@ func createEvaluator(logger *slog.Logger) (ExtismEvaluator, error) {
 		logger = slog.Default()
 	}
 
-	// Create the evaluator using embedded WASM
-	// Uses the simpler interface with dynamic data only via context
-	evaluator, err := polyscript.FromExtismBytes(
-		wasmdata.TestModule,
-		logger.Handler(),
-		wasmdata.EntrypointGreet,
+	evaluator, err := polyscript.New[polyscript.Extism](
+		polyscript.FromBytes(wasmdata.TestModule),
+		polyscript.WithEntryPoint(wasmdata.EntrypointGreet),
+		polyscript.WithLogHandler[polyscript.Extism](logger.Handler()),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create evaluator: %w", err)

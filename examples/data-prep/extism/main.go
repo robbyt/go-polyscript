@@ -109,12 +109,11 @@ func run() error {
 		"input": "Static User",
 	}
 
-	// Create evaluator with embedded WASM and static data
-	evaluator, err := polyscript.FromExtismBytesWithData(
-		wasmdata.TestModule,
-		staticData,
-		logger.Handler(),
-		wasmdata.EntrypointGreet,
+	evaluator, err := polyscript.New[polyscript.Extism](
+		polyscript.FromBytes(wasmdata.TestModule),
+		polyscript.WithEntryPoint(wasmdata.EntrypointGreet),
+		polyscript.WithStaticData[polyscript.Extism](staticData),
+		polyscript.WithLogHandler[polyscript.Extism](logger.Handler()),
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create evaluator: %w", err)

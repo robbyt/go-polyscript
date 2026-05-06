@@ -27,12 +27,10 @@ func createStarlarkEvaluator(
 	scriptContent string,
 	staticData map[string]any,
 ) (StarlarkEvaluator, error) {
-	// Create evaluator using the new simplified interface
-	// This automatically sets up a composite provider with both static and dynamic data
-	return polyscript.FromStarlarkStringWithData(
-		scriptContent,
-		staticData,
-		logger.Handler(),
+	return polyscript.New[polyscript.Starlark](
+		polyscript.FromString(scriptContent),
+		polyscript.WithStaticData[polyscript.Starlark](staticData),
+		polyscript.WithLogHandler[polyscript.Starlark](logger.Handler()),
 	)
 }
 
