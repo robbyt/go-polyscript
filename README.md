@@ -326,16 +326,25 @@ eval, _ := risor.FromRisorLoader(
 result, _ := eval.Eval(context.Background())
 ```
 
-Logging is optional: omit `WithLogHandler` and the engine inherits whatever `slog.Default()` has been configured to in the host process. Extism is the same shape but requires `WithEntryPoint`:
+Logging is optional: omit `WithLogHandler` and the engine inherits whatever `slog.Default()` has been configured to in the host process. Extism is the same shape but expects a WASM module loader and requires `WithEntryPoint`:
 
 ```go
-import "github.com/robbyt/go-polyscript/engines/extism"
+import (
+	"context"
+
+	"github.com/robbyt/go-polyscript/engines/extism"
+	"github.com/robbyt/go-polyscript/platform/script/loader"
+)
+
+wasmLdr, _ := loader.NewFromBytes(wasmBytes) // wasmBytes is a compiled WASM module
 
 eval, _ := extism.FromExtismLoader(
-	ldr,
+	wasmLdr,
 	extism.WithEntryPoint("greet"),
 	extism.WithStaticData(map[string]any{"input": "World"}),
 )
+
+result, _ := eval.Eval(context.Background())
 ```
 
 ## License

@@ -226,7 +226,7 @@ func New[E Engine](src Source, opts ...Option[E]) (platform.Evaluator, error) {
 	}
 	var e E
 	if _, ok := any(e).(Extism); ok && cfg.entryPoint == "" {
-		return nil, errors.New("polyscript.New[Extism]: entry point is required (use WithEntryPoint)")
+		return nil, fmt.Errorf("polyscript.New[Extism]: %w", extismMachine.ErrEntryPointRequired)
 	}
 
 	ldr, err := src.resolve()

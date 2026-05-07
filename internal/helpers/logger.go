@@ -7,11 +7,12 @@ import (
 // SetupLogger creates a configured logger and handler for an engine implementation.
 //
 // If handler is nil, the handler returned by slog.Default().Handler() is used,
-// wrapped with engineName as a slog group so log records carry an "engine.<…>"
-// prefix. This lets hosts wire one configuration (level, format, sink) globally
-// and have the engine inherit it. Hosts that pass an explicit handler get it
-// back unchanged — no engineName grouping is applied in that case (the caller
-// is presumed to have configured the handler the way they want).
+// wrapped with engineName as a slog group so log records carry an
+// "<engineName>.<…>" prefix (e.g. engineName "risor" produces "risor.<…>").
+// This lets hosts wire one configuration (level, format, sink) globally and
+// have the engine inherit it. Hosts that pass an explicit handler get it back
+// unchanged — no engineName grouping is applied in that case (the caller is
+// presumed to have configured the handler the way they want).
 //
 // Parameters:
 //   - handler: handler to use, or nil to inherit from slog.Default().Handler()
