@@ -3,6 +3,7 @@ package helpers
 import (
 	"bytes"
 	"net/http"
+	"net/url"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -222,5 +223,44 @@ func TestRequestToMap(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, "/", result["URL_Path"])
 		require.Nil(t, req.URL, "caller's nil URL must stay nil")
+	})
+}
+
+// TestResolveURL covers the helper extracted from newHTTPRequestWrapper.
+func TestResolveURL(t *testing.T) {
+	t.Run("nil returns / sentinel", func(t *testing.T) {
+		got, err := resolveURL(nil)
+		require.NoError(t, err)
+		require.NotNil(t, got)
+		require.Equal(t, "/", got.Path)
+		require.Empty(t, got.Host)
+		require.Empty(t, got.Scheme)
+	})
+
+	t.Run("nil returns a fresh sentinel each call", func(t *testing.T) {
+		first, err := resolveURL(nil)
+		require.NoError(t, err)
+		second, err := resolveURL(nil)
+		require.NoError(t, err)
+		require.NotSame(t, first, second, "callers must not share a sentinel")
+	})
+
+	t.Run("non-nil returns same pointer", func(t *testing.T) {
+		input, err := url.Parse("http://example.com/path?q=1#frag")
+		require.NoError(t, err)
+
+		got, err := resolveURL(input)
+		require.NoError(t, err)
+		require.Same(t, input, got, "non-nil URL must be returned as-is")
+	})
+
+	t.Run("does not mutate input", func(t *testing.T) {
+		input, err := url.Parse("http://example.com/path?q=1#frag")
+		require.NoError(t, err)
+		snapshot := *input
+
+		_, err = resolveURL(input)
+		require.NoError(t, err)
+		require.Equal(t, snapshot, *input, "fields of input URL must be unchanged")
 	})
 }
