@@ -392,10 +392,8 @@ func TestCompilerOptions_SetupLogger(t *testing.T) {
 		c.applyDefaults()
 		c.setupLogger()
 
-		// applyDefaults no longer fills logHandler; setupLogger inherits from
-		// slog.Default() and produces both a handler and a logger.
-		require.NotNil(t, c.logHandler, "handler should be initialized via slog.Default()")
-		require.NotNil(t, c.logger, "logger should be initialized")
+		require.NotNil(t, c.logHandler)
+		require.NotNil(t, c.logger)
 	})
 }
 
@@ -409,8 +407,7 @@ func TestCompilerOptions_DefaultsAndValidation(t *testing.T) {
 			c := &Compiler{}
 			c.applyDefaults()
 
-			// Handler defaults are now deferred to helpers.SetupLogger.
-			require.Nil(t, c.logHandler, "applyDefaults no longer fills logHandler")
+			require.Nil(t, c.logHandler)
 			require.Equal(t, defaultEntryPoint, c.entryPointName)
 			require.NotNil(t, c.options, "options should be initialized")
 			require.True(t, c.options.EnableWASI, "WASI should be enabled by default")
@@ -470,9 +467,8 @@ func TestCompilerOptions_DefaultsAndValidation(t *testing.T) {
 				c := &Compiler{logHandler: nil, logger: nil}
 				c.applyDefaults()
 
-				// applyDefaults leaves both nil; setupLogger handles the fallback.
-				require.Nil(t, c.logHandler, "applyDefaults no longer fills logHandler")
-				require.Nil(t, c.logger, "logger should not be created yet")
+				require.Nil(t, c.logHandler)
+				require.Nil(t, c.logger)
 			})
 		})
 	})
@@ -501,9 +497,7 @@ func TestCompilerOptions_DefaultsAndValidation(t *testing.T) {
 			require.NoError(t, err)
 		})
 
-		t.Run("nil handler and logger is now valid", func(t *testing.T) {
-			// helpers.SetupLogger inherits from slog.Default() at log time,
-			// so a Compiler with neither field set is valid.
+		t.Run("nil handler and logger", func(t *testing.T) {
 			c := &Compiler{
 				entryPointName: "test",
 				ctx:            t.Context(),
@@ -924,8 +918,7 @@ func TestCompilerOptions(t *testing.T) {
 			c := &Compiler{}
 			c.applyDefaults()
 
-			// Handler defaults are now deferred to helpers.SetupLogger.
-			require.Nil(t, c.logHandler, "applyDefaults no longer fills logHandler")
+			require.Nil(t, c.logHandler)
 			require.Nil(t, c.logger)
 			require.Equal(t, defaultEntryPoint, c.GetEntryPointName())
 			require.NotNil(t, c.options)
@@ -986,9 +979,7 @@ func TestCompilerOptions(t *testing.T) {
 				require.NoError(t, err)
 			})
 
-			t.Run("nil handler and logger is now valid", func(t *testing.T) {
-				// helpers.SetupLogger inherits from slog.Default() at log time,
-				// so a Compiler with neither field set is valid.
+			t.Run("nil handler and logger", func(t *testing.T) {
 				c := &Compiler{}
 				c.applyDefaults()
 				c.logHandler = nil

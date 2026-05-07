@@ -91,10 +91,6 @@ func TestFromRisorLoader_WithDataProvider(t *testing.T) {
 }
 
 func TestFromRisorLoader_DataProviderBeatsStaticData(t *testing.T) {
-	// When both are passed, WithDataProvider wins. Verify by smuggling a
-	// sentinel provider in and confirming the resulting executable unit
-	// uses it (we can't directly inspect, but a successful build with a
-	// provider that returns no data is enough to demonstrate the path).
 	provider := data.NewContextProvider("sentinel")
 	eval, err := FromRisorLoader(
 		newTestLoader(t),
@@ -146,9 +142,6 @@ func TestFromRisorLoader_DiskLoader(t *testing.T) {
 }
 
 func TestFromRisorLoader_RunsEndToEnd(t *testing.T) {
-	// End-to-end: building with WithStaticData and evaluating produces the
-	// expected greeting. Locks in that the new options form does not break
-	// the existing data pipeline.
 	const script = `"Hello, " + ctx["name"]`
 	scriptLoader, err := loader.NewFromString(script)
 	require.NoError(t, err)
@@ -165,27 +158,21 @@ func TestFromRisorLoader_RunsEndToEnd(t *testing.T) {
 	assert.Equal(t, "Hello, World", res.Interface())
 }
 
-// Note: mutates slog.Default via SetDefault — must not call t.Parallel().
-// Across packages it is safe because `go test ./...` runs each package in
-// its own process (each with its own slog.Default).
+// Mutates slog.Default — must not call t.Parallel(). Cross-package safe
+// because `go test ./...` runs each package in its own process.
 func TestFromRisorLoader_DefaultsToSlogDefault(t *testing.T) {
-	// Without WithLogHandler, the evaluator should inherit from slog.Default().
 	prev := slog.Default()
 	t.Cleanup(func() { slog.SetDefault(prev) })
 
 	var buf bytes.Buffer
 	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, nil)))
 
-	const script = `"hi"`
-	scriptLoader, err := loader.NewFromString(script)
+	scriptLoader, err := loader.NewFromString(`"hi"`)
 	require.NoError(t, err)
 
 	eval, err := FromRisorLoader(scriptLoader)
 	require.NoError(t, err)
 	require.NotNil(t, eval)
-	// We don't assert anything specific about buf; the point is that
-	// construction succeeds and any log output (debug or otherwise) flows
-	// through the swapped default.
 }
 
 func TestNewCompiler(t *testing.T) {

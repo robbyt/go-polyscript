@@ -75,16 +75,11 @@ func (c *Compiler) setupLogger() {
 }
 
 // validate checks if the compiler configuration is valid.
-//
-// A nil logHandler/logger pair is allowed; helpers.SetupLogger will inherit
-// from slog.Default() when both are unset.
 func (c *Compiler) validate() error {
 	return nil
 }
 
 // applyDefaults sets the default values for a compiler.
-// Logging defaults are deferred to helpers.SetupLogger so a single source
-// of truth (slog.Default) governs the fallback handler.
 func (c *Compiler) applyDefaults() {
 	if c.globals == nil {
 		c.globals = []string{}

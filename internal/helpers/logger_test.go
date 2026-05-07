@@ -9,9 +9,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Note: this test mutates slog.Default via SetDefault and must not call
-// t.Parallel(). Across packages it is safe because `go test ./...` runs
-// each package in its own process (each with its own slog.Default).
+// Mutates slog.Default — must not call t.Parallel(). Cross-package safe
+// because `go test ./...` runs each package in its own process.
 func TestSetupLogger_NilHandlerInheritsDefault(t *testing.T) {
 	prev := slog.Default()
 	t.Cleanup(func() { slog.SetDefault(prev) })

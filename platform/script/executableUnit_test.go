@@ -468,14 +468,10 @@ func TestNewVersionWithScriptData(t *testing.T) {
 	})
 }
 
-// TestNewExecutableUnit_NilHandler locks in that callers may pass a nil
-// slog.Handler — helpers.SetupLogger inherits from slog.Default() in that
-// case, so construction must succeed without a panic.
 func TestNewExecutableUnit_NilHandler(t *testing.T) {
 	t.Parallel()
 
-	scriptContent := "any content"
-	lod, err := loader.NewFromString(scriptContent)
+	lod, err := loader.NewFromString("any content")
 	require.NoError(t, err)
 
 	reader, err := lod.GetReader()
@@ -487,13 +483,7 @@ func TestNewExecutableUnit_NilHandler(t *testing.T) {
 	comp := new(MockCompiler)
 	comp.On("Compile", reader).Return(&MockExecutableContent{}, nil)
 
-	exe, err := NewExecutableUnit(
-		nil, // <-- handler intentionally nil
-		t.Name(),
-		mockLdr,
-		comp,
-		data.NewStaticProvider(emptyScriptData),
-	)
+	exe, err := NewExecutableUnit(nil, t.Name(), mockLdr, comp, data.NewStaticProvider(emptyScriptData))
 	require.NoError(t, err)
 	require.NotNil(t, exe)
 	require.Equal(t, t.Name(), exe.GetID())
