@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -13,6 +14,19 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// repeatingByte is an infinite io.Reader that emits a single byte
+// repeatedly. Used by TestFromHTTP_MaxBodySize's serveBody helper to
+// stream test response bodies via io.CopyN without allocating a full
+// buffer up front.
+type repeatingByte struct{ b byte }
+
+func (r repeatingByte) Read(p []byte) (int, error) {
+	for i := range p {
+		p[i] = r.b
+	}
+	return len(p), nil
+}
 
 func TestNewFromHTTP(t *testing.T) {
 	t.Parallel()
@@ -663,4 +677,122 @@ func TestFromHTTP_GetSourceURL(t *testing.T) {
 
 func TestFromHTTP_ImplementsLoader(t *testing.T) {
 	var _ Loader = (*FromHTTP)(nil)
+}
+
+func TestFromHTTP_MaxBodySize(t *testing.T) {
+	t.Parallel()
+
+	// serveBody returns a test server that streams exactly size bytes via
+	// io.CopyN over a small repeating buffer, so even multi-MiB cases
+	// don't allocate a full body up front.
+	//
+	// Write errors are logged on the caller's t (not asserted): when the
+	// loader rejects an oversize body it closes the connection
+	// mid-stream, surfacing as a broken-pipe error that isn't a test
+	// failure.
+	serveBody := func(t *testing.T, size int) *httptest.Server {
+		t.Helper()
+		return httptest.NewServer(
+			http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+				if _, err := io.CopyN(w, repeatingByte{b: 'a'}, int64(size)); err != nil {
+					t.Logf("server write: %v", err)
+				}
+			}),
+		)
+	}
+
+	t.Run("body under limit succeeds", func(t *testing.T) {
+		server := serveBody(t, 50)
+		defer server.Close()
+
+		opts := DefaultHTTPOptions().WithMaxBodySize(100)
+		loader, err := NewFromHTTPWithOptions(server.URL+"/s", opts)
+		require.NoError(t, err)
+
+		reader, err := loader.GetReader()
+		require.NoError(t, err)
+		require.NotNil(t, reader)
+		require.NoError(t, reader.Close())
+	})
+
+	t.Run("body exactly at limit succeeds", func(t *testing.T) {
+		server := serveBody(t, 100)
+		defer server.Close()
+
+		opts := DefaultHTTPOptions().WithMaxBodySize(100)
+		loader, err := NewFromHTTPWithOptions(server.URL+"/s", opts)
+		require.NoError(t, err)
+
+		reader, err := loader.GetReader()
+		require.NoError(t, err)
+		require.NotNil(t, reader)
+		require.NoError(t, reader.Close())
+	})
+
+	t.Run("body over limit returns ErrScriptTooLarge", func(t *testing.T) {
+		server := serveBody(t, 200)
+		defer server.Close()
+
+		opts := DefaultHTTPOptions().WithMaxBodySize(100)
+		loader, err := NewFromHTTPWithOptions(server.URL+"/s", opts)
+		require.NoError(t, err)
+
+		reader, err := loader.GetReader()
+		require.Error(t, err)
+		require.Nil(t, reader)
+		require.ErrorIs(t, err, ErrScriptTooLarge)
+	})
+
+	t.Run("MaxBodySize -1 disables cap", func(t *testing.T) {
+		// Serve well over the default 10 MiB cap.
+		size := int(DefaultMaxBodySize) + 1024
+		server := serveBody(t, size)
+		defer server.Close()
+
+		opts := DefaultHTTPOptions().WithMaxBodySize(-1)
+		loader, err := NewFromHTTPWithOptions(server.URL+"/s", opts)
+		require.NoError(t, err)
+
+		reader, err := loader.GetReader()
+		require.NoError(t, err)
+		require.NotNil(t, reader)
+		require.NoError(t, reader.Close())
+	})
+
+	t.Run("MaxBodySize 0 falls back to default", func(t *testing.T) {
+		// Bypass DefaultHTTPOptions to construct a zero-value field.
+		opts := &HTTPOptions{
+			Timeout:       30 * time.Second,
+			Authenticator: httpauth.NewNoAuth(),
+			Headers:       map[string]string{},
+			// MaxBodySize: 0 (zero value)
+		}
+		// Serve just over the default cap.
+		size := int(DefaultMaxBodySize) + 1
+		server := serveBody(t, size)
+		defer server.Close()
+
+		loader, err := NewFromHTTPWithOptions(server.URL+"/s", opts)
+		require.NoError(t, err)
+
+		reader, err := loader.GetReader()
+		require.Error(t, err)
+		require.Nil(t, reader)
+		require.ErrorIs(t, err, ErrScriptTooLarge)
+	})
+
+	t.Run("default options enforce 10 MiB cap", func(t *testing.T) {
+		size := int(DefaultMaxBodySize) + 1
+		server := serveBody(t, size)
+		defer server.Close()
+
+		loader, err := NewFromHTTP(server.URL + "/s")
+		require.NoError(t, err)
+
+		reader, err := loader.GetReader()
+		require.Error(t, err)
+		require.Nil(t, reader)
+		require.ErrorIs(t, err, ErrScriptTooLarge)
+	})
 }
