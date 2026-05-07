@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -13,6 +14,19 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// repeatingByte is an infinite io.Reader that emits a single byte
+// repeatedly. Used by TestFromHTTP_MaxBodySize's serveBody helper to
+// stream test response bodies via io.CopyN without allocating a full
+// buffer up front.
+type repeatingByte struct{ b byte }
+
+func (r repeatingByte) Read(p []byte) (int, error) {
+	for i := range p {
+		p[i] = r.b
+	}
+	return len(p), nil
+}
 
 func TestNewFromHTTP(t *testing.T) {
 	t.Parallel()
@@ -668,19 +682,20 @@ func TestFromHTTP_ImplementsLoader(t *testing.T) {
 func TestFromHTTP_MaxBodySize(t *testing.T) {
 	t.Parallel()
 
-	// serveBody returns a test server that writes exactly size bytes.
-	// Write errors are logged but not asserted: when the loader rejects
-	// an oversize body it closes the connection mid-stream, which
-	// surfaces here as a broken-pipe error that isn't a test failure.
-	serveBody := func(size int) *httptest.Server {
-		body := make([]byte, size)
-		for i := range body {
-			body[i] = 'a'
-		}
+	// serveBody returns a test server that streams exactly size bytes via
+	// io.CopyN over a small repeating buffer, so even multi-MiB cases
+	// don't allocate a full body up front.
+	//
+	// Write errors are logged on the caller's t (not asserted): when the
+	// loader rejects an oversize body it closes the connection
+	// mid-stream, surfacing as a broken-pipe error that isn't a test
+	// failure.
+	serveBody := func(t *testing.T, size int) *httptest.Server {
+		t.Helper()
 		return httptest.NewServer(
 			http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
-				if _, err := w.Write(body); err != nil {
+				if _, err := io.CopyN(w, repeatingByte{b: 'a'}, int64(size)); err != nil {
 					t.Logf("server write: %v", err)
 				}
 			}),
@@ -688,7 +703,7 @@ func TestFromHTTP_MaxBodySize(t *testing.T) {
 	}
 
 	t.Run("body under limit succeeds", func(t *testing.T) {
-		server := serveBody(50)
+		server := serveBody(t, 50)
 		defer server.Close()
 
 		opts := DefaultHTTPOptions().WithMaxBodySize(100)
@@ -702,7 +717,7 @@ func TestFromHTTP_MaxBodySize(t *testing.T) {
 	})
 
 	t.Run("body exactly at limit succeeds", func(t *testing.T) {
-		server := serveBody(100)
+		server := serveBody(t, 100)
 		defer server.Close()
 
 		opts := DefaultHTTPOptions().WithMaxBodySize(100)
@@ -716,7 +731,7 @@ func TestFromHTTP_MaxBodySize(t *testing.T) {
 	})
 
 	t.Run("body over limit returns ErrScriptTooLarge", func(t *testing.T) {
-		server := serveBody(200)
+		server := serveBody(t, 200)
 		defer server.Close()
 
 		opts := DefaultHTTPOptions().WithMaxBodySize(100)
@@ -732,7 +747,7 @@ func TestFromHTTP_MaxBodySize(t *testing.T) {
 	t.Run("MaxBodySize -1 disables cap", func(t *testing.T) {
 		// Serve well over the default 10 MiB cap.
 		size := int(DefaultMaxBodySize) + 1024
-		server := serveBody(size)
+		server := serveBody(t, size)
 		defer server.Close()
 
 		opts := DefaultHTTPOptions().WithMaxBodySize(-1)
@@ -755,7 +770,7 @@ func TestFromHTTP_MaxBodySize(t *testing.T) {
 		}
 		// Serve just over the default cap.
 		size := int(DefaultMaxBodySize) + 1
-		server := serveBody(size)
+		server := serveBody(t, size)
 		defer server.Close()
 
 		loader, err := NewFromHTTPWithOptions(server.URL+"/s", opts)
@@ -769,7 +784,7 @@ func TestFromHTTP_MaxBodySize(t *testing.T) {
 
 	t.Run("default options enforce 10 MiB cap", func(t *testing.T) {
 		size := int(DefaultMaxBodySize) + 1
-		server := serveBody(size)
+		server := serveBody(t, size)
 		defer server.Close()
 
 		loader, err := NewFromHTTP(server.URL + "/s")

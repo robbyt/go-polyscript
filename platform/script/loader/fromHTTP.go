@@ -17,6 +17,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"math"
 	"net/http"
 	"net/url"
 	"time"
@@ -280,8 +281,15 @@ func (l *FromHTTP) GetReaderWithContext(ctx context.Context) (io.ReadCloser, err
 	}
 
 	// Read up to limit+1 bytes so a body of exactly limit bytes passes
-	// while one byte more trips the overflow check.
-	buf, err := io.ReadAll(io.LimitReader(resp.Body, limit+1))
+	// while one byte more trips the overflow check. Guard against
+	// MaxInt64 overflow: if limit is already at the int64 ceiling no
+	// realistic body can exceed it, so we read up to limit and the
+	// overflow branch is unreachable.
+	readLimit := limit
+	if readLimit < math.MaxInt64 {
+		readLimit++
+	}
+	buf, err := io.ReadAll(io.LimitReader(resp.Body, readLimit))
 	if closeErr := resp.Body.Close(); closeErr != nil {
 		slog.Default().Debug("Failed to close response body", "error", closeErr)
 	}
