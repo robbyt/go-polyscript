@@ -45,6 +45,7 @@ type ExecutableUnit struct {
 
 // NewExecutableUnit creates a new ExecutableUnit from the provided loader and compiler.
 // The dataProvider parameter provides runtime data for script evaluation.
+// A nil handler is permitted and inherits from slog.Default.
 func NewExecutableUnit(
 	handler slog.Handler,
 	versionID string,

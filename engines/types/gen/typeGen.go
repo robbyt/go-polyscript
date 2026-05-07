@@ -68,14 +68,6 @@ func main() {
 			TemplateFile: "type_test.go.tmpl",
 			OutputFile:   "./type_test.go",
 		},
-		{
-			TemplateFile: "new.go.tmpl",
-			OutputFile:   "../new.go",
-		},
-		{
-			TemplateFile: "new_test.go.tmpl",
-			OutputFile:   "../new_test.go",
-		},
 	}
 
 	for _, target := range outputTargets {

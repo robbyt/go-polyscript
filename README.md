@@ -304,6 +304,49 @@ func main() {
 }
 ```
 
+## Direct engine subpackage usage
+
+Most callers should use `polyscript.New[E]`. For finer-grained control over a single engine — for example, plugging in a custom `data.Provider` — each engine subpackage exposes the same shape: `FromXxxLoader(ldr, opts...)`, with engine-scoped `WithLogHandler`, `WithStaticData`, `WithDataProvider`, and (Extism only) `WithEntryPoint` options.
+
+```go
+import (
+	"context"
+
+	"github.com/robbyt/go-polyscript/engines/risor"
+	"github.com/robbyt/go-polyscript/platform/script/loader"
+)
+
+ldr, _ := loader.NewFromString(`{"name": ctx["name"]}`)
+
+eval, _ := risor.FromRisorLoader(
+	ldr,
+	risor.WithStaticData(map[string]any{"name": "World"}),
+)
+
+result, _ := eval.Eval(context.Background())
+```
+
+Logging is optional: omit `WithLogHandler` and the engine inherits whatever `slog.Default()` has been configured to in the host process. Extism is the same shape but expects a WASM module loader and requires `WithEntryPoint`:
+
+```go
+import (
+	"context"
+
+	"github.com/robbyt/go-polyscript/engines/extism"
+	"github.com/robbyt/go-polyscript/platform/script/loader"
+)
+
+wasmLdr, _ := loader.NewFromBytes(wasmBytes) // wasmBytes is a compiled WASM module
+
+eval, _ := extism.FromExtismLoader(
+	wasmLdr,
+	extism.WithEntryPoint("greet"),
+	extism.WithStaticData(map[string]any{"input": "World"}),
+)
+
+result, _ := eval.Eval(context.Background())
+```
+
 ## License
 
 Apache License 2.0

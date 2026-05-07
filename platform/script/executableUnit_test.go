@@ -467,3 +467,27 @@ func TestNewVersionWithScriptData(t *testing.T) {
 		mockContent.AssertExpectations(t)
 	})
 }
+
+func TestNewExecutableUnit_NilHandler(t *testing.T) {
+	t.Parallel()
+
+	lod, err := loader.NewFromString("any content")
+	require.NoError(t, err)
+
+	reader, err := lod.GetReader()
+	require.NoError(t, err)
+
+	mockLdr := new(mockLoader)
+	mockLdr.On("GetReader").Return(reader, nil)
+
+	comp := new(MockCompiler)
+	comp.On("Compile", reader).Return(&MockExecutableContent{}, nil)
+
+	exe, err := NewExecutableUnit(nil, t.Name(), mockLdr, comp, data.NewStaticProvider(emptyScriptData))
+	require.NoError(t, err)
+	require.NotNil(t, exe)
+	require.Equal(t, t.Name(), exe.GetID())
+
+	mockLdr.AssertExpectations(t)
+	comp.AssertExpectations(t)
+}

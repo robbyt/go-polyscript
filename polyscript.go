@@ -225,11 +225,8 @@ func New[E Engine](src Source, opts ...Option[E]) (platform.Evaluator, error) {
 		}
 	}
 	var e E
-	switch any(e).(type) {
-	case Extism:
-		if cfg.entryPoint == "" {
-			return nil, errors.New("polyscript.New[Extism]: entry point is required (use WithEntryPoint)")
-		}
+	if _, ok := any(e).(Extism); ok && cfg.entryPoint == "" {
+		return nil, fmt.Errorf("polyscript.New[Extism]: %w", extismMachine.ErrEntryPointRequired)
 	}
 
 	ldr, err := src.resolve()
@@ -239,21 +236,45 @@ func New[E Engine](src Source, opts ...Option[E]) (platform.Evaluator, error) {
 
 	switch any(e).(type) {
 	case Risor:
-		if cfg.staticData != nil {
-			return risorMachine.FromRisorLoaderWithData(cfg.handler, ldr, cfg.staticData)
-		}
-		return risorMachine.FromRisorLoader(cfg.handler, ldr)
+		return newRisor(ldr, cfg)
 	case Starlark:
-		if cfg.staticData != nil {
-			return starlarkMachine.FromStarlarkLoaderWithData(cfg.handler, ldr, cfg.staticData)
-		}
-		return starlarkMachine.FromStarlarkLoader(cfg.handler, ldr)
+		return newStarlark(ldr, cfg)
 	case Extism:
-		if cfg.staticData != nil {
-			return extismMachine.FromExtismLoaderWithData(cfg.handler, ldr, cfg.staticData, cfg.entryPoint)
-		}
-		return extismMachine.FromExtismLoader(cfg.handler, ldr, cfg.entryPoint)
+		return newExtism(ldr, cfg)
 	default:
 		return nil, fmt.Errorf("polyscript.New: unsupported engine type %T", e)
 	}
+}
+
+func newRisor(ldr loader.Loader, cfg *config) (platform.Evaluator, error) {
+	var opts []risorMachine.Option
+	if cfg.handler != nil {
+		opts = append(opts, risorMachine.WithLogHandler(cfg.handler))
+	}
+	if cfg.staticData != nil {
+		opts = append(opts, risorMachine.WithStaticData(cfg.staticData))
+	}
+	return risorMachine.FromRisorLoader(ldr, opts...)
+}
+
+func newStarlark(ldr loader.Loader, cfg *config) (platform.Evaluator, error) {
+	var opts []starlarkMachine.Option
+	if cfg.handler != nil {
+		opts = append(opts, starlarkMachine.WithLogHandler(cfg.handler))
+	}
+	if cfg.staticData != nil {
+		opts = append(opts, starlarkMachine.WithStaticData(cfg.staticData))
+	}
+	return starlarkMachine.FromStarlarkLoader(ldr, opts...)
+}
+
+func newExtism(ldr loader.Loader, cfg *config) (platform.Evaluator, error) {
+	opts := []extismMachine.Option{extismMachine.WithEntryPoint(cfg.entryPoint)}
+	if cfg.handler != nil {
+		opts = append(opts, extismMachine.WithLogHandler(cfg.handler))
+	}
+	if cfg.staticData != nil {
+		opts = append(opts, extismMachine.WithStaticData(cfg.staticData))
+	}
+	return extismMachine.FromExtismLoader(ldr, opts...)
 }

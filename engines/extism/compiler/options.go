@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"os"
 
 	extismSDK "github.com/extism/go-sdk"
 	"github.com/robbyt/go-polyscript/engines/extism/compiler/internal/compile"
@@ -103,13 +102,8 @@ func WithContext(ctx context.Context) FunctionalOption {
 	}
 }
 
-// applyDefaults sets the default values for a compiler
+// applyDefaults sets the default values for a compiler.
 func (c *Compiler) applyDefaults() {
-	// Default to stderr for logging if neither handler nor logger specified
-	if c.logHandler == nil && c.logger == nil {
-		c.logHandler = slog.NewTextHandler(os.Stderr, nil)
-	}
-
 	// Set default entry point
 	if c.entryPointName == "" {
 		c.entryPointName = defaultEntryPoint
@@ -151,13 +145,8 @@ func (c *Compiler) setupLogger() {
 	}
 }
 
-// validate checks if the compiler configuration is valid
+// validate checks if the compiler configuration is valid.
 func (c *Compiler) validate() error {
-	// Ensure we have either a logger or a handler
-	if c.logHandler == nil && c.logger == nil {
-		return fmt.Errorf("either log handler or logger must be specified")
-	}
-
 	// Entry point must be non-empty
 	if c.entryPointName == "" {
 		return fmt.Errorf("entry point must be specified")

@@ -35,7 +35,10 @@ func FromExtismFile(
 		return nil, err
 	}
 
-	return extismMachine.FromExtismLoader(logHandler, l, entryPoint)
+	return extismMachine.FromExtismLoader(l,
+		extismMachine.WithLogHandler(logHandler),
+		extismMachine.WithEntryPoint(entryPoint),
+	)
 }
 
 // FromExtismFileWithData creates an Extism evaluator with both static and
@@ -54,7 +57,11 @@ func FromExtismFileWithData(
 		return nil, err
 	}
 
-	return extismMachine.FromExtismLoaderWithData(logHandler, l, staticData, entryPoint)
+	return extismMachine.FromExtismLoader(l,
+		extismMachine.WithLogHandler(logHandler),
+		extismMachine.WithStaticData(staticData),
+		extismMachine.WithEntryPoint(entryPoint),
+	)
 }
 
 // FromExtismBytes creates an Extism evaluator from WASM bytecode.
@@ -70,7 +77,10 @@ func FromExtismBytes(
 		return nil, err
 	}
 
-	return extismMachine.FromExtismLoader(logHandler, l, entryPoint)
+	return extismMachine.FromExtismLoader(l,
+		extismMachine.WithLogHandler(logHandler),
+		extismMachine.WithEntryPoint(entryPoint),
+	)
 }
 
 // FromExtismBytesWithData creates an Extism evaluator from WASM bytecode with
@@ -89,7 +99,11 @@ func FromExtismBytesWithData(
 		return nil, err
 	}
 
-	return extismMachine.FromExtismLoaderWithData(logHandler, l, staticData, entryPoint)
+	return extismMachine.FromExtismLoader(l,
+		extismMachine.WithLogHandler(logHandler),
+		extismMachine.WithStaticData(staticData),
+		extismMachine.WithEntryPoint(entryPoint),
+	)
 }
 
 // FromRisorFile creates a Risor evaluator from a .risor file.
@@ -104,7 +118,7 @@ func FromRisorFile(
 		return nil, err
 	}
 
-	return risorMachine.FromRisorLoader(logHandler, l)
+	return risorMachine.FromRisorLoader(l, risorMachine.WithLogHandler(logHandler))
 }
 
 // FromRisorFileWithData creates a Risor evaluator with both static and dynamic
@@ -121,7 +135,10 @@ func FromRisorFileWithData(
 		return nil, err
 	}
 
-	return risorMachine.FromRisorLoaderWithData(logHandler, l, staticData)
+	return risorMachine.FromRisorLoader(l,
+		risorMachine.WithLogHandler(logHandler),
+		risorMachine.WithStaticData(staticData),
+	)
 }
 
 // FromRisorString creates a Risor evaluator from a script string.
@@ -136,7 +153,7 @@ func FromRisorString(
 		return nil, err
 	}
 
-	return risorMachine.FromRisorLoader(logHandler, l)
+	return risorMachine.FromRisorLoader(l, risorMachine.WithLogHandler(logHandler))
 }
 
 // FromRisorStringWithData creates a Risor evaluator with both static and
@@ -153,7 +170,10 @@ func FromRisorStringWithData(
 		return nil, err
 	}
 
-	return risorMachine.FromRisorLoaderWithData(logHandler, l, staticData)
+	return risorMachine.FromRisorLoader(l,
+		risorMachine.WithLogHandler(logHandler),
+		risorMachine.WithStaticData(staticData),
+	)
 }
 
 // FromStarlarkFile creates a Starlark evaluator from a .star file.
@@ -168,7 +188,7 @@ func FromStarlarkFile(
 		return nil, err
 	}
 
-	return starlarkMachine.FromStarlarkLoader(logHandler, l)
+	return starlarkMachine.FromStarlarkLoader(l, starlarkMachine.WithLogHandler(logHandler))
 }
 
 // FromStarlarkFileWithData creates a Starlark evaluator with both static and
@@ -185,7 +205,10 @@ func FromStarlarkFileWithData(
 		return nil, err
 	}
 
-	return starlarkMachine.FromStarlarkLoaderWithData(logHandler, l, staticData)
+	return starlarkMachine.FromStarlarkLoader(l,
+		starlarkMachine.WithLogHandler(logHandler),
+		starlarkMachine.WithStaticData(staticData),
+	)
 }
 
 // FromStarlarkString creates a Starlark evaluator from a script string.
@@ -200,7 +223,7 @@ func FromStarlarkString(
 		return nil, err
 	}
 
-	return starlarkMachine.FromStarlarkLoader(logHandler, l)
+	return starlarkMachine.FromStarlarkLoader(l, starlarkMachine.WithLogHandler(logHandler))
 }
 
 // FromStarlarkStringWithData creates a Starlark evaluator with both static and
@@ -217,5 +240,8 @@ func FromStarlarkStringWithData(
 		return nil, err
 	}
 
-	return starlarkMachine.FromStarlarkLoaderWithData(logHandler, l, staticData)
+	return starlarkMachine.FromStarlarkLoader(l,
+		starlarkMachine.WithLogHandler(logHandler),
+		starlarkMachine.WithStaticData(staticData),
+	)
 }
