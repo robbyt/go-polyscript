@@ -3,10 +3,18 @@ package helpers
 import (
 	"bytes"
 	"net/http"
+	"net/url"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
+
+// trackingBody is a pointer-typed io.ReadCloser used in the
+// non-mutation regression test so require.Same can assert that
+// RequestToMap doesn't replace req.Body with a fresh wrapper.
+type trackingBody struct{ *bytes.Reader }
+
+func (*trackingBody) Close() error { return nil }
 
 // TestNewHTTPRequestWrapper tests the newHTTPRequestWrapper function.
 func TestNewHTTPRequestWrapper(t *testing.T) {
@@ -180,5 +188,79 @@ func TestRequestToMap(t *testing.T) {
 		}, result["QueryParams"])
 		require.Equal(t, map[string][]string{}, result["Headers"])
 		require.Empty(t, result["Body"])
+	})
+
+	t.Run("does not mutate input", func(t *testing.T) {
+		body := "test body"
+		req, err := http.NewRequest(
+			http.MethodPost,
+			"http://localhost:8080/test?q=1",
+			nil,
+		)
+		require.NoError(t, err)
+
+		// Use a pointer-typed body wrapper so require.Same asserts
+		// pointer identity (io.NopCloser returns a value type).
+		bodyPtr := &trackingBody{Reader: bytes.NewReader([]byte(body))}
+		req.Body = bodyPtr
+
+		originalURL := req.URL
+
+		_, err = RequestToMap(req)
+		require.NoError(t, err)
+
+		require.Same(t, originalURL, req.URL, "URL must not be replaced")
+		require.Equal(t, "/test", req.URL.Path, "URL path must be unchanged")
+		require.Same(t, bodyPtr, req.Body, "Body must not be replaced")
+	})
+
+	t.Run("nil URL stays nil", func(t *testing.T) {
+		req, err := http.NewRequest(http.MethodGet, "http://localhost/", nil)
+		require.NoError(t, err)
+		req.URL = nil
+
+		result, err := RequestToMap(req)
+		require.NoError(t, err)
+		require.Equal(t, "/", result["URL_Path"])
+		require.Nil(t, req.URL, "caller's nil URL must stay nil")
+	})
+}
+
+// TestResolveURL covers the helper extracted from newHTTPRequestWrapper.
+func TestResolveURL(t *testing.T) {
+	t.Run("nil returns / sentinel", func(t *testing.T) {
+		got, err := resolveURL(nil)
+		require.NoError(t, err)
+		require.NotNil(t, got)
+		require.Equal(t, "/", got.Path)
+		require.Empty(t, got.Host)
+		require.Empty(t, got.Scheme)
+	})
+
+	t.Run("nil returns a fresh sentinel each call", func(t *testing.T) {
+		first, err := resolveURL(nil)
+		require.NoError(t, err)
+		second, err := resolveURL(nil)
+		require.NoError(t, err)
+		require.NotSame(t, first, second, "callers must not share a sentinel")
+	})
+
+	t.Run("non-nil returns same pointer", func(t *testing.T) {
+		input, err := url.Parse("http://example.com/path?q=1#frag")
+		require.NoError(t, err)
+
+		got, err := resolveURL(input)
+		require.NoError(t, err)
+		require.Same(t, input, got, "non-nil URL must be returned as-is")
+	})
+
+	t.Run("does not mutate input", func(t *testing.T) {
+		input, err := url.Parse("http://example.com/path?q=1#frag")
+		require.NoError(t, err)
+		snapshot := *input
+
+		_, err = resolveURL(input)
+		require.NoError(t, err)
+		require.Equal(t, snapshot, *input, "fields of input URL must be unchanged")
 	})
 }

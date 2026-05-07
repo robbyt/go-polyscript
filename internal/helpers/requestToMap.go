@@ -1,7 +1,6 @@
 package helpers
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -22,26 +21,34 @@ type httpRequestWrapper struct {
 	QueryParams   map[string][]string
 }
 
+// resolveURL returns the request URL or a "/" sentinel when nil, so the
+// caller's r.URL is never mutated. It does not parse u itself; the
+// round-trip through url.Parse is preserved from the original
+// implementation and is tracked for removal under issue #100.
+func resolveURL(u *url.URL) (*url.URL, error) {
+	if u == nil {
+		return &url.URL{Path: "/"}, nil
+	}
+	if _, err := url.Parse(u.String()); err != nil {
+		return nil, fmt.Errorf("invalid URL: %w", err)
+	}
+	return u, nil
+}
+
 // newHTTPRequestWrapper converts an http.Request to an httpRequest struct.
 func newHTTPRequestWrapper(r *http.Request) (*httpRequestWrapper, error) {
 	if r == nil {
 		return nil, errors.New("request is nil")
 	}
 
-	// Ensure and validate the URL
-	if r.URL == nil {
-		// If URL is nil, provide a default one
-		r.URL = &url.URL{Path: "/"}
-	} else {
-		// If URL is not nil, validate it
-		if _, err := url.Parse(r.URL.String()); err != nil {
-			return nil, fmt.Errorf("invalid URL: %w", err)
-		}
+	urlToUse, err := resolveURL(r.URL)
+	if err != nil {
+		return nil, err
 	}
 
 	reqStruct := &httpRequestWrapper{
 		Method:        r.Method,
-		URL:           r.URL,
+		URL:           urlToUse,
 		Proto:         r.Proto,
 		ContentLength: r.ContentLength,
 		Host:          r.Host,
@@ -57,24 +64,18 @@ func newHTTPRequestWrapper(r *http.Request) (*httpRequestWrapper, error) {
 		}
 	}
 
-	// Read and set the body
+	// Read the body. The reader is consumed once — we don't restore it,
+	// since rewriting r.Body would mutate the caller's request.
 	if r.Body != nil {
 		bodyBytes, err := io.ReadAll(r.Body)
 		if err != nil {
 			return nil, err
 		}
 		reqStruct.Body = string(bodyBytes)
-
-		// Reset the body to allow further reads
-		r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
 	}
 
-	// Copy query parameters if URL is present
-	if r.URL != nil {
-		query := r.URL.Query()
-		for k, v := range query {
-			reqStruct.QueryParams[k] = v
-		}
+	for k, v := range urlToUse.Query() {
+		reqStruct.QueryParams[k] = v
 	}
 
 	return reqStruct, nil
@@ -99,7 +100,14 @@ func (h *httpRequestWrapper) toMap() map[string]any {
 	}
 }
 
-// RequestToMap converts an http.Request to a map[string]any using the httpRequest struct as an intermediary.
+// RequestToMap converts an http.Request to a map[string]any using the
+// httpRequest struct as an intermediary.
+//
+// RequestToMap reads r without mutating it: r.URL and r.Body are
+// observed but never reassigned. As a consequence, r.Body is consumed
+// like any io.Reader — after the call it will be at EOF. Callers that
+// need a re-readable body should clone it (e.g. via r.GetBody()) or
+// buffer it before passing the request in.
 func RequestToMap(r *http.Request) (map[string]any, error) {
 	// Transform http.Request to httpRequest struct
 	reqStruct, err := newHTTPRequestWrapper(r)
