@@ -3,10 +3,10 @@ package evaluator
 import (
 	"fmt"
 	"log/slog"
-	"os"
 	"time"
 
 	"github.com/robbyt/go-polyscript/engines/starlark/internal"
+	"github.com/robbyt/go-polyscript/internal/helpers"
 	"github.com/robbyt/go-polyscript/platform/data"
 	starlarkLib "go.starlark.net/starlark"
 )
@@ -26,13 +26,7 @@ func newEvalResult(
 	execTime time.Duration,
 	versionID string,
 ) *execResult {
-	if handler == nil {
-		defaultHandler := slog.NewTextHandler(os.Stdout, nil)
-		handler = defaultHandler.WithGroup("starlark")
-		// Create a logger from the handler rather than using slog directly
-		defaultLogger := slog.New(handler)
-		defaultLogger.Warn("Handler is nil, using the default logger configuration.")
-	}
+	handler, logger := helpers.SetupLogger(handler, "starlark", "execResult")
 
 	if obj == nil {
 		obj = starlarkLib.None
@@ -43,7 +37,7 @@ func newEvalResult(
 		execTime:    execTime,
 		scriptExeID: versionID,
 		logHandler:  handler,
-		logger:      slog.New(handler.WithGroup("execResult")),
+		logger:      logger,
 	}
 }
 

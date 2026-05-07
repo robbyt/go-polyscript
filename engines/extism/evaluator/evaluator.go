@@ -130,8 +130,6 @@ func (be *Evaluator) exec(
 }
 
 // Eval implements evaluation.Evaluator
-// TODO: Some error paths in this method are hard to test with the current design
-// Consider adding more integration tests to cover these paths.
 func (be *Evaluator) Eval(ctx context.Context) (platform.EvaluatorResponse, error) {
 	logger := be.logger.WithGroup("Eval")
 	if be.execUnit == nil {

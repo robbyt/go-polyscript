@@ -3,10 +3,10 @@ package evaluator
 import (
 	"fmt"
 	"log/slog"
-	"os"
 	"time"
 
 	risorObject "github.com/deepnoodle-ai/risor/v2/pkg/object"
+	"github.com/robbyt/go-polyscript/internal/helpers"
 	"github.com/robbyt/go-polyscript/platform/data"
 )
 
@@ -26,20 +26,14 @@ func newEvalResult(
 	execTime time.Duration,
 	versionID string,
 ) *execResult {
-	if handler == nil {
-		defaultHandler := slog.NewTextHandler(os.Stdout, nil)
-		handler = defaultHandler.WithGroup("risor")
-		// Create a logger from the handler rather than using slog directly
-		defaultLogger := slog.New(handler)
-		defaultLogger.Warn("Handler is nil, using the default logger configuration.")
-	}
+	handler, logger := helpers.SetupLogger(handler, "risor", "execResult")
 
 	return &execResult{
 		Object:      obj,
 		execTime:    execTime,
 		scriptExeID: versionID,
 		logHandler:  handler,
-		logger:      slog.New(handler.WithGroup("execResult")),
+		logger:      logger,
 	}
 }
 

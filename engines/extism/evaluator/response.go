@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"os"
 	"time"
 
+	"github.com/robbyt/go-polyscript/internal/helpers"
 	"github.com/robbyt/go-polyscript/platform/data"
 )
 
@@ -25,20 +25,14 @@ func newEvalResult(
 	execTime time.Duration,
 	scriptExeID string,
 ) *execResult {
-	if handler == nil {
-		defaultHandler := slog.NewTextHandler(os.Stdout, nil)
-		handler = defaultHandler.WithGroup("extism")
-		// Create a logger from the handler rather than using slog directly
-		defaultLogger := slog.New(handler)
-		defaultLogger.Warn("Handler is nil, using the default logger configuration.")
-	}
+	handler, logger := helpers.SetupLogger(handler, "extism", "execResult")
 
 	return &execResult{
 		value:       value,
 		execTime:    execTime,
 		scriptExeID: scriptExeID,
 		logHandler:  handler,
-		logger:      slog.New(handler.WithGroup("execResult")),
+		logger:      logger,
 	}
 }
 
