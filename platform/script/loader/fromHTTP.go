@@ -11,6 +11,7 @@
 package loader
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"fmt"
@@ -23,6 +24,11 @@ import (
 	"github.com/robbyt/go-polyscript/internal/helpers"
 	"github.com/robbyt/go-polyscript/platform/script/loader/httpauth"
 )
+
+// DefaultMaxBodySize is the default cap on HTTP-loaded script bodies.
+// 10 MiB is large enough for any realistic script while keeping a single
+// rogue response from exhausting memory.
+const DefaultMaxBodySize int64 = 10 << 20
 
 // HTTPOptions contains configuration options for HTTP loader.
 // Use DefaultHTTPOptions() to get sensible defaults, then modify as needed.
@@ -51,6 +57,11 @@ type HTTPOptions struct {
 
 	// Headers for additional headers not related to authentication
 	Headers map[string]string
+
+	// MaxBodySize caps the response body in bytes. A zero value is treated
+	// as DefaultMaxBodySize; a negative value disables the cap. Bodies
+	// larger than the limit cause GetReader to return ErrScriptTooLarge.
+	MaxBodySize int64
 }
 
 // DefaultHTTPOptions returns default options for HTTP loader.
@@ -61,12 +72,14 @@ type HTTPOptions struct {
 // - InsecureSkipVerify: false (certificate validation enabled)
 // - Authenticator: NoAuth (no authentication)
 // - Headers: empty map (initialized, ready for values)
+// - MaxBodySize: DefaultMaxBodySize (10 MiB)
 func DefaultHTTPOptions() *HTTPOptions {
 	return &HTTPOptions{
 		Timeout:            30 * time.Second,
 		InsecureSkipVerify: false,
 		Authenticator:      httpauth.NewNoAuth(),
 		Headers:            make(map[string]string),
+		MaxBodySize:        DefaultMaxBodySize,
 	}
 }
 
@@ -102,6 +115,15 @@ func (o *HTTPOptions) WithNoAuth() *HTTPOptions {
 func (o *HTTPOptions) WithTimeout(timeout time.Duration) *HTTPOptions {
 	newOpts := *o
 	newOpts.Timeout = timeout
+	return &newOpts
+}
+
+// WithMaxBodySize returns a copy of options with the response body cap set.
+// Pass 0 to fall back to DefaultMaxBodySize, or a negative value to disable
+// the cap entirely.
+func (o *HTTPOptions) WithMaxBodySize(n int64) *HTTPOptions {
+	newOpts := *o
+	newOpts.MaxBodySize = n
 	return &newOpts
 }
 
@@ -249,7 +271,27 @@ func (l *FromHTTP) GetReaderWithContext(ctx context.Context) (io.ReadCloser, err
 		)
 	}
 
-	return resp.Body, nil
+	limit := l.options.MaxBodySize
+	if limit == 0 {
+		limit = DefaultMaxBodySize
+	}
+	if limit < 0 {
+		return resp.Body, nil
+	}
+
+	// Read up to limit+1 bytes so a body of exactly limit bytes passes
+	// while one byte more trips the overflow check.
+	buf, err := io.ReadAll(io.LimitReader(resp.Body, limit+1))
+	if closeErr := resp.Body.Close(); closeErr != nil {
+		slog.Default().Debug("Failed to close response body", "error", closeErr)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("read response body: %w", err)
+	}
+	if int64(len(buf)) > limit {
+		return nil, fmt.Errorf("%w: %s exceeds %d bytes", ErrScriptTooLarge, l.url, limit)
+	}
+	return io.NopCloser(bytes.NewReader(buf)), nil
 }
 
 // GetSourceURL returns the source URL.
