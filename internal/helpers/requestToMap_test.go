@@ -199,7 +199,7 @@ func TestRequestToMap(t *testing.T) {
 
 		require.Same(t, originalURL, req.URL, "URL pointer must be unchanged")
 		require.Equal(t, "/test", req.URL.Path, "URL path must be unchanged")
-		require.True(t, originalBody == req.Body, "Body reader must be unchanged")
+		require.Equal(t, originalBody, req.Body, "Body reader must be unchanged")
 	})
 
 	t.Run("nil URL stays nil", func(t *testing.T) {
