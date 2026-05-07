@@ -669,8 +669,8 @@ func TestFromHTTP_MaxBodySize(t *testing.T) {
 	t.Parallel()
 
 	// serveBody returns a test server that writes exactly size bytes.
-	// We intentionally don't assert on the Write error: when the loader
-	// rejects an oversize body it closes the connection mid-stream, which
+	// Write errors are logged but not asserted: when the loader rejects
+	// an oversize body it closes the connection mid-stream, which
 	// surfaces here as a broken-pipe error that isn't a test failure.
 	serveBody := func(size int) *httptest.Server {
 		body := make([]byte, size)
@@ -680,7 +680,9 @@ func TestFromHTTP_MaxBodySize(t *testing.T) {
 		return httptest.NewServer(
 			http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
-				_, _ = w.Write(body)
+				if _, err := w.Write(body); err != nil {
+					t.Logf("server write: %v", err)
+				}
 			}),
 		)
 	}
