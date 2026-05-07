@@ -21,20 +21,29 @@ type httpRequestWrapper struct {
 	QueryParams   map[string][]string
 }
 
+// resolveURL returns the request URL or a "/" sentinel when nil, so the
+// caller's r.URL is never mutated. It does not parse u itself; the
+// round-trip through url.Parse is preserved from the original
+// implementation and is tracked for removal under issue #100.
+func resolveURL(u *url.URL) (*url.URL, error) {
+	if u == nil {
+		return &url.URL{Path: "/"}, nil
+	}
+	if _, err := url.Parse(u.String()); err != nil {
+		return nil, fmt.Errorf("invalid URL: %w", err)
+	}
+	return u, nil
+}
+
 // newHTTPRequestWrapper converts an http.Request to an httpRequest struct.
 func newHTTPRequestWrapper(r *http.Request) (*httpRequestWrapper, error) {
 	if r == nil {
 		return nil, errors.New("request is nil")
 	}
 
-	// Compute URL locally so a nil r.URL doesn't get backfilled on the caller.
-	urlToUse := r.URL
-	if urlToUse == nil {
-		urlToUse = &url.URL{Path: "/"}
-	} else {
-		if _, err := url.Parse(urlToUse.String()); err != nil {
-			return nil, fmt.Errorf("invalid URL: %w", err)
-		}
+	urlToUse, err := resolveURL(r.URL)
+	if err != nil {
+		return nil, err
 	}
 
 	reqStruct := &httpRequestWrapper{
