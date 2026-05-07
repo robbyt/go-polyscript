@@ -91,7 +91,14 @@ func (h *httpRequestWrapper) toMap() map[string]any {
 	}
 }
 
-// RequestToMap converts an http.Request to a map[string]any using the httpRequest struct as an intermediary.
+// RequestToMap converts an http.Request to a map[string]any using the
+// httpRequest struct as an intermediary.
+//
+// RequestToMap reads r without mutating it: r.URL and r.Body are
+// observed but never reassigned. As a consequence, r.Body is consumed
+// like any io.Reader — after the call it will be at EOF. Callers that
+// need a re-readable body should clone it (e.g. via r.GetBody()) or
+// buffer it before passing the request in.
 func RequestToMap(r *http.Request) (map[string]any, error) {
 	// Transform http.Request to httpRequest struct
 	reqStruct, err := newHTTPRequestWrapper(r)

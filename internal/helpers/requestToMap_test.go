@@ -8,6 +8,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// trackingBody is a pointer-typed io.ReadCloser used in the
+// non-mutation regression test so require.Same can assert that
+// RequestToMap doesn't replace req.Body with a fresh wrapper.
+type trackingBody struct{ *bytes.Reader }
+
+func (*trackingBody) Close() error { return nil }
+
 // TestNewHTTPRequestWrapper tests the newHTTPRequestWrapper function.
 func TestNewHTTPRequestWrapper(t *testing.T) {
 	t.Run("with body", func(t *testing.T) {
@@ -187,19 +194,23 @@ func TestRequestToMap(t *testing.T) {
 		req, err := http.NewRequest(
 			http.MethodPost,
 			"http://localhost:8080/test?q=1",
-			bytes.NewBufferString(body),
+			nil,
 		)
 		require.NoError(t, err)
 
+		// Use a pointer-typed body wrapper so require.Same asserts
+		// pointer identity (io.NopCloser returns a value type).
+		bodyPtr := &trackingBody{Reader: bytes.NewReader([]byte(body))}
+		req.Body = bodyPtr
+
 		originalURL := req.URL
-		originalBody := req.Body
 
 		_, err = RequestToMap(req)
 		require.NoError(t, err)
 
-		require.Same(t, originalURL, req.URL, "URL pointer must be unchanged")
+		require.Same(t, originalURL, req.URL, "URL must not be replaced")
 		require.Equal(t, "/test", req.URL.Path, "URL path must be unchanged")
-		require.Equal(t, originalBody, req.Body, "Body reader must be unchanged")
+		require.Same(t, bodyPtr, req.Body, "Body must not be replaced")
 	})
 
 	t.Run("nil URL stays nil", func(t *testing.T) {
