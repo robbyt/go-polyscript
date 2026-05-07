@@ -1,7 +1,6 @@
 package helpers
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -28,20 +27,19 @@ func newHTTPRequestWrapper(r *http.Request) (*httpRequestWrapper, error) {
 		return nil, errors.New("request is nil")
 	}
 
-	// Ensure and validate the URL
-	if r.URL == nil {
-		// If URL is nil, provide a default one
-		r.URL = &url.URL{Path: "/"}
+	// Compute URL locally so a nil r.URL doesn't get backfilled on the caller.
+	urlToUse := r.URL
+	if urlToUse == nil {
+		urlToUse = &url.URL{Path: "/"}
 	} else {
-		// If URL is not nil, validate it
-		if _, err := url.Parse(r.URL.String()); err != nil {
+		if _, err := url.Parse(urlToUse.String()); err != nil {
 			return nil, fmt.Errorf("invalid URL: %w", err)
 		}
 	}
 
 	reqStruct := &httpRequestWrapper{
 		Method:        r.Method,
-		URL:           r.URL,
+		URL:           urlToUse,
 		Proto:         r.Proto,
 		ContentLength: r.ContentLength,
 		Host:          r.Host,
@@ -57,24 +55,18 @@ func newHTTPRequestWrapper(r *http.Request) (*httpRequestWrapper, error) {
 		}
 	}
 
-	// Read and set the body
+	// Read the body. The reader is consumed once — we don't restore it,
+	// since rewriting r.Body would mutate the caller's request.
 	if r.Body != nil {
 		bodyBytes, err := io.ReadAll(r.Body)
 		if err != nil {
 			return nil, err
 		}
 		reqStruct.Body = string(bodyBytes)
-
-		// Reset the body to allow further reads
-		r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
 	}
 
-	// Copy query parameters if URL is present
-	if r.URL != nil {
-		query := r.URL.Query()
-		for k, v := range query {
-			reqStruct.QueryParams[k] = v
-		}
+	for k, v := range urlToUse.Query() {
+		reqStruct.QueryParams[k] = v
 	}
 
 	return reqStruct, nil

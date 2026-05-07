@@ -181,4 +181,35 @@ func TestRequestToMap(t *testing.T) {
 		require.Equal(t, map[string][]string{}, result["Headers"])
 		require.Empty(t, result["Body"])
 	})
+
+	t.Run("does not mutate input", func(t *testing.T) {
+		body := "test body"
+		req, err := http.NewRequest(
+			http.MethodPost,
+			"http://localhost:8080/test?q=1",
+			bytes.NewBufferString(body),
+		)
+		require.NoError(t, err)
+
+		originalURL := req.URL
+		originalBody := req.Body
+
+		_, err = RequestToMap(req)
+		require.NoError(t, err)
+
+		require.Same(t, originalURL, req.URL, "URL pointer must be unchanged")
+		require.Equal(t, "/test", req.URL.Path, "URL path must be unchanged")
+		require.True(t, originalBody == req.Body, "Body reader must be unchanged")
+	})
+
+	t.Run("nil URL stays nil", func(t *testing.T) {
+		req, err := http.NewRequest(http.MethodGet, "http://localhost/", nil)
+		require.NoError(t, err)
+		req.URL = nil
+
+		result, err := RequestToMap(req)
+		require.NoError(t, err)
+		require.Equal(t, "/", result["URL_Path"])
+		require.Nil(t, req.URL, "caller's nil URL must stay nil")
+	})
 }
