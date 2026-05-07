@@ -272,6 +272,15 @@ func (l *FromHTTP) GetReaderWithContext(ctx context.Context) (io.ReadCloser, err
 		)
 	}
 
+	return l.cappedBody(resp)
+}
+
+// cappedBody enforces HTTPOptions.MaxBodySize on the response. A zero
+// value falls back to DefaultMaxBodySize; a negative value returns the
+// body unwrapped. Otherwise the body is eagerly read into memory and
+// returned as a NopCloser; ErrScriptTooLarge is returned when it
+// exceeds the limit.
+func (l *FromHTTP) cappedBody(resp *http.Response) (io.ReadCloser, error) {
 	limit := l.options.MaxBodySize
 	if limit == 0 {
 		limit = DefaultMaxBodySize
