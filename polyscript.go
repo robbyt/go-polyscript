@@ -185,7 +185,8 @@ func WithStaticData[E Engine](data map[string]any) Option[E] {
 }
 
 // WithLogHandler sets the slog.Handler used for diagnostic logging by the
-// evaluator. If unset, the underlying engine picks a default.
+// evaluator. A nil handler is permitted and means "inherit from
+// slog.Default()" — equivalent to omitting the option.
 //
 // The type parameter is normally inferred from the surrounding [New] call.
 func WithLogHandler[E Engine](h slog.Handler) Option[E] {
@@ -247,10 +248,7 @@ func New[E Engine](src Source, opts ...Option[E]) (platform.Evaluator, error) {
 }
 
 func newRisor(ldr loader.Loader, cfg *config) (platform.Evaluator, error) {
-	var opts []risorMachine.Option
-	if cfg.handler != nil {
-		opts = append(opts, risorMachine.WithLogHandler(cfg.handler))
-	}
+	opts := []risorMachine.Option{risorMachine.WithLogHandler(cfg.handler)}
 	if cfg.staticData != nil {
 		opts = append(opts, risorMachine.WithStaticData(cfg.staticData))
 	}
@@ -258,10 +256,7 @@ func newRisor(ldr loader.Loader, cfg *config) (platform.Evaluator, error) {
 }
 
 func newStarlark(ldr loader.Loader, cfg *config) (platform.Evaluator, error) {
-	var opts []starlarkMachine.Option
-	if cfg.handler != nil {
-		opts = append(opts, starlarkMachine.WithLogHandler(cfg.handler))
-	}
+	opts := []starlarkMachine.Option{starlarkMachine.WithLogHandler(cfg.handler)}
 	if cfg.staticData != nil {
 		opts = append(opts, starlarkMachine.WithStaticData(cfg.staticData))
 	}
@@ -269,9 +264,9 @@ func newStarlark(ldr loader.Loader, cfg *config) (platform.Evaluator, error) {
 }
 
 func newExtism(ldr loader.Loader, cfg *config) (platform.Evaluator, error) {
-	opts := []extismMachine.Option{extismMachine.WithEntryPoint(cfg.entryPoint)}
-	if cfg.handler != nil {
-		opts = append(opts, extismMachine.WithLogHandler(cfg.handler))
+	opts := []extismMachine.Option{
+		extismMachine.WithEntryPoint(cfg.entryPoint),
+		extismMachine.WithLogHandler(cfg.handler),
 	}
 	if cfg.staticData != nil {
 		opts = append(opts, extismMachine.WithStaticData(cfg.staticData))

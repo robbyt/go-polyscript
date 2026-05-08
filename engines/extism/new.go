@@ -81,9 +81,9 @@ func FromExtismLoader(ldr loader.Loader, opts ...Option) (*evaluator.Evaluator, 
 
 	provider := resolveProvider(cfg)
 
-	compilerOpts := []compiler.FunctionalOption{compiler.WithEntryPoint(cfg.entryPoint)}
-	if cfg.handler != nil {
-		compilerOpts = append(compilerOpts, compiler.WithLogHandler(cfg.handler))
+	compilerOpts := []compiler.FunctionalOption{
+		compiler.WithEntryPoint(cfg.entryPoint),
+		compiler.WithLogHandler(cfg.handler),
 	}
 	comp, err := NewCompiler(compilerOpts...)
 	if err != nil {
