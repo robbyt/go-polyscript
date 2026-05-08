@@ -26,7 +26,6 @@ func AddDataToContextHelper(
 	d ...map[string]any,
 ) (context.Context, error) {
 	if logger == nil {
-		// TODO: remove or use logger more effectively
 		logger = slog.Default()
 	}
 

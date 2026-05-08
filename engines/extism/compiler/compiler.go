@@ -51,8 +51,6 @@ func (c *Compiler) String() string {
 }
 
 // Compile implements script.Compiler
-// TODO: Some error paths are difficult to test with the current design
-// Consider adding integration tests for hard-to-reach error cases.
 func (c *Compiler) Compile(scriptReader io.ReadCloser) (script.ExecutableContent, error) {
 	logger := c.logger.WithGroup("compile")
 
