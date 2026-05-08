@@ -1,7 +1,6 @@
 package compiler
 
 import (
-	"fmt"
 	"log/slog"
 	"slices"
 
@@ -35,10 +34,13 @@ func WithCtxGlobal() FunctionalOption {
 // WithLogHandler creates an option to set the log handler for Risor compiler.
 // This is the preferred option for logging configuration as it provides
 // more flexibility through the slog.Handler interface.
+//
+// Passing a nil handler is a no-op equivalent to not calling the option:
+// the compiler inherits from slog.Default() via [helpers.SetupLogger].
 func WithLogHandler(handler slog.Handler) FunctionalOption {
 	return func(c *Compiler) error {
 		if handler == nil {
-			return fmt.Errorf("log handler cannot be nil")
+			return nil
 		}
 		c.logHandler = handler
 		// Clear logger if handler is explicitly set
@@ -50,10 +52,12 @@ func WithLogHandler(handler slog.Handler) FunctionalOption {
 // WithLogger creates an option to set a specific logger for Risor compiler.
 // This is less flexible than WithLogHandler but allows users to customize
 // their logging group configuration.
+//
+// Passing a nil logger is a no-op equivalent to not calling the option.
 func WithLogger(logger *slog.Logger) FunctionalOption {
 	return func(c *Compiler) error {
 		if logger == nil {
-			return fmt.Errorf("logger cannot be nil")
+			return nil
 		}
 		c.logger = logger
 		// Clear handler if logger is explicitly set
