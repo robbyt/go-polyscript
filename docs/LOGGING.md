@@ -24,10 +24,24 @@ also accepts nil:
 - `engines/{risor,starlark,extism}/compiler.WithLogHandler(nil)` — compiler-level
 - `engines/{risor,starlark,extism}/compiler.WithLogger(nil)` — compiler-level
 
-Calling any of them with nil is **a true no-op** — semantically equivalent to
-not calling the option at all. It does not error, does not panic, and does
-not clear state set by a prior call. A host that supplies no handler is
-treated identically to a host that supplies `nil`.
+A host that supplies no handler is treated identically to a host that
+supplies `nil` — no error, no panic, the engine inherits from
+`slog.Default()`.
+
+Two layers behave slightly differently when the option is called more than
+once with mixed values:
+
+- The **compiler-level** options (`compiler.WithLogHandler`,
+  `compiler.WithLogger`) are **true no-ops** on nil: they skip the set
+  *and* the clear-of-the-other-field, so `WithLogHandler(real)` followed by
+  `WithLogHandler(nil)` leaves the real handler in place. This was
+  established in #111 / PR #113.
+- The **top-level and per-engine** `WithLogHandler` options assign the
+  handler field directly (`c.handler = h`). They accept nil, but if a
+  caller passes nil after a non-nil value in the same option list, the
+  earlier value is replaced. In practice this isn't a concern — these
+  options are rarely passed twice — and the field's zero value (nil) is
+  the same shape, so nothing observable changes for the common case.
 
 ### 2. nil means "inherit from `slog.Default()`"
 
@@ -39,14 +53,24 @@ func SetupLogger(handler slog.Handler, engineName, groupName string) (slog.Handl
 ```
 
 When `handler` is nil, `SetupLogger` calls `slog.Default().Handler()` and
-wraps it with `engineName` as a `slog.Group`, so a record from the Risor
-evaluator looks like `risor.Evaluator.<…>` regardless of whether the host
-configured a handler. When `handler` is non-nil it's returned unchanged —
-the host configured it the way they want and the library doesn't second-guess
-the grouping.
+wraps it with `engineName` as a `slog.Group`. The returned logger is then
+wrapped with `groupName` as a nested group. So a record from the Risor
+evaluator carries the group prefix `risor.Evaluator.<…>` — the engine name
+is added because the host supplied no handler.
 
-This means a host can call `slog.SetDefault(...)` once at startup and have
-every engine inherit it — no per-engine wiring, no per-call argument passing.
+When `handler` is non-nil, `SetupLogger` returns it unchanged and only
+wraps the *logger* with `groupName`. The host's handler keeps whatever
+grouping the host configured; the library doesn't prepend its engine name.
+A record from the Risor evaluator under a host-supplied handler carries
+just the `Evaluator.<…>` group — the host already knows it's their handler
+and presumably has their own taxonomy.
+
+The asymmetry is deliberate: when the library is using its own (default)
+sink, prefixing with the engine name disambiguates "where did this record
+come from?" When the host owns the handler, the host owns the layout.
+
+A host can call `slog.SetDefault(...)` once at startup and have every
+engine inherit it — no per-engine wiring, no per-call argument passing.
 
 ### 3. There is exactly one fallback path
 
@@ -95,10 +119,24 @@ helpers.SetupLogger(handler, "extism", "execResult")
 helpers.SetupLogger(handler, "script", "ExecutableUnit")
 ```
 
-This produces records prefixed `<engine>.<struct>.<field>=…`, which is what
-a host querying their logs expects: filter by `engine=extism` to see the
-WASM path; filter by `script=ExecutableUnit` to see the loader/compile
-machinery; etc.
+`slog.Handler.WithGroup` prepends a group qualifier to every attribute key
+that follows. With a `slog.JSONHandler`, the records nest under that group
+key; with a `slog.TextHandler`, attribute keys carry the group prefix
+(e.g. `extism.Evaluator.scriptID=…`).
+
+The exact prefix depends on whether the host supplied a handler (see
+principle 2):
+
+- **Nil handler**: prefix is `<engine>.<struct>.` — `extism.Evaluator.`,
+  `script.ExecutableUnit.`. The engine name is the library's own
+  contribution; the struct name disambiguates between the compiler's logs
+  and the evaluator's.
+- **Host-supplied handler**: prefix is `<struct>.` only — `Evaluator.`,
+  `ExecutableUnit.`. The host owns whatever outer grouping is in place.
+
+In either case the `<struct>` group is always present, so a host filtering
+by group `Evaluator` reaches the per-evaluator records regardless of which
+mode is active.
 
 ---
 
