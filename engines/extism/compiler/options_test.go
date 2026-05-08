@@ -85,15 +85,18 @@ func TestCompilerOptions_Options(t *testing.T) {
 			require.Contains(t, buf.String(), "test message", "log message should be captured")
 		})
 
-		// Error case
-		t.Run("nil handler", func(t *testing.T) {
+		t.Run("nil handler is no-op and preserves prior state", func(t *testing.T) {
+			var buf bytes.Buffer
+			real := slog.NewTextHandler(&buf, nil)
+
 			c := &Compiler{}
 			c.applyDefaults()
-			nilOpt := WithLogHandler(nil)
-			err := nilOpt(c)
+			require.NoError(t, WithLogHandler(real)(c))
 
-			require.Error(t, err)
-			require.Contains(t, err.Error(), "log handler cannot be nil")
+			err := WithLogHandler(nil)(c)
+			require.NoError(t, err)
+			require.Equal(t, real, c.logHandler)
+			require.Nil(t, c.logger)
 		})
 	})
 
@@ -120,15 +123,19 @@ func TestCompilerOptions_Options(t *testing.T) {
 			require.Contains(t, buf.String(), "test message", "log message should be captured")
 		})
 
-		// Error case
-		t.Run("nil logger", func(t *testing.T) {
+		t.Run("nil logger is no-op and preserves prior state", func(t *testing.T) {
+			var buf bytes.Buffer
+			handler := slog.NewTextHandler(&buf, nil)
+			logger := slog.New(handler)
+
 			c := &Compiler{}
 			c.applyDefaults()
-			nilOpt := WithLogger(nil)
-			err := nilOpt(c)
+			require.NoError(t, WithLogger(logger)(c))
 
-			require.Error(t, err)
-			require.Contains(t, err.Error(), "logger cannot be nil")
+			err := WithLogger(nil)(c)
+			require.NoError(t, err)
+			require.Equal(t, logger, c.logger)
+			require.Nil(t, c.logHandler)
 		})
 	})
 
@@ -719,14 +726,18 @@ func TestCompilerOptions(t *testing.T) {
 				require.Nil(t, c.logger) // Should clear Logger field
 			})
 
-			t.Run("nil handler", func(t *testing.T) {
+			t.Run("nil handler is no-op and preserves prior state", func(t *testing.T) {
+				var buf bytes.Buffer
+				real := slog.NewTextHandler(&buf, nil)
+
 				c := &Compiler{}
 				c.applyDefaults()
-				nilOpt := WithLogHandler(nil)
-				err := nilOpt(c)
+				require.NoError(t, WithLogHandler(real)(c))
 
-				require.Error(t, err)
-				require.Contains(t, err.Error(), "log handler cannot be nil")
+				err := WithLogHandler(nil)(c)
+				require.NoError(t, err)
+				require.Equal(t, real, c.logHandler)
+				require.Nil(t, c.logger)
 			})
 		})
 
@@ -746,14 +757,15 @@ func TestCompilerOptions(t *testing.T) {
 				require.Nil(t, c.logHandler) // Should clear LogHandler field
 			})
 
-			t.Run("nil logger", func(t *testing.T) {
+			t.Run("nil logger is no-op and preserves prior state", func(t *testing.T) {
 				c := &Compiler{}
 				c.applyDefaults()
-				nilOpt := WithLogger(nil)
-				err := nilOpt(c)
+				require.NoError(t, WithLogger(logger)(c))
 
-				require.Error(t, err)
-				require.Contains(t, err.Error(), "logger cannot be nil")
+				err := WithLogger(nil)(c)
+				require.NoError(t, err)
+				require.Equal(t, logger, c.logger)
+				require.Nil(t, c.logHandler)
 			})
 		})
 	})

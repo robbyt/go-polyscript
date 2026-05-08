@@ -372,16 +372,14 @@ func TestCompilerOptions(t *testing.T) {
 		require.NotNil(t, execContent)
 	})
 
-	t.Run("Option error handling", func(t *testing.T) {
-		// Test with nil logger
-		_, err := New(WithLogger(nil))
-		require.Error(t, err)
-		require.Contains(t, err.Error(), "logger cannot be nil")
+	t.Run("nil logger and handler options are no-ops", func(t *testing.T) {
+		comp, err := New(WithLogger(nil))
+		require.NoError(t, err)
+		require.NotNil(t, comp)
 
-		// Test with nil handler
-		_, err = New(WithLogHandler(nil))
-		require.Error(t, err)
-		require.Contains(t, err.Error(), "log handler cannot be nil")
+		comp, err = New(WithLogHandler(nil))
+		require.NoError(t, err)
+		require.NotNil(t, comp)
 	})
 }
 
