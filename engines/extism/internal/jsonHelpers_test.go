@@ -206,6 +206,24 @@ func TestFixJSONNumberTypes(t *testing.T) {
 		assert.IsType(t, float64(0), mapResult["huge"])
 	})
 
+	t.Run("converts top-level integer json.Number", func(t *testing.T) {
+		result := FixJSONNumberTypes(json.Number("42"))
+		assert.Equal(t, 42, result)
+		assert.IsType(t, int(0), result)
+	})
+
+	t.Run("converts top-level decimal json.Number", func(t *testing.T) {
+		result := FixJSONNumberTypes(json.Number("3.14"))
+		assert.InDelta(t, 3.14, result, 0.0001)
+		assert.IsType(t, float64(0), result)
+	})
+
+	t.Run("preserves invalid top-level json.Number", func(t *testing.T) {
+		result := FixJSONNumberTypes(json.Number("xyz"))
+		assert.Equal(t, json.Number("xyz"), result)
+		assert.IsType(t, json.Number(""), result)
+	})
+
 	t.Run("handles mixed types in map", func(t *testing.T) {
 		data := map[string]any{
 			"name":    "test",

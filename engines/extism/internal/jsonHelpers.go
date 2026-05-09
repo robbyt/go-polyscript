@@ -48,6 +48,9 @@ func FixJSONNumberTypes(data any) any {
 		}
 		return v
 
+	case json.Number:
+		return convertJSONNumber(v)
+
 	default:
 		return data
 	}
