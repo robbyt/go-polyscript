@@ -15,6 +15,7 @@ config.toml
 .idea/
 *.iml
 
+.claude/**
 **/.claude/settings.local.json
 CLAUDE.md
 .worktrees/
