@@ -27,17 +27,18 @@ func TestCompilerOptionsDetailed(t *testing.T) {
 				require.Equal(t, globals, c.globals)
 			})
 
-			t.Run("nil globals", func(t *testing.T) {
+			t.Run("nil globals is no-op", func(t *testing.T) {
 				c := &Compiler{}
 				c.applyDefaults()
 				nilOpt := WithGlobals(nil)
 				err := nilOpt(c)
 
 				require.NoError(t, err)
-				require.Nil(t, c.globals)
+				require.NotNil(t, c.globals)
+				require.Empty(t, c.globals)
 			})
 
-			t.Run("empty globals", func(t *testing.T) {
+			t.Run("empty globals is no-op", func(t *testing.T) {
 				c := &Compiler{}
 				c.applyDefaults()
 				emptyOpt := WithGlobals([]string{})
@@ -46,6 +47,41 @@ func TestCompilerOptionsDetailed(t *testing.T) {
 				require.NoError(t, err)
 				require.NotNil(t, c.globals)
 				require.Empty(t, c.globals)
+			})
+
+			t.Run("order-independent with WithCtxGlobal", func(t *testing.T) {
+				// WithCtxGlobal then WithGlobals
+				c1 := &Compiler{}
+				c1.applyDefaults()
+				require.NoError(t, WithCtxGlobal()(c1))
+				require.NoError(t, WithGlobals([]string{"x"})(c1))
+
+				// WithGlobals then WithCtxGlobal
+				c2 := &Compiler{}
+				c2.applyDefaults()
+				require.NoError(t, WithGlobals([]string{"x"})(c2))
+				require.NoError(t, WithCtxGlobal()(c2))
+
+				require.ElementsMatch(t, c1.globals, c2.globals)
+				require.ElementsMatch(t, []string{constants.Ctx, "x"}, c1.globals)
+			})
+
+			t.Run("dedupes within a single call", func(t *testing.T) {
+				c := &Compiler{}
+				c.applyDefaults()
+				err := WithGlobals([]string{"a", "b", "a"})(c)
+
+				require.NoError(t, err)
+				require.Equal(t, []string{"a", "b"}, c.globals)
+			})
+
+			t.Run("dedupes across multiple calls", func(t *testing.T) {
+				c := &Compiler{}
+				c.applyDefaults()
+				require.NoError(t, WithGlobals([]string{"a", "b"})(c))
+				require.NoError(t, WithGlobals([]string{"b", "c"})(c))
+
+				require.Equal(t, []string{"a", "b", "c"}, c.globals)
 			})
 		})
 

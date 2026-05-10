@@ -11,10 +11,22 @@ import (
 // FunctionalOption is a function that configures a Compiler instance
 type FunctionalOption func(*Compiler) error
 
-// WithGlobals creates an option to set the globals for Starlark scripts
+// WithGlobals creates an option to declare additional global identifiers
+// the Starlark script may reference at evaluation time.
+//
+// WithGlobals is additive: each call appends to the compiler's existing
+// globals, deduplicating any names already present. Order-of-call no
+// longer matters when combined with [WithCtxGlobal]; both orderings
+// produce the same final set.
+//
+// A nil or empty slice is a no-op.
 func WithGlobals(globals []string) FunctionalOption {
 	return func(c *Compiler) error {
-		c.globals = globals
+		for _, g := range globals {
+			if !slices.Contains(c.globals, g) {
+				c.globals = append(c.globals, g)
+			}
+		}
 		return nil
 	}
 }
