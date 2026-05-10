@@ -27,7 +27,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - `slog.Handler` is now optional throughout. A nil handler at any layer
   inherits from `slog.Default()` via the canonical `helpers.SetupLogger`
-  helper; no constructor demands a handler.
+  helper. The new `polyscript.New[E]` constructor takes no handler
+  positionally; the deprecated `FromXxx` constructors still accept one
+  in their signatures but nil is now valid.
   ([#105](https://github.com/robbyt/go-polyscript/pull/105),
   [#110](https://github.com/robbyt/go-polyscript/pull/110),
   [#113](https://github.com/robbyt/go-polyscript/pull/113),
