@@ -229,8 +229,7 @@ func TestRequestToMap(t *testing.T) {
 // TestResolveURL covers the helper extracted from newHTTPRequestWrapper.
 func TestResolveURL(t *testing.T) {
 	t.Run("nil returns / sentinel", func(t *testing.T) {
-		got, err := resolveURL(nil)
-		require.NoError(t, err)
+		got := resolveURL(nil)
 		require.NotNil(t, got)
 		require.Equal(t, "/", got.Path)
 		require.Empty(t, got.Host)
@@ -238,10 +237,8 @@ func TestResolveURL(t *testing.T) {
 	})
 
 	t.Run("nil returns a fresh sentinel each call", func(t *testing.T) {
-		first, err := resolveURL(nil)
-		require.NoError(t, err)
-		second, err := resolveURL(nil)
-		require.NoError(t, err)
+		first := resolveURL(nil)
+		second := resolveURL(nil)
 		require.NotSame(t, first, second, "callers must not share a sentinel")
 	})
 
@@ -249,8 +246,7 @@ func TestResolveURL(t *testing.T) {
 		input, err := url.Parse("http://example.com/path?q=1#frag")
 		require.NoError(t, err)
 
-		got, err := resolveURL(input)
-		require.NoError(t, err)
+		got := resolveURL(input)
 		require.Same(t, input, got, "non-nil URL must be returned as-is")
 	})
 
@@ -259,8 +255,7 @@ func TestResolveURL(t *testing.T) {
 		require.NoError(t, err)
 		snapshot := *input
 
-		_, err = resolveURL(input)
-		require.NoError(t, err)
+		_ = resolveURL(input)
 		require.Equal(t, snapshot, *input, "fields of input URL must be unchanged")
 	})
 }
