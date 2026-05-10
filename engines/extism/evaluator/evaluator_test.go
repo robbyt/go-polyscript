@@ -66,6 +66,23 @@ func (m *mockErrProvider) AddDataToContext(
 	return ctx, m.err
 }
 
+// mockMapProvider returns a fixed data map without erroring. Tests use this
+// to control the bytes that flow into internal.ConvertToExtismFormat.
+type mockMapProvider struct {
+	data map[string]any
+}
+
+func (m *mockMapProvider) GetData(ctx context.Context) (map[string]any, error) {
+	return m.data, nil
+}
+
+func (m *mockMapProvider) AddDataToContext(
+	ctx context.Context,
+	data ...map[string]any,
+) (context.Context, error) {
+	return ctx, nil
+}
+
 // mockPluginInstance is a mock implementation of the adapters.PluginInstance interface
 type mockPluginInstance struct {
 	exitCode   uint32
@@ -461,6 +478,51 @@ func TestEvaluator_Evaluate(t *testing.T) {
 			_, err := evaluator.Eval(ctx)
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), "failed to create plugin instance")
+		})
+
+		// Eval should wrap the data-provider's error when loadInputData fails,
+		// without ever reaching plugin.Instance.
+		t.Run("load input data error", func(t *testing.T) {
+			handler := slog.NewTextHandler(os.Stdout, nil)
+			mockPlugin := new(MockCompiledPlugin)
+			content := createMockExecutable(mockPlugin, "main")
+
+			exe := &script.ExecutableUnit{
+				ID:           "test-load-input-error",
+				DataProvider: &mockErrProvider{err: errors.New("provider boom")},
+				Content:      content,
+			}
+
+			evaluator := New(handler, exe)
+			_, err := evaluator.Eval(t.Context())
+
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "failed to get input data")
+			assert.Contains(t, err.Error(), "provider boom")
+			mockPlugin.AssertNotCalled(t, "Instance", mock.Anything, mock.Anything)
+		})
+
+		// Eval should wrap json.Marshal errors from internal.ConvertToExtismFormat
+		// without reaching plugin.Instance. A chan value is not JSON-marshalable.
+		t.Run("convert to extism format error", func(t *testing.T) {
+			handler := slog.NewTextHandler(os.Stdout, nil)
+			mockPlugin := new(MockCompiledPlugin)
+			content := createMockExecutable(mockPlugin, "main")
+
+			exe := &script.ExecutableUnit{
+				ID: "test-convert-format-error",
+				DataProvider: &mockMapProvider{data: map[string]any{
+					"bad": make(chan int),
+				}},
+				Content: content,
+			}
+
+			evaluator := New(handler, exe)
+			_, err := evaluator.Eval(t.Context())
+
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "failed to marshal input data")
+			mockPlugin.AssertNotCalled(t, "Instance", mock.Anything, mock.Anything)
 		})
 	})
 
