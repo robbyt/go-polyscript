@@ -1,6 +1,7 @@
 package evaluator
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"log/slog"
@@ -454,6 +455,9 @@ func TestEvaluator_Evaluate(t *testing.T) {
 			_, err := evaluator.Eval(ctx)
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), "non-zero exit code")
+			// Output bytes should now be surfaced in the error so the host
+			// can diagnose the misbehaving plugin (issue #94).
+			assert.Contains(t, err.Error(), "something went wrong")
 		})
 
 		// Test error creating plugin instance
@@ -564,12 +568,13 @@ func TestEvaluator_Evaluate(t *testing.T) {
 		// Test the exec helper function
 		t.Run("exec helper", func(t *testing.T) {
 			tests := []struct {
-				name        string
-				setup       func() (*mockPluginInstance, context.Context, context.CancelFunc)
-				entryPoint  string
-				input       []byte
-				wantErr     bool
-				errContains string
+				name           string
+				setup          func() (*mockPluginInstance, context.Context, context.CancelFunc)
+				entryPoint     string
+				input          []byte
+				wantErr        bool
+				errContainsAll []string
+				errExcludes    []string
 			}{
 				{
 					name: "successful execution",
@@ -593,10 +598,43 @@ func TestEvaluator_Evaluate(t *testing.T) {
 							output:   []byte(`{"error": "something went wrong"}`),
 						}, ctx, cancel
 					},
-					entryPoint:  "main",
-					input:       []byte(`{"key":"value"}`),
-					wantErr:     true,
-					errContains: "non-zero exit code",
+					entryPoint:     "main",
+					input:          []byte(`{"key":"value"}`),
+					wantErr:        true,
+					errContainsAll: []string{"non-zero exit code", "something went wrong"},
+				},
+				{
+					name: "non-zero exit code with empty output",
+					setup: func() (*mockPluginInstance, context.Context, context.CancelFunc) {
+						ctx, cancel := context.WithCancel(t.Context())
+						return &mockPluginInstance{
+							exitCode: 1,
+							output:   nil,
+						}, ctx, cancel
+					},
+					entryPoint:     "main",
+					input:          []byte(`{"key":"value"}`),
+					wantErr:        true,
+					errContainsAll: []string{"non-zero exit code: 1"},
+					// Empty output must not produce a noisy '(output: "")' tail.
+					errExcludes: []string{"(output:"},
+				},
+				{
+					name: "non-zero exit code with truncated output",
+					setup: func() (*mockPluginInstance, context.Context, context.CancelFunc) {
+						ctx, cancel := context.WithCancel(t.Context())
+						return &mockPluginInstance{
+							exitCode: 2,
+							output:   bytes.Repeat([]byte("X"), 2048),
+						}, ctx, cancel
+					},
+					entryPoint: "main",
+					input:      []byte(`{"key":"value"}`),
+					wantErr:    true,
+					errContainsAll: []string{
+						"non-zero exit code: 2",
+						"truncated from 2048 bytes",
+					},
 				},
 				{
 					name: "execution error",
@@ -606,10 +644,10 @@ func TestEvaluator_Evaluate(t *testing.T) {
 							callErr: errors.New("execution failed"),
 						}, ctx, cancel
 					},
-					entryPoint:  "main",
-					input:       []byte(`{"key":"value"}`),
-					wantErr:     true,
-					errContains: "execution failed",
+					entryPoint:     "main",
+					input:          []byte(`{"key":"value"}`),
+					wantErr:        true,
+					errContainsAll: []string{"execution failed"},
 				},
 				{
 					name: "context cancellation",
@@ -621,10 +659,10 @@ func TestEvaluator_Evaluate(t *testing.T) {
 						}
 						return mock, ctx, cancel
 					},
-					entryPoint:  "main",
-					input:       []byte(`{"key":"value"}`),
-					wantErr:     true,
-					errContains: "cancelled",
+					entryPoint:     "main",
+					input:          []byte(`{"key":"value"}`),
+					wantErr:        true,
+					errContainsAll: []string{"cancelled"},
 				},
 			}
 
@@ -651,8 +689,11 @@ func TestEvaluator_Evaluate(t *testing.T) {
 
 					if tt.wantErr {
 						require.Error(t, err)
-						if tt.errContains != "" {
-							assert.Contains(t, err.Error(), tt.errContains)
+						for _, s := range tt.errContainsAll {
+							assert.Contains(t, err.Error(), s)
+						}
+						for _, s := range tt.errExcludes {
+							assert.NotContains(t, err.Error(), s)
 						}
 					} else {
 						require.NoError(t, err)
@@ -790,4 +831,40 @@ func TestEvaluator_AddDataToContext(t *testing.T) {
 			require.NotNil(t, enrichedCtx)
 		})
 	}
+}
+
+// TestFormatExitOutput covers the helper that builds the "(output: ...)"
+// suffix appended to non-zero-exit error messages.
+func TestFormatExitOutput(t *testing.T) {
+	t.Parallel()
+
+	t.Run("empty output produces no suffix", func(t *testing.T) {
+		assert.Equal(t, "", formatExitOutput(nil))
+		assert.Equal(t, "", formatExitOutput([]byte{}))
+	})
+
+	t.Run("short output is quoted in full", func(t *testing.T) {
+		assert.Equal(t, ` (output: "boom")`, formatExitOutput([]byte("boom")))
+	})
+
+	t.Run("output exactly at limit is not truncated", func(t *testing.T) {
+		payload := bytes.Repeat([]byte("a"), exitOutputMaxBytes)
+		got := formatExitOutput(payload)
+		assert.Contains(t, got, "(output:")
+		assert.NotContains(t, got, "truncated")
+	})
+
+	t.Run("output over limit reports original byte count", func(t *testing.T) {
+		payload := bytes.Repeat([]byte("a"), exitOutputMaxBytes+5)
+		got := formatExitOutput(payload)
+		assert.Contains(t, got, "truncated from")
+		assert.Contains(t, got, "1029 bytes")
+	})
+
+	t.Run("control characters are escaped via %q", func(t *testing.T) {
+		got := formatExitOutput([]byte("line1\nline2\ttab"))
+		// %q renders newlines and tabs as literal \n / \t escape sequences.
+		assert.Contains(t, got, `\n`)
+		assert.Contains(t, got, `\t`)
+	})
 }

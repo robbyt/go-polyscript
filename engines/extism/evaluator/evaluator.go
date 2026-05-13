@@ -57,6 +57,28 @@ func (be *Evaluator) loadInputData(ctx context.Context) (map[string]any, error) 
 	return data.LoadInputData(ctx, be.logger.WithGroup("loadInputData"), be.getDataProvider())
 }
 
+// exitOutputMaxBytes caps the output snippet included in non-zero-exit
+// error messages so a multi-megabyte plugin payload can't blow up logs.
+const exitOutputMaxBytes = 1024
+
+// formatExitOutput returns a parenthesized " (output: %q)" suffix for
+// inclusion in non-zero-exit-code errors. Returns "" when output is empty,
+// so callers don't get a noisy '(output: "")' tail. Long outputs are
+// truncated to exitOutputMaxBytes; the original byte length is surfaced
+// so callers can tell something was elided.
+func formatExitOutput(output []byte) string {
+	if len(output) == 0 {
+		return ""
+	}
+	if len(output) <= exitOutputMaxBytes {
+		return fmt.Sprintf(" (output: %q)", output)
+	}
+	return fmt.Sprintf(
+		" (output: %q, truncated from %d bytes)",
+		output[:exitOutputMaxBytes], len(output),
+	)
+}
+
 // execHelper is a utility function to handle common execution logic
 // Extracted to make unit testing easier
 func execHelper(
@@ -77,8 +99,10 @@ func execHelper(
 		return nil, execTime, fmt.Errorf("execution failed: %w", err)
 	}
 	if exit != 0 {
-		// TODO should we return the output in this case?
-		return nil, execTime, fmt.Errorf("function returned non-zero exit code: %d", exit)
+		return nil, execTime, fmt.Errorf(
+			"function returned non-zero exit code: %d%s",
+			exit, formatExitOutput(output),
+		)
 	}
 
 	// Try to parse output as JSON with number handling
