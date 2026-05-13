@@ -171,9 +171,10 @@ func (s Source) resolve() (loader.Loader, error) {
 type Option[E Engine] func(*config)
 
 type config struct {
-	handler    slog.Handler
-	staticData map[string]any
-	entryPoint string
+	handler            slog.Handler
+	staticData         map[string]any
+	entryPoint         string
+	exitOutputMaxBytes int
 }
 
 // WithStaticData attaches a fixed map of values that the script will see
@@ -198,6 +199,21 @@ func WithLogHandler[E Engine](h slog.Handler) Option[E] {
 // [New[Starlark]] is a compile error rather than a silent no-op.
 func WithEntryPoint(name string) Option[Extism] {
 	return func(c *config) { c.entryPoint = name }
+}
+
+// WithExitOutputMaxBytes caps the WASM-output snippet included in
+// non-zero-exit-code error messages produced by the evaluator.
+//
+//   - zero (or omitted) → use the default cap (1024 bytes)
+//   - positive          → truncate at that value; the original byte length
+//     is surfaced in the error so callers can tell
+//     something was elided
+//   - negative          → no cap; the full output is included unchanged
+//
+// Bound to [Extism] — passing it to [New[Risor]] or [New[Starlark]] is a
+// compile-time error rather than a silent no-op.
+func WithExitOutputMaxBytes(n int) Option[Extism] {
+	return func(c *config) { c.exitOutputMaxBytes = n }
 }
 
 // ----------------------------------------------------------------------------
@@ -267,6 +283,7 @@ func newExtism(ldr loader.Loader, cfg *config) (platform.Evaluator, error) {
 	opts := []extismMachine.Option{
 		extismMachine.WithEntryPoint(cfg.entryPoint),
 		extismMachine.WithLogHandler(cfg.handler),
+		extismMachine.WithExitOutputMaxBytes(cfg.exitOutputMaxBytes),
 	}
 	if cfg.staticData != nil {
 		opts = append(opts, extismMachine.WithStaticData(cfg.staticData))

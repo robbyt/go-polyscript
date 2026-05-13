@@ -11,10 +11,11 @@ import (
 type Option func(*config)
 
 type config struct {
-	handler      slog.Handler
-	staticData   map[string]any
-	dataProvider data.Provider
-	entryPoint   string
+	handler            slog.Handler
+	staticData         map[string]any
+	dataProvider       data.Provider
+	entryPoint         string
+	exitOutputMaxBytes int
 }
 
 // WithLogHandler sets the slog.Handler used for diagnostic logging by the
@@ -48,4 +49,18 @@ func WithDataProvider(p data.Provider) Option {
 // option is omitted or the name is empty.
 func WithEntryPoint(name string) Option {
 	return func(c *config) { c.entryPoint = name }
+}
+
+// WithExitOutputMaxBytes caps the WASM-output snippet included in
+// non-zero-exit-code error messages produced by the evaluator.
+//
+//   - zero (or omitted) → use the default cap (1024 bytes)
+//   - positive          → truncate at that value; the original byte length
+//     is surfaced in the error so callers can tell
+//     something was elided
+//   - negative          → no cap; the full output is included unchanged
+//
+// Mirrors the cap semantics of HTTPOptions.MaxBodySize.
+func WithExitOutputMaxBytes(n int) Option {
+	return func(c *config) { c.exitOutputMaxBytes = n }
 }

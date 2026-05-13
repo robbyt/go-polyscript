@@ -148,6 +148,29 @@ func TestNewExtism(t *testing.T) {
 		require.True(t, ok)
 		assert.Equal(t, "Hello, Test!", got["greeting"])
 	})
+
+	t.Run("WithExitOutputMaxBytes is accepted and a successful Eval still works", func(t *testing.T) {
+		// Construction-level test: verify the option is wired through
+		// newExtism → extism.WithExitOutputMaxBytes → evaluator.New
+		// without breaking the happy path. End-to-end truncation
+		// behavior is exercised at the evaluator layer in
+		// engines/extism/evaluator/evaluator_test.go (issue #122).
+		for _, n := range []int{-1, 0, 42, 8 * 1024} {
+			eval, err := polyscript.New[polyscript.Extism](
+				polyscript.FromBytes(wasmdata.TestModule),
+				polyscript.WithEntryPoint(wasmdata.EntrypointGreet),
+				polyscript.WithExitOutputMaxBytes(n),
+				polyscript.WithStaticData[polyscript.Extism](map[string]any{"input": "Cap"}),
+			)
+			require.NoError(t, err, "cap=%d", n)
+
+			result, err := eval.Eval(t.Context())
+			require.NoError(t, err, "cap=%d", n)
+			got, ok := result.Interface().(map[string]any)
+			require.True(t, ok, "cap=%d", n)
+			assert.Equal(t, "Hello, Cap!", got["greeting"], "cap=%d", n)
+		}
+	})
 }
 
 func TestFromLoader(t *testing.T) {

@@ -20,23 +20,31 @@ import (
 
 // Evaluator executes compiled WASM modules with provided runtime data
 type Evaluator struct {
-	execUnit   *script.ExecutableUnit
-	logHandler slog.Handler
-	logger     *slog.Logger
+	execUnit           *script.ExecutableUnit
+	logHandler         slog.Handler
+	logger             *slog.Logger
+	exitOutputMaxBytes int
 }
 
-// New creates a new Evaluator object
+// New creates a new Evaluator object.
 func New(
 	handler slog.Handler,
 	execUnit *script.ExecutableUnit,
+	opts ...Option,
 ) *Evaluator {
 	handler, logger := helpers.SetupLogger(handler, "extism", "Evaluator")
 
-	return &Evaluator{
+	e := &Evaluator{
 		execUnit:   execUnit,
 		logHandler: handler,
 		logger:     logger,
 	}
+	for _, opt := range opts {
+		if opt != nil {
+			opt(e)
+		}
+	}
+	return e
 }
 
 func (be *Evaluator) String() string {
@@ -57,25 +65,35 @@ func (be *Evaluator) loadInputData(ctx context.Context) (map[string]any, error) 
 	return data.LoadInputData(ctx, be.logger.WithGroup("loadInputData"), be.getDataProvider())
 }
 
-// exitOutputMaxBytes caps the output snippet included in non-zero-exit
-// error messages so a multi-megabyte plugin payload can't blow up logs.
-const exitOutputMaxBytes = 1024
+// defaultExitOutputMaxBytes is the cap applied when an Evaluator is built
+// without [WithExitOutputMaxBytes] (or with the zero value). It keeps a
+// multi-megabyte plugin payload from blowing up logs while still surfacing
+// enough bytes for the host to diagnose a misbehaving plugin.
+const defaultExitOutputMaxBytes = 1024
 
 // formatExitOutput returns a parenthesized " (output: %q)" suffix for
 // inclusion in non-zero-exit-code errors. Returns "" when output is empty,
-// so callers don't get a noisy '(output: "")' tail. Long outputs are
-// truncated to exitOutputMaxBytes; the original byte length is surfaced
-// so callers can tell something was elided.
-func formatExitOutput(output []byte) string {
+// so callers don't get a noisy '(output: "")' tail.
+//
+// maxBytes governs truncation:
+//
+//   - zero  → fall back to [defaultExitOutputMaxBytes]
+//   - >0    → truncate at that value; the original byte length is surfaced
+//     so callers can tell something was elided
+//   - <0    → no cap; the full output is quoted unchanged
+func formatExitOutput(output []byte, maxBytes int) string {
 	if len(output) == 0 {
 		return ""
 	}
-	if len(output) <= exitOutputMaxBytes {
+	if maxBytes == 0 {
+		maxBytes = defaultExitOutputMaxBytes
+	}
+	if maxBytes < 0 || len(output) <= maxBytes {
 		return fmt.Sprintf(" (output: %q)", output)
 	}
 	return fmt.Sprintf(
 		" (output: %q, truncated from %d bytes)",
-		output[:exitOutputMaxBytes], len(output),
+		output[:maxBytes], len(output),
 	)
 }
 
@@ -87,6 +105,7 @@ func execHelper(
 	instance adapters.SdkPluginInstanceConfig,
 	entryPoint string,
 	inputJSON []byte,
+	exitOutputMaxBytes int,
 ) (any, time.Duration, error) {
 	// Call the function (context handles timeout)
 	startTime := time.Now()
@@ -101,7 +120,7 @@ func execHelper(
 	if exit != 0 {
 		return nil, execTime, fmt.Errorf(
 			"function returned non-zero exit code: %d%s",
-			exit, formatExitOutput(output),
+			exit, formatExitOutput(output, exitOutputMaxBytes),
 		)
 	}
 
@@ -146,7 +165,9 @@ func (be *Evaluator) exec(
 	}()
 
 	// Use the helper function for execution
-	result, execTime, err := execHelper(ctx, logger, instance, entryPoint, inputJSON)
+	result, execTime, err := execHelper(
+		ctx, logger, instance, entryPoint, inputJSON, be.exitOutputMaxBytes,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("extism execution error: %w", err)
 	}
