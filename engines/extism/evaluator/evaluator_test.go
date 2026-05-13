@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"os"
 	"testing"
@@ -620,12 +621,14 @@ func TestEvaluator_Evaluate(t *testing.T) {
 					errExcludes: []string{"(output:"},
 				},
 				{
+					// Sized as a multiple of exitOutputMaxBytes so the
+					// truncation branch keeps firing if the cap is raised.
 					name: "non-zero exit code with truncated output",
 					setup: func() (*mockPluginInstance, context.Context, context.CancelFunc) {
 						ctx, cancel := context.WithCancel(t.Context())
 						return &mockPluginInstance{
 							exitCode: 2,
-							output:   bytes.Repeat([]byte("X"), 2048),
+							output:   bytes.Repeat([]byte("X"), exitOutputMaxBytes*2),
 						}, ctx, cancel
 					},
 					entryPoint: "main",
@@ -633,7 +636,7 @@ func TestEvaluator_Evaluate(t *testing.T) {
 					wantErr:    true,
 					errContainsAll: []string{
 						"non-zero exit code: 2",
-						"truncated from 2048 bytes",
+						fmt.Sprintf("truncated from %d bytes", exitOutputMaxBytes*2),
 					},
 				},
 				{
@@ -858,7 +861,7 @@ func TestFormatExitOutput(t *testing.T) {
 		payload := bytes.Repeat([]byte("a"), exitOutputMaxBytes+5)
 		got := formatExitOutput(payload)
 		assert.Contains(t, got, "truncated from")
-		assert.Contains(t, got, "1029 bytes")
+		assert.Contains(t, got, fmt.Sprintf("%d bytes", len(payload)))
 	})
 
 	t.Run("control characters are escaped via %q", func(t *testing.T) {
