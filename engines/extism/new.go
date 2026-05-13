@@ -100,7 +100,11 @@ func FromExtismLoader(ldr loader.Loader, opts ...Option) (*evaluator.Evaluator, 
 		return nil, err
 	}
 
-	return evaluator.New(cfg.handler, execUnit), nil
+	return evaluator.New(
+		cfg.handler,
+		execUnit,
+		evaluator.WithExitOutputMaxBytes(cfg.exitOutputMaxBytes),
+	), nil
 }
 
 // NewCompiler creates a new Extism compiler using the functional options pattern.

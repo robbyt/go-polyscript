@@ -461,6 +461,43 @@ func TestEvaluator_Evaluate(t *testing.T) {
 			assert.Contains(t, err.Error(), "something went wrong")
 		})
 
+		// Regression for issue #122: WithExitOutputMaxBytes flows from
+		// Evaluator construction through exec → execHelper → formatExitOutput.
+		// A negative cap disables truncation, so a multi-KiB plugin payload
+		// makes it into the error string unchanged.
+		t.Run("non-zero exit code with WithExitOutputMaxBytes(-1)", func(t *testing.T) {
+			handler := slog.NewTextHandler(os.Stdout, nil)
+			ctxProvider := data.NewContextProvider(constants.EvalData)
+
+			payload := bytes.Repeat([]byte("Y"), defaultExitOutputMaxBytes*4)
+
+			mockPlugin := new(MockCompiledPlugin)
+			mockInstance := &mockPluginInstance{
+				exitCode: 7,
+				output:   payload,
+			}
+			mockPlugin.On("Instance", mock.Anything, mock.Anything).Return(mockInstance, nil)
+			mockPlugin.On("Close", mock.Anything).Return(nil)
+
+			content := createMockExecutable(mockPlugin, "main")
+			exe := &script.ExecutableUnit{
+				ID:           "test-error-exit-uncapped",
+				DataProvider: ctxProvider,
+				Content:      content,
+			}
+
+			evaluator := New(handler, exe, WithExitOutputMaxBytes(-1))
+			_, err := evaluator.Eval(t.Context())
+
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "non-zero exit code: 7")
+			// No truncation tail.
+			assert.NotContains(t, err.Error(), "truncated from")
+			// The full payload survived end-to-end.
+			assert.Contains(t, err.Error(), string(payload[:32]))
+			assert.Contains(t, err.Error(), string(payload[len(payload)-32:]))
+		})
+
 		// Test error creating plugin instance
 		t.Run("error creating plugin instance", func(t *testing.T) {
 			handler := slog.NewTextHandler(os.Stdout, nil)
@@ -573,6 +610,7 @@ func TestEvaluator_Evaluate(t *testing.T) {
 				setup          func() (*mockPluginInstance, context.Context, context.CancelFunc)
 				entryPoint     string
 				input          []byte
+				maxBytes       int // exit-output cap; zero uses defaultExitOutputMaxBytes
 				wantErr        bool
 				errContainsAll []string
 				errExcludes    []string
@@ -621,14 +659,14 @@ func TestEvaluator_Evaluate(t *testing.T) {
 					errExcludes: []string{"(output:"},
 				},
 				{
-					// Sized as a multiple of exitOutputMaxBytes so the
-					// truncation branch keeps firing if the cap is raised.
-					name: "non-zero exit code with truncated output",
+					// Sized as a multiple of defaultExitOutputMaxBytes so the
+					// truncation branch keeps firing if the default is raised.
+					name: "non-zero exit code with truncated output (default cap)",
 					setup: func() (*mockPluginInstance, context.Context, context.CancelFunc) {
 						ctx, cancel := context.WithCancel(t.Context())
 						return &mockPluginInstance{
 							exitCode: 2,
-							output:   bytes.Repeat([]byte("X"), exitOutputMaxBytes*2),
+							output:   bytes.Repeat([]byte("X"), defaultExitOutputMaxBytes*2),
 						}, ctx, cancel
 					},
 					entryPoint: "main",
@@ -636,7 +674,46 @@ func TestEvaluator_Evaluate(t *testing.T) {
 					wantErr:    true,
 					errContainsAll: []string{
 						"non-zero exit code: 2",
-						fmt.Sprintf("truncated from %d bytes", exitOutputMaxBytes*2),
+						fmt.Sprintf("truncated from %d bytes", defaultExitOutputMaxBytes*2),
+					},
+				},
+				{
+					// Negative cap disables truncation; the full output is
+					// quoted into the error and there's no "truncated from"
+					// tail.
+					name: "non-zero exit code with disabled cap",
+					setup: func() (*mockPluginInstance, context.Context, context.CancelFunc) {
+						ctx, cancel := context.WithCancel(t.Context())
+						return &mockPluginInstance{
+							exitCode: 3,
+							output:   bytes.Repeat([]byte("Y"), defaultExitOutputMaxBytes*4),
+						}, ctx, cancel
+					},
+					entryPoint:     "main",
+					input:          []byte(`{"key":"value"}`),
+					maxBytes:       -1,
+					wantErr:        true,
+					errContainsAll: []string{"non-zero exit code: 3"},
+					errExcludes:    []string{"truncated from"},
+				},
+				{
+					// Small custom cap is honored and truncation kicks in
+					// before reaching the default.
+					name: "non-zero exit code with custom small cap",
+					setup: func() (*mockPluginInstance, context.Context, context.CancelFunc) {
+						ctx, cancel := context.WithCancel(t.Context())
+						return &mockPluginInstance{
+							exitCode: 4,
+							output:   []byte("0123456789ABCDEFGHIJ"),
+						}, ctx, cancel
+					},
+					entryPoint: "main",
+					input:      []byte(`{"key":"value"}`),
+					maxBytes:   4,
+					wantErr:    true,
+					errContainsAll: []string{
+						"non-zero exit code: 4",
+						"truncated from 20 bytes",
 					},
 				},
 				{
@@ -681,6 +758,7 @@ func TestEvaluator_Evaluate(t *testing.T) {
 						mockInstance,
 						tt.entryPoint,
 						tt.input,
+						tt.maxBytes,
 					)
 
 					// Verify the mock was called
@@ -841,31 +919,60 @@ func TestEvaluator_AddDataToContext(t *testing.T) {
 func TestFormatExitOutput(t *testing.T) {
 	t.Parallel()
 
-	t.Run("empty output produces no suffix", func(t *testing.T) {
-		assert.Empty(t, formatExitOutput(nil))
-		assert.Empty(t, formatExitOutput([]byte{}))
+	t.Run("empty output produces no suffix regardless of cap", func(t *testing.T) {
+		assert.Empty(t, formatExitOutput(nil, 0))
+		assert.Empty(t, formatExitOutput([]byte{}, 0))
+		assert.Empty(t, formatExitOutput(nil, 100))
+		assert.Empty(t, formatExitOutput(nil, -1))
 	})
 
-	t.Run("short output is quoted in full", func(t *testing.T) {
-		assert.Equal(t, ` (output: "boom")`, formatExitOutput([]byte("boom")))
+	t.Run("short output is quoted in full with default cap", func(t *testing.T) {
+		assert.Equal(t, ` (output: "boom")`, formatExitOutput([]byte("boom"), 0))
 	})
 
-	t.Run("output exactly at limit is not truncated", func(t *testing.T) {
-		payload := bytes.Repeat([]byte("a"), exitOutputMaxBytes)
-		got := formatExitOutput(payload)
+	t.Run("output exactly at default cap is not truncated", func(t *testing.T) {
+		payload := bytes.Repeat([]byte("a"), defaultExitOutputMaxBytes)
+		got := formatExitOutput(payload, 0)
 		assert.Contains(t, got, "(output:")
 		assert.NotContains(t, got, "truncated")
 	})
 
-	t.Run("output over limit reports original byte count", func(t *testing.T) {
-		payload := bytes.Repeat([]byte("a"), exitOutputMaxBytes+5)
-		got := formatExitOutput(payload)
+	t.Run("output over default cap reports original byte count", func(t *testing.T) {
+		payload := bytes.Repeat([]byte("a"), defaultExitOutputMaxBytes+5)
+		got := formatExitOutput(payload, 0)
 		assert.Contains(t, got, "truncated from")
 		assert.Contains(t, got, fmt.Sprintf("%d bytes", len(payload)))
 	})
 
+	t.Run("zero cap falls back to default", func(t *testing.T) {
+		// A 5-byte payload sits well below the 1024-byte default cap, so
+		// passing 0 must not truncate it.
+		got := formatExitOutput([]byte("short"), 0)
+		assert.Equal(t, ` (output: "short")`, got)
+	})
+
+	t.Run("negative cap disables truncation", func(t *testing.T) {
+		// A payload several multiples of the default cap must come back
+		// unchanged when the caller asks for no cap.
+		payload := bytes.Repeat([]byte("z"), defaultExitOutputMaxBytes*4)
+		got := formatExitOutput(payload, -1)
+		assert.Contains(t, got, "(output:")
+		assert.NotContains(t, got, "truncated")
+		// Output length is unbounded; verify the full payload made it in.
+		assert.Contains(t, got, string(payload[:64]))
+		assert.Contains(t, got, string(payload[len(payload)-64:]))
+	})
+
+	t.Run("positive cap honors the supplied limit", func(t *testing.T) {
+		// Payload of 20 bytes with a cap of 4 must truncate, reporting
+		// the original 20-byte length.
+		got := formatExitOutput([]byte("0123456789ABCDEFGHIJ"), 4)
+		assert.Contains(t, got, `"0123"`)
+		assert.Contains(t, got, "truncated from 20 bytes")
+	})
+
 	t.Run("control characters are escaped via %q", func(t *testing.T) {
-		got := formatExitOutput([]byte("line1\nline2\ttab"))
+		got := formatExitOutput([]byte("line1\nline2\ttab"), 0)
 		// %q renders newlines and tabs as literal \n / \t escape sequences.
 		assert.Contains(t, got, `\n`)
 		assert.Contains(t, got, `\t`)
