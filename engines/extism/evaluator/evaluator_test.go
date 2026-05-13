@@ -839,8 +839,8 @@ func TestFormatExitOutput(t *testing.T) {
 	t.Parallel()
 
 	t.Run("empty output produces no suffix", func(t *testing.T) {
-		assert.Equal(t, "", formatExitOutput(nil))
-		assert.Equal(t, "", formatExitOutput([]byte{}))
+		assert.Empty(t, formatExitOutput(nil))
+		assert.Empty(t, formatExitOutput([]byte{}))
 	})
 
 	t.Run("short output is quoted in full", func(t *testing.T) {
