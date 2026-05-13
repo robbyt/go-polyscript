@@ -93,7 +93,7 @@ const defaultExitOutputMaxBytes = 1024
 //
 //   - zero  → fall back to [defaultExitOutputMaxBytes]
 //   - >0    → truncate at that value; the original byte length is surfaced
-//             so callers can tell something was elided
+//     so callers can tell something was elided
 //   - <0    → no cap; the full output is quoted unchanged
 func formatExitOutput(output []byte, maxBytes int) string {
 	if len(output) == 0 {

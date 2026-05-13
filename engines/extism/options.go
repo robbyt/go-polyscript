@@ -56,8 +56,8 @@ func WithEntryPoint(name string) Option {
 //
 //   - zero (or omitted) → use the default cap (1024 bytes)
 //   - positive          → truncate at that value; the original byte length
-//                         is surfaced in the error so callers can tell
-//                         something was elided
+//     is surfaced in the error so callers can tell
+//     something was elided
 //   - negative          → no cap; the full output is included unchanged
 //
 // Mirrors the cap semantics of HTTPOptions.MaxBodySize.

@@ -206,8 +206,8 @@ func WithEntryPoint(name string) Option[Extism] {
 //
 //   - zero (or omitted) → use the default cap (1024 bytes)
 //   - positive          → truncate at that value; the original byte length
-//                         is surfaced in the error so callers can tell
-//                         something was elided
+//     is surfaced in the error so callers can tell
+//     something was elided
 //   - negative          → no cap; the full output is included unchanged
 //
 // Bound to [Extism] — passing it to [New[Risor]] or [New[Starlark]] is a
