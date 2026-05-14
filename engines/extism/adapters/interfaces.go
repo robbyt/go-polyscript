@@ -6,10 +6,6 @@ import (
 	extismSDK "github.com/extism/go-sdk"
 )
 
-type ExtismExecutable struct {
-	GetExtismExecutable func() *extismSDK.CompiledPlugin
-}
-
 // CompiledPlugin is an interface for abstracting the extismSDK.CompiledPlugin
 type CompiledPlugin interface {
 	Instance(ctx context.Context, config extismSDK.PluginInstanceConfig) (PluginInstance, error)
