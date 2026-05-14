@@ -210,7 +210,7 @@ ctx, _ := provider.AddDataToContext(parent, requestData)
 ctx, _ = provider.AddDataToContext(ctx, moreData)  // build on the returned ctx
 ```
 
-Non-map values stored via `AddDataToContext` (slices, structs, `*http.Request`) are passed through by reference rather than copied. Callers must not mutate those values after handing them in; the provider itself never does.
+Reference-typed values stored in the map (slices, pointers, channels, function values) remain shared with the caller after `AddDataToContext` returns. The provider never mutates them, but callers should avoid mutating them either. Value types (int, string, struct, etc.) are copied as usual when stored in an `any` slot. `*http.Request` and `http.Request` inputs are converted to maps via `helpers.RequestToMap` on the way in, so the underlying request itself is not retained.
 
 ### Combining Static and Dynamic Runtime Data
 

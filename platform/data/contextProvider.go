@@ -58,9 +58,16 @@ func (p *ContextProvider) GetData(ctx context.Context) (map[string]any, error) {
 // chain. Existing data from the parent context is deep-copied at every
 // nesting level when forming the derived context, so concurrent
 // enrichments from goroutines that share a parent never race on shared
-// inner map storage. (Non-map values such as slices, structs, and
-// *http.Request are passed through by reference; callers must not
-// mutate those after handing them to AddDataToContext.)
+// inner map storage.
+//
+// Reference-typed values stored in the map (slices, pointers, channels,
+// function values) remain shared with the source — ContextProvider
+// never mutates them in place, but callers should avoid mutating them
+// after handing them to AddDataToContext. Value types (int, string,
+// struct, etc.) are copied as usual when stored in an `any` slot.
+// *http.Request and http.Request inputs are converted to maps via
+// helpers.RequestToMap on the way in, so the underlying request is not
+// stored.
 //
 // The typical pattern is one derived-context chain per request, with
 // the returned context threaded forward for any subsequent enrichment.
@@ -166,17 +173,20 @@ func (p *ContextProvider) mergeIntoMap(
 }
 
 // deepCopyMap returns a recursive copy of m. Nested map[string]any values
-// are allocated fresh at every level so the returned map shares no
-// mutable map storage with m. Other values (slices, structs, primitives,
-// *http.Request) are passed through by reference — ContextProvider never
-// mutates them in place after storing, but callers must not mutate them
-// either.
+// are allocated fresh at every level so the returned map shares no mutable
+// map storage with m.
 //
-// Returns nil when m is nil.
+// Always returns a non-nil map, even when m is nil or empty; this lets
+// AddDataToContext use the result directly without a separate guard
+// against a nil parent-context value.
+//
+// Non-map values are stored by assignment to an `any` slot. Value types
+// (int, string, struct, etc.) are copied as usual; reference types
+// (slices, pointers, channels, function values) remain shared with the
+// source. ContextProvider never mutates stored values in place; callers
+// should avoid mutating reference-typed values after handing them to
+// AddDataToContext.
 func deepCopyMap(m map[string]any) map[string]any {
-	if m == nil {
-		return nil
-	}
 	out := make(map[string]any, len(m))
 	for k, v := range m {
 		if nested, ok := v.(map[string]any); ok {

@@ -586,6 +586,30 @@ func TestContextProvider_DataIntegration(t *testing.T) {
 	})
 }
 
+// TestContextProvider_AddDataToContext_TypedNilParent guards against a
+// regression caught in Copilot review of #93: if a typed-nil map[string]any
+// is stored in the context value (e.g. `context.WithValue(parent, key,
+// (map[string]any)(nil))`), the parent map ranges as empty, deepCopyMap
+// must still produce a usable non-nil destination, and the subsequent
+// merge must not panic with "assignment to entry in nil map".
+func TestContextProvider_AddDataToContext_TypedNilParent(t *testing.T) {
+	t.Parallel()
+	p := NewContextProvider(constants.EvalData)
+
+	var typedNil map[string]any
+	parent := context.WithValue(t.Context(), constants.EvalData, typedNil)
+
+	// This call would have panicked under the early-return-nil version
+	// of deepCopyMap (toStore = nil → mergeIntoMap → assignment to entry
+	// in nil map).
+	next, err := p.AddDataToContext(parent, map[string]any{"k": "v"})
+	require.NoError(t, err)
+
+	got, err := p.GetData(next)
+	require.NoError(t, err)
+	assert.Equal(t, "v", got["k"])
+}
+
 // TestContextProvider_AddDataToContext_Concurrent is the regression test
 // for the deep-copy fix in #93. Goroutines share an already-enriched
 // parent context whose value contains a nested map. Each goroutine
