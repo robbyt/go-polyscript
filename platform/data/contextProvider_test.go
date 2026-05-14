@@ -602,13 +602,13 @@ func TestContextProvider_AddDataToContext_Concurrent(t *testing.T) {
 
 	var wg sync.WaitGroup
 	wg.Add(goroutines)
-	for i := 0; i < goroutines; i++ {
-		go func(id int) {
+	for id := range goroutines {
+		go func() {
 			defer wg.Done()
 
 			// Per-request derived ctx — the documented safe pattern.
 			ctx := t.Context()
-			for j := 0; j < iterations; j++ {
+			for j := range iterations {
 				key := fmt.Sprintf("g%d-iter%d", id, j)
 				next, err := p.AddDataToContext(ctx, map[string]any{key: j})
 				if err != nil {
@@ -628,7 +628,7 @@ func TestContextProvider_AddDataToContext_Concurrent(t *testing.T) {
 				}
 				ctx = next
 			}
-		}(i)
+		}()
 	}
 	wg.Wait()
 }
