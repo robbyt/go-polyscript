@@ -210,7 +210,7 @@ ctx, _ := provider.AddDataToContext(parent, requestData)
 ctx, _ = provider.AddDataToContext(ctx, moreData)  // build on the returned ctx
 ```
 
-Reference-typed values stored in the map (slices, pointers, channels, function values, and maps **other than** `map[string]any`) remain shared with the caller after `AddDataToContext` returns. The provider never mutates them, but callers should avoid mutating them either. The deep-copy guarantee applies specifically to `map[string]any` values — `processValue` and `deepCopyMap` recurse into those; other map types (e.g. `map[string]string`, `map[any]any`) are passed through as opaque values. Value types (int, string, struct, etc.) are copied as usual when stored in an `any` slot. `*http.Request` and `http.Request` inputs are converted to `map[string]any` via `helpers.RequestToMap` on the way in, so the underlying request itself is not retained.
+For the details of which value kinds are deep-copied versus stored by reference, see the [`AddDataToContext` godoc](https://pkg.go.dev/github.com/robbyt/go-polyscript/platform/data#ContextProvider.AddDataToContext).
 
 ### Combining Static and Dynamic Runtime Data
 
