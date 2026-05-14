@@ -587,10 +587,12 @@ func TestContextProvider_DataIntegration(t *testing.T) {
 }
 
 // TestContextProvider_AddDataToContext_Concurrent exercises the documented
-// per-request derived-context pattern under -race: each goroutine starts
-// from its own root context, threads the returned context through repeated
-// AddDataToContext calls, and reads its own data back. Independent chains
-// must not interfere — this test asserts the contract narrowed in #93's
+// safe concurrency pattern under -race: each goroutine builds its own
+// derived-context chain off a shared, un-enriched root (t.Context()),
+// threads the returned context through repeated AddDataToContext calls,
+// and reads its own data back. The root carries no nested maps, so the
+// chains never race on shared inner storage — independent chains must
+// not interfere. This test asserts the contract narrowed in #93's
 // godoc and README updates.
 func TestContextProvider_AddDataToContext_Concurrent(t *testing.T) {
 	t.Parallel()
@@ -606,7 +608,7 @@ func TestContextProvider_AddDataToContext_Concurrent(t *testing.T) {
 		go func() {
 			defer wg.Done()
 
-			// Per-request derived ctx — the documented safe pattern.
+			// Shared un-enriched root; per-goroutine derived chain on top.
 			ctx := t.Context()
 			for j := range iterations {
 				key := fmt.Sprintf("g%d-iter%d", id, j)
