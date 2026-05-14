@@ -612,20 +612,18 @@ func TestContextProvider_AddDataToContext_Concurrent(t *testing.T) {
 			ctx := t.Context()
 			for j := range iterations {
 				key := fmt.Sprintf("g%d-iter%d", id, j)
+
 				next, err := p.AddDataToContext(ctx, map[string]any{key: j})
-				if err != nil {
-					t.Errorf("goroutine %d iter %d: %v", id, j, err)
+				if !assert.NoErrorf(t, err, "goroutine %d iter %d", id, j) {
 					return
 				}
+
 				// Read-back invariant: our derived chain must contain our key.
 				got, err := p.GetData(next)
-				if err != nil {
-					t.Errorf("goroutine %d iter %d GetData: %v", id, j, err)
+				if !assert.NoErrorf(t, err, "goroutine %d iter %d GetData", id, j) {
 					return
 				}
-				if got[key] != j {
-					t.Errorf("goroutine %d iter %d: got[%q] = %v, want %d",
-						id, j, key, got[key], j)
+				if !assert.Equalf(t, j, got[key], "goroutine %d iter %d key=%q", id, j, key) {
 					return
 				}
 				ctx = next
