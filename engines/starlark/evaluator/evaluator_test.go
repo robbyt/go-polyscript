@@ -2,12 +2,15 @@ package evaluator
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http/httptest"
 	"os"
 	"runtime"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/robbyt/go-polyscript/engines/starlark/compiler"
 	"github.com/robbyt/go-polyscript/internal/helpers"
@@ -342,5 +345,55 @@ func TestEvaluator_AddDataToContext(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// TestEval_CancellationHaltsExecution is the regression companion to PR #81
+// (issue #125). PR #81 added a context.AfterFunc-registered thread.Cancel
+// in engines/starlark/evaluator/exec(); this test confirms the registered
+// cancellation actually halts a running script within a bounded time. The
+// script body is an unboundedly-long loop; only cancellation can return
+// it within the test deadline.
+func TestEval_CancellationHaltsExecution(t *testing.T) {
+	t.Parallel()
+
+	// Lazy range(); cancellation halts at the next instruction boundary
+	// via the AfterFunc-registered thread.Cancel().
+	const scriptContent = `
+def spin():
+    for i in range(1000000000000):
+        pass
+    return "done"
+
+result = spin()
+`
+	_, eval := evalBuilder(t, scriptContent)
+
+	// evalBuilder uses a ContextProvider with constants.EvalData; populate
+	// it with an empty map so loadInputData has the value to read.
+	ctx, cancel := context.WithCancel(t.Context())
+	ctx = context.WithValue(ctx, constants.EvalData, map[string]any{})
+
+	done := make(chan error, 1)
+	go func() {
+		_, err := eval.Eval(ctx)
+		done <- err
+	}()
+
+	// Give the engine a moment to enter the spin loop, then cancel.
+	time.Sleep(50 * time.Millisecond)
+	cancel()
+
+	select {
+	case err := <-done:
+		require.Error(t, err)
+		require.True(t,
+			errors.Is(err, context.Canceled) ||
+				strings.Contains(err.Error(), "context canceled") ||
+				strings.Contains(err.Error(), "cancel"),
+			"expected cancellation-shaped error, got: %v", err,
+		)
+	case <-time.After(2 * time.Second):
+		t.Fatal("Eval did not return within 2s after cancel; cancellation unresponsive")
 	}
 }
