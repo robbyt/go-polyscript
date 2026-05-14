@@ -586,18 +586,28 @@ func TestContextProvider_DataIntegration(t *testing.T) {
 	})
 }
 
-// TestContextProvider_AddDataToContext_Concurrent exercises the documented
-// safe concurrency pattern under -race: each goroutine builds its own
-// derived-context chain off a shared, un-enriched root (t.Context()),
-// threads the returned context through repeated AddDataToContext calls,
-// and reads its own data back. The root carries no nested maps, so the
-// chains never race on shared inner storage — independent chains must
-// not interfere. This test asserts the contract narrowed in #93's
-// godoc and README updates.
+// TestContextProvider_AddDataToContext_Concurrent is the regression test
+// for the deep-copy fix in #93. Goroutines share an already-enriched
+// parent context whose value contains a nested map. Each goroutine
+// enriches the SAME nested key with its own data and reads it back.
+// Before the deep-copy fix, the recursive merge mutated the nested map
+// in-place — concurrent goroutines raced on shared inner storage and
+// -race would fire. The fix deep-copies nested maps when deriving from
+// the parent so each derived chain owns its own nested map storage.
+//
+// 32 goroutines × 100 iterations = 3200 enrichment + read-back checks
+// against a shared parent. Passes cleanly under -race.
 func TestContextProvider_AddDataToContext_Concurrent(t *testing.T) {
 	t.Parallel()
 
 	p := NewContextProvider(constants.EvalData)
+
+	// Pre-enrich a shared root with a nested map. This is the exact
+	// shape that was unsafe under the old shallow-copy implementation.
+	parent, err := p.AddDataToContext(t.Context(), map[string]any{
+		"shared": map[string]any{"baseline": "from-parent"},
+	})
+	require.NoError(t, err)
 
 	const goroutines = 32
 	const iterations = 100
@@ -608,22 +618,36 @@ func TestContextProvider_AddDataToContext_Concurrent(t *testing.T) {
 		go func() {
 			defer wg.Done()
 
-			// Shared un-enriched root; per-goroutine derived chain on top.
-			ctx := t.Context()
+			// All goroutines start from the SAME enriched parent.
+			ctx := parent
 			for j := range iterations {
 				key := fmt.Sprintf("g%d-iter%d", id, j)
 
-				next, err := p.AddDataToContext(ctx, map[string]any{key: j})
+				// Enrich the nested "shared" map with our own key. Before
+				// the fix this was the racing path: mergeIntoMap recursed
+				// into parent.shared and mutated it concurrently.
+				next, err := p.AddDataToContext(ctx, map[string]any{
+					"shared": map[string]any{key: j},
+				})
 				if !assert.NoErrorf(t, err, "goroutine %d iter %d", id, j) {
 					return
 				}
 
-				// Read-back invariant: our derived chain must contain our key.
+				// Read-back invariant: our derived chain must contain
+				// our key under "shared", plus the baseline from parent.
 				got, err := p.GetData(next)
 				if !assert.NoErrorf(t, err, "goroutine %d iter %d GetData", id, j) {
 					return
 				}
-				if !assert.Equalf(t, j, got[key], "goroutine %d iter %d key=%q", id, j, key) {
+				shared, ok := got["shared"].(map[string]any)
+				if !assert.Truef(t, ok, "goroutine %d iter %d: shared not a map", id, j) {
+					return
+				}
+				if !assert.Equalf(t, j, shared[key], "goroutine %d iter %d shared[%q]", id, j, key) {
+					return
+				}
+				if !assert.Equalf(t, "from-parent", shared["baseline"],
+					"goroutine %d iter %d: parent baseline lost", id, j) {
 					return
 				}
 				ctx = next
@@ -631,4 +655,13 @@ func TestContextProvider_AddDataToContext_Concurrent(t *testing.T) {
 		}()
 	}
 	wg.Wait()
+
+	// Parent context must be unchanged after all the concurrent
+	// enrichment — the deep-copy fix guarantees independence.
+	parentData, err := p.GetData(parent)
+	require.NoError(t, err)
+	parentShared, ok := parentData["shared"].(map[string]any)
+	require.True(t, ok)
+	require.Equal(t, "from-parent", parentShared["baseline"])
+	require.Len(t, parentShared, 1, "parent.shared must hold only the baseline key; got %v", parentShared)
 }
