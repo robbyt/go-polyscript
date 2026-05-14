@@ -17,7 +17,7 @@ The top-level package (`polyscript.go`) exposes a single generic constructor —
 
 - **Unified Abstraction API**: Common interfaces and implementations for several scripting languages
 - **Flexible Engine Selection**: Easily switch between different script engines
-- **Thread-safe Data Management**: Per-request data flows through Go's `context.Context` via a derived-context pattern. Each `AddDataToContext` call returns a context independent of its parent (nested maps are deep-copied), so concurrent enrichments from goroutines that share a parent never race — see [Concurrency](#concurrency-and-thread-safety).
+- **Thread-safe Data Management**: Multiple ways to provide input data to scripts
 - **Compilation, Evaluation, and Data Handling**: Compile scripts once with static data when creating the evaluator instance, then run multiple evaluation executions with variable runtime input.
 
 ## Engines Implemented
