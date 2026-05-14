@@ -50,6 +50,24 @@ func (p *ContextProvider) GetData(ctx context.Context) (map[string]any, error) {
 // and later values override earlier ones for duplicate keys.
 //
 // See README.md for detailed usage examples.
+//
+// # Concurrency
+//
+// Each caller MUST use the returned context for any subsequent
+// enrichment. The supported pattern is one derived-context chain per
+// request: independent chains do not share mutable state and are safe
+// to operate on concurrently.
+//
+// Concurrent calls from goroutines that share a parent context already
+// populated with nested maps are NOT safe. The top-level map is
+// shallow-copied via [maps.Copy], so nested-map references survive into
+// the new derived context. The recursive merge in [mergeIntoMap]
+// mutates those nested maps in place, which races if another goroutine
+// is concurrently reading or merging the same parent.
+//
+// If you need to enrich a single context from multiple goroutines, give
+// each goroutine its own root context and merge results at a host-side
+// join point — do not share an already-enriched parent.
 func (p *ContextProvider) AddDataToContext(
 	ctx context.Context,
 	data ...map[string]any,

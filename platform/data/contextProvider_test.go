@@ -2,7 +2,9 @@ package data
 
 import (
 	"context"
+	"fmt"
 	"net/http"
+	"sync"
 	"testing"
 
 	"github.com/robbyt/go-polyscript/platform/constants"
@@ -582,4 +584,51 @@ func TestContextProvider_DataIntegration(t *testing.T) {
 		require.Error(t, err, "Should reject empty keys")
 		assert.Contains(t, err.Error(), "empty keys are not allowed")
 	})
+}
+
+// TestContextProvider_AddDataToContext_Concurrent exercises the documented
+// per-request derived-context pattern under -race: each goroutine starts
+// from its own root context, threads the returned context through repeated
+// AddDataToContext calls, and reads its own data back. Independent chains
+// must not interfere — this test asserts the contract narrowed in #93's
+// godoc and README updates.
+func TestContextProvider_AddDataToContext_Concurrent(t *testing.T) {
+	t.Parallel()
+
+	p := NewContextProvider(constants.EvalData)
+
+	const goroutines = 32
+	const iterations = 100
+
+	var wg sync.WaitGroup
+	wg.Add(goroutines)
+	for i := 0; i < goroutines; i++ {
+		go func(id int) {
+			defer wg.Done()
+
+			// Per-request derived ctx — the documented safe pattern.
+			ctx := t.Context()
+			for j := 0; j < iterations; j++ {
+				key := fmt.Sprintf("g%d-iter%d", id, j)
+				next, err := p.AddDataToContext(ctx, map[string]any{key: j})
+				if err != nil {
+					t.Errorf("goroutine %d iter %d: %v", id, j, err)
+					return
+				}
+				// Read-back invariant: our derived chain must contain our key.
+				got, err := p.GetData(next)
+				if err != nil {
+					t.Errorf("goroutine %d iter %d GetData: %v", id, j, err)
+					return
+				}
+				if got[key] != j {
+					t.Errorf("goroutine %d iter %d: got[%q] = %v, want %d",
+						id, j, key, got[key], j)
+					return
+				}
+				ctx = next
+			}
+		}(i)
+	}
+	wg.Wait()
 }

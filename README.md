@@ -17,7 +17,7 @@ The top-level package (`polyscript.go`) exposes a single generic constructor —
 
 - **Unified Abstraction API**: Common interfaces and implementations for several scripting languages
 - **Flexible Engine Selection**: Easily switch between different script engines
-- **Thread-safe Data Management**: Multiple ways to provide input data to scripts
+- **Context-derived Data**: Per-request data threads through Go's `context.Context` via a derived-context pattern that's safe across goroutines when each request owns its own chain (see [Concurrency](#concurrency-and-thread-safety)).
 - **Compilation, Evaluation, and Data Handling**: Compile scripts once with static data when creating the evaluator instance, then run multiple evaluation executions with variable runtime input.
 
 ## Engines Implemented
@@ -196,6 +196,14 @@ enrichedCtx, _ := evaluator.AddDataToContext(context.Background(), runtimeData)
 // Execute with the "enriched" context containing the link to the input data
 result, _ := evaluator.Eval(enrichedCtx)
 ```
+
+#### Concurrency and thread-safety
+
+`ContextProvider.AddDataToContext` is safe for the **per-request derived-context** pattern: each goroutine starts from its own context and threads the returned context forward for any subsequent enrichment. Multiple goroutines using independent context chains do not interfere with each other.
+
+Concurrent enrichment of a **shared parent context that already contains nested maps** is *not* safe. `AddDataToContext` shallow-copies the existing top-level map when deriving the new context; nested maps inside that map are reference-shared with the parent and are mutated in place during recursive merge. Two goroutines enriching such a shared parent with overlapping nested keys will race.
+
+If your usage looks like "fan out N goroutines, each enriches the same base context with its own slice of data," give each goroutine its own root context (e.g. `context.Background()` or `t.Context()`) and merge results at a join point on the caller side, rather than sharing a base context that has already been enriched with nested data.
 
 ### Combining Static and Dynamic Runtime Data
 
