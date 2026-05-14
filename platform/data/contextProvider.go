@@ -61,11 +61,15 @@ func (p *ContextProvider) GetData(ctx context.Context) (map[string]any, error) {
 // inner map storage.
 //
 // Reference-typed values stored in the map (slices, pointers, channels,
-// function values) remain shared with the source — ContextProvider
-// never mutates them in place, but callers should avoid mutating them
-// after handing them to AddDataToContext. Value types (int, string,
-// struct, etc.) are copied as usual when stored in an `any` slot.
-// *http.Request and http.Request inputs are converted to maps via
+// function values, and maps OTHER than map[string]any) remain shared
+// with the source — ContextProvider never mutates them in place, but
+// callers should avoid mutating them after handing them to
+// AddDataToContext. The deep-copy guarantee applies specifically to
+// map[string]any values, which processValue and deepCopyMap recurse
+// into; other map types (e.g. map[string]string, map[any]any) are
+// stored as opaque values. Value types (int, string, struct, etc.) are
+// copied as usual when stored in an `any` slot. *http.Request and
+// http.Request inputs are converted to map[string]any via
 // helpers.RequestToMap on the way in, so the underlying request is not
 // stored.
 //
