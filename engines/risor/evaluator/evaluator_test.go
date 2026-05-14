@@ -2,6 +2,7 @@ package evaluator
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -9,6 +10,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/deepnoodle-ai/risor/v2/pkg/bytecode"
 	"github.com/robbyt/go-polyscript/engines/risor/compiler"
@@ -558,5 +560,62 @@ func TestEvaluator_AddDataToContext(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// TestEval_CancellationHaltsExecution verifies that cancelling the context
+// passed to Eval() halts the running script within a bounded time. The
+// script body is an unboundedly-long loop; only cancellation can return
+// it within the test deadline (issue #125).
+func TestEval_CancellationHaltsExecution(t *testing.T) {
+	t.Parallel()
+
+	handler := slog.NewTextHandler(io.Discard, nil)
+
+	// Condition-only Risor for-loop with a counter that would take far
+	// longer than the 2s test deadline to exhaust naturally; only ctx
+	// cancellation lets Eval return early.
+	// Risor v2 has no while/for-condition statements; iterate via a
+	// lazy range and the .each higher-order. The VM checks ctx.Done()
+	// periodically during execution (vm.go DefaultContextCheckInterval),
+	// so cancellation halts inside the .each call. Range count chosen
+	// so natural completion would far outrun the 2s test deadline.
+	const script = `
+range(1000000000).each(x => x)
+"done"
+`
+
+	ld, err := loader.NewFromString(script)
+	require.NoError(t, err)
+	ctxProvider := data.NewContextProvider(constants.EvalData)
+	exe, err := createTestExecutable(handler, ld, []string{constants.Ctx}, ctxProvider)
+	require.NoError(t, err)
+	eval := New(handler, exe)
+	require.NotNil(t, eval)
+
+	ctx, cancel := context.WithCancel(t.Context())
+	ctx = context.WithValue(ctx, constants.EvalData, map[string]any{})
+
+	done := make(chan error, 1)
+	go func() {
+		_, err := eval.Eval(ctx)
+		done <- err
+	}()
+
+	// Give the engine a moment to enter the spin loop, then cancel.
+	time.Sleep(50 * time.Millisecond)
+	cancel()
+
+	select {
+	case err := <-done:
+		require.Error(t, err)
+		require.True(t,
+			errors.Is(err, context.Canceled) ||
+				strings.Contains(err.Error(), "context canceled") ||
+				strings.Contains(err.Error(), "cancel"),
+			"expected cancellation-shaped error, got: %v", err,
+		)
+	case <-time.After(2 * time.Second):
+		t.Fatal("Eval did not return within 2s after cancel; cancellation unresponsive")
 	}
 }
