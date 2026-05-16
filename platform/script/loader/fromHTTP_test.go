@@ -7,6 +7,8 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -540,7 +542,7 @@ func TestFromHTTP_GetReaderWithContext(t *testing.T) {
 func TestFromHTTP_String(t *testing.T) {
 	t.Parallel()
 
-	t.Run("successful string representation", func(t *testing.T) {
+	t.Run("string representation populates SHA after first GetReader", func(t *testing.T) {
 		// Create test server that returns content
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
@@ -554,15 +556,25 @@ func TestFromHTTP_String(t *testing.T) {
 		loader, err := NewFromHTTP(testURL)
 		require.NoError(t, err)
 
+		// Issue #96: String() no longer fetches on its own. The SHA is
+		// cached during the production GetReader path; drain a reader
+		// here to populate it.
+		r, err := loader.GetReader()
+		require.NoError(t, err)
+		_, copyErr := io.Copy(io.Discard, r)
+		require.NoError(t, copyErr)
+		require.NoError(t, r.Close())
+
 		str := loader.String()
 		require.Contains(t, str, "loader.FromHTTP{URL:")
 		require.Contains(t, str, testURL)
 		require.Contains(t, str, "SHA256:")
 	})
 
-	t.Run("string representation with network error", func(t *testing.T) {
-		// Create server that deliberately fails connections (invalid port)
-		testURL := "http://localhost:1" // This port is unlikely to be listening
+	t.Run("string representation when no read has occurred is the no-checksum form", func(t *testing.T) {
+		// Unreachable URL — String() must still return cheaply with no
+		// network round-trip.
+		testURL := "http://localhost:1" // unlikely to be listening
 
 		loader, err := NewFromHTTP(testURL)
 		require.NoError(t, err)
@@ -590,6 +602,120 @@ func TestFromHTTP_String(t *testing.T) {
 		str := loader.String()
 		require.Contains(t, str, "loader.FromHTTP{URL:")
 		require.Contains(t, str, testURL)
+		require.NotContains(t, str, "SHA256")
+	})
+}
+
+// TestFromHTTP_String_NoNetworkRoundTrip is the regression suite for
+// issue #96: String() must be cheap and side-effect-free. The cache
+// is populated only when the body has been fetched through the regular
+// GetReader path.
+func TestFromHTTP_String_NoNetworkRoundTrip(t *testing.T) {
+	t.Parallel()
+
+	t.Run("String before GetReader makes no HTTP request", func(t *testing.T) {
+		var hits atomic.Int32
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			hits.Add(1)
+			_, writeErr := w.Write([]byte("body"))
+			assert.NoError(t, writeErr)
+		}))
+		defer server.Close()
+
+		loader, err := NewFromHTTP(server.URL + "/script.js")
+		require.NoError(t, err)
+
+		// Multiple String() calls — none should hit the server.
+		for range 5 {
+			str := loader.String()
+			require.Contains(t, str, "loader.FromHTTP{URL:")
+			require.NotContains(t, str, "SHA256")
+		}
+		require.Equal(t, int32(0), hits.Load(), "String() must not perform HTTP requests")
+	})
+
+	t.Run("String after GetReader returns cached SHA without re-fetching", func(t *testing.T) {
+		var hits atomic.Int32
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			hits.Add(1)
+			_, writeErr := w.Write([]byte("deterministic body"))
+			assert.NoError(t, writeErr)
+		}))
+		defer server.Close()
+
+		loader, err := NewFromHTTP(server.URL + "/script.js")
+		require.NoError(t, err)
+
+		r, err := loader.GetReader()
+		require.NoError(t, err)
+		_, copyErr := io.Copy(io.Discard, r)
+		require.NoError(t, copyErr)
+		require.NoError(t, r.Close())
+		require.Equal(t, int32(1), hits.Load(), "GetReader should hit the server once")
+
+		// Multiple String() calls — still only 1 server hit.
+		for range 5 {
+			str := loader.String()
+			require.Contains(t, str, "SHA256: ")
+		}
+		require.Equal(t, int32(1), hits.Load(), "String() must not re-fetch")
+	})
+
+	t.Run("Concurrent String and GetReader is race-free", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			_, writeErr := w.Write([]byte("body"))
+			assert.NoError(t, writeErr)
+		}))
+		defer server.Close()
+
+		loader, err := NewFromHTTP(server.URL + "/script.js")
+		require.NoError(t, err)
+
+		var wg sync.WaitGroup
+		for range 32 {
+			wg.Add(2)
+			go func() {
+				defer wg.Done()
+				_ = loader.String()
+			}()
+			go func() {
+				defer wg.Done()
+				r, err := loader.GetReader()
+				if err != nil {
+					return
+				}
+				_, copyErr := io.Copy(io.Discard, r)
+				assert.NoError(t, copyErr)
+				assert.NoError(t, r.Close())
+			}()
+		}
+		wg.Wait()
+
+		// After the dust settles, SHA must be cached.
+		require.Contains(t, loader.String(), "SHA256: ")
+	})
+
+	t.Run("MaxBodySize=-1 streams body and leaves SHA cache empty", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			_, writeErr := w.Write([]byte("body"))
+			assert.NoError(t, writeErr)
+		}))
+		defer server.Close()
+
+		opts := DefaultHTTPOptions().WithMaxBodySize(-1)
+		loader, err := NewFromHTTPWithOptions(server.URL+"/script.js", opts)
+		require.NoError(t, err)
+
+		r, err := loader.GetReader()
+		require.NoError(t, err)
+		_, copyErr := io.Copy(io.Discard, r)
+		require.NoError(t, copyErr)
+		require.NoError(t, r.Close())
+
+		// Negative cap disables buffering in cappedBody, so the SHA
+		// cache stays empty. String() falls back to no-checksum form.
+		str := loader.String()
+		require.Contains(t, str, "loader.FromHTTP{URL:")
 		require.NotContains(t, str, "SHA256")
 	})
 }
