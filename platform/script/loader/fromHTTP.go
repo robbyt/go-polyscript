@@ -20,6 +20,7 @@ import (
 	"math"
 	"net/http"
 	"net/url"
+	"sync/atomic"
 	"time"
 
 	"github.com/robbyt/go-polyscript/internal/helpers"
@@ -139,6 +140,13 @@ type FromHTTP struct {
 	sourceURL *url.URL
 	options   *HTTPOptions
 	client    httpRequester
+
+	// sha holds a short (8-char) SHA-256 prefix of the response body,
+	// cached on the first successful GetReader call. String() loads it
+	// without making a network request. Nil until the first body has
+	// been buffered by cappedBody — when MaxBodySize is negative the
+	// body is streamed and the cache stays unset.
+	sha atomic.Pointer[string]
 }
 
 // NewFromHTTP creates a new HTTP loader with the given URL and default options.
@@ -308,6 +316,17 @@ func (l *FromHTTP) cappedBody(resp *http.Response) (io.ReadCloser, error) {
 	if int64(len(buf)) > limit {
 		return nil, fmt.Errorf("%w: %s exceeds %d bytes", ErrScriptTooLarge, l.url, limit)
 	}
+
+	// Cache the short SHA prefix from the first successful read so
+	// String() can include it without a network round-trip. CAS-on-nil
+	// keeps the first writer's value if multiple goroutines race here.
+	if l.sha.Load() == nil {
+		if sum, sumErr := helpers.SHA256Reader(bytes.NewReader(buf)); sumErr == nil && len(sum) >= 8 {
+			short := sum[:8]
+			l.sha.CompareAndSwap(nil, &short)
+		}
+	}
+
 	return io.NopCloser(bytes.NewReader(buf)), nil
 }
 
@@ -317,34 +336,19 @@ func (l *FromHTTP) GetSourceURL() *url.URL {
 	return l.sourceURL
 }
 
-// String returns a string representation of the HTTP loader.
-// This is useful for debugging and logging.
+// String returns a string representation of the HTTP loader, suitable
+// for debugging and logging. The returned value is cheap to compute:
+// it never performs a network request.
+//
+// The "SHA256: <prefix>" form is included only after the body has been
+// fetched at least once via [FromHTTP.GetReader] (or
+// [FromHTTP.GetReaderWithContext]) and the response was buffered through
+// [FromHTTP.cappedBody]. Until then — or when [HTTPOptions.MaxBodySize]
+// is negative (which disables buffering) — String returns the
+// no-checksum form.
 func (l *FromHTTP) String() string {
-	var chksum string
-	noChkSum := fmt.Sprintf("loader.FromHTTP{URL: %s}", l.url)
-
-	if l.sourceURL != nil {
-		reader, err := l.GetReader()
-		if err != nil {
-			return noChkSum
-		}
-		defer func() {
-			if err := reader.Close(); err != nil {
-				slog.Default().Debug("Failed to close reader in String() method", "error", err)
-			}
-		}()
-
-		chksum, err = helpers.SHA256Reader(reader)
-		if err != nil {
-			return noChkSum
-		}
-
-		chksum = chksum[:8]
+	if p := l.sha.Load(); p != nil {
+		return fmt.Sprintf("loader.FromHTTP{URL: %s, SHA256: %s}", l.url, *p)
 	}
-
-	if chksum == "" {
-		return noChkSum
-	}
-
-	return fmt.Sprintf("loader.FromHTTP{URL: %s, SHA256: %s}", l.url, chksum)
+	return fmt.Sprintf("loader.FromHTTP{URL: %s}", l.url)
 }
