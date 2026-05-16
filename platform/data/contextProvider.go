@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"maps"
 	"net/http"
 
 	"github.com/robbyt/go-polyscript/internal/helpers"
@@ -50,6 +49,32 @@ func (p *ContextProvider) GetData(ctx context.Context) (map[string]any, error) {
 // and later values override earlier ones for duplicate keys.
 //
 // See README.md for detailed usage examples.
+//
+// # Concurrency
+//
+// AddDataToContext is safe for concurrent use. Each call returns a
+// derived context independent of its parent: data merged into the
+// derived context does not affect the parent or any sibling derived
+// chain. Existing data from the parent context is deep-copied at every
+// nesting level when forming the derived context, so concurrent
+// enrichments from goroutines that share a parent never race on shared
+// inner map storage.
+//
+// Reference-typed values stored in the map (slices, pointers, channels,
+// function values, and maps OTHER than map[string]any) remain shared
+// with the source — ContextProvider never mutates them in place, but
+// callers should avoid mutating them after handing them to
+// AddDataToContext. The deep-copy guarantee applies specifically to
+// map[string]any values, which processValue and deepCopyMap recurse
+// into; other map types (e.g. map[string]string, map[any]any) are
+// stored as opaque values. Value types (int, string, struct, etc.) are
+// copied as usual when stored in an `any` slot. *http.Request and
+// http.Request inputs are converted to map[string]any via
+// helpers.RequestToMap on the way in, so the underlying request is not
+// stored.
+//
+// The typical pattern is one derived-context chain per request, with
+// the returned context threaded forward for any subsequent enrichment.
 func (p *ContextProvider) AddDataToContext(
 	ctx context.Context,
 	data ...map[string]any,
@@ -63,7 +88,10 @@ func (p *ContextProvider) AddDataToContext(
 
 	if existingData := ctx.Value(p.contextKey); existingData != nil {
 		if existingMap, ok := existingData.(map[string]any); ok {
-			maps.Copy(toStore, existingMap)
+			// Deep-copy nested maps so subsequent in-place merge into
+			// toStore cannot race with goroutines reading or merging the
+			// same parent context. See the # Concurrency note above.
+			toStore = deepCopyMap(existingMap)
 		}
 	}
 
@@ -146,4 +174,30 @@ func (p *ContextProvider) mergeIntoMap(
 
 	// Non-map values simply replace existing values
 	target[key] = value
+}
+
+// deepCopyMap returns a recursive copy of m. Nested map[string]any values
+// are allocated fresh at every level so the returned map shares no mutable
+// map storage with m.
+//
+// Always returns a non-nil map, even when m is nil or empty; this lets
+// AddDataToContext use the result directly without a separate guard
+// against a nil parent-context value.
+//
+// Non-map values are stored by assignment to an `any` slot. Value types
+// (int, string, struct, etc.) are copied as usual; reference types
+// (slices, pointers, channels, function values) remain shared with the
+// source. ContextProvider never mutates stored values in place; callers
+// should avoid mutating reference-typed values after handing them to
+// AddDataToContext.
+func deepCopyMap(m map[string]any) map[string]any {
+	out := make(map[string]any, len(m))
+	for k, v := range m {
+		if nested, ok := v.(map[string]any); ok {
+			out[k] = deepCopyMap(nested)
+		} else {
+			out[k] = v
+		}
+	}
+	return out
 }

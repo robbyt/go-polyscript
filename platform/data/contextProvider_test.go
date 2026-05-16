@@ -2,7 +2,9 @@ package data
 
 import (
 	"context"
+	"fmt"
 	"net/http"
+	"sync"
 	"testing"
 
 	"github.com/robbyt/go-polyscript/platform/constants"
@@ -582,4 +584,108 @@ func TestContextProvider_DataIntegration(t *testing.T) {
 		require.Error(t, err, "Should reject empty keys")
 		assert.Contains(t, err.Error(), "empty keys are not allowed")
 	})
+}
+
+// TestContextProvider_AddDataToContext_TypedNilParent guards against a
+// regression caught in Copilot review of #93: if a typed-nil map[string]any
+// is stored in the context value (e.g. `context.WithValue(parent, key,
+// (map[string]any)(nil))`), the parent map ranges as empty, deepCopyMap
+// must still produce a usable non-nil destination, and the subsequent
+// merge must not panic with "assignment to entry in nil map".
+func TestContextProvider_AddDataToContext_TypedNilParent(t *testing.T) {
+	t.Parallel()
+	p := NewContextProvider(constants.EvalData)
+
+	var typedNil map[string]any
+	parent := context.WithValue(t.Context(), constants.EvalData, typedNil)
+
+	// This call would have panicked under the early-return-nil version
+	// of deepCopyMap (toStore = nil → mergeIntoMap → assignment to entry
+	// in nil map).
+	next, err := p.AddDataToContext(parent, map[string]any{"k": "v"})
+	require.NoError(t, err)
+
+	got, err := p.GetData(next)
+	require.NoError(t, err)
+	assert.Equal(t, "v", got["k"])
+}
+
+// TestContextProvider_AddDataToContext_Concurrent is the regression test
+// for the deep-copy fix in #93. Goroutines share an already-enriched
+// parent context whose value contains a nested map. Each goroutine
+// enriches the SAME nested key with its own data and reads it back.
+// Before the deep-copy fix, the recursive merge mutated the nested map
+// in-place — concurrent goroutines raced on shared inner storage and
+// -race would fire. The fix deep-copies nested maps when deriving from
+// the parent so each derived chain owns its own nested map storage.
+//
+// 32 goroutines × 100 iterations = 3200 enrichment + read-back checks
+// against a shared parent. Passes cleanly under -race.
+func TestContextProvider_AddDataToContext_Concurrent(t *testing.T) {
+	t.Parallel()
+
+	p := NewContextProvider(constants.EvalData)
+
+	// Pre-enrich a shared root with a nested map. This is the exact
+	// shape that was unsafe under the old shallow-copy implementation.
+	parent, err := p.AddDataToContext(t.Context(), map[string]any{
+		"shared": map[string]any{"baseline": "from-parent"},
+	})
+	require.NoError(t, err)
+
+	const goroutines = 32
+	const iterations = 100
+
+	var wg sync.WaitGroup
+	wg.Add(goroutines)
+	for id := range goroutines {
+		go func() {
+			defer wg.Done()
+
+			// All goroutines start from the SAME enriched parent.
+			ctx := parent
+			for j := range iterations {
+				key := fmt.Sprintf("g%d-iter%d", id, j)
+
+				// Enrich the nested "shared" map with our own key. Before
+				// the fix this was the racing path: mergeIntoMap recursed
+				// into parent.shared and mutated it concurrently.
+				next, err := p.AddDataToContext(ctx, map[string]any{
+					"shared": map[string]any{key: j},
+				})
+				if !assert.NoErrorf(t, err, "goroutine %d iter %d", id, j) {
+					return
+				}
+
+				// Read-back invariant: our derived chain must contain
+				// our key under "shared", plus the baseline from parent.
+				got, err := p.GetData(next)
+				if !assert.NoErrorf(t, err, "goroutine %d iter %d GetData", id, j) {
+					return
+				}
+				shared, ok := got["shared"].(map[string]any)
+				if !assert.Truef(t, ok, "goroutine %d iter %d: shared not a map", id, j) {
+					return
+				}
+				if !assert.Equalf(t, j, shared[key], "goroutine %d iter %d shared[%q]", id, j, key) {
+					return
+				}
+				if !assert.Equalf(t, "from-parent", shared["baseline"],
+					"goroutine %d iter %d: parent baseline lost", id, j) {
+					return
+				}
+				ctx = next
+			}
+		}()
+	}
+	wg.Wait()
+
+	// Parent context must be unchanged after all the concurrent
+	// enrichment — the deep-copy fix guarantees independence.
+	parentData, err := p.GetData(parent)
+	require.NoError(t, err)
+	parentShared, ok := parentData["shared"].(map[string]any)
+	require.True(t, ok)
+	require.Equal(t, "from-parent", parentShared["baseline"])
+	require.Len(t, parentShared, 1, "parent.shared must hold only the baseline key; got %v", parentShared)
 }
