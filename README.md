@@ -201,7 +201,7 @@ result, _ := evaluator.Eval(enrichedCtx)
 
 `ContextProvider.AddDataToContext` is safe for concurrent use. Each call returns a derived context independent of its parent: data merged into the derived context never affects the parent or any sibling derived chain.
 
-Existing data from the parent context is deep-copied at every nesting level when forming the derived context, so concurrent enrichments from goroutines that share a parent context — even one already populated with nested maps — do not race on shared inner storage.
+Existing data from the parent context is deep-copied when forming the derived context, so concurrent enrichments from goroutines that share a parent context — even one already populated with nested maps — do not race on shared inner map storage.
 
 The typical pattern is one derived-context chain per request, with the returned context threaded forward for any subsequent enrichment:
 
