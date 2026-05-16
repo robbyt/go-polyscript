@@ -561,7 +561,8 @@ func TestFromHTTP_String(t *testing.T) {
 		// here to populate it.
 		r, err := loader.GetReader()
 		require.NoError(t, err)
-		_, _ = io.Copy(io.Discard, r)
+		_, copyErr := io.Copy(io.Discard, r)
+		require.NoError(t, copyErr)
 		require.NoError(t, r.Close())
 
 		str := loader.String()
@@ -616,7 +617,8 @@ func TestFromHTTP_String_NoNetworkRoundTrip(t *testing.T) {
 		var hits atomic.Int32
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			hits.Add(1)
-			_, _ = w.Write([]byte("body"))
+			_, writeErr := w.Write([]byte("body"))
+			assert.NoError(t, writeErr)
 		}))
 		defer server.Close()
 
@@ -636,7 +638,8 @@ func TestFromHTTP_String_NoNetworkRoundTrip(t *testing.T) {
 		var hits atomic.Int32
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			hits.Add(1)
-			_, _ = w.Write([]byte("deterministic body"))
+			_, writeErr := w.Write([]byte("deterministic body"))
+			assert.NoError(t, writeErr)
 		}))
 		defer server.Close()
 
@@ -645,7 +648,8 @@ func TestFromHTTP_String_NoNetworkRoundTrip(t *testing.T) {
 
 		r, err := loader.GetReader()
 		require.NoError(t, err)
-		_, _ = io.Copy(io.Discard, r)
+		_, copyErr := io.Copy(io.Discard, r)
+		require.NoError(t, copyErr)
 		require.NoError(t, r.Close())
 		require.Equal(t, int32(1), hits.Load(), "GetReader should hit the server once")
 
@@ -659,7 +663,8 @@ func TestFromHTTP_String_NoNetworkRoundTrip(t *testing.T) {
 
 	t.Run("Concurrent String and GetReader is race-free", func(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			_, _ = w.Write([]byte("body"))
+			_, writeErr := w.Write([]byte("body"))
+			assert.NoError(t, writeErr)
 		}))
 		defer server.Close()
 
@@ -679,8 +684,9 @@ func TestFromHTTP_String_NoNetworkRoundTrip(t *testing.T) {
 				if err != nil {
 					return
 				}
-				_, _ = io.Copy(io.Discard, r)
-				_ = r.Close()
+				_, copyErr := io.Copy(io.Discard, r)
+				assert.NoError(t, copyErr)
+				assert.NoError(t, r.Close())
 			}()
 		}
 		wg.Wait()
@@ -691,7 +697,8 @@ func TestFromHTTP_String_NoNetworkRoundTrip(t *testing.T) {
 
 	t.Run("MaxBodySize=-1 streams body and leaves SHA cache empty", func(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			_, _ = w.Write([]byte("body"))
+			_, writeErr := w.Write([]byte("body"))
+			assert.NoError(t, writeErr)
 		}))
 		defer server.Close()
 
@@ -701,7 +708,8 @@ func TestFromHTTP_String_NoNetworkRoundTrip(t *testing.T) {
 
 		r, err := loader.GetReader()
 		require.NoError(t, err)
-		_, _ = io.Copy(io.Discard, r)
+		_, copyErr := io.Copy(io.Discard, r)
+		require.NoError(t, copyErr)
 		require.NoError(t, r.Close())
 
 		// Negative cap disables buffering in cappedBody, so the SHA
