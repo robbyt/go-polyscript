@@ -4,7 +4,6 @@ import (
 	"context"
 	"net/http"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -94,9 +93,8 @@ func TestBasicAuth(t *testing.T) {
 		req, err := http.NewRequest(http.MethodGet, "http://localhost/test", nil)
 		require.NoError(t, err)
 
-		ctx, cancel := context.WithTimeout(t.Context(), 1*time.Nanosecond)
-		time.Sleep(5 * time.Millisecond) // Ensure the timeout occurs
-		defer cancel()
+		ctx, cancel := context.WithCancel(t.Context())
+		cancel()
 
 		auth := NewBasicAuth(username, password)
 		require.Equal(t, "Basic", auth.Name())
