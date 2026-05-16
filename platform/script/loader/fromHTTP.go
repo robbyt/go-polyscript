@@ -321,7 +321,8 @@ func (l *FromHTTP) cappedBody(resp *http.Response) (io.ReadCloser, error) {
 	// String() can include it without a network round-trip. CAS-on-nil
 	// keeps the first writer's value if multiple goroutines race here.
 	if l.sha.Load() == nil {
-		if sum, sumErr := helpers.SHA256Reader(bytes.NewReader(buf)); sumErr == nil && len(sum) >= 8 {
+		sum := helpers.SHA256Bytes(buf)
+		if len(sum) >= 8 {
 			short := sum[:8]
 			l.sha.CompareAndSwap(nil, &short)
 		}
