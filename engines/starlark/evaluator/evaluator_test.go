@@ -391,3 +391,89 @@ result = spin()
 		t.Fatal("Eval did not return within 2s after cancel; cancellation unresponsive")
 	}
 }
+
+// TestEval_ErrorTypeExposesStarlarkDetails verifies that errors returned from
+// Eval expose the underlying *starlark.EvalError via errors.As and via the
+// GetErrorDetails helper, including through additional fmt.Errorf wrapping.
+func TestEval_ErrorTypeExposesStarlarkDetails(t *testing.T) {
+	t.Parallel()
+
+	t.Run("fail() in script surfaces EvalError", func(t *testing.T) {
+		t.Parallel()
+
+		const scriptContent = `fail("user reason")`
+		_, eval := evalBuilder(t, scriptContent)
+
+		_, err := eval.Eval(t.Context())
+		require.Error(t, err)
+
+		var evalErrWrap *Error
+		require.True(t, errors.As(err, &evalErrWrap), "errors.As should recover *evaluator.Error")
+		require.NotNil(t, evalErrWrap.EvalErr, "EvalErr should be populated for fail()")
+		require.Contains(t, evalErrWrap.EvalErr.Msg, "user reason")
+		require.NotEmpty(t, evalErrWrap.EvalErr.Backtrace(), "Backtrace should be non-empty")
+
+		details := GetErrorDetails(err)
+		require.NotNil(t, details)
+		require.Same(t, evalErrWrap.EvalErr, details, "GetErrorDetails returns the same *starlark.EvalError")
+	})
+
+	t.Run("further wrapping preserves recovery", func(t *testing.T) {
+		t.Parallel()
+
+		const scriptContent = `fail("nested")`
+		_, eval := evalBuilder(t, scriptContent)
+
+		_, err := eval.Eval(t.Context())
+		require.Error(t, err)
+
+		wrapped := fmt.Errorf("upstream: %w", err)
+
+		var evalErrWrap *Error
+		require.True(t, errors.As(wrapped, &evalErrWrap), "errors.As works through extra wrapping")
+		require.NotNil(t, evalErrWrap.EvalErr)
+		require.Contains(t, evalErrWrap.EvalErr.Msg, "nested")
+
+		require.NotNil(t, GetErrorDetails(wrapped))
+	})
+
+	t.Run("auto-call failure surfaces EvalError", func(t *testing.T) {
+		t.Parallel()
+
+		// Script's last value is a callable; auto-call invokes it; the call
+		// raises via fail() and the evaluator wraps it as *Error.
+		const scriptContent = `
+def boom():
+    fail("from callable")
+
+_ = boom
+`
+		_, eval := evalBuilder(t, scriptContent)
+
+		_, err := eval.Eval(t.Context())
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "error calling function")
+
+		details := GetErrorDetails(err)
+		require.NotNil(t, details)
+		require.Contains(t, details.Msg, "from callable")
+	})
+
+	t.Run("non-Starlark failure leaves EvalErr nil", func(t *testing.T) {
+		t.Parallel()
+
+		// Hitting the "executable unit is nil" path returns a *fmt.Errorf
+		// without ever calling into Starlark — GetErrorDetails should return
+		// nil and a bare err != nil check still works.
+		handler := slog.NewTextHandler(os.Stdout, nil)
+		eval := New(handler, nil)
+
+		_, err := eval.Eval(t.Context())
+		require.Error(t, err)
+
+		require.Nil(t, GetErrorDetails(err))
+
+		var evalErrWrap *Error
+		require.False(t, errors.As(err, &evalErrWrap), "errors.As should not match for non-Starlark errors")
+	})
+}

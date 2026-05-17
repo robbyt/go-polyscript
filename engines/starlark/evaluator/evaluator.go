@@ -2,6 +2,7 @@ package evaluator
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"maps"
@@ -113,7 +114,12 @@ func (be *Evaluator) exec(
 	execTime := time.Since(startTime)
 
 	if err != nil {
-		return nil, fmt.Errorf("starlark execution error: %w", err)
+		var evalErr *starlarkLib.EvalError
+		errors.As(err, &evalErr)
+		return nil, &Error{
+			Msg:     fmt.Sprintf("starlark execution error: %s", err),
+			EvalErr: evalErr,
+		}
 	}
 
 	// Get the main value from globals
@@ -202,7 +208,12 @@ func (be *Evaluator) Eval(ctx context.Context) (platform.EvaluatorResponse, erro
 		thread := &starlarkLib.Thread{Name: "func"}
 		val, err := starlarkLib.Call(thread, callable, nil, nil)
 		if err != nil {
-			return nil, fmt.Errorf("error calling function: %w", err)
+			var evalErr *starlarkLib.EvalError
+			errors.As(err, &evalErr)
+			return nil, &Error{
+				Msg:     fmt.Sprintf("error calling function: %s", err),
+				EvalErr: evalErr,
+			}
 		}
 		// "Freeze" the value to prevent any further modifications
 		val.Freeze()
