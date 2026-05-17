@@ -7,9 +7,14 @@ import (
 	"log/slog"
 
 	extismSDK "github.com/extism/go-sdk"
+	"github.com/robbyt/go-polyscript/engines/extism/adapters"
 	"github.com/robbyt/go-polyscript/engines/extism/compiler/internal/compile"
 	"github.com/robbyt/go-polyscript/platform/script"
 )
+
+// compileFunc is the signature for compiling raw WASM bytes into a CompiledPlugin.
+// Defaulted to compile.CompileBytes; overridable in tests to drive failure paths.
+type compileFunc func(ctx context.Context, wasmBytes []byte, opts *compile.Settings) (adapters.CompiledPlugin, error)
 
 // Compiler implements the script.Compiler interface for WASM modules
 type Compiler struct {
@@ -18,6 +23,7 @@ type Compiler struct {
 	options        *compile.Settings
 	logHandler     slog.Handler
 	logger         *slog.Logger
+	compileFn      compileFunc
 }
 
 // New creates a new Extism WASM Compiler instance with the provided options.
@@ -75,8 +81,8 @@ func (c *Compiler) Compile(scriptReader io.ReadCloser) (script.ExecutableContent
 
 	logger.Debug("Starting WASM compilation", "scriptLength", len(scriptBytes))
 
-	// Compile the WASM module using the CompileBytes function from the internal compile package
-	plugin, err := compile.CompileBytes(c.ctx, scriptBytes, c.options)
+	// Compile the WASM module using the configured compile function (defaults to compile.CompileBytes)
+	plugin, err := c.compileFn(c.ctx, scriptBytes, c.options)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrValidationFailed, err)
 	}
@@ -106,11 +112,10 @@ func (c *Compiler) Compile(scriptReader io.ReadCloser) (script.ExecutableContent
 		)
 	}
 
-	// Create executable with the compiled plugin
+	// Create executable with the compiled plugin. Inputs are guaranteed non-empty
+	// by the checks above (scriptBytes, plugin) and validate() (funcName), so
+	// NewExecutable cannot return nil here.
 	executable := NewExecutable(scriptBytes, plugin, funcName)
-	if executable == nil {
-		return nil, ErrExecCreationFailed
-	}
 
 	logger.Debug("WASM compilation completed")
 	return executable, nil

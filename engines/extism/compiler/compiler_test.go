@@ -1,13 +1,18 @@
 package compiler
 
 import (
+	"bytes"
+	"context"
 	_ "embed"
 	"encoding/json"
+	"errors"
 	"io"
 	"log/slog"
 	"testing"
 
 	extismSDK "github.com/extism/go-sdk"
+	"github.com/robbyt/go-polyscript/engines/extism/adapters"
+	"github.com/robbyt/go-polyscript/engines/extism/compiler/internal/compile"
 	"github.com/robbyt/go-polyscript/engines/extism/wasmdata"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -290,4 +295,169 @@ func TestCompiler_Compile(t *testing.T) {
 			reader.AssertExpectations(t)
 		})
 	})
+}
+
+// TestCompiler_Compile_Branches exercises the Compile() error paths that are not
+// reachable through the real Extism SDK with a valid module: io.ReadAll failure,
+// reader Close failure, compile-yields-nil-plugin, plugin.Instance failure, and
+// instance.Close-on-defer failure. Uses the unexported compileFn seam.
+func TestCompiler_Compile_Branches(t *testing.T) {
+	t.Parallel()
+
+	t.Run("io.ReadAll fails", func(t *testing.T) {
+		t.Parallel()
+		comp := createTestCompiler(t, "main")
+		reader := &errReader{readErr: errors.New("read kaboom")}
+
+		execContent, err := comp.Compile(reader)
+		require.Error(t, err)
+		require.Nil(t, execContent)
+		require.ErrorContains(t, err, "failed to read script")
+		require.ErrorContains(t, err, "read kaboom")
+	})
+
+	t.Run("scriptReader.Close fails", func(t *testing.T) {
+		t.Parallel()
+		comp := createTestCompiler(t, "main")
+		// Read succeeds (returns EOF on first Read with empty buffer is fine for
+		// io.ReadAll, but we want non-empty bytes so Close error is the only failure).
+		reader := &readCloseErr{
+			buf:      bytes.NewReader([]byte("anything")),
+			closeErr: errors.New("close kaboom"),
+		}
+
+		execContent, err := comp.Compile(reader)
+		require.Error(t, err)
+		require.Nil(t, execContent)
+		require.ErrorContains(t, err, "failed to close reader")
+		require.ErrorContains(t, err, "close kaboom")
+	})
+
+	t.Run("compileFn returns nil plugin without error", func(t *testing.T) {
+		t.Parallel()
+		comp := createTestCompiler(t, "main")
+		comp.compileFn = func(
+			ctx context.Context,
+			wasmBytes []byte,
+			opts *compile.Settings,
+		) (adapters.CompiledPlugin, error) {
+			return nil, nil
+		}
+
+		reader := newMockScriptReaderCloser([]byte("any-bytes"))
+		reader.On("Close").Return(nil)
+
+		execContent, err := comp.Compile(reader)
+		require.Error(t, err)
+		require.Nil(t, execContent)
+		require.ErrorIs(t, err, ErrBytecodeNil)
+		reader.AssertExpectations(t)
+	})
+
+	t.Run("plugin.Instance fails", func(t *testing.T) {
+		t.Parallel()
+		comp := createTestCompiler(t, "main")
+
+		plugin := &mockCompiledPlugin{}
+		plugin.On("Instance", mock.Anything, mock.Anything).
+			Return(nil, errors.New("instance kaboom"))
+
+		comp.compileFn = func(
+			ctx context.Context,
+			wasmBytes []byte,
+			opts *compile.Settings,
+		) (adapters.CompiledPlugin, error) {
+			return plugin, nil
+		}
+
+		reader := newMockScriptReaderCloser([]byte("any-bytes"))
+		reader.On("Close").Return(nil)
+
+		execContent, err := comp.Compile(reader)
+		require.Error(t, err)
+		require.Nil(t, execContent)
+		require.ErrorIs(t, err, ErrValidationFailed)
+		require.ErrorContains(t, err, "failed to create test instance")
+		require.ErrorContains(t, err, "instance kaboom")
+		plugin.AssertExpectations(t)
+		reader.AssertExpectations(t)
+	})
+
+	t.Run("instance.Close error is logged, not returned", func(t *testing.T) {
+		t.Parallel()
+		comp := createTestCompiler(t, "main")
+
+		instance := &mockPluginInstance{}
+		instance.On("FunctionExists", "main").Return(true)
+		instance.On("Close", mock.Anything).Return(errors.New("close kaboom"))
+
+		plugin := &mockCompiledPlugin{}
+		plugin.On("Instance", mock.Anything, mock.Anything).Return(instance, nil)
+
+		comp.compileFn = func(
+			ctx context.Context,
+			wasmBytes []byte,
+			opts *compile.Settings,
+		) (adapters.CompiledPlugin, error) {
+			return plugin, nil
+		}
+
+		reader := newMockScriptReaderCloser([]byte("any-bytes"))
+		reader.On("Close").Return(nil)
+
+		execContent, err := comp.Compile(reader)
+		require.NoError(t, err, "instance.Close error must not propagate")
+		require.NotNil(t, execContent)
+		plugin.AssertExpectations(t)
+		instance.AssertExpectations(t)
+		reader.AssertExpectations(t)
+	})
+
+	t.Run("FunctionExists returns false", func(t *testing.T) {
+		t.Parallel()
+		comp := createTestCompiler(t, "no_such_fn")
+
+		instance := &mockPluginInstance{}
+		instance.On("FunctionExists", "no_such_fn").Return(false)
+		instance.On("Close", mock.Anything).Return(nil)
+
+		plugin := &mockCompiledPlugin{}
+		plugin.On("Instance", mock.Anything, mock.Anything).Return(instance, nil)
+
+		comp.compileFn = func(
+			ctx context.Context,
+			wasmBytes []byte,
+			opts *compile.Settings,
+		) (adapters.CompiledPlugin, error) {
+			return plugin, nil
+		}
+
+		reader := newMockScriptReaderCloser([]byte("any-bytes"))
+		reader.On("Close").Return(nil)
+
+		execContent, err := comp.Compile(reader)
+		require.Error(t, err)
+		require.Nil(t, execContent)
+		require.ErrorIs(t, err, ErrValidationFailed)
+		require.ErrorContains(t, err, "entry point function 'no_such_fn' not found")
+		plugin.AssertExpectations(t)
+		instance.AssertExpectations(t)
+		reader.AssertExpectations(t)
+	})
+}
+
+// readCloseErr is an io.ReadCloser that delegates Read to a *bytes.Reader and
+// returns a configured error from Close. Used to exercise the scriptReader.Close
+// failure branch without involving the testify mock machinery.
+type readCloseErr struct {
+	buf      *bytes.Reader
+	closeErr error
+}
+
+func (r *readCloseErr) Read(p []byte) (int, error) {
+	return r.buf.Read(p)
+}
+
+func (r *readCloseErr) Close() error {
+	return r.closeErr
 }
