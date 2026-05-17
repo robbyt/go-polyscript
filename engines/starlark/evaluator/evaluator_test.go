@@ -408,7 +408,7 @@ func TestEval_ErrorTypeExposesStarlarkDetails(t *testing.T) {
 		require.Error(t, err)
 
 		var evalErrWrap *Error
-		require.True(t, errors.As(err, &evalErrWrap), "errors.As should recover *evaluator.Error")
+		require.ErrorAs(t, err, &evalErrWrap)
 		require.NotNil(t, evalErrWrap.EvalErr, "EvalErr should be populated for fail()")
 		require.Contains(t, evalErrWrap.EvalErr.Msg, "user reason")
 		require.NotEmpty(t, evalErrWrap.EvalErr.Backtrace(), "Backtrace should be non-empty")
@@ -430,7 +430,7 @@ func TestEval_ErrorTypeExposesStarlarkDetails(t *testing.T) {
 		wrapped := fmt.Errorf("upstream: %w", err)
 
 		var evalErrWrap *Error
-		require.True(t, errors.As(wrapped, &evalErrWrap), "errors.As works through extra wrapping")
+		require.ErrorAs(t, wrapped, &evalErrWrap)
 		require.NotNil(t, evalErrWrap.EvalErr)
 		require.Contains(t, evalErrWrap.EvalErr.Msg, "nested")
 
@@ -474,6 +474,6 @@ _ = boom
 		require.Nil(t, GetErrorDetails(err))
 
 		var evalErrWrap *Error
-		require.False(t, errors.As(err, &evalErrWrap), "errors.As should not match for non-Starlark errors")
+		require.NotErrorAs(t, err, &evalErrWrap)
 	})
 }
