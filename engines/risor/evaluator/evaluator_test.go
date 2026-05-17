@@ -619,3 +619,96 @@ range(1000000000).each(x => x)
 		t.Fatal("Eval did not return within 2s after cancel; cancellation unresponsive")
 	}
 }
+
+// TestEval_ErrorTypeExposesRisorDetails verifies that errors returned from
+// Eval expose the script-side diagnostic (Inspect() output of the error/function
+// object) via errors.As and via the GetErrorDetails helper, and that the
+// three-state (result, err) shape has been retired in favor of (nil, err).
+func TestEval_ErrorTypeExposesRisorDetails(t *testing.T) {
+	t.Parallel()
+
+	buildEval := func(t *testing.T, script string) *Evaluator {
+		t.Helper()
+		handler := slog.NewTextHandler(io.Discard, nil)
+		ld, err := loader.NewFromString(script)
+		require.NoError(t, err)
+		ctxProvider := data.NewContextProvider(constants.EvalData)
+		exe, err := createTestExecutable(handler, ld, []string{constants.Ctx}, ctxProvider)
+		require.NoError(t, err)
+		eval := New(handler, exe)
+		require.NotNil(t, eval)
+		return eval
+	}
+
+	t.Run("script returns error surfaces diagnostic", func(t *testing.T) {
+		t.Parallel()
+
+		eval := buildEval(t, `error("user reason")`)
+		ctx := context.WithValue(t.Context(), constants.EvalData, map[string]any{})
+
+		result, err := eval.Eval(ctx)
+		require.Error(t, err)
+		require.Nil(t, result, "result should be nil — three-state shape retired")
+
+		var rErr *Error
+		require.ErrorAs(t, err, &rErr)
+		require.Contains(t, rErr.ScriptResult, "user reason")
+		require.Contains(t, GetErrorDetails(err), "user reason")
+	})
+
+	t.Run("script returns function surfaces diagnostic", func(t *testing.T) {
+		t.Parallel()
+
+		eval := buildEval(t, `x => x + 1`)
+		ctx := context.WithValue(t.Context(), constants.EvalData, map[string]any{})
+
+		result, err := eval.Eval(ctx)
+		require.Error(t, err)
+		require.Nil(t, result)
+
+		var rErr *Error
+		require.ErrorAs(t, err, &rErr)
+		require.NotEmpty(t, rErr.ScriptResult)
+		require.Contains(t, err.Error(), "function object returned from script")
+	})
+
+	t.Run("further wrapping preserves recovery", func(t *testing.T) {
+		t.Parallel()
+
+		eval := buildEval(t, `error("nested")`)
+		ctx := context.WithValue(t.Context(), constants.EvalData, map[string]any{})
+
+		_, err := eval.Eval(ctx)
+		require.Error(t, err)
+
+		wrapped := fmt.Errorf("upstream: %w", err)
+
+		var rErr *Error
+		require.ErrorAs(t, wrapped, &rErr)
+		require.Contains(t, rErr.ScriptResult, "nested")
+		require.Contains(t, GetErrorDetails(wrapped), "nested")
+	})
+
+	t.Run("non-Risor failure leaves ScriptResult empty", func(t *testing.T) {
+		t.Parallel()
+
+		// Hitting the "executable unit is nil" path returns a *fmt.Errorf
+		// without ever calling into the Risor VM — GetErrorDetails should
+		// return "" and ErrorAs against *Error should not match.
+		handler := slog.NewTextHandler(os.Stdout, nil)
+		eval := &Evaluator{
+			ctxKey:     constants.Ctx,
+			execUnit:   nil,
+			logHandler: handler,
+			logger:     slog.New(handler),
+		}
+
+		_, err := eval.Eval(t.Context())
+		require.Error(t, err)
+
+		require.Empty(t, GetErrorDetails(err))
+
+		var rErr *Error
+		require.NotErrorAs(t, err, &rErr)
+	})
+}
