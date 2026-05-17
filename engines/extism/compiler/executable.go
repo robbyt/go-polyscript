@@ -7,7 +7,7 @@ import (
 	"sync/atomic"
 
 	"github.com/robbyt/go-polyscript/engines/extism/adapters"
-	machineTypes "github.com/robbyt/go-polyscript/engines/types"
+	engineTypes "github.com/robbyt/go-polyscript/engines/types"
 )
 
 var ErrExecutableClosed = errors.New("executable is closed")
@@ -56,9 +56,9 @@ func (e *Executable) GetExtismByteCode() adapters.CompiledPlugin {
 	return e.ByteCode
 }
 
-// GetMachineType returns the Extism machine type
-func (e *Executable) GetMachineType() machineTypes.Type {
-	return machineTypes.Extism
+// EngineType returns the Extism engine type
+func (e *Executable) EngineType() engineTypes.Type {
+	return engineTypes.Extism
 }
 
 // GetEntryPoint returns the name of the entry point function

@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	machineTypes "github.com/robbyt/go-polyscript/engines/types"
+	engineTypes "github.com/robbyt/go-polyscript/engines/types"
 	"github.com/robbyt/go-polyscript/platform/data"
 	"github.com/robbyt/go-polyscript/platform/script/loader"
 	"github.com/stretchr/testify/mock"
@@ -49,17 +49,17 @@ func (m *mockReadCloser) Close() error {
 }
 
 func TestVersionMethods(t *testing.T) {
-	t.Run("GetMachineType", func(t *testing.T) {
+	t.Run("EngineType", func(t *testing.T) {
 		mockContent := new(MockExecutableContent)
-		expectedType := machineTypes.Risor
-		mockContent.On("GetMachineType").Return(expectedType)
+		expectedType := engineTypes.Risor
+		mockContent.On("EngineType").Return(expectedType)
 
 		exe := &ExecutableUnit{
 			Content: mockContent,
 		}
 
-		machineType := exe.GetMachineType()
-		require.Equal(t, expectedType, machineType, "Expected machine type to match")
+		engineType := exe.EngineType()
+		require.Equal(t, expectedType, engineType, "Expected engine type to match")
 		mockContent.AssertExpectations(t)
 	})
 

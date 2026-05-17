@@ -6,7 +6,7 @@ import (
 
 	extismSDK "github.com/extism/go-sdk"
 	"github.com/robbyt/go-polyscript/engines/extism/adapters"
-	machineTypes "github.com/robbyt/go-polyscript/engines/types"
+	engineTypes "github.com/robbyt/go-polyscript/engines/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -83,7 +83,7 @@ func TestExecutable(t *testing.T) {
 			assert.Equal(t, string(wasmBytes), exe.GetSource())
 			assert.Equal(t, mockPlugin, exe.GetByteCode())
 			assert.Equal(t, mockPlugin, exe.GetExtismByteCode())
-			assert.Equal(t, machineTypes.Extism, exe.GetMachineType())
+			assert.Equal(t, engineTypes.Extism, exe.EngineType())
 			assert.Equal(t, entryPoint, exe.GetEntryPoint())
 			assert.False(t, exe.closed.Load())
 		})
@@ -128,9 +128,9 @@ func TestExecutable(t *testing.T) {
 			assert.Equal(t, mockPlugin, bytecode)
 		})
 
-		t.Run("GetMachineType", func(t *testing.T) {
-			machineType := exe.GetMachineType()
-			assert.Equal(t, machineTypes.Extism, machineType)
+		t.Run("EngineType", func(t *testing.T) {
+			engineType := exe.EngineType()
+			assert.Equal(t, engineTypes.Extism, engineType)
 		})
 
 		t.Run("GetEntryPoint", func(t *testing.T) {

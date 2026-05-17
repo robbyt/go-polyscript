@@ -1,7 +1,7 @@
 package compiler
 
 import (
-	machineTypes "github.com/robbyt/go-polyscript/engines/types"
+	engineTypes "github.com/robbyt/go-polyscript/engines/types"
 	starlarkLib "go.starlark.net/starlark"
 )
 
@@ -35,6 +35,6 @@ func (e *executable) GetStarlarkByteCode() *starlarkLib.Program {
 	return e.ByteCode
 }
 
-func (e *executable) GetMachineType() machineTypes.Type {
-	return machineTypes.Starlark
+func (e *executable) EngineType() engineTypes.Type {
+	return engineTypes.Starlark
 }

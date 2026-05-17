@@ -76,7 +76,7 @@ func (m *MockContent) GetByteCode() any {
 	return m.Content
 }
 
-func (m *MockContent) GetMachineType() types.Type {
+func (m *MockContent) EngineType() types.Type {
 	return types.Risor
 }
 

@@ -3,7 +3,7 @@ package compiler
 import (
 	"testing"
 
-	machineTypes "github.com/robbyt/go-polyscript/engines/types"
+	engineTypes "github.com/robbyt/go-polyscript/engines/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	starlarkLib "go.starlark.net/starlark"
@@ -24,7 +24,7 @@ func TestExecutable(t *testing.T) {
 			assert.Equal(t, content, exe.GetSource())
 			assert.Equal(t, bytecode, exe.GetByteCode())
 			assert.Equal(t, bytecode, exe.GetStarlarkByteCode())
-			assert.Equal(t, machineTypes.Starlark, exe.GetMachineType())
+			assert.Equal(t, engineTypes.Starlark, exe.EngineType())
 		})
 
 		t.Run("nil content", func(t *testing.T) {
@@ -71,9 +71,9 @@ func TestExecutable(t *testing.T) {
 			assert.Equal(t, bytecode, code)
 		})
 
-		t.Run("GetMachineType", func(t *testing.T) {
-			machineType := executable.GetMachineType()
-			assert.Equal(t, machineTypes.Starlark, machineType)
+		t.Run("EngineType", func(t *testing.T) {
+			engineType := executable.EngineType()
+			assert.Equal(t, engineTypes.Starlark, engineType)
 		})
 	})
 }

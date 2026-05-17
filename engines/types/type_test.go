@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestGetMachineTypeFromString(t *testing.T) {
+func TestGetEngineTypeFromString(t *testing.T) {
 	tests := []struct {
 		name        string
 		input       string
@@ -16,31 +16,31 @@ func TestGetMachineTypeFromString(t *testing.T) {
 		expectError bool
 	}{
 		{
-			name:        "valid machine type Risor",
+			name:        "valid engine type Risor",
 			input:       "Risor",
 			expected:    Risor,
 			expectError: false,
 		},
 		{
-			name:        "valid machine type Starlark",
+			name:        "valid engine type Starlark",
 			input:       "Starlark",
 			expected:    Starlark,
 			expectError: false,
 		},
 		{
-			name:        "valid machine type Extism",
+			name:        "valid engine type Extism",
 			input:       "Extism",
 			expected:    Extism,
 			expectError: false,
 		},
 		{
-			name:        "invalid machine type",
+			name:        "invalid engine type",
 			input:       "invalid",
 			expected:    "",
 			expectError: true,
 		},
 		{
-			name:        "empty machine type",
+			name:        "empty engine type",
 			input:       "",
 			expected:    "",
 			expectError: true,
@@ -50,7 +50,7 @@ func TestGetMachineTypeFromString(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Helper()
-			result, err := GetMachineTypeFromString(tt.input)
+			result, err := GetEngineTypeFromString(tt.input)
 			if tt.expectError {
 				require.Error(t, err)
 			} else {
@@ -61,7 +61,7 @@ func TestGetMachineTypeFromString(t *testing.T) {
 	}
 }
 
-func TestGetMachineTypeFromPath(t *testing.T) {
+func TestGetEngineTypeFromPath(t *testing.T) {
 	tests := []struct {
 		name        string
 		input       string
@@ -121,7 +121,7 @@ func TestGetMachineTypeFromPath(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Helper()
-			result, err := GetMachineTypeFromPath(tt.input)
+			result, err := GetEngineTypeFromPath(tt.input)
 			if tt.expectError {
 				require.Error(t, err)
 			} else {

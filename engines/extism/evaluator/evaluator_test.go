@@ -13,7 +13,7 @@ import (
 	"github.com/robbyt/go-polyscript/engines/extism/adapters"
 	"github.com/robbyt/go-polyscript/engines/extism/compiler"
 	"github.com/robbyt/go-polyscript/engines/extism/internal"
-	machineTypes "github.com/robbyt/go-polyscript/engines/types"
+	engineTypes "github.com/robbyt/go-polyscript/engines/types"
 	"github.com/robbyt/go-polyscript/platform/constants"
 	"github.com/robbyt/go-polyscript/platform/data"
 	"github.com/robbyt/go-polyscript/platform/script"
@@ -128,13 +128,13 @@ func (m *mockPluginInstance) Close(ctx context.Context) error {
 }
 
 type mockExecutableContent struct {
-	machineType machineTypes.Type
-	source      string
-	bytecode    any
+	engineType engineTypes.Type
+	source     string
+	bytecode   any
 }
 
-func (m *mockExecutableContent) GetMachineType() machineTypes.Type {
-	return m.machineType
+func (m *mockExecutableContent) EngineType() engineTypes.Type {
+	return m.engineType
 }
 
 func (m *mockExecutableContent) GetSource() string {
@@ -332,9 +332,9 @@ func TestEvaluator_Evaluate(t *testing.T) {
 		// Test nil bytecode
 		t.Run("nil bytecode", func(t *testing.T) {
 			mockContent := &mockExecutableContent{
-				machineType: machineTypes.Extism,
-				source:      "invalid wasm",
-				bytecode:    nil, // Nil bytecode will cause error
+				engineType: engineTypes.Extism,
+				source:     "invalid wasm",
+				bytecode:   nil, // Nil bytecode will cause error
 			}
 
 			handler := slog.NewTextHandler(os.Stdout, nil)
@@ -358,9 +358,9 @@ func TestEvaluator_Evaluate(t *testing.T) {
 		// Test invalid content type
 		t.Run("invalid content type", func(t *testing.T) {
 			mockContent := &mockExecutableContent{
-				machineType: machineTypes.Extism,
-				source:      "invalid wasm",
-				bytecode:    []byte{0x00}, // Not a valid WASM plugin
+				engineType: engineTypes.Extism,
+				source:     "invalid wasm",
+				bytecode:   []byte{0x00}, // Not a valid WASM plugin
 			}
 
 			handler := slog.NewTextHandler(os.Stdout, nil)

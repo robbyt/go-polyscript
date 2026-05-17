@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"time"
 
-	machineTypes "github.com/robbyt/go-polyscript/engines/types"
+	engineTypes "github.com/robbyt/go-polyscript/engines/types"
 	"github.com/robbyt/go-polyscript/internal/helpers"
 	"github.com/robbyt/go-polyscript/platform/data"
 	"github.com/robbyt/go-polyscript/platform/script/loader"
@@ -108,9 +108,9 @@ func (exe *ExecutableUnit) GetCreatedAt() time.Time {
 	return exe.CreatedAt
 }
 
-// GetMachineType returns the machine type this script is intended to run on.
-func (exe *ExecutableUnit) GetMachineType() machineTypes.Type {
-	return exe.Content.GetMachineType()
+// EngineType returns the engine type this script is intended to run on.
+func (exe *ExecutableUnit) EngineType() engineTypes.Type {
+	return exe.Content.EngineType()
 }
 
 // GetCompiler returns the compiler used to validate the script and convert it into runnable bytecode.

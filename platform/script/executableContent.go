@@ -1,7 +1,7 @@
 package script
 
 import (
-	machineTypes "github.com/robbyt/go-polyscript/engines/types"
+	engineTypes "github.com/robbyt/go-polyscript/engines/types"
 )
 
 // ExecutableContent represents validated script content that is ready for execution or compilation.
@@ -19,6 +19,6 @@ type ExecutableContent interface {
 	// an error at runtime, so the engine type and ByteCode must be compatible.
 	GetByteCode() any
 
-	// GetMachineType returns the engine type this script is intended to run on.
-	GetMachineType() machineTypes.Type
+	// EngineType returns the engine type this script is intended to run on.
+	EngineType() engineTypes.Type
 }
