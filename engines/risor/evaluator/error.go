@@ -5,9 +5,13 @@ import (
 )
 
 // Error is returned from (*Evaluator).Eval for Risor execution failures —
-// VM exec errors (compile/runtime crash) and script-side error/function
-// returns. It implements error and exposes the diagnostic Inspect()
-// output of the script-side error/function object via ScriptResult.
+// VM runtime errors (e.g. type mismatches, divide-by-zero, cancellation)
+// and script-side error/function returns. Compile-time failures occur in
+// the compiler package before an Evaluator is constructed and are not
+// surfaced through this type.
+//
+// It implements error and exposes the diagnostic Inspect() output of the
+// script-side error/function object via ScriptResult.
 //
 // Callers using `if err != nil` need no changes. Callers wanting the
 // script-side diagnostic can either type-assert with errors.As or call

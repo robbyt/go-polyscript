@@ -689,6 +689,30 @@ func TestEval_ErrorTypeExposesRisorDetails(t *testing.T) {
 		require.Contains(t, GetErrorDetails(wrapped), "nested")
 	})
 
+	t.Run("VM exec failure populates Cause, leaves ScriptResult empty", func(t *testing.T) {
+		t.Parallel()
+
+		// Already-cancelled context drives the VM through be.exec and out
+		// the err != nil branch deterministically — no reliance on
+		// runtime-error script shapes.
+		eval := buildEval(t, `range(1000000).each(x => x)`)
+		ctx, cancel := context.WithCancel(t.Context())
+		ctx = context.WithValue(ctx, constants.EvalData, map[string]any{})
+		cancel()
+
+		result, err := eval.Eval(ctx)
+		require.Error(t, err)
+		require.Nil(t, result)
+
+		var rErr *Error
+		require.ErrorAs(t, err, &rErr)
+		require.Contains(t, rErr.Msg, "exec error")
+		require.Empty(t, rErr.ScriptResult, "VM exec failure should not carry ScriptResult")
+		require.Error(t, rErr.Cause, "Cause should expose the underlying VM error via Unwrap")
+		// Cause should be unwrappable to the original ctx cancellation.
+		require.ErrorIs(t, err, context.Canceled)
+	})
+
 	t.Run("non-Risor failure leaves ScriptResult empty", func(t *testing.T) {
 		t.Parallel()
 
