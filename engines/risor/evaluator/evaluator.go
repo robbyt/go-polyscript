@@ -133,7 +133,10 @@ func (be *Evaluator) Eval(ctx context.Context) (platform.EvaluatorResponse, erro
 	// 4. Execute the program
 	result, err := be.exec(ctx, risorByteCode, runtimeEnv)
 	if err != nil {
-		return nil, fmt.Errorf("exec error: %w", err)
+		return nil, &Error{
+			Msg:   fmt.Sprintf("exec error: %s", err),
+			Cause: err,
+		}
 	}
 	logger.DebugContext(ctx, "exec complete", "result", result)
 
@@ -147,9 +150,15 @@ func (be *Evaluator) Eval(ctx context.Context) (platform.EvaluatorResponse, erro
 
 	switch result.Object.Type() {
 	case "error":
-		return result, fmt.Errorf("error returned from script: %s", result.Inspect())
+		return nil, &Error{
+			Msg:          fmt.Sprintf("error returned from script: %s", result.Inspect()),
+			ScriptResult: result.Inspect(),
+		}
 	case "function":
-		return result, fmt.Errorf("function object returned from script: %s", result.Inspect())
+		return nil, &Error{
+			Msg:          fmt.Sprintf("function object returned from script: %s", result.Inspect()),
+			ScriptResult: result.Inspect(),
+		}
 	}
 
 	return result, nil
