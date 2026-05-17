@@ -136,6 +136,11 @@ func (c *Compiler) applyDefaults() {
 	if c.ctx == nil {
 		c.ctx = context.Background()
 	}
+
+	// Default compile function (test seam); production path is compile.CompileBytes
+	if c.compileFn == nil {
+		c.compileFn = compile.CompileBytes
+	}
 }
 
 // setupLogger configures the logger and handler based on the current state.
