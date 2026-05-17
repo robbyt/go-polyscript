@@ -48,7 +48,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `engines/types` package exports `ErrInvalidEngineType`,
   `GetEngineTypeFromString`, and `GetEngineTypeFromPath` (renamed from the
   `MachineType` equivalents). The conventional import alias is now
-  `engineTypes`. ([#90](https://github.com/robbyt/go-polyscript/issues/90))
+  `engineTypes`. Closes [#90](https://github.com/robbyt/go-polyscript/issues/90).
+  ([#137](https://github.com/robbyt/go-polyscript/pull/137))
 
 ### Deprecated
 - The twelve legacy top-level constructors (`FromRisorFile`,
