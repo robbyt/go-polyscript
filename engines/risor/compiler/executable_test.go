@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/deepnoodle-ai/risor/v2/pkg/bytecode"
-	machineTypes "github.com/robbyt/go-polyscript/engines/types"
+	engineTypes "github.com/robbyt/go-polyscript/engines/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -24,7 +24,7 @@ func TestExecutable(t *testing.T) {
 			assert.Equal(t, content, exe.GetSource())
 			assert.Equal(t, bc, exe.GetByteCode())
 			assert.Equal(t, bc, exe.GetRisorByteCode())
-			assert.Equal(t, machineTypes.Risor, exe.GetMachineType())
+			assert.Equal(t, engineTypes.Risor, exe.EngineType())
 		})
 
 		t.Run("nil content", func(t *testing.T) {
@@ -71,9 +71,9 @@ func TestExecutable(t *testing.T) {
 			assert.Equal(t, bc, code)
 		})
 
-		t.Run("GetMachineType", func(t *testing.T) {
-			machineType := executable.GetMachineType()
-			assert.Equal(t, machineTypes.Risor, machineType)
+		t.Run("EngineType", func(t *testing.T) {
+			engineType := executable.EngineType()
+			assert.Equal(t, engineTypes.Risor, engineType)
 		})
 	})
 }

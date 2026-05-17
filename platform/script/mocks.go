@@ -3,7 +3,7 @@ package script
 import (
 	"io"
 
-	machineTypes "github.com/robbyt/go-polyscript/engines/types"
+	engineTypes "github.com/robbyt/go-polyscript/engines/types"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -37,7 +37,7 @@ func (m *MockExecutableContent) GetByteCode() any {
 	return args.Get(0)
 }
 
-func (m *MockExecutableContent) GetMachineType() machineTypes.Type {
+func (m *MockExecutableContent) EngineType() engineTypes.Type {
 	args := m.Called()
-	return args.Get(0).(machineTypes.Type)
+	return args.Get(0).(engineTypes.Type)
 }

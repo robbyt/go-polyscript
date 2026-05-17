@@ -10,7 +10,7 @@ import (
     "strings"
 )
 
-var ErrInvalidMachineType = errors.New("invalid machine type")
+var ErrInvalidEngineType = errors.New("invalid engine type")
 
 type Type string
 
@@ -27,21 +27,21 @@ const (
     {{- end}}
 )
 
-func GetMachineTypeFromString(machineType string) (Type, error) {
-    machineType = strings.ToLower(strings.TrimSpace(machineType))
-    machineType = strings.TrimPrefix(machineType, ".")
+func GetEngineTypeFromString(engineType string) (Type, error) {
+    engineType = strings.ToLower(strings.TrimSpace(engineType))
+    engineType = strings.TrimPrefix(engineType, ".")
 
-    switch machineType {
+    switch engineType {
     {{- range .Types}}
     case "{{.Value}}":
         return {{.Name}}, nil
     {{- end}}
     default:
-        return "", fmt.Errorf("%w: %s", ErrInvalidMachineType, machineType)
+        return "", fmt.Errorf("%w: %s", ErrInvalidEngineType, engineType)
     }
 }
 
-func GetMachineTypeFromPath(path string) (Type, error) {
+func GetEngineTypeFromPath(path string) (Type, error) {
     ext := strings.TrimSpace(strings.ToLower(strings.TrimSpace(filepath.Ext(path))))
-    return GetMachineTypeFromString(ext)
+    return GetEngineTypeFromString(ext)
 }

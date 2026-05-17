@@ -2,7 +2,7 @@ package compiler
 
 import (
 	"github.com/deepnoodle-ai/risor/v2/pkg/bytecode"
-	machineTypes "github.com/robbyt/go-polyscript/engines/types"
+	engineTypes "github.com/robbyt/go-polyscript/engines/types"
 )
 
 type executable struct {
@@ -33,6 +33,6 @@ func (e *executable) GetRisorByteCode() *bytecode.Code {
 	return e.ByteCode
 }
 
-func (e *executable) GetMachineType() machineTypes.Type {
-	return machineTypes.Risor
+func (e *executable) EngineType() engineTypes.Type {
+	return engineTypes.Risor
 }

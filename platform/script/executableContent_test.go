@@ -3,7 +3,7 @@ package script
 import (
 	"testing"
 
-	machineTypes "github.com/robbyt/go-polyscript/engines/types"
+	engineTypes "github.com/robbyt/go-polyscript/engines/types"
 	"github.com/stretchr/testify/require"
 )
 
@@ -30,13 +30,13 @@ func TestExecutableContent(t *testing.T) {
 		mockContent.AssertExpectations(t)
 	})
 
-	t.Run("GetMachineType", func(t *testing.T) {
+	t.Run("EngineType", func(t *testing.T) {
 		mockContent := new(MockExecutableContent)
-		expectedType := machineTypes.Risor
-		mockContent.On("GetMachineType").Return(expectedType)
+		expectedType := engineTypes.Risor
+		mockContent.On("EngineType").Return(expectedType)
 
-		machineType := mockContent.GetMachineType()
-		require.Equal(t, expectedType, machineType, "Expected machine type to match")
+		engineType := mockContent.EngineType()
+		require.Equal(t, expectedType, engineType, "Expected engine type to match")
 		mockContent.AssertExpectations(t)
 	})
 }

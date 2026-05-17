@@ -42,6 +42,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   appends to the compiler's existing globals, deduplicating names already
   present. Order-of-call no longer matters when combined with
   `WithCtxGlobal`. ([#118](https://github.com/robbyt/go-polyscript/pull/118))
+- **Breaking:** Renamed `machine`→`engine` in the type-system API to match
+  the terminology used everywhere else. `ExecutableContent.GetMachineType()`
+  and `ExecutableUnit.GetMachineType()` are now `EngineType()`. The
+  `engines/types` package exports `ErrInvalidEngineType`,
+  `GetEngineTypeFromString`, and `GetEngineTypeFromPath` (renamed from the
+  `MachineType` equivalents). The conventional import alias is now
+  `engineTypes`. Closes [#90](https://github.com/robbyt/go-polyscript/issues/90).
+  ([#137](https://github.com/robbyt/go-polyscript/pull/137))
 
 ### Deprecated
 - The twelve legacy top-level constructors (`FromRisorFile`,
