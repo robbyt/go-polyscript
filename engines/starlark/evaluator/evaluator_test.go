@@ -220,7 +220,7 @@ invalid_func()
 }
 
 // TestEval_NoGoroutineLeak verifies that Eval() with a non-cancellable context does not leak
-// goroutines. synctest.Run only returns once every goroutine spawned inside the bubble has
+// goroutines. synctest.Test only returns once every goroutine spawned inside the bubble has
 // exited; a stray goroutine blocked on <-ctx.Done() (the scenario PR #81 fixed by switching to
 // context.AfterFunc) would be reported as a leak with a clear diagnostic.
 func TestEval_NoGoroutineLeak(t *testing.T) {
