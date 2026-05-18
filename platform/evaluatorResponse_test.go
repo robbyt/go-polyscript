@@ -3,7 +3,7 @@ package platform_test
 import (
 	"testing"
 
-	"github.com/robbyt/go-polyscript/engines/mocks"
+	
 	"github.com/robbyt/go-polyscript/platform/data"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -12,7 +12,7 @@ import (
 // TestEvaluatorResponseInterface tests all methods of the EvaluatorResponse interface
 func TestEvaluatorResponseInterface(t *testing.T) {
 	t.Parallel()
-	mockResponse := new(mocks.EvaluatorResponse)
+	mockResponse := new(mockEvaluatorResponse)
 
 	// Test Type method with various return types
 	t.Run("Type method", func(t *testing.T) {
@@ -110,7 +110,7 @@ func TestEvaluatorResponseInterface(t *testing.T) {
 // TestEvaluatorResponseUsage tests how EvaluatorResponse is typically used in real code
 func TestEvaluatorResponseUsage(t *testing.T) {
 	t.Parallel()
-	mockResponse := new(mocks.EvaluatorResponse)
+	mockResponse := new(mockEvaluatorResponse)
 
 	// Test a typical usage pattern where a string value is returned
 	mockResponse.On("Interface").Return("Hello World").Once()

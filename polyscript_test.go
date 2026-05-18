@@ -13,7 +13,7 @@ import (
 	"testing"
 
 	"github.com/robbyt/go-polyscript"
-	"github.com/robbyt/go-polyscript/engines/mocks"
+	
 	"github.com/robbyt/go-polyscript/platform"
 	"github.com/robbyt/go-polyscript/platform/data"
 	"github.com/robbyt/go-polyscript/platform/script/loader"
@@ -269,7 +269,7 @@ func TestEvalHelpers(t *testing.T) {
 
 		t.Run("AddDataToContext error", func(t *testing.T) {
 			mockPrepCtx := &mockPreparer{}
-			mockEval := &mocks.Evaluator{}
+			mockEval := &mockEvaluator{}
 
 			ctx := t.Context()
 			d := map[string]any{"name": "World"}
@@ -293,7 +293,7 @@ func TestEvalHelpers(t *testing.T) {
 
 		t.Run("Eval error", func(t *testing.T) {
 			mockPrepCtx := &mockPreparer{}
-			mockEval := &mocks.Evaluator{}
+			mockEval := &mockEvaluator{}
 
 			ctx := t.Context()
 			d := map[string]any{"name": "World"}
@@ -304,7 +304,7 @@ func TestEvalHelpers(t *testing.T) {
 			mockPrepCtx.On("AddDataToContext", ctx, mock.Anything).Return(enrichedCtx, nil)
 
 			mockEval.On("Eval", enrichedCtx).
-				Return((*mocks.EvaluatorResponse)(nil), errors.New("eval error"))
+				Return((*mockEvaluatorResponse)(nil), errors.New("eval error"))
 
 			mockEvalWithPrep := struct {
 				platform.EvalOnly
@@ -365,11 +365,11 @@ func TestEvalHelpers(t *testing.T) {
 		assert.Contains(t, err.Error(), "result is not a map")
 
 		t.Run("Eval error", func(t *testing.T) {
-			mockEval := &mocks.Evaluator{}
+			mockEval := &mockEvaluator{}
 			ctx := t.Context()
 
 			mockEval.On("Eval", ctx).
-				Return((*mocks.EvaluatorResponse)(nil), errors.New("eval error"))
+				Return((*mockEvaluatorResponse)(nil), errors.New("eval error"))
 
 			_, err := evalAndExtractMap(t, ctx, mockEval)
 			require.Error(t, err)

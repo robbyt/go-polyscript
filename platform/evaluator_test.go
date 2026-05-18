@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	"github.com/robbyt/go-polyscript"
-	"github.com/robbyt/go-polyscript/engines/mocks"
+	
 	"github.com/robbyt/go-polyscript/platform"
 	"github.com/robbyt/go-polyscript/platform/data"
 	"github.com/stretchr/testify/assert"
@@ -57,7 +57,7 @@ func (m *mockEvaluatorWithPreparer) AddDataToContext(
 func TestEvaluatorInterface(t *testing.T) {
 	t.Parallel()
 	// Create a mock evaluator response
-	mockResponse := new(mocks.EvaluatorResponse)
+	mockResponse := new(mockEvaluatorResponse)
 	mockResponse.On("Interface").Return("test result")
 	mockResponse.On("GetScriptExeID").Return("test-script-id")
 	mockResponse.On("GetExecTime").Return("10µs")
@@ -72,7 +72,7 @@ func TestEvaluatorInterface(t *testing.T) {
 	ctx := context.WithValue(t.Context(), testKey, "test-value")
 
 	// Create a mock evaluator with success case
-	evaluator := new(mocks.Evaluator)
+	evaluator := new(mockEvaluator)
 	evaluator.On("Eval", mock.MatchedBy(func(c context.Context) bool {
 		// Verify that context is passed correctly
 		_, hasKey := c.Value(testKey).(string)
@@ -98,9 +98,9 @@ func TestEvaluatorInterface(t *testing.T) {
 	assert.Equal(t, "test result", response.Inspect(), "Inspect() should return expected value")
 
 	// Test error case
-	errorEvaluator := new(mocks.Evaluator)
+	errorEvaluator := new(mockEvaluator)
 	errorEvaluator.On("Eval", mock.Anything).
-		Return((*mocks.EvaluatorResponse)(nil), errors.New("evaluation error"))
+		Return((*mockEvaluatorResponse)(nil), errors.New("evaluation error"))
 
 	response, err = errorEvaluator.Eval(t.Context())
 	require.Error(t, err, "Eval should return an error")
@@ -205,7 +205,7 @@ func TestEvalDataPreparerInterfaceDirectImplementation(t *testing.T) {
 func TestEvaluatorWithPrepInterface(t *testing.T) {
 	t.Parallel()
 	// Create a mock evaluator response
-	mockResponse := new(mocks.EvaluatorResponse)
+	mockResponse := new(mockEvaluatorResponse)
 	mockResponse.On("Interface").Return("combined result")
 	mockResponse.On("GetScriptExeID").Return("test-script-id")
 	mockResponse.On("GetExecTime").Return("10µs")
@@ -260,7 +260,7 @@ func TestEvaluatorWithPrepInterface(t *testing.T) {
 	evalErrorEvaluator := &mockEvaluatorWithPreparer{}
 	evalErrorEvaluator.On("AddDataToContext", ctx, mock.Anything).Return(enrichedCtx, nil)
 	evalErrorEvaluator.On("Eval", mock.Anything).
-		Return((*mocks.EvaluatorResponse)(nil), errors.New("evaluation error"))
+		Return((*mockEvaluatorResponse)(nil), errors.New("evaluation error"))
 
 	evalCtx, prepErr := evalErrorEvaluator.AddDataToContext(ctx, map[string]any{"test": "data"})
 	require.NoError(t, prepErr, "AddDataToContext should not return an error")

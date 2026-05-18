@@ -18,9 +18,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func newWASMLoader(t *testing.T) *loader.MockLoader {
+func newWASMLoader(t *testing.T) *mockLoader {
 	t.Helper()
-	mockLoader := new(loader.MockLoader)
+	mockLoader := new(mockLoader)
 	mockURL, err := url.Parse("file:///test-wasm-file.wasm")
 	require.NoError(t, err)
 	mockLoader.On("GetSourceURL").Return(mockURL)
@@ -29,9 +29,9 @@ func newWASMLoader(t *testing.T) *loader.MockLoader {
 	return mockLoader
 }
 
-func newErrorLoader(t *testing.T, msg string) *loader.MockLoader {
+func newErrorLoader(t *testing.T, msg string) *mockLoader {
 	t.Helper()
-	mockLoader := new(loader.MockLoader)
+	mockLoader := new(mockLoader)
 	mockURL, err := url.Parse("file:///test-wasm-file.wasm")
 	require.NoError(t, err)
 	mockLoader.On("GetSourceURL").Return(mockURL)
@@ -40,7 +40,7 @@ func newErrorLoader(t *testing.T, msg string) *loader.MockLoader {
 }
 
 func TestFromExtismLoader_RequiresEntryPoint(t *testing.T) {
-	mockLoader := new(loader.MockLoader)
+	mockLoader := new(mockLoader)
 	eval, err := FromExtismLoader(mockLoader)
 	require.Error(t, err)
 	require.Nil(t, eval)
@@ -51,7 +51,7 @@ func TestFromExtismLoader_RequiresEntryPoint(t *testing.T) {
 }
 
 func TestFromExtismLoader_EmptyEntryPointStillRejected(t *testing.T) {
-	mockLoader := new(loader.MockLoader)
+	mockLoader := new(mockLoader)
 	eval, err := FromExtismLoader(mockLoader, WithEntryPoint(""))
 	require.Error(t, err)
 	require.Nil(t, eval)
@@ -146,7 +146,7 @@ func TestFromExtismLoader_LoaderError(t *testing.T) {
 }
 
 func TestFromExtismLoader_NilSourceURL(t *testing.T) {
-	mockLoader := new(loader.MockLoader)
+	mockLoader := new(mockLoader)
 	mockLoader.On("GetSourceURL").Return(nil)
 	mockLoader.On("GetReader").Return(io.NopCloser(bytes.NewReader(wasmdata.TestModule)), nil)
 
