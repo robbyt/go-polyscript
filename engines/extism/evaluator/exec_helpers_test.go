@@ -18,9 +18,9 @@ import (
 // loadInputData paths that never touch GetByteCode).
 type stubContent struct{}
 
-func (stubContent) GetSource() string             { return "" }
-func (stubContent) GetByteCode() any              { return nil }
-func (stubContent) EngineType() engineTypes.Type  { return engineTypes.Unsupported }
+func (stubContent) GetSource() string            { return "" }
+func (stubContent) GetByteCode() any             { return nil }
+func (stubContent) EngineType() engineTypes.Type { return engineTypes.Unsupported }
 
 // loaderMock satisfies script/loader.Loader; only GetReader is exercised
 // by NewExecutableUnit.

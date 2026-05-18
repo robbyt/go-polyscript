@@ -17,9 +17,9 @@ import (
 // doesn't care about the content.
 type stubContent struct{}
 
-func (stubContent) GetSource() string             { return "" }
-func (stubContent) GetByteCode() any              { return nil }
-func (stubContent) EngineType() engineTypes.Type  { return engineTypes.Unsupported }
+func (stubContent) GetSource() string            { return "" }
+func (stubContent) GetByteCode() any             { return nil }
+func (stubContent) EngineType() engineTypes.Type { return engineTypes.Unsupported }
 
 // loaderMock satisfies script/loader.Loader for tests that don't care about
 // the loader's behavior, only that NewExecutableUnit can call GetReader().
