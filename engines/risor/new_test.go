@@ -34,9 +34,9 @@ func newTestLoader(t *testing.T) *loader.FromString {
 	return stringLoader
 }
 
-func newErrorLoader(t *testing.T, msg string) *loader.MockLoader {
+func newErrorLoader(t *testing.T, msg string) *loaderMock {
 	t.Helper()
-	mockLoader := new(loader.MockLoader)
+	mockLoader := new(loaderMock)
 	mockURL, err := url.Parse("file:///test-risor-file.risor")
 	require.NoError(t, err)
 	mockLoader.On("GetSourceURL").Return(mockURL)

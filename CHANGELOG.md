@@ -60,6 +60,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ([#103](https://github.com/robbyt/go-polyscript/pull/103))
 
 ### Removed
+- **Breaking:** Removed four exported mock types that pulled `testify/mock`
+  into the production dependency graph: `platform/script/loader.MockLoader`
+  (with `NewMockLoaderWithContent`), `platform/script.MockCompiler`,
+  `platform/script.MockExecutableContent`, and the entire `engines/mocks`
+  package (`Evaluator`, `EvaluatorResponse`). Consumers should copy these
+  small mock definitions inline into their own `_test.go` files. After this
+  change `go mod why github.com/stretchr/testify` reports `main module does
+  not need package github.com/stretchr/testify` — `testify` is only reached
+  via test binaries.
+  Closes [#88](https://github.com/robbyt/go-polyscript/issues/88).
+  ([#138](https://github.com/robbyt/go-polyscript/pull/138))
 - The redundant `cfg.handler != nil` guards in `polyscript.go` and
   `engines/{risor,starlark,extism}/new.go` that existed solely to work
   around the pre-#113 nil-rejection in `WithLogHandler`. Each pair of
