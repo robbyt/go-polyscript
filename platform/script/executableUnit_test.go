@@ -55,7 +55,7 @@ func TestVersionMethods(t *testing.T) {
 		mockContent.On("EngineType").Return(expectedType)
 
 		exe := &ExecutableUnit{
-			Content: mockContent,
+			content: mockContent,
 		}
 
 		engineType := exe.EngineType()
@@ -66,7 +66,7 @@ func TestVersionMethods(t *testing.T) {
 	t.Run("GetCompiler", func(t *testing.T) {
 		mockCompiler := new(MockCompiler)
 		exe := &ExecutableUnit{
-			Compiler: mockCompiler,
+			compiler: mockCompiler,
 		}
 
 		compiler := exe.GetCompiler()
@@ -77,7 +77,7 @@ func TestVersionMethods(t *testing.T) {
 		mockContent := new(MockExecutableContent)
 
 		exe := &ExecutableUnit{
-			Content: mockContent,
+			content: mockContent,
 		}
 
 		content := exe.GetContent()
@@ -88,7 +88,7 @@ func TestVersionMethods(t *testing.T) {
 	t.Run("GetCreatedAt", func(t *testing.T) {
 		createdAt := time.Now()
 		exe := &ExecutableUnit{
-			CreatedAt: createdAt,
+			createdAt: createdAt,
 		}
 
 		timestamp := exe.GetCreatedAt()
@@ -357,19 +357,19 @@ func TestExecutableUnit_String(t *testing.T) {
 		mockContent := new(MockExecutableContent)
 
 		exe := &ExecutableUnit{
-			ID:           "testID",
-			CreatedAt:    time.Now(),
-			ScriptLoader: mockLoader,
-			Content:      mockContent,
-			Compiler:     mockCompiler,
+			id:           "testID",
+			createdAt:    time.Now(),
+			scriptLoader: mockLoader,
+			content:      mockContent,
+			compiler:     mockCompiler,
 		}
 
 		expectedString := fmt.Sprintf(
 			"ExecutableUnit{ID: %s, CreatedAt: %s, Compiler: %s, Loader: %s}",
-			exe.ID,
-			exe.CreatedAt,
-			exe.Compiler,
-			exe.ScriptLoader,
+			exe.id,
+			exe.createdAt,
+			exe.compiler,
+			exe.scriptLoader,
 		)
 
 		require.Equal(t, expectedString, exe.String(), "Expected string representation to match")
@@ -419,7 +419,7 @@ func TestNewVersionWithScriptData(t *testing.T) {
 		require.NoError(t, err, "Expected no error creating executable unit")
 		require.NotNil(t, exe, "Expected executable unit to be non-nil")
 
-		dataFromProvider, err := exe.DataProvider.GetData(t.Context())
+		dataFromProvider, err := exe.dataProvider.GetData(t.Context())
 		require.NoError(t, err, "Expected no error when getting data from provider")
 		require.Equal(t, scriptData, dataFromProvider, "Expected script data to match")
 
@@ -454,7 +454,7 @@ func TestNewVersionWithScriptData(t *testing.T) {
 		)
 
 		require.NotNil(t, exe, "Expected version to be non-nil")
-		dataFromProvider, err := exe.DataProvider.GetData(t.Context())
+		dataFromProvider, err := exe.dataProvider.GetData(t.Context())
 		require.NoError(t, err, "Expected no error when getting data from provider")
 		require.Equal(
 			t,

@@ -179,10 +179,7 @@ _ = request_handler(ctx.get("request"))
 		// Test content nil
 		t.Run("content nil", func(t *testing.T) {
 			handler := slog.NewTextHandler(os.Stdout, nil)
-			exe := &script.ExecutableUnit{
-				ID:      "test-nil-content",
-				Content: nil, // Deliberately nil content
-			}
+			exe := newExe(t, "test-nil-content", nil, nil)
 			evaluator := New(handler, exe)
 
 			response, err := evaluator.Eval(t.Context())
@@ -268,7 +265,7 @@ func TestEvaluator_AddDataToContext(t *testing.T) {
 				mockProvider.On("AddDataToContext", mock.Anything, mock.Anything).
 					Return(enrichedCtx, nil)
 
-				return &script.ExecutableUnit{DataProvider: mockProvider}
+				return newExe(t, "with provider", nil, mockProvider)
 			},
 			inputs:    []map[string]any{{"test": "data"}},
 			wantError: false,
@@ -283,7 +280,7 @@ func TestEvaluator_AddDataToContext(t *testing.T) {
 				mockProvider.On("AddDataToContext", mock.Anything, mock.Anything).
 					Return(nil, expectedErr)
 
-				return &script.ExecutableUnit{DataProvider: mockProvider}
+				return newExe(t, "with provider error", nil, mockProvider)
 			},
 			inputs:       []map[string]any{{"test": "data"}},
 			wantError:    true,
@@ -293,7 +290,7 @@ func TestEvaluator_AddDataToContext(t *testing.T) {
 			name: "nil provider",
 			setupExe: func(t *testing.T) *script.ExecutableUnit {
 				t.Helper()
-				return &script.ExecutableUnit{DataProvider: nil}
+				return newExe(t, "nil provider", nil, nil)
 			},
 			inputs:       []map[string]any{{"test": "data"}},
 			wantError:    true,
@@ -333,8 +330,8 @@ func TestEvaluator_AddDataToContext(t *testing.T) {
 			}
 
 			// If using mocks, verify expectations
-			if exe != nil && exe.DataProvider != nil {
-				if mockProvider, ok := exe.DataProvider.(*MockProvider); ok {
+			if exe != nil && exe.GetDataProvider() != nil {
+				if mockProvider, ok := exe.GetDataProvider().(*MockProvider); ok {
 					mockProvider.AssertExpectations(t)
 				}
 			}

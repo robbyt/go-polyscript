@@ -175,11 +175,7 @@ func TestEvaluator_Evaluate(t *testing.T) {
 			content := createMockExecutable(mockPlugin, "main")
 
 			// Create a mock executable
-			exe := &script.ExecutableUnit{
-				ID:           "test-json-success",
-				DataProvider: ctxProvider,
-				Content:      content,
-			}
+			exe := newExe(t, "test-json-success", content, ctxProvider)
 
 			evaluator := New(handler, exe)
 
@@ -214,11 +210,7 @@ func TestEvaluator_Evaluate(t *testing.T) {
 			mockPlugin.On("Close", mock.Anything).Return(nil)
 
 			content := createMockExecutable(mockPlugin, "main")
-			exe := &script.ExecutableUnit{
-				ID:           "test-string-success",
-				DataProvider: ctxProvider,
-				Content:      content,
-			}
+			exe := newExe(t, "test-string-success", content, ctxProvider)
 
 			evaluator := New(handler, exe)
 			ctx := t.Context()
@@ -267,9 +259,7 @@ func TestEvaluator_Evaluate(t *testing.T) {
 				t.Run(tt.name, func(t *testing.T) {
 					handler := slog.NewTextHandler(os.Stdout, nil)
 					ctxProvider := data.NewContextProvider(constants.EvalData)
-					dummyExe := &script.ExecutableUnit{
-						DataProvider: ctxProvider,
-					}
+					dummyExe := newExe(t, "load-input-data", nil, ctxProvider)
 
 					evaluator := New(handler, dummyExe)
 					ctx := t.Context()
@@ -340,11 +330,7 @@ func TestEvaluator_Evaluate(t *testing.T) {
 			handler := slog.NewTextHandler(os.Stdout, nil)
 			ctxProvider := data.NewContextProvider(constants.EvalData)
 
-			exe := &script.ExecutableUnit{
-				ID:           "test-case",
-				Content:      mockContent,
-				DataProvider: ctxProvider,
-			}
+			exe := newExe(t, "test-case", mockContent, ctxProvider)
 
 			evaluator := New(handler, exe)
 
@@ -366,11 +352,7 @@ func TestEvaluator_Evaluate(t *testing.T) {
 			handler := slog.NewTextHandler(os.Stdout, nil)
 			ctxProvider := data.NewContextProvider(constants.EvalData)
 
-			exe := &script.ExecutableUnit{
-				ID:           "test-case",
-				Content:      mockContent,
-				DataProvider: ctxProvider,
-			}
+			exe := newExe(t, "test-case", mockContent, ctxProvider)
 
 			evaluator := New(handler, exe)
 
@@ -403,11 +385,7 @@ func TestEvaluator_Evaluate(t *testing.T) {
 
 			// Create executor unit
 			handler := slog.NewTextHandler(os.Stdout, nil)
-			execUnit := &script.ExecutableUnit{
-				ID:           "test-cancel",
-				Content:      content,
-				DataProvider: data.NewContextProvider(constants.EvalData),
-			}
+			execUnit := newExe(t, "test-cancel", content, data.NewContextProvider(constants.EvalData))
 
 			evaluator := New(handler, execUnit)
 
@@ -442,11 +420,7 @@ func TestEvaluator_Evaluate(t *testing.T) {
 			mockPlugin.On("Close", mock.Anything).Return(nil)
 
 			content := createMockExecutable(mockPlugin, "main")
-			exe := &script.ExecutableUnit{
-				ID:           "test-error-exit",
-				DataProvider: ctxProvider,
-				Content:      content,
-			}
+			exe := newExe(t, "test-error-exit", content, ctxProvider)
 
 			evaluator := New(handler, exe)
 			ctx := t.Context()
@@ -480,11 +454,7 @@ func TestEvaluator_Evaluate(t *testing.T) {
 			mockPlugin.On("Close", mock.Anything).Return(nil)
 
 			content := createMockExecutable(mockPlugin, "main")
-			exe := &script.ExecutableUnit{
-				ID:           "test-error-exit-uncapped",
-				DataProvider: ctxProvider,
-				Content:      content,
-			}
+			exe := newExe(t, "test-error-exit-uncapped", content, ctxProvider)
 
 			evaluator := New(handler, exe, WithExitOutputMaxBytes(-1))
 			_, err := evaluator.Eval(t.Context())
@@ -508,11 +478,7 @@ func TestEvaluator_Evaluate(t *testing.T) {
 			mockPlugin.On("Close", mock.Anything).Return(nil)
 
 			content := createMockExecutable(mockPlugin, "main")
-			exe := &script.ExecutableUnit{
-				ID:           "test-instance-error",
-				DataProvider: data.NewContextProvider(constants.EvalData),
-				Content:      content,
-			}
+			exe := newExe(t, "test-instance-error", content, data.NewContextProvider(constants.EvalData))
 
 			evaluator := New(handler, exe)
 			ctx := t.Context()
@@ -529,11 +495,7 @@ func TestEvaluator_Evaluate(t *testing.T) {
 			mockPlugin := new(MockCompiledPlugin)
 			content := createMockExecutable(mockPlugin, "main")
 
-			exe := &script.ExecutableUnit{
-				ID:           "test-load-input-error",
-				DataProvider: &mockErrProvider{err: errors.New("provider boom")},
-				Content:      content,
-			}
+			exe := newExe(t, "test-load-input-error", content, &mockErrProvider{err: errors.New("provider boom")})
 
 			evaluator := New(handler, exe)
 			_, err := evaluator.Eval(t.Context())
@@ -551,13 +513,9 @@ func TestEvaluator_Evaluate(t *testing.T) {
 			mockPlugin := new(MockCompiledPlugin)
 			content := createMockExecutable(mockPlugin, "main")
 
-			exe := &script.ExecutableUnit{
-				ID: "test-convert-format-error",
-				DataProvider: &mockMapProvider{data: map[string]any{
-					"bad": make(chan int),
-				}},
-				Content: content,
-			}
+			exe := newExe(t, "test-convert-format-error", content, &mockMapProvider{data: map[string]any{
+				"bad": make(chan int),
+			}})
 
 			evaluator := New(handler, exe)
 			_, err := evaluator.Eval(t.Context())
@@ -578,11 +536,7 @@ func TestEvaluator_Evaluate(t *testing.T) {
 			// Create a real compiler.Executable with our mock plugin
 			content := createMockExecutable(mockPlugin, "main")
 
-			exe := &script.ExecutableUnit{
-				ID:           "test-nil-handler",
-				DataProvider: data.NewContextProvider(constants.EvalData),
-				Content:      content,
-			}
+			exe := newExe(t, "test-nil-handler", content, data.NewContextProvider(constants.EvalData))
 
 			// Create with nil handler
 			evaluator := New(nil, exe)
@@ -809,11 +763,7 @@ func TestEvaluator_AddDataToContext(t *testing.T) {
 				mockPlugin.On("Close", mock.Anything).Return(nil)
 				content := createMockExecutable(mockPlugin, "main")
 
-				return &script.ExecutableUnit{
-					ID:           "test-nil-provider",
-					DataProvider: nil,
-					Content:      content,
-				}
+				return newExe(t, "test-nil-provider", content, nil)
 			},
 			inputs:      []map[string]any{{"test": "data"}},
 			wantError:   true,
@@ -828,11 +778,7 @@ func TestEvaluator_AddDataToContext(t *testing.T) {
 				mockPlugin.On("Close", mock.Anything).Return(nil)
 				content := createMockExecutable(mockPlugin, "main")
 
-				return &script.ExecutableUnit{
-					ID:           "test-valid-data",
-					DataProvider: data.NewContextProvider(constants.EvalData),
-					Content:      content,
-				}
+				return newExe(t, "test-valid-data", content, data.NewContextProvider(constants.EvalData))
 			},
 			inputs:    []map[string]any{{"test": "data"}},
 			wantError: false,
@@ -846,11 +792,7 @@ func TestEvaluator_AddDataToContext(t *testing.T) {
 				mockPlugin.On("Close", mock.Anything).Return(nil)
 				content := createMockExecutable(mockPlugin, "main")
 
-				return &script.ExecutableUnit{
-					ID:           "test-empty-input",
-					DataProvider: data.NewContextProvider(constants.EvalData),
-					Content:      content,
-				}
+				return newExe(t, "test-empty-input", content, data.NewContextProvider(constants.EvalData))
 			},
 			inputs:    []map[string]any{{}},
 			wantError: false,
@@ -877,11 +819,7 @@ func TestEvaluator_AddDataToContext(t *testing.T) {
 				mockProvider := &mockErrProvider{
 					err: errors.New("provider error"),
 				}
-				return &script.ExecutableUnit{
-					ID:           "test-err-provider",
-					DataProvider: mockProvider,
-					Content:      content,
-				}
+				return newExe(t, "test-err-provider", content, mockProvider)
 			},
 			inputs:      []map[string]any{{"test": "data"}},
 			wantError:   true,

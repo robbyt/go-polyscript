@@ -16,29 +16,15 @@ const checksumLength = 12
 
 // ExecutableUnit represents a specific version of a script, including its content and creation time.
 // It holds the compiled script content and provides access to evaluation facilities.
+// Fields are unexported; construct via NewExecutableUnit and read via the getter methods.
 type ExecutableUnit struct {
-	// ID is a unique identifier for this executable unit, typically derived from a hash of the script content.
-	ID string
+	id           string
+	createdAt    time.Time
+	scriptLoader loader.Loader
+	compiler     Compiler
+	content      ExecutableContent
+	dataProvider data.Provider
 
-	// CreatedAt records when this executable unit was instantiated.
-	CreatedAt time.Time
-
-	// ScriptLoader loads the script content to local memory from various places (file, string, etc.).
-	ScriptLoader loader.Loader
-
-	// Compiler is the script language-specific compiler that was used to compile this unit.
-	Compiler Compiler
-
-	// Content holds the compiled bytecode and source representation of the script.
-	Content ExecutableContent
-
-	// DataProvider provides access to both static compile-time data and variable runtime data
-	// during script evaluation. Enabling the "compile once, run many times" design.
-	// When created with NewExecutableUnit, this is typically a CompositeProvider containing
-	// a StaticProvider (for compile-time data) and another provider (for runtime data).
-	DataProvider data.Provider
-
-	// Logging components
 	logHandler slog.Handler
 	logger     *slog.Logger
 }
@@ -77,12 +63,12 @@ func NewExecutableUnit(
 	}
 
 	return &ExecutableUnit{
-		ID:           versionID,
-		CreatedAt:    time.Now(),
-		ScriptLoader: scriptLoader,
-		Content:      exe,
-		Compiler:     compiler,
-		DataProvider: dataProvider,
+		id:           versionID,
+		createdAt:    time.Now(),
+		scriptLoader: scriptLoader,
+		content:      exe,
+		compiler:     compiler,
+		dataProvider: dataProvider,
 		logHandler:   handler,
 		logger:       logger.With("ID", versionID),
 	}, nil
@@ -90,40 +76,40 @@ func NewExecutableUnit(
 
 func (exe *ExecutableUnit) String() string {
 	return fmt.Sprintf("ExecutableUnit{ID: %s, CreatedAt: %s, Compiler: %s, Loader: %s}",
-		exe.ID, exe.CreatedAt, exe.Compiler, exe.ScriptLoader)
+		exe.id, exe.createdAt, exe.compiler, exe.scriptLoader)
 }
 
 // GetID returns the unique identifier (version number, or name) for this script version.
 func (exe *ExecutableUnit) GetID() string {
-	return exe.ID
+	return exe.id
 }
 
 // GetContent returns the validated & compiled script content as ExecutableContent
 func (exe *ExecutableUnit) GetContent() ExecutableContent {
-	return exe.Content
+	return exe.content
 }
 
-// CreatedAt returns the timestamp when the version was created.
+// GetCreatedAt returns the timestamp when the version was created.
 func (exe *ExecutableUnit) GetCreatedAt() time.Time {
-	return exe.CreatedAt
+	return exe.createdAt
 }
 
 // EngineType returns the engine type this script is intended to run on.
 func (exe *ExecutableUnit) EngineType() engineTypes.Type {
-	return exe.Content.EngineType()
+	return exe.content.EngineType()
 }
 
 // GetCompiler returns the compiler used to validate the script and convert it into runnable bytecode.
 func (exe *ExecutableUnit) GetCompiler() Compiler {
-	return exe.Compiler
+	return exe.compiler
 }
 
 // GetLoader returns the loader used to load the script.
 func (exe *ExecutableUnit) GetLoader() loader.Loader {
-	return exe.ScriptLoader
+	return exe.scriptLoader
 }
 
 // GetDataProvider returns the data provider for this executable unit.
 func (exe *ExecutableUnit) GetDataProvider() data.Provider {
-	return exe.DataProvider
+	return exe.dataProvider
 }
