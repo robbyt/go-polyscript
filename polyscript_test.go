@@ -13,7 +13,6 @@ import (
 	"testing"
 
 	"github.com/robbyt/go-polyscript"
-	
 	"github.com/robbyt/go-polyscript/platform"
 	"github.com/robbyt/go-polyscript/platform/data"
 	"github.com/robbyt/go-polyscript/platform/script/loader"

@@ -7,11 +7,11 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-type mockLoader struct {
+type loaderMock struct {
 	mock.Mock
 }
 
-func (m *mockLoader) GetSourceURL() *url.URL {
+func (m *loaderMock) GetSourceURL() *url.URL {
 	args := m.Called()
 	if args.Get(0) == nil {
 		return nil
@@ -19,7 +19,7 @@ func (m *mockLoader) GetSourceURL() *url.URL {
 	return args.Get(0).(*url.URL)
 }
 
-func (m *mockLoader) GetReader() (io.ReadCloser, error) {
+func (m *loaderMock) GetReader() (io.ReadCloser, error) {
 	args := m.Called()
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
