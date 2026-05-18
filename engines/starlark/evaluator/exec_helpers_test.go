@@ -6,20 +6,11 @@ import (
 	"strings"
 	"testing"
 
-	engineTypes "github.com/robbyt/go-polyscript/engines/types"
 	"github.com/robbyt/go-polyscript/platform/data"
 	"github.com/robbyt/go-polyscript/platform/script"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
-
-// stubContent is a minimal ExecutableContent used by newExe when a test
-// doesn't care about the content.
-type stubContent struct{}
-
-func (stubContent) GetSource() string            { return "" }
-func (stubContent) GetByteCode() any             { return nil }
-func (stubContent) EngineType() engineTypes.Type { return engineTypes.Unsupported }
 
 // loaderMock satisfies script/loader.Loader for tests that don't care about
 // the loader's behavior, only that NewExecutableUnit can call GetReader().
@@ -68,9 +59,6 @@ func newExe(
 	t.Helper()
 	if id == "" {
 		id = t.Name()
-	}
-	if content == nil {
-		content = stubContent{}
 	}
 	ldr := new(loaderMock)
 	ldr.On("GetReader").

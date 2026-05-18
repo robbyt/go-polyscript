@@ -176,6 +176,18 @@ _ = request_handler(ctx.get("request"))
 			require.Contains(t, err.Error(), "executable unit is nil")
 		})
 
+		// Test content nil
+		t.Run("content nil", func(t *testing.T) {
+			handler := slog.NewTextHandler(os.Stdout, nil)
+			exe := newExe(t, "test-nil-content", nil, nil)
+			evaluator := New(handler, exe)
+
+			response, err := evaluator.Eval(t.Context())
+			require.Error(t, err)
+			require.Nil(t, response)
+			require.Contains(t, err.Error(), "content is nil")
+		})
+
 		// Test script with execution error
 		t.Run("script execution error", func(t *testing.T) {
 			// Create a script that will intentionally cause an error
