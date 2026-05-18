@@ -263,6 +263,42 @@ func TestNewVersion(t *testing.T) {
 		require.Contains(t, err.Error(), "compiler is nil")
 	})
 
+	t.Run("NilScriptLoader", func(t *testing.T) {
+		exe, err := NewExecutableUnit(
+			logHandler,
+			"test",
+			nil,
+			new(MockCompiler),
+			data.NewStaticProvider(emptyScriptData),
+		)
+		require.Error(t, err)
+		require.Nil(t, exe)
+		require.Contains(t, err.Error(), "scriptLoader is nil")
+	})
+
+	t.Run("NilCompiledContent", func(t *testing.T) {
+		lod, err := loader.NewFromString("anything")
+		require.NoError(t, err)
+
+		reader, err := lod.GetReader()
+		require.NoError(t, err)
+
+		comp := new(MockCompiler)
+		comp.On("Compile", reader).Return(nil, nil).Once()
+
+		exe, err := NewExecutableUnit(
+			logHandler,
+			"test",
+			lod,
+			comp,
+			data.NewStaticProvider(emptyScriptData),
+		)
+		require.Error(t, err)
+		require.Nil(t, exe)
+		require.Contains(t, err.Error(), "compiler returned nil content")
+		comp.AssertExpectations(t)
+	})
+
 	t.Run("EmptyContent", func(t *testing.T) {
 		loader, err := loader.NewFromString("")
 

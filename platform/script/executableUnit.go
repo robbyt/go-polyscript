@@ -45,6 +45,10 @@ func NewExecutableUnit(
 		return nil, errors.New("compiler is nil")
 	}
 
+	if scriptLoader == nil {
+		return nil, errors.New("scriptLoader is nil")
+	}
+
 	reader, err := scriptLoader.GetReader()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get reader from loader: %w", err)
@@ -53,6 +57,10 @@ func NewExecutableUnit(
 	exe, err := compiler.Compile(reader)
 	if err != nil {
 		return nil, fmt.Errorf("compiler failed: %w", err)
+	}
+
+	if exe == nil {
+		return nil, errors.New("compiler returned nil content")
 	}
 
 	if versionID == "" {
