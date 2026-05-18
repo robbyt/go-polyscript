@@ -70,6 +70,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   not need package github.com/stretchr/testify` — `testify` is only reached
   via test binaries.
   Closes [#88](https://github.com/robbyt/go-polyscript/issues/88).
+  ([#138](https://github.com/robbyt/go-polyscript/pull/138))
 - The redundant `cfg.handler != nil` guards in `polyscript.go` and
   `engines/{risor,starlark,extism}/new.go` that existed solely to work
   around the pre-#113 nil-rejection in `WithLogHandler`. Each pair of
