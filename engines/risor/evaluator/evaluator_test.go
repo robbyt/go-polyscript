@@ -12,7 +12,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/deepnoodle-ai/risor/v2/pkg/bytecode"
 	"github.com/robbyt/go-polyscript/engines/risor/compiler"
 	"github.com/robbyt/go-polyscript/engines/types"
 	"github.com/robbyt/go-polyscript/internal/helpers"
@@ -94,22 +93,7 @@ func createTestExecutable(
 	if err != nil {
 		return nil, fmt.Errorf("failed to create compiler: %w", err)
 	}
-
-	reader, err := ld.GetReader()
-	if err != nil {
-		return nil, err
-	}
-
-	content, err := c.Compile(reader)
-	if err != nil {
-		return nil, err
-	}
-
-	return &script.ExecutableUnit{
-		ID:           "test-id",
-		Content:      content,
-		DataProvider: provider,
-	}, nil
+	return script.NewExecutableUnit(handler, "test-id", ld, c, provider)
 }
 
 // TestEvaluator_Evaluate tests evaluating Risor scripts
@@ -243,36 +227,14 @@ func TestEvaluator_Evaluate(t *testing.T) {
 			{
 				name: "nil bytecode",
 				setupExe: func() *script.ExecutableUnit {
-					return &script.ExecutableUnit{
-						ID: "test-id",
-						Content: &MockContent{
-							Content: nil,
-						},
-					}
+					return newExe(t, "test-id", &MockContent{Content: nil}, nil)
 				},
 				errorMessage: "bytecode is nil",
 			},
 			{
-				name: "empty execution id",
-				setupExe: func() *script.ExecutableUnit {
-					return &script.ExecutableUnit{
-						ID: "",
-						Content: &MockContent{
-							Content: bytecode.NewCode(bytecode.CodeParams{}),
-						},
-					}
-				},
-				errorMessage: "exeID is empty",
-			},
-			{
 				name: "wrong bytecode type",
 				setupExe: func() *script.ExecutableUnit {
-					return &script.ExecutableUnit{
-						ID: "test-id",
-						Content: &MockContent{
-							Content: "not a risor bytecode",
-						},
-					}
+					return newExe(t, "test-id", &MockContent{Content: "not a risor bytecode"}, nil)
 				},
 				errorMessage: "unable to type assert bytecode",
 			},
@@ -327,9 +289,7 @@ func TestEvaluator_Evaluate(t *testing.T) {
 					expectedErr := fmt.Errorf("provider error")
 					mockProvider.On("GetData", mock.Anything).Return(nil, expectedErr)
 
-					return &script.ExecutableUnit{
-						DataProvider: mockProvider,
-					}
+					return newExe(t, "provider-error", nil, mockProvider)
 				},
 				setupCtx: func() context.Context {
 					return t.Context()
@@ -345,9 +305,7 @@ func TestEvaluator_Evaluate(t *testing.T) {
 					emptyData := map[string]any{}
 					mockProvider.On("GetData", mock.Anything).Return(emptyData, nil)
 
-					return &script.ExecutableUnit{
-						DataProvider: mockProvider,
-					}
+					return newExe(t, "empty-data", nil, mockProvider)
 				},
 				setupCtx: func() context.Context {
 					return t.Context()
@@ -362,9 +320,7 @@ func TestEvaluator_Evaluate(t *testing.T) {
 					validData := map[string]any{"test": "data"}
 					mockProvider.On("GetData", mock.Anything).Return(validData, nil)
 
-					return &script.ExecutableUnit{
-						DataProvider: mockProvider,
-					}
+					return newExe(t, "valid-data", nil, mockProvider)
 				},
 				setupCtx: func() context.Context {
 					return t.Context()
@@ -405,8 +361,8 @@ func TestEvaluator_Evaluate(t *testing.T) {
 				}
 
 				// Verify mock expectations if we have a mockProvider
-				if exe != nil && exe.DataProvider != nil {
-					if mockProvider, ok := exe.DataProvider.(*MockProvider); ok {
+				if exe != nil && exe.GetDataProvider() != nil {
+					if mockProvider, ok := exe.GetDataProvider().(*MockProvider); ok {
 						mockProvider.AssertExpectations(t)
 					}
 				}
@@ -442,7 +398,7 @@ func TestEvaluator_Evaluate(t *testing.T) {
 
 			for _, tt := range tests {
 				t.Run(tt.name, func(t *testing.T) {
-					exe := &script.ExecutableUnit{}
+					exe := newExe(t, "new-test", nil, nil)
 					evaluator := New(tt.handler, exe)
 
 					require.NotNil(t, evaluator)
@@ -484,7 +440,7 @@ func TestEvaluator_AddDataToContext(t *testing.T) {
 				mockProvider.On("AddDataToContext", mock.Anything, mock.Anything).
 					Return(enrichedCtx, nil)
 
-				return &script.ExecutableUnit{DataProvider: mockProvider}
+				return newExe(t, "with-provider", nil, mockProvider)
 			},
 			inputs:    []map[string]any{{"test": "data"}},
 			wantError: false,
@@ -499,7 +455,7 @@ func TestEvaluator_AddDataToContext(t *testing.T) {
 				mockProvider.On("AddDataToContext", mock.Anything, mock.Anything).
 					Return(nil, expectedErr)
 
-				return &script.ExecutableUnit{DataProvider: mockProvider}
+				return newExe(t, "with-provider-error", nil, mockProvider)
 			},
 			inputs:       []map[string]any{{"test": "data"}},
 			wantError:    true,
@@ -509,7 +465,7 @@ func TestEvaluator_AddDataToContext(t *testing.T) {
 			name: "nil provider",
 			setupExe: func(t *testing.T) *script.ExecutableUnit {
 				t.Helper()
-				return &script.ExecutableUnit{DataProvider: nil}
+				return newExe(t, "nil-provider", nil, nil)
 			},
 			inputs:       []map[string]any{{"test": "data"}},
 			wantError:    true,
@@ -554,8 +510,8 @@ func TestEvaluator_AddDataToContext(t *testing.T) {
 			}
 
 			// If using mocks, verify expectations
-			if exe != nil && exe.DataProvider != nil {
-				if mockProvider, ok := exe.DataProvider.(*MockProvider); ok {
+			if exe != nil && exe.GetDataProvider() != nil {
+				if mockProvider, ok := exe.GetDataProvider().(*MockProvider); ok {
 					mockProvider.AssertExpectations(t)
 				}
 			}

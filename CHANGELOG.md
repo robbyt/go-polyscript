@@ -50,6 +50,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `MachineType` equivalents). The conventional import alias is now
   `engineTypes`. Closes [#90](https://github.com/robbyt/go-polyscript/issues/90).
   ([#137](https://github.com/robbyt/go-polyscript/pull/137))
+- **Breaking:** Unexported the six fields on `platform/script.ExecutableUnit`
+  (`ID`, `CreatedAt`, `ScriptLoader`, `Compiler`, `Content`, `DataProvider`).
+  External callers must use the existing getters (`GetID()`, `GetCreatedAt()`,
+  `GetLoader()`, `GetCompiler()`, `GetContent()`, `GetDataProvider()`) for
+  reads and construct only via `NewExecutableUnit(...)`. Mid-flight mutation
+  of `DataProvider` (and the other fields) is no longer possible from outside
+  the package. Closes [#91](https://github.com/robbyt/go-polyscript/issues/91).
 
 ### Deprecated
 - The twelve legacy top-level constructors (`FromRisorFile`,
