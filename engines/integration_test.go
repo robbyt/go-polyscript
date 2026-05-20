@@ -82,8 +82,8 @@ let tags = ctx["tags"]
 			require.NoError(t, err)
 
 			// Verify results
-			resultMap, ok := result.Interface().(map[string]any)
-			require.True(t, ok)
+			resultMap, err := result.AsMap()
+			require.NoError(t, err)
 
 			assert.Equal(t, "risor", resultMap["engine"])
 			assert.Equal(t, "Integration Test", resultMap["name"])
@@ -135,8 +135,8 @@ _ = result
 			require.NoError(t, err)
 
 			// Verify results
-			resultMap, ok := result.Interface().(map[string]any)
-			require.True(t, ok)
+			resultMap, err := result.AsMap()
+			require.NoError(t, err)
 
 			assert.Equal(t, "starlark", resultMap["engine"])
 			assert.Equal(t, "Integration Test", resultMap["name"])
@@ -175,8 +175,8 @@ _ = result
 		require.NoError(t, err)
 
 		// Verify results - the greet function returns {"greeting": "Hello, <input>!"}
-		resultMap, ok := result.Interface().(map[string]any)
-		require.True(t, ok)
+		resultMap, err := result.AsMap()
+		require.NoError(t, err)
 
 		greeting, exists := resultMap["greeting"]
 		require.True(t, exists)
@@ -239,8 +239,8 @@ let action = ctx["action"]
 		require.NoError(t, err)
 
 		// Verify both static and dynamic data are accessible
-		resultMap, ok := result.Interface().(map[string]any)
-		require.True(t, ok)
+		resultMap, err := result.AsMap()
+		require.NoError(t, err)
 
 		assert.Equal(t, "TestApp", resultMap["app"])            // Static data
 		assert.Equal(t, "user123", resultMap["user"])           // Dynamic data
@@ -282,8 +282,8 @@ _ = result
 		require.NoError(t, err)
 
 		// Verify both static and dynamic data are accessible
-		resultMap, ok := result.Interface().(map[string]any)
-		require.True(t, ok)
+		resultMap, err := result.AsMap()
+		require.NoError(t, err)
 
 		assert.Equal(t, "TestApp", resultMap["app"])            // Static data
 		assert.Equal(t, "user123", resultMap["user"])           // Dynamic data
@@ -323,8 +323,8 @@ _ = result
 		require.NoError(t, err)
 
 		// Verify the WASM module processed the data
-		resultMap, ok := result.Interface().(map[string]any)
-		require.True(t, ok)
+		resultMap, err := result.AsMap()
+		require.NoError(t, err)
 
 		greeting, exists := resultMap["greeting"]
 		require.True(t, exists)
@@ -364,8 +364,8 @@ let debug = ctx["config"]["debug"]
 		result, err := evaluator.Eval(t.Context())
 		require.NoError(t, err)
 
-		resultMap, ok := result.Interface().(map[string]any)
-		require.True(t, ok)
+		resultMap, err := result.AsMap()
+		require.NoError(t, err)
 
 		assert.Equal(t, "World", resultMap["name"])
 		assert.Equal(t, true, resultMap["debug"])
@@ -390,8 +390,8 @@ _ = result
 		result, err := evaluator.Eval(t.Context())
 		require.NoError(t, err)
 
-		resultMap, ok := result.Interface().(map[string]any)
-		require.True(t, ok)
+		resultMap, err := result.AsMap()
+		require.NoError(t, err)
 
 		assert.Equal(t, "World", resultMap["name"])
 		assert.Equal(t, true, resultMap["debug"])
@@ -416,8 +416,8 @@ _ = result
 		result, err := evaluator.Eval(t.Context())
 		require.NoError(t, err)
 
-		resultMap, ok := result.Interface().(map[string]any)
-		require.True(t, ok)
+		resultMap, err := result.AsMap()
+		require.NoError(t, err)
 
 		// The greet function returns {"greeting": "Hello, <input>!"}
 		greeting, exists := resultMap["greeting"]
@@ -476,8 +476,8 @@ let user_data = ctx["user_data"]
 				require.NoError(t, err)
 
 				// Verify
-				resultMap, ok := result.Interface().(map[string]any)
-				require.True(t, ok)
+				resultMap, err := result.AsMap()
+				require.NoError(t, err)
 
 				config, exists := resultMap["config"].(map[string]any)
 				require.True(t, exists)
@@ -534,8 +534,8 @@ _ = result
 				require.NoError(t, err)
 
 				// Verify
-				resultMap, ok := result.Interface().(map[string]any)
-				require.True(t, ok)
+				resultMap, err := result.AsMap()
+				require.NoError(t, err)
 
 				config, exists := resultMap["config"].(map[string]any)
 				require.True(t, exists)
@@ -576,8 +576,8 @@ _ = result
 			require.NoError(t, err)
 
 			// Verify
-			resultMap, ok := result.Interface().(map[string]any)
-			require.True(t, ok)
+			resultMap, err := result.AsMap()
+			require.NoError(t, err)
 
 			greeting, exists := resultMap["greeting"]
 			require.True(t, exists)
@@ -624,8 +624,8 @@ let max_retries = ctx["constants"]["max_retries"]
 			require.NoError(t, err)
 
 			// Verify
-			resultMap, ok := result.Interface().(map[string]any)
-			require.True(t, ok)
+			resultMap, err := result.AsMap()
+			require.NoError(t, err)
 
 			assert.Equal(t, "TestApp", resultMap["app_name"])
 			assert.Equal(t, "1.0.0", resultMap["version"])
@@ -661,8 +661,8 @@ _ = result
 			require.NoError(t, err)
 
 			// Verify
-			resultMap, ok := result.Interface().(map[string]any)
-			require.True(t, ok)
+			resultMap, err := result.AsMap()
+			require.NoError(t, err)
 
 			assert.Equal(t, "TestApp", resultMap["app_name"])
 			assert.Equal(t, "1.0.0", resultMap["version"])
@@ -692,8 +692,8 @@ _ = result
 			require.NoError(t, err)
 
 			// Verify
-			resultMap, ok := result.Interface().(map[string]any)
-			require.True(t, ok)
+			resultMap, err := result.AsMap()
+			require.NoError(t, err)
 
 			greeting, exists := resultMap["greeting"]
 			require.True(t, exists)
@@ -752,8 +752,8 @@ let request_id = ctx["request_id"]
 				require.NoError(t, err)
 
 				// Verify both static and dynamic data are accessible
-				resultMap, ok := result.Interface().(map[string]any)
-				require.True(t, ok)
+				resultMap, err := result.AsMap()
+				require.NoError(t, err)
 
 				assert.Equal(t, "TestApp", resultMap["app_name"])  // Static data
 				assert.Equal(t, "1.0.0", resultMap["version"])     // Static data
@@ -799,8 +799,8 @@ _ = result
 				require.NoError(t, err)
 
 				// Verify both static and dynamic data are accessible
-				resultMap, ok := result.Interface().(map[string]any)
-				require.True(t, ok)
+				resultMap, err := result.AsMap()
+				require.NoError(t, err)
 
 				assert.Equal(t, "TestApp", resultMap["app_name"])  // Static data
 				assert.Equal(t, "1.0.0", resultMap["version"])     // Static data
@@ -845,8 +845,8 @@ _ = result
 			require.NoError(t, err)
 
 			// Verify dynamic data overrode static data
-			resultMap, ok := result.Interface().(map[string]any)
-			require.True(t, ok)
+			resultMap, err := result.AsMap()
+			require.NoError(t, err)
 
 			greeting, exists := resultMap["greeting"]
 			require.True(t, exists)
@@ -914,8 +914,8 @@ let content_type = ctx["request"]["Headers"]["Content-Type"][0]
 				require.NoError(t, err)
 
 				// Verify HTTP request data is accessible
-				resultMap, ok := result.Interface().(map[string]any)
-				require.True(t, ok)
+				resultMap, err := result.AsMap()
+				require.NoError(t, err)
 
 				assert.Equal(t, "POST", resultMap["method"])
 				assert.Equal(t, "/api/test", resultMap["path"])
@@ -963,8 +963,8 @@ _ = result
 				require.NoError(t, err)
 
 				// Verify HTTP request data is accessible
-				resultMap, ok := result.Interface().(map[string]any)
-				require.True(t, ok)
+				resultMap, err := result.AsMap()
+				require.NoError(t, err)
 
 				assert.Equal(t, "POST", resultMap["method"])
 				assert.Equal(t, "/api/test", resultMap["path"])
@@ -998,8 +998,8 @@ _ = result
 			require.NoError(t, err)
 
 			// Verify the WASM module processed the request data
-			resultMap, ok := result.Interface().(map[string]any)
-			require.True(t, ok)
+			resultMap, err := result.AsMap()
+			require.NoError(t, err)
 
 			greeting, exists := resultMap["greeting"]
 			require.True(t, exists)
@@ -1048,8 +1048,8 @@ let config_data = ctx["config"]
 			require.NoError(t, err)
 
 			// Verify explicit key wrapping worked
-			resultMap, ok := result.Interface().(map[string]any)
-			require.True(t, ok)
+			resultMap, err := result.AsMap()
+			require.NoError(t, err)
 
 			assert.Equal(t, true, resultMap["has_request"])
 			assert.Equal(t, true, resultMap["has_user"])

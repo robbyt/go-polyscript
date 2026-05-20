@@ -188,8 +188,8 @@ func TestEvaluator_Evaluate(t *testing.T) {
 			require.NotNil(t, response)
 
 			// Verify the response
-			resultMap, ok := response.Interface().(map[string]any)
-			require.True(t, ok, "Expected map response")
+			resultMap, err := response.AsMap()
+			require.NoError(t, err, "Expected map response")
 			require.Contains(t, resultMap, "result")
 			require.Equal(t, "success", resultMap["result"])
 			require.Contains(t, resultMap, "value")

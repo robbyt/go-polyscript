@@ -333,11 +333,11 @@ func TestResponseMethods(t *testing.T) {
 				handler := slog.NewTextHandler(os.Stdout, nil)
 				result := newEvalResult(handler, tt.value, tt.execTime, tt.versionID)
 
-				// Test GetScriptExeID
-				assert.Equal(t, tt.versionID, result.GetScriptExeID())
+				// Test ScriptExeID
+				assert.Equal(t, tt.versionID, result.ScriptExeID())
 
-				// Test GetExecTime
-				assert.Equal(t, tt.execTime.String(), result.GetExecTime())
+				// Test ExecTime
+				assert.Equal(t, tt.execTime, result.ExecTime())
 			})
 		}
 	})

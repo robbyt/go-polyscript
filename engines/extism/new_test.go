@@ -185,8 +185,8 @@ func TestFromExtismLoader_RunsEndToEnd(t *testing.T) {
 
 	res, err := eval.Eval(t.Context())
 	require.NoError(t, err)
-	got, ok := res.Interface().(map[string]any)
-	require.True(t, ok)
+	got, err := res.AsMap()
+	require.NoError(t, err)
 	assert.Equal(t, "Hello, World!", got["greeting"])
 }
 

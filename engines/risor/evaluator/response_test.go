@@ -121,8 +121,8 @@ func TestResponseMethods(t *testing.T) {
 				require.Implements(t, (*platform.EvaluatorResponse)(nil), result)
 
 				// Verify metadata methods
-				assert.Equal(t, tt.execTime.String(), result.GetExecTime())
-				assert.Equal(t, tt.versionID, result.GetScriptExeID())
+				assert.Equal(t, tt.execTime, result.ExecTime())
+				assert.Equal(t, tt.versionID, result.ScriptExeID())
 			})
 		}
 	})
@@ -347,11 +347,11 @@ func TestResponseMethods(t *testing.T) {
 
 				result := newEvalResult(handler, mockObj, tt.execTime, tt.versionID)
 
-				// Test GetScriptExeID
-				assert.Equal(t, tt.versionID, result.GetScriptExeID())
+				// Test ScriptExeID
+				assert.Equal(t, tt.versionID, result.ScriptExeID())
 
-				// Test GetExecTime
-				assert.Equal(t, tt.execTime.String(), result.GetExecTime())
+				// Test ExecTime
+				assert.Equal(t, tt.execTime, result.ExecTime())
 			})
 		}
 	})

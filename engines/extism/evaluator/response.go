@@ -39,7 +39,7 @@ func newEvalResult(
 func (r *execResult) String() string {
 	return fmt.Sprintf(
 		"execResult{Type: %s, Value: %v, ExecTime: %s, ScriptExeID: %s}",
-		r.Type(), r.value, r.GetExecTime(), r.GetScriptExeID(),
+		r.Type(), r.value, r.ExecTime(), r.ScriptExeID(),
 	)
 }
 
@@ -66,12 +66,20 @@ func (r *execResult) Type() data.Types {
 	}
 }
 
-func (r *execResult) GetScriptExeID() string {
+func (r *execResult) ScriptExeID() string {
 	return r.scriptExeID
 }
 
-func (r *execResult) GetExecTime() string {
-	return r.execTime.String()
+func (r *execResult) ExecTime() time.Duration {
+	return r.execTime
+}
+
+func (r *execResult) AsMap() (map[string]any, error) {
+	m, ok := r.value.(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("AsMap: expected map[string]any, got %T", r.value)
+	}
+	return m, nil
 }
 
 func (r *execResult) Inspect() string {

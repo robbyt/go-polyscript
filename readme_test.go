@@ -40,8 +40,8 @@ func TestReadmeQuickStart(t *testing.T) {
 	require.NoError(t, err, "Should evaluate successfully")
 	require.NotNil(t, result, "Result should not be nil")
 
-	resultMap, ok := result.Interface().(map[string]any)
-	require.True(t, ok, "Result should be a map")
+	resultMap, err := result.AsMap()
+	require.NoError(t, err, "Result should be a map")
 	assert.Equal(t, "Hello, World.", resultMap["greeting"], "Greeting should match")
 	assert.Equal(t, int64(13), resultMap["length"], "Length should be 13")
 }
@@ -74,8 +74,8 @@ func TestReadmeStaticProvider(t *testing.T) {
 	result, err := evaluator.Eval(t.Context())
 	require.NoError(t, err, "Should evaluate successfully")
 
-	resultMap, ok := result.Interface().(map[string]any)
-	require.True(t, ok, "Result should be a map")
+	resultMap, err := result.AsMap()
+	require.NoError(t, err, "Result should be a map")
 	assert.Equal(t, "Hello, cats!", resultMap["greeting"], "Greeting should match with excitement")
 }
 
@@ -102,8 +102,8 @@ func TestReadmeContextProvider(t *testing.T) {
 	result, err := evaluator.Eval(enrichedCtx)
 	require.NoError(t, err, "Should evaluate successfully")
 
-	resultMap, ok := result.Interface().(map[string]any)
-	require.True(t, ok, "Result should be a map")
+	resultMap, err := result.AsMap()
+	require.NoError(t, err, "Result should be a map")
 	assert.Equal(t, "Billie Jean", resultMap["name"], "Name should match")
 	assert.Equal(t, true, resultMap["is_not_my_lover"], "Relationship status should be correct")
 }
@@ -146,8 +146,8 @@ func TestReadmeCombiningStaticAndDynamic(t *testing.T) {
 	result, err := evaluator.Eval(enrichedCtx)
 	require.NoError(t, err, "Should evaluate with combined data")
 
-	resultMap, ok := result.Interface().(map[string]any)
-	require.True(t, ok, "Result should be a map")
+	resultMap, err := result.AsMap()
+	require.NoError(t, err, "Result should be a map")
 	assert.Equal(t, "Hello, Robert!", resultMap["greeting"], "Should use runtime name over static")
 }
 
@@ -175,8 +175,8 @@ _ = result
 	result, err := evaluator.Eval(t.Context())
 	require.NoError(t, err, "Should evaluate Starlark script")
 
-	resultMap, ok := result.Interface().(map[string]any)
-	require.True(t, ok, "Result should be a map")
+	resultMap, err := result.AsMap()
+	require.NoError(t, err, "Result should be a map")
 	assert.Equal(t, "Hello, World!", resultMap["greeting"], "Greeting should match")
 	assert.Equal(t, int64(13), resultMap["length"], "Length should be 13")
 }
@@ -195,8 +195,8 @@ func TestReadmeExtism(t *testing.T) {
 	require.NoError(t, err, "Should evaluate WASM module")
 	require.NotNil(t, result, "Result should not be nil")
 
-	resultMap, ok := result.Interface().(map[string]any)
-	require.True(t, ok, "Result should be a map")
+	resultMap, err := result.AsMap()
+	require.NoError(t, err, "Result should be a map")
 	assert.Contains(t, resultMap, "greeting", "Result should contain greeting field")
 	assert.Equal(t, "Hello, World!", resultMap["greeting"], "Greeting should match")
 }

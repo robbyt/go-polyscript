@@ -130,8 +130,8 @@ func TestExtismDataIntegrationScenarios(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, result)
 
-		resultMap, ok := result.Interface().(map[string]any)
-		require.True(t, ok, "Result should be a map")
+		resultMap, err := result.AsMap()
+		require.NoError(t, err, "Result should be a map")
 		require.Contains(t, resultMap, "greeting")
 		assert.Equal(t, "Hello, Test User!", resultMap["greeting"])
 
@@ -171,8 +171,8 @@ func TestExtismEvalEndToEnd(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, result)
 
-	resultMap, ok := result.Interface().(map[string]any)
-	require.True(t, ok, "Result should be a map")
+	resultMap, err := result.AsMap()
+	require.NoError(t, err, "Result should be a map")
 	require.Contains(t, resultMap, "greeting")
 	assert.Equal(t, "Hello, Test User!", resultMap["greeting"])
 }

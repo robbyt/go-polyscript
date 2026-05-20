@@ -80,9 +80,9 @@ func TestResponseMethods(t *testing.T) {
 				require.NotNil(t, result)
 				require.Equal(t, mockVal, result.Value)
 				require.Equal(t, tt.execTime, result.execTime)
-				assert.Equal(t, tt.execTime.String(), result.GetExecTime())
+				assert.Equal(t, tt.execTime, result.ExecTime())
 				require.Equal(t, tt.versionID, result.scriptExeID)
-				require.Equal(t, tt.versionID, result.GetScriptExeID())
+				require.Equal(t, tt.versionID, result.ScriptExeID())
 				require.Implements(t, (*platform.EvaluatorResponse)(nil), result)
 
 				mockVal.AssertExpectations(t)
@@ -239,11 +239,11 @@ func TestResponseMethods(t *testing.T) {
 				handler := slog.NewTextHandler(os.Stdout, nil)
 				result := newEvalResult(handler, mockVal, tt.execTime, tt.scriptID)
 
-				// Test GetScriptExeID
-				assert.Equal(t, tt.scriptID, result.GetScriptExeID())
+				// Test ScriptExeID
+				assert.Equal(t, tt.scriptID, result.ScriptExeID())
 
-				// Test GetExecTime
-				assert.Equal(t, tt.execTime.String(), result.GetExecTime())
+				// Test ExecTime
+				assert.Equal(t, tt.execTime, result.ExecTime())
 			})
 		}
 	})

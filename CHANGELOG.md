@@ -57,6 +57,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reads and construct only via `NewExecutableUnit(...)`. Mid-flight mutation
   of `DataProvider` (and the other fields) is no longer possible from outside
   the package. Closes [#91](https://github.com/robbyt/go-polyscript/issues/91).
+- **Breaking:** Tightened the `platform.EvaluatorResponse` interface:
+  - `GetScriptExeID() string` → `ScriptExeID() string` (dropped `Get` prefix).
+  - `GetExecTime() string` → `ExecTime() time.Duration` (no longer stringified
+    at the boundary).
+  - Added `AsMap() (map[string]any, error)` returning the result as a typed
+    map, with an error of the form `"AsMap: expected map[string]any, got <T>"`
+    when the underlying value has a different shape. Replaces the
+    `result.Interface().(map[string]any)` ceremony at 40+ call sites across
+    the test suite.
+  Closes [#86](https://github.com/robbyt/go-polyscript/issues/86).
 
 ### Deprecated
 - The twelve legacy top-level constructors (`FromRisorFile`,
