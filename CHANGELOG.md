@@ -92,6 +92,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   signature simplified from `(*url.URL, error)` to `*url.URL`.
   ([#118](https://github.com/robbyt/go-polyscript/pull/118))
 
+### Documentation
+- Documented the intentional divergence between Risor and Starlark in how a
+  callable-returning script is handled: Risor errors, Starlark auto-invokes.
+  Added a "Script Return Value Handling" section to `engines/README.md` and
+  brief rationale comments next to each evaluator's branch.
+
 ### Fixed
 - `RequestToMap` no longer mutates the caller's `*http.Request`. The URL
   is now resolved through a local sentinel (`resolveURL`) and the body is

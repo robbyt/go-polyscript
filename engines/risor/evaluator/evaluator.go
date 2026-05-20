@@ -155,6 +155,10 @@ func (be *Evaluator) Eval(ctx context.Context) (platform.EvaluatorResponse, erro
 			ScriptResult: result.Inspect(),
 		}
 	case "function":
+		// Risor is expression-oriented; a trailing lambda is a legitimate value to
+		// return. Returning it as an error rather than auto-invoking avoids guessing
+		// arity/arguments. Diverges from Starlark by design — see engines/README.md
+		// "Script Return Value Handling".
 		return nil, &Error{
 			Msg:          fmt.Sprintf("function object returned from script: %s", result.Inspect()),
 			ScriptResult: result.Inspect(),
