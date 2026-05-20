@@ -166,16 +166,18 @@ See `engines/risor/evaluator/evaluator.go` (`case "function":` branch).
 
 ### Starlark: callable returns are auto-invoked with no args
 
-A Starlark script's value is the final assignment's value. If that value is
-a callable (a `*starlark.Function`, `*starlark.Builtin`, or any
-`starlark.Callable`), the evaluator auto-invokes it with no positional args
-and no kwargs, then returns the call's result. The returned value is frozen
-to prevent further mutation.
+The Starlark evaluator pulls the script's return value out of the global
+named `_` (the standard Starlark convention for "the unused/anonymous value").
+If `_` is None or unset, it falls back to a global named `result`. If that
+final value is a callable (a `*starlark.Function`, `*starlark.Builtin`, or
+any `starlark.Callable`), the evaluator auto-invokes it with no positional
+args and no kwargs, then returns the call's result. The returned value is
+frozen via `val.Freeze()` to prevent further mutation.
 
 Rationale: Starlark has no top-level expression statement, so a script body
-conventionally ends in a `def` block (followed by something like `_ = main`).
-Auto-call provides the ergonomic "run my main()" semantics that the language
-otherwise lacks.
+conventionally ends in a `def` block followed by an assignment like
+`_ = main`. Auto-call provides the ergonomic "run my main()" semantics that
+the language otherwise lacks.
 
 ```starlark
 def greet():
@@ -183,8 +185,8 @@ def greet():
 _ = greet                # script returns "Hello, World"
 ```
 
-See `engines/starlark/evaluator/evaluator.go` (the `starlarkLib.Callable`
-branch).
+See `engines/starlark/evaluator/evaluator.go` (the `_` / `result` lookup
+plus the `starlarkLib.Callable` auto-call branch).
 
 ### Extism / WASM: no callable-at-script-level concept
 
