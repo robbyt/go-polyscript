@@ -2,6 +2,7 @@ package platform_test
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/robbyt/go-polyscript/platform"
@@ -83,6 +84,17 @@ func (m *mockEvaluatorResponse) ExecTime() time.Duration {
 
 func (m *mockEvaluatorResponse) AsMap() (map[string]any, error) {
 	args := m.Called()
-	m0, _ := args.Get(0).(map[string]any)
-	return m0, args.Error(1)
+	err := args.Error(1)
+	got := args.Get(0)
+	if got == nil {
+		return nil, err
+	}
+	m0, ok := got.(map[string]any)
+	if !ok {
+		if err != nil {
+			return nil, err
+		}
+		return nil, fmt.Errorf("AsMap: expected map[string]any, got %T", got)
+	}
+	return m0, err
 }
