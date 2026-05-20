@@ -203,7 +203,10 @@ func (be *Evaluator) Eval(ctx context.Context) (platform.EvaluatorResponse, erro
 		return result, nil
 	}
 
-	// Handle callable results (functions)
+	// Starlark has no top-level expression statement, so a script body conventionally
+	// ends in a `def` block; auto-invoke with no args matches the "run my main()"
+	// idiom. Diverges from Risor by design — see engines/README.md "Script Return
+	// Value Handling".
 	if callable, ok := result.Value.(starlarkLib.Callable); ok {
 		thread := &starlarkLib.Thread{Name: "func"}
 		val, err := starlarkLib.Call(thread, callable, nil, nil)
