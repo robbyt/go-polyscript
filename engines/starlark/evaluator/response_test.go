@@ -291,3 +291,37 @@ func TestResponseMethods(t *testing.T) {
 		}
 	})
 }
+
+func TestExecResultAsMap(t *testing.T) {
+	t.Parallel()
+	handler := slog.NewTextHandler(os.Stdout, nil)
+
+	t.Run("success", func(t *testing.T) {
+		dict := starlark.NewDict(2)
+		require.NoError(t, dict.SetKey(starlark.String("greeting"), starlark.String("hi")))
+		require.NoError(t, dict.SetKey(starlark.String("n"), starlark.MakeInt(42)))
+
+		result := newEvalResult(handler, dict, time.Millisecond, "id-ok")
+		got, err := result.AsMap()
+		require.NoError(t, err)
+		assert.Equal(t, "hi", got["greeting"])
+		assert.Equal(t, int64(42), got["n"])
+	})
+
+	t.Run("error on string", func(t *testing.T) {
+		result := newEvalResult(handler, starlark.String("not a map"), time.Millisecond, "id-bad")
+		got, err := result.AsMap()
+		require.Error(t, err)
+		assert.Nil(t, got)
+		assert.Contains(t, err.Error(), "AsMap: expected map[string]any, got string")
+	})
+
+	t.Run("error on int", func(t *testing.T) {
+		result := newEvalResult(handler, starlark.MakeInt(123), time.Millisecond, "id-int")
+		got, err := result.AsMap()
+		require.Error(t, err)
+		assert.Nil(t, got)
+		// starlark int converts to int64; the AsMap error message reflects the Go type.
+		assert.Contains(t, err.Error(), "AsMap: expected map[string]any, got int64")
+	})
+}
