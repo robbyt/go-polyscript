@@ -313,7 +313,8 @@ func TestExecResultAsMap(t *testing.T) {
 		got, err := result.AsMap()
 		require.Error(t, err)
 		assert.Nil(t, got)
-		assert.Contains(t, err.Error(), "AsMap: expected map[string]any, got string")
+		require.ErrorIs(t, err, ErrAsMapTypeMismatch)
+		assert.Contains(t, err.Error(), "got string")
 	})
 
 	t.Run("error on int", func(t *testing.T) {
@@ -321,7 +322,8 @@ func TestExecResultAsMap(t *testing.T) {
 		got, err := result.AsMap()
 		require.Error(t, err)
 		assert.Nil(t, got)
+		require.ErrorIs(t, err, ErrAsMapTypeMismatch)
 		// starlark int converts to int64; the AsMap error message reflects the Go type.
-		assert.Contains(t, err.Error(), "AsMap: expected map[string]any, got int64")
+		assert.Contains(t, err.Error(), "got int64")
 	})
 }

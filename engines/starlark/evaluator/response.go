@@ -88,7 +88,7 @@ func (r *execResult) AsMap() (map[string]any, error) {
 	v := r.Interface()
 	m, ok := v.(map[string]any)
 	if !ok {
-		return nil, fmt.Errorf("AsMap: expected map[string]any, got %T", v)
+		return nil, fmt.Errorf("%w, got %T", ErrAsMapTypeMismatch, v)
 	}
 	return m, nil
 }

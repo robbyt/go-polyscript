@@ -62,8 +62,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `GetExecTime() string` → `ExecTime() time.Duration` (no longer stringified
     at the boundary).
   - Added `AsMap() (map[string]any, error)` returning the result as a typed
-    map, with an error of the form `"AsMap: expected map[string]any, got <T>"`
-    when the underlying value has a different shape. Replaces the
+    map. On type mismatch, the returned error wraps a per-engine sentinel
+    (`engines/{extism,risor,starlark}/evaluator.ErrAsMapTypeMismatch`) and
+    includes the actual Go type via `"%T"`, so callers can use
+    `errors.Is(err, evaluator.ErrAsMapTypeMismatch)` and still read the
+    concrete type from `err.Error()`. Replaces the
     `result.Interface().(map[string]any)` ceremony at 40+ call sites across
     the test suite.
   Closes [#86](https://github.com/robbyt/go-polyscript/issues/86).

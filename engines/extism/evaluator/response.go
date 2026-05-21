@@ -77,7 +77,7 @@ func (r *execResult) ExecTime() time.Duration {
 func (r *execResult) AsMap() (map[string]any, error) {
 	m, ok := r.value.(map[string]any)
 	if !ok {
-		return nil, fmt.Errorf("AsMap: expected map[string]any, got %T", r.value)
+		return nil, fmt.Errorf("%w, got %T", ErrAsMapTypeMismatch, r.value)
 	}
 	return m, nil
 }

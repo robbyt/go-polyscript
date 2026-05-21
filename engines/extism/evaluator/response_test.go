@@ -405,7 +405,8 @@ func TestExecResultAsMap(t *testing.T) {
 		got, err := result.AsMap()
 		require.Error(t, err)
 		assert.Nil(t, got)
-		assert.Contains(t, err.Error(), "AsMap: expected map[string]any, got string")
+		require.ErrorIs(t, err, ErrAsMapTypeMismatch)
+		assert.Contains(t, err.Error(), "got string")
 	})
 
 	t.Run("error on nil", func(t *testing.T) {
@@ -413,6 +414,7 @@ func TestExecResultAsMap(t *testing.T) {
 		got, err := result.AsMap()
 		require.Error(t, err)
 		assert.Nil(t, got)
-		assert.Contains(t, err.Error(), "AsMap: expected map[string]any, got <nil>")
+		require.ErrorIs(t, err, ErrAsMapTypeMismatch)
+		assert.Contains(t, err.Error(), "got <nil>")
 	})
 }
