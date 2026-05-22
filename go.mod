@@ -7,7 +7,7 @@ require (
 	github.com/extism/go-sdk v1.7.1
 	github.com/stretchr/testify v1.11.1
 	github.com/tetratelabs/wazero v1.11.0
-	go.starlark.net v0.0.0-20260326113308-fadfc96def35
+	go.starlark.net v0.0.0-20260522144826-ec58d4b459e2
 )
 
 require (
