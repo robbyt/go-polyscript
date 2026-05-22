@@ -42,34 +42,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   appends to the compiler's existing globals, deduplicating names already
   present. Order-of-call no longer matters when combined with
   `WithCtxGlobal`. ([#118](https://github.com/robbyt/go-polyscript/pull/118))
-- **Breaking:** Renamed `machine`→`engine` in the type-system API to match
-  the terminology used everywhere else. `ExecutableContent.GetMachineType()`
-  and `ExecutableUnit.GetMachineType()` are now `EngineType()`. The
-  `engines/types` package exports `ErrInvalidEngineType`,
-  `GetEngineTypeFromString`, and `GetEngineTypeFromPath` (renamed from the
-  `MachineType` equivalents). The conventional import alias is now
-  `engineTypes`. Closes [#90](https://github.com/robbyt/go-polyscript/issues/90).
+- **BREAKING**: Renamed `machine`→`engine` throughout the type-system API.
+  `ExecutableContent.GetMachineType()` and `ExecutableUnit.GetMachineType()`
+  are now `EngineType()`. `engines/types` exports `ErrInvalidEngineType`,
+  `GetEngineTypeFromString`, and `GetEngineTypeFromPath`.
   ([#137](https://github.com/robbyt/go-polyscript/pull/137))
-- **Breaking:** Unexported the six fields on `platform/script.ExecutableUnit`
-  (`ID`, `CreatedAt`, `ScriptLoader`, `Compiler`, `Content`, `DataProvider`).
-  External callers must use the existing getters (`GetID()`, `GetCreatedAt()`,
-  `GetLoader()`, `GetCompiler()`, `GetContent()`, `GetDataProvider()`) for
-  reads and construct only via `NewExecutableUnit(...)`. Mid-flight mutation
-  of `DataProvider` (and the other fields) is no longer possible from outside
-  the package. Closes [#91](https://github.com/robbyt/go-polyscript/issues/91).
-- **Breaking:** Tightened the `platform.EvaluatorResponse` interface:
-  - `GetScriptExeID() string` → `ScriptExeID() string` (dropped `Get` prefix).
-  - `GetExecTime() string` → `ExecTime() time.Duration` (no longer stringified
-    at the boundary).
-  - Added `AsMap() (map[string]any, error)` returning the result as a typed
-    map. On type mismatch, the returned error wraps a per-engine sentinel
-    (`engines/{extism,risor,starlark}/evaluator.ErrAsMapTypeMismatch`) and
-    includes the actual Go type via `"%T"`, so callers can use
-    `errors.Is(err, evaluator.ErrAsMapTypeMismatch)` and still read the
-    concrete type from `err.Error()`. Replaces the
-    `result.Interface().(map[string]any)` ceremony at 40+ call sites across
-    the test suite.
-  Closes [#86](https://github.com/robbyt/go-polyscript/issues/86).
+- **BREAKING**: Unexported all six fields on `platform/script.ExecutableUnit`.
+  Construct via `NewExecutableUnit` only; read via the existing getters.
+  ([#139](https://github.com/robbyt/go-polyscript/pull/139))
+- **BREAKING**: Tightened `platform.EvaluatorResponse`. `GetScriptExeID()`
+  and `GetExecTime()` are now `ScriptExeID()` and `ExecTime() time.Duration`.
+  Added `AsMap() (map[string]any, error)`; on type mismatch the error wraps
+  a per-engine `evaluator.ErrAsMapTypeMismatch` sentinel.
+  ([#141](https://github.com/robbyt/go-polyscript/pull/141))
 
 ### Deprecated
 - The twelve legacy top-level constructors (`FromRisorFile`,
@@ -80,16 +65,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ([#103](https://github.com/robbyt/go-polyscript/pull/103))
 
 ### Removed
-- **Breaking:** Removed four exported mock types that pulled `testify/mock`
-  into the production dependency graph: `platform/script/loader.MockLoader`
-  (with `NewMockLoaderWithContent`), `platform/script.MockCompiler`,
-  `platform/script.MockExecutableContent`, and the entire `engines/mocks`
-  package (`Evaluator`, `EvaluatorResponse`). Consumers should copy these
-  small mock definitions inline into their own `_test.go` files. After this
-  change `go mod why github.com/stretchr/testify` reports `main module does
-  not need package github.com/stretchr/testify` — `testify` is only reached
-  via test binaries.
-  Closes [#88](https://github.com/robbyt/go-polyscript/issues/88).
+- **BREAKING**: Removed four exported mock types (`loader.MockLoader` with
+  `NewMockLoaderWithContent`, `script.MockCompiler`,
+  `script.MockExecutableContent`, and the entire `engines/mocks` package).
+  `testify` is no longer reachable from any production import path.
   ([#138](https://github.com/robbyt/go-polyscript/pull/138))
 - The redundant `cfg.handler != nil` guards in `polyscript.go` and
   `engines/{risor,starlark,extism}/new.go` that existed solely to work
@@ -106,10 +85,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ([#118](https://github.com/robbyt/go-polyscript/pull/118))
 
 ### Documentation
-- Documented the intentional divergence between Risor and Starlark in how a
-  callable-returning script is handled: Risor errors, Starlark auto-invokes.
-  Added a "Script Return Value Handling" section to `engines/README.md` and
-  brief rationale comments next to each evaluator's branch.
+- Documented the intentional Risor vs Starlark divergence for
+  callable-returning scripts: Risor errors, Starlark auto-invokes. New
+  "Script Return Value Handling" section in `engines/README.md`.
+  ([#140](https://github.com/robbyt/go-polyscript/pull/140))
 
 ### Fixed
 - `RequestToMap` no longer mutates the caller's `*http.Request`. The URL
