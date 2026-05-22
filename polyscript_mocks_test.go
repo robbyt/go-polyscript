@@ -2,6 +2,8 @@ package polyscript_test
 
 import (
 	"context"
+	"fmt"
+	"time"
 
 	"github.com/robbyt/go-polyscript/platform"
 	"github.com/robbyt/go-polyscript/platform/data"
@@ -70,12 +72,29 @@ func (m *mockEvaluatorResponse) Interface() any {
 	return args.Get(0)
 }
 
-func (m *mockEvaluatorResponse) GetScriptExeID() string {
+func (m *mockEvaluatorResponse) ScriptExeID() string {
 	args := m.Called()
 	return args.String(0)
 }
 
-func (m *mockEvaluatorResponse) GetExecTime() string {
+func (m *mockEvaluatorResponse) ExecTime() time.Duration {
 	args := m.Called()
-	return args.String(0)
+	return args.Get(0).(time.Duration)
+}
+
+func (m *mockEvaluatorResponse) AsMap() (map[string]any, error) {
+	args := m.Called()
+	err := args.Error(1)
+	got := args.Get(0)
+	if got == nil {
+		return nil, err
+	}
+	m0, ok := got.(map[string]any)
+	if !ok {
+		if err != nil {
+			return nil, err
+		}
+		return nil, fmt.Errorf("AsMap: expected map[string]any, got %T", got)
+	}
+	return m0, err
 }

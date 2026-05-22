@@ -251,8 +251,8 @@ func TestEvalHelpers(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, result)
 
-		resultMap, ok := result.Interface().(map[string]any)
-		require.True(t, ok)
+		resultMap, err := result.AsMap()
+		require.NoError(t, err)
 		assert.Equal(t, "Hello, World!", resultMap["message"])
 
 		length := resultMap["length"]
@@ -425,8 +425,8 @@ _ = result`
 		result, err := eval.Eval(enrichedCtx)
 		require.NoError(t, err)
 
-		resultMap, ok := result.Interface().(map[string]any)
-		require.True(t, ok)
+		resultMap, err := result.AsMap()
+		require.NoError(t, err)
 		assert.Equal(t, "Hello, Risor User (v1.0.0)", resultMap["message"])
 
 		timeout := resultMap["timeout"]
@@ -456,8 +456,8 @@ _ = result`
 		result, err := eval.Eval(enrichedCtx)
 		require.NoError(t, err)
 
-		resultMap, ok := result.Interface().(map[string]any)
-		require.True(t, ok)
+		resultMap, err := result.AsMap()
+		require.NoError(t, err)
 		assert.Equal(t, "Hello, Starlark User (v1.0.0)", resultMap["message"])
 
 		starlarkTimeout := resultMap["timeout"]

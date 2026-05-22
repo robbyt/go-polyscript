@@ -80,9 +80,9 @@ func TestResponseMethods(t *testing.T) {
 				require.NotNil(t, result)
 				require.Equal(t, mockVal, result.Value)
 				require.Equal(t, tt.execTime, result.execTime)
-				assert.Equal(t, tt.execTime.String(), result.GetExecTime())
+				assert.Equal(t, tt.execTime, result.ExecTime())
 				require.Equal(t, tt.versionID, result.scriptExeID)
-				require.Equal(t, tt.versionID, result.GetScriptExeID())
+				require.Equal(t, tt.versionID, result.ScriptExeID())
 				require.Implements(t, (*platform.EvaluatorResponse)(nil), result)
 
 				mockVal.AssertExpectations(t)
@@ -239,11 +239,11 @@ func TestResponseMethods(t *testing.T) {
 				handler := slog.NewTextHandler(os.Stdout, nil)
 				result := newEvalResult(handler, mockVal, tt.execTime, tt.scriptID)
 
-				// Test GetScriptExeID
-				assert.Equal(t, tt.scriptID, result.GetScriptExeID())
+				// Test ScriptExeID
+				assert.Equal(t, tt.scriptID, result.ScriptExeID())
 
-				// Test GetExecTime
-				assert.Equal(t, tt.execTime.String(), result.GetExecTime())
+				// Test ExecTime
+				assert.Equal(t, tt.execTime, result.ExecTime())
 			})
 		}
 	})
@@ -289,5 +289,41 @@ func TestResponseMethods(t *testing.T) {
 				assert.Equal(t, tt.versionID, result.scriptExeID)
 			})
 		}
+	})
+}
+
+func TestExecResultAsMap(t *testing.T) {
+	t.Parallel()
+	handler := slog.NewTextHandler(os.Stdout, nil)
+
+	t.Run("success", func(t *testing.T) {
+		dict := starlark.NewDict(2)
+		require.NoError(t, dict.SetKey(starlark.String("greeting"), starlark.String("hi")))
+		require.NoError(t, dict.SetKey(starlark.String("n"), starlark.MakeInt(42)))
+
+		result := newEvalResult(handler, dict, time.Millisecond, "id-ok")
+		got, err := result.AsMap()
+		require.NoError(t, err)
+		assert.Equal(t, "hi", got["greeting"])
+		assert.Equal(t, int64(42), got["n"])
+	})
+
+	t.Run("error on string", func(t *testing.T) {
+		result := newEvalResult(handler, starlark.String("not a map"), time.Millisecond, "id-bad")
+		got, err := result.AsMap()
+		require.Error(t, err)
+		assert.Nil(t, got)
+		require.ErrorIs(t, err, ErrAsMapTypeMismatch)
+		assert.Contains(t, err.Error(), "got string")
+	})
+
+	t.Run("error on int", func(t *testing.T) {
+		result := newEvalResult(handler, starlark.MakeInt(123), time.Millisecond, "id-int")
+		got, err := result.AsMap()
+		require.Error(t, err)
+		assert.Nil(t, got)
+		require.ErrorIs(t, err, ErrAsMapTypeMismatch)
+		// starlark int converts to int64; the AsMap error message reflects the Go type.
+		assert.Contains(t, err.Error(), "got int64")
 	})
 }

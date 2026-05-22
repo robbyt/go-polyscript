@@ -2,6 +2,7 @@ package platform_test
 
 import (
 	"testing"
+	"time"
 
 	"github.com/robbyt/go-polyscript/platform/data"
 	"github.com/stretchr/testify/assert"
@@ -93,13 +94,13 @@ func TestEvaluatorResponseInterface(t *testing.T) {
 
 	// Test script ID and execution time methods
 	t.Run("Script metadata methods", func(t *testing.T) {
-		mockResponse.On("GetScriptExeID").Return("script-123").Once()
-		scriptID := mockResponse.GetScriptExeID()
-		assert.Equal(t, "script-123", scriptID, "GetScriptExeID() should return expected ID")
+		mockResponse.On("ScriptExeID").Return("script-123").Once()
+		scriptID := mockResponse.ScriptExeID()
+		assert.Equal(t, "script-123", scriptID, "ScriptExeID() should return expected ID")
 
-		mockResponse.On("GetExecTime").Return("42ms").Once()
-		execTime := mockResponse.GetExecTime()
-		assert.Equal(t, "42ms", execTime, "GetExecTime() should return expected time")
+		mockResponse.On("ExecTime").Return(42 * time.Millisecond).Once()
+		execTime := mockResponse.ExecTime()
+		assert.Equal(t, 42*time.Millisecond, execTime, "ExecTime() should return expected time")
 	})
 
 	// Verify all expected assertions

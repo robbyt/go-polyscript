@@ -121,8 +121,8 @@ func TestResponseMethods(t *testing.T) {
 				require.Implements(t, (*platform.EvaluatorResponse)(nil), result)
 
 				// Verify metadata methods
-				assert.Equal(t, tt.execTime.String(), result.GetExecTime())
-				assert.Equal(t, tt.versionID, result.GetScriptExeID())
+				assert.Equal(t, tt.execTime, result.ExecTime())
+				assert.Equal(t, tt.versionID, result.ScriptExeID())
 			})
 		}
 	})
@@ -347,12 +347,49 @@ func TestResponseMethods(t *testing.T) {
 
 				result := newEvalResult(handler, mockObj, tt.execTime, tt.versionID)
 
-				// Test GetScriptExeID
-				assert.Equal(t, tt.versionID, result.GetScriptExeID())
+				// Test ScriptExeID
+				assert.Equal(t, tt.versionID, result.ScriptExeID())
 
-				// Test GetExecTime
-				assert.Equal(t, tt.execTime.String(), result.GetExecTime())
+				// Test ExecTime
+				assert.Equal(t, tt.execTime, result.ExecTime())
 			})
 		}
+	})
+}
+
+func TestExecResultAsMap(t *testing.T) {
+	t.Parallel()
+	handler := slog.NewTextHandler(os.Stdout, nil)
+
+	t.Run("success", func(t *testing.T) {
+		m := map[string]any{"k": "v", "n": 42}
+		mockObj := new(RisorObjectMock)
+		mockObj.On("Interface").Return(m)
+		result := newEvalResult(handler, mockObj, time.Millisecond, "id-ok")
+		got, err := result.AsMap()
+		require.NoError(t, err)
+		assert.Equal(t, m, got)
+	})
+
+	t.Run("error on string", func(t *testing.T) {
+		mockObj := new(RisorObjectMock)
+		mockObj.On("Interface").Return("not a map")
+		result := newEvalResult(handler, mockObj, time.Millisecond, "id-bad")
+		got, err := result.AsMap()
+		require.Error(t, err)
+		assert.Nil(t, got)
+		require.ErrorIs(t, err, ErrAsMapTypeMismatch)
+		assert.Contains(t, err.Error(), "got string")
+	})
+
+	t.Run("error on int", func(t *testing.T) {
+		mockObj := new(RisorObjectMock)
+		mockObj.On("Interface").Return(42)
+		result := newEvalResult(handler, mockObj, time.Millisecond, "id-int")
+		got, err := result.AsMap()
+		require.Error(t, err)
+		assert.Nil(t, got)
+		require.ErrorIs(t, err, ErrAsMapTypeMismatch)
+		assert.Contains(t, err.Error(), "got int")
 	})
 }

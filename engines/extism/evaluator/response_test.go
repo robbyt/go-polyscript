@@ -333,11 +333,11 @@ func TestResponseMethods(t *testing.T) {
 				handler := slog.NewTextHandler(os.Stdout, nil)
 				result := newEvalResult(handler, tt.value, tt.execTime, tt.versionID)
 
-				// Test GetScriptExeID
-				assert.Equal(t, tt.versionID, result.GetScriptExeID())
+				// Test ScriptExeID
+				assert.Equal(t, tt.versionID, result.ScriptExeID())
 
-				// Test GetExecTime
-				assert.Equal(t, tt.execTime.String(), result.GetExecTime())
+				// Test ExecTime
+				assert.Equal(t, tt.execTime, result.ExecTime())
 			})
 		}
 	})
@@ -385,5 +385,36 @@ func TestResponseMethods(t *testing.T) {
 				assert.Equal(t, tt.versionID, result.scriptExeID)
 			})
 		}
+	})
+}
+
+func TestExecResultAsMap(t *testing.T) {
+	t.Parallel()
+	handler := slog.NewTextHandler(os.Stdout, nil)
+
+	t.Run("success", func(t *testing.T) {
+		m := map[string]any{"k": "v", "n": 42}
+		result := newEvalResult(handler, m, time.Millisecond, "id-ok")
+		got, err := result.AsMap()
+		require.NoError(t, err)
+		assert.Equal(t, m, got)
+	})
+
+	t.Run("error on string", func(t *testing.T) {
+		result := newEvalResult(handler, "not a map", time.Millisecond, "id-bad")
+		got, err := result.AsMap()
+		require.Error(t, err)
+		assert.Nil(t, got)
+		require.ErrorIs(t, err, ErrAsMapTypeMismatch)
+		assert.Contains(t, err.Error(), "got string")
+	})
+
+	t.Run("error on nil", func(t *testing.T) {
+		result := newEvalResult(handler, nil, time.Millisecond, "id-nil")
+		got, err := result.AsMap()
+		require.Error(t, err)
+		assert.Nil(t, got)
+		require.ErrorIs(t, err, ErrAsMapTypeMismatch)
+		assert.Contains(t, err.Error(), "got <nil>")
 	})
 }

@@ -31,8 +31,8 @@ func TestNewRisor(t *testing.T) {
 
 		result, err := eval.Eval(t.Context())
 		require.NoError(t, err)
-		got, ok := result.Interface().(map[string]any)
-		require.True(t, ok)
+		got, err := result.AsMap()
+		require.NoError(t, err)
 		assert.Equal(t, "World", got["name"])
 	})
 
@@ -45,8 +45,8 @@ func TestNewRisor(t *testing.T) {
 		require.NoError(t, err)
 		result, err := eval.Eval(ctx)
 		require.NoError(t, err)
-		got, ok := result.Interface().(map[string]any)
-		require.True(t, ok)
+		got, err := result.AsMap()
+		require.NoError(t, err)
 		assert.Equal(t, "Robert", got["name"])
 	})
 
@@ -92,8 +92,8 @@ _ = result`
 
 		result, err := eval.Eval(t.Context())
 		require.NoError(t, err)
-		got, ok := result.Interface().(map[string]any)
-		require.True(t, ok)
+		got, err := result.AsMap()
+		require.NoError(t, err)
 		assert.Equal(t, "World", got["name"])
 	})
 }
@@ -111,8 +111,8 @@ func TestNewExtism(t *testing.T) {
 
 		result, err := eval.Eval(t.Context())
 		require.NoError(t, err)
-		got, ok := result.Interface().(map[string]any)
-		require.True(t, ok)
+		got, err := result.AsMap()
+		require.NoError(t, err)
 		assert.Equal(t, "Hello, World!", got["greeting"])
 	})
 
@@ -144,8 +144,8 @@ func TestNewExtism(t *testing.T) {
 
 		result, err := eval.Eval(t.Context())
 		require.NoError(t, err)
-		got, ok := result.Interface().(map[string]any)
-		require.True(t, ok)
+		got, err := result.AsMap()
+		require.NoError(t, err)
 		assert.Equal(t, "Hello, Test!", got["greeting"])
 	})
 
@@ -166,8 +166,8 @@ func TestNewExtism(t *testing.T) {
 
 			result, err := eval.Eval(t.Context())
 			require.NoError(t, err, "cap=%d", n)
-			got, ok := result.Interface().(map[string]any)
-			require.True(t, ok, "cap=%d", n)
+			got, err := result.AsMap()
+			require.NoError(t, err, "cap=%d", n)
 			assert.Equal(t, "Hello, Cap!", got["greeting"], "cap=%d", n)
 		}
 	})
@@ -237,8 +237,8 @@ func TestOptionsCompose(t *testing.T) {
 
 		result, err := eval.Eval(t.Context())
 		require.NoError(t, err)
-		got, ok := result.Interface().(map[string]any)
-		require.True(t, ok)
+		got, err := result.AsMap()
+		require.NoError(t, err)
 		assert.Equal(t, "second", got["k"])
 	})
 }
@@ -269,8 +269,8 @@ func TestFromBytesIsolatesCallerSlice(t *testing.T) {
 
 	result, err := eval.Eval(t.Context())
 	require.NoError(t, err)
-	got, ok := result.Interface().(map[string]any)
-	require.True(t, ok)
+	got, err := result.AsMap()
+	require.NoError(t, err)
 	assert.Equal(t, "Hello, World!", got["greeting"])
 }
 

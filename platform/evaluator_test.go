@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/robbyt/go-polyscript"
 	"github.com/robbyt/go-polyscript/platform"
@@ -58,8 +59,8 @@ func TestEvaluatorInterface(t *testing.T) {
 	// Create a mock evaluator response
 	mockResponse := new(mockEvaluatorResponse)
 	mockResponse.On("Interface").Return("test result")
-	mockResponse.On("GetScriptExeID").Return("test-script-id")
-	mockResponse.On("GetExecTime").Return("10µs")
+	mockResponse.On("ScriptExeID").Return("test-script-id")
+	mockResponse.On("ExecTime").Return(10 * time.Microsecond)
 	mockResponse.On("Type").Return(data.STRING)
 	mockResponse.On("Inspect").Return("test result")
 
@@ -89,10 +90,10 @@ func TestEvaluatorInterface(t *testing.T) {
 	assert.Equal(
 		t,
 		"test-script-id",
-		response.GetScriptExeID(),
-		"GetScriptExeID() should return expected value",
+		response.ScriptExeID(),
+		"ScriptExeID() should return expected value",
 	)
-	assert.Equal(t, "10µs", response.GetExecTime(), "GetExecTime() should return expected value")
+	assert.Equal(t, 10*time.Microsecond, response.ExecTime(), "ExecTime() should return expected value")
 	assert.Equal(t, data.STRING, response.Type(), "Type() should return expected value")
 	assert.Equal(t, "test result", response.Inspect(), "Inspect() should return expected value")
 
@@ -206,8 +207,8 @@ func TestEvaluatorWithPrepInterface(t *testing.T) {
 	// Create a mock evaluator response
 	mockResponse := new(mockEvaluatorResponse)
 	mockResponse.On("Interface").Return("combined result")
-	mockResponse.On("GetScriptExeID").Return("test-script-id")
-	mockResponse.On("GetExecTime").Return("10µs")
+	mockResponse.On("ScriptExeID").Return("test-script-id")
+	mockResponse.On("ExecTime").Return(10 * time.Microsecond)
 	mockResponse.On("Type").Return(data.STRING)
 	mockResponse.On("Inspect").Return("combined result")
 
