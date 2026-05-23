@@ -316,11 +316,12 @@ func TestCompiler_Compile_Branches(t *testing.T) {
 		require.ErrorContains(t, err, "read kaboom")
 	})
 
-	t.Run("scriptReader.Close fails", func(t *testing.T) {
+	t.Run("scriptReader.Close error is silenced", func(t *testing.T) {
 		t.Parallel()
 		comp := createTestCompiler(t, "main")
-		// Read succeeds (returns EOF on first Read with empty buffer is fine for
-		// io.ReadAll, but we want non-empty bytes so Close error is the only failure).
+		// Close errors are logged via the deferred cleanup, not returned. The
+		// "anything" bytes still fail validation; we assert that error
+		// propagates (not the close error).
 		reader := &readCloseErr{
 			buf:      bytes.NewReader([]byte("anything")),
 			closeErr: errors.New("close kaboom"),
@@ -329,8 +330,8 @@ func TestCompiler_Compile_Branches(t *testing.T) {
 		execContent, err := comp.Compile(t.Context(), reader)
 		require.Error(t, err)
 		require.Nil(t, execContent)
-		require.ErrorContains(t, err, "failed to close reader")
-		require.ErrorContains(t, err, "close kaboom")
+		require.ErrorIs(t, err, ErrValidationFailed)
+		require.NotContains(t, err.Error(), "close kaboom")
 	})
 
 	t.Run("compileFn returns nil plugin without error", func(t *testing.T) {

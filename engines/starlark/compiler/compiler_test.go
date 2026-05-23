@@ -269,26 +269,22 @@ main()
 			)
 		})
 
-		t.Run("close error", func(t *testing.T) {
+		t.Run("close error is silenced", func(t *testing.T) {
 			comp, err := New(
 				WithLogHandler(slog.NewTextHandler(os.Stdout, nil)),
 			)
 			require.NoError(t, err)
 			require.NotNil(t, comp, "Expected compiler to be non-nil")
 
-			// Create a reader that will return an error on close
+			// Close errors are logged via the deferred cleanup, not returned —
+			// a successful read+compile still produces a usable executable.
 			reader := newMockScriptReaderCloser(`print("Hello, World!")`)
 			reader.On("Close").Return(errors.New("test error")).Once()
 
 			execContent, err := comp.Compile(t.Context(), reader)
-			require.Error(t, err, "Expected an error but got none")
-			require.Nil(t, execContent, "Expected execContent to be nil")
-			require.Contains(
-				t,
-				err.Error(),
-				"failed to close reader",
-				"Expected error to contain 'failed to close reader'",
-			)
+			require.NoError(t, err)
+			require.NotNil(t, execContent)
+			reader.AssertExpectations(t)
 		})
 	})
 }
@@ -421,27 +417,22 @@ func TestCompileIOError(t *testing.T) {
 	)
 }
 
-func TestCompileCloseError(t *testing.T) {
-	// Test that we return the correct error when there's an error closing the reader
+func TestCompileCloseErrorIsSilenced(t *testing.T) {
+	// Close errors are logged via the deferred cleanup, not returned —
+	// a successful read+compile still produces a usable executable.
 	comp, err := New(
 		WithLogHandler(slog.NewTextHandler(os.Stdout, nil)),
 	)
 	require.NoError(t, err)
 	require.NotNil(t, comp, "Expected compiler to be non-nil")
 
-	// Create a reader that will return an error on close
 	reader := newMockScriptReaderCloser(`print("Hello, World!")`)
 	reader.On("Close").Return(errors.New("test error")).Once()
 
 	execContent, err := comp.Compile(t.Context(), reader)
-	require.Error(t, err, "Expected an error but got none")
-	require.Nil(t, execContent, "Expected execContent to be nil")
-	require.Contains(
-		t,
-		err.Error(),
-		"failed to close reader",
-		"Expected error to contain 'failed to close reader'",
-	)
+	require.NoError(t, err)
+	require.NotNil(t, execContent)
+	reader.AssertExpectations(t)
 }
 
 func TestCompilerString(t *testing.T) {

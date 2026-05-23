@@ -54,15 +54,15 @@ func (c *Compiler) Compile(_ context.Context, scriptReader io.ReadCloser) (scrip
 	if scriptReader == nil {
 		return nil, ErrContentNil
 	}
+	defer func() {
+		if err := scriptReader.Close(); err != nil {
+			c.logger.WithGroup("compile").Warn("failed to close script reader", "error", err)
+		}
+	}()
 
 	scriptBodyBytes, err := io.ReadAll(scriptReader)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read script: %w", err)
-	}
-
-	err = scriptReader.Close()
-	if err != nil {
-		return nil, fmt.Errorf("failed to close reader: %w", err)
 	}
 
 	return c.compile(scriptBodyBytes)
