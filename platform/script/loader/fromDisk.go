@@ -62,9 +62,9 @@ func (l *FromDisk) String() string {
 	noChkSum := fmt.Sprintf("loader.FromDisk{Path: %s}", l.path)
 
 	if l.sourceURL != nil {
-		// os.Open directly so String() doesn't need to fabricate a ctx;
-		// the file is read synchronously for the SHA256 checksum.
-		reader, err := os.Open(l.sourceURL.Path)
+		// Background ctx is fine here: String() is a synchronous debug
+		// helper, and FromDisk.GetReader's os.Open is synchronous anyway.
+		reader, err := l.GetReader(context.Background())
 		if err != nil {
 			return noChkSum
 		}
