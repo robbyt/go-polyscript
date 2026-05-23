@@ -1,6 +1,7 @@
 package script
 
 import (
+	"context"
 	"io"
 
 	engineTypes "github.com/robbyt/go-polyscript/engines/types"
@@ -13,8 +14,8 @@ type MockCompiler struct {
 }
 
 // Compile mocks the Compile method of the Compiler interface.
-func (m *MockCompiler) Compile(scriptReader io.ReadCloser) (ExecutableContent, error) {
-	args := m.Called(scriptReader)
+func (m *MockCompiler) Compile(ctx context.Context, scriptReader io.ReadCloser) (ExecutableContent, error) {
+	args := m.Called(ctx, scriptReader)
 	execContent, ok := args.Get(0).(ExecutableContent)
 	if !ok {
 		return nil, args.Error(1)

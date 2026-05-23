@@ -15,6 +15,7 @@ import (
 	"github.com/robbyt/go-polyscript/platform/data"
 	"github.com/robbyt/go-polyscript/platform/script/loader"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -25,7 +26,7 @@ func newWASMLoader(t *testing.T) *loaderMock {
 	require.NoError(t, err)
 	mockLoader.On("GetSourceURL").Return(mockURL)
 	wasmBytes := wasmdata.TestModule
-	mockLoader.On("GetReader").Return(io.NopCloser(bytes.NewReader(wasmBytes)), nil)
+	mockLoader.On("GetReader", mock.Anything).Return(io.NopCloser(bytes.NewReader(wasmBytes)), nil)
 	return mockLoader
 }
 
@@ -35,7 +36,7 @@ func newErrorLoader(t *testing.T, msg string) *loaderMock {
 	mockURL, err := url.Parse("file:///test-wasm-file.wasm")
 	require.NoError(t, err)
 	mockLoader.On("GetSourceURL").Return(mockURL)
-	mockLoader.On("GetReader").Return(nil, errors.New(msg))
+	mockLoader.On("GetReader", mock.Anything).Return(nil, errors.New(msg))
 	return mockLoader
 }
 
@@ -148,7 +149,7 @@ func TestFromExtismLoader_LoaderError(t *testing.T) {
 func TestFromExtismLoader_NilSourceURL(t *testing.T) {
 	mockLoader := new(loaderMock)
 	mockLoader.On("GetSourceURL").Return(nil)
-	mockLoader.On("GetReader").Return(io.NopCloser(bytes.NewReader(wasmdata.TestModule)), nil)
+	mockLoader.On("GetReader", mock.Anything).Return(io.NopCloser(bytes.NewReader(wasmdata.TestModule)), nil)
 
 	eval, err := FromExtismLoader(mockLoader, WithEntryPoint(wasmdata.EntrypointGreet))
 	require.NoError(t, err)

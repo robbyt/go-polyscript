@@ -2,6 +2,7 @@ package loader
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"net/url"
 
@@ -21,8 +22,8 @@ func (m *MockLoader) GetSourceURL() *url.URL {
 	return args.Get(0).(*url.URL)
 }
 
-func (m *MockLoader) GetReader() (io.ReadCloser, error) {
-	args := m.Called()
+func (m *MockLoader) GetReader(ctx context.Context) (io.ReadCloser, error) {
+	args := m.Called(ctx)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
@@ -37,6 +38,6 @@ func (m *MockLoader) Close() error {
 // Helper method to easily create a mock with content
 func NewMockLoaderWithContent(content []byte) *MockLoader {
 	m := new(MockLoader)
-	m.On("GetReader").Return(io.NopCloser(bytes.NewReader(content)), nil)
+	m.On("GetReader", mock.Anything).Return(io.NopCloser(bytes.NewReader(content)), nil)
 	return m
 }

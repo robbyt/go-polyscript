@@ -8,7 +8,6 @@ import (
 
 	extismSDK "github.com/extism/go-sdk"
 	"github.com/robbyt/go-polyscript/engines/extism/compiler/internal/compile"
-	"github.com/robbyt/go-polyscript/platform/constants"
 	"github.com/stretchr/testify/require"
 	"github.com/tetratelabs/wazero"
 )
@@ -313,52 +312,6 @@ func TestCompilerOptions_Options(t *testing.T) {
 			require.Equal(t, hostFuncs, c.options.HostFunctions)
 		})
 	})
-
-	// WithContext tests
-	t.Run("WithContext", func(t *testing.T) {
-		// Success cases
-		t.Run("valid context", func(t *testing.T) {
-			customCtx := context.WithValue(
-				t.Context(),
-				constants.EvalData,
-				"test-value",
-			)
-
-			c := &Compiler{}
-			c.applyDefaults()
-			opt := WithContext(customCtx)
-			err := opt(c)
-
-			require.NoError(t, err)
-			require.Equal(t, customCtx, c.ctx)
-			require.Equal(t, "test-value", c.ctx.Value(constants.EvalData))
-		})
-
-		t.Run("background context", func(t *testing.T) {
-			ctx := t.Context()
-
-			c := &Compiler{}
-			c.applyDefaults()
-			opt := WithContext(ctx)
-			err := opt(c)
-
-			require.NoError(t, err)
-			require.Equal(t, ctx, c.ctx)
-		})
-
-		// Error case
-		t.Run("nil context", func(t *testing.T) {
-			c := &Compiler{}
-			c.applyDefaults()
-			// Using variable to create nil context to avoid linter issues
-			var nilContext context.Context
-			nilOpt := WithContext(nilContext)
-			err := nilOpt(c)
-
-			require.Error(t, err)
-			require.Contains(t, err.Error(), "context cannot be nil")
-		})
-	})
 }
 
 // TestCompilerOptions_SetupLogger tests the setupLogger method
@@ -421,12 +374,10 @@ func TestCompilerOptions_DefaultsAndValidation(t *testing.T) {
 			require.NotNil(t, c.options.RuntimeConfig, "runtime config should be initialized")
 			require.NotNil(t, c.options.HostFunctions, "host functions should be initialized")
 			require.Empty(t, c.options.HostFunctions, "host functions should be empty by default")
-			require.NotNil(t, c.ctx, "context should be initialized")
 		})
 
 		t.Run("custom values preserved", func(t *testing.T) {
 			customEntryPoint := "custom_entry"
-			customCtx := context.WithValue(t.Context(), constants.EvalData, "value")
 			customConfig := wazero.NewRuntimeConfig()
 
 			// Create a compiler with defaults
@@ -435,13 +386,11 @@ func TestCompilerOptions_DefaultsAndValidation(t *testing.T) {
 
 			// Then set the values that would have been set by options
 			c.entryPointName = customEntryPoint
-			c.ctx = customCtx
 			c.options.RuntimeConfig = customConfig
 			c.options.EnableWASI = false
 
 			// Check that values are set as expected
 			require.Equal(t, customEntryPoint, c.entryPointName)
-			require.Equal(t, customCtx, c.ctx)
 			require.Equal(t, customConfig, c.options.RuntimeConfig)
 			require.False(t, c.options.EnableWASI)
 		})
@@ -494,7 +443,6 @@ func TestCompilerOptions_DefaultsAndValidation(t *testing.T) {
 			c := &Compiler{
 				entryPointName: "custom",
 				logHandler:     slog.NewTextHandler(bytes.NewBuffer(nil), nil),
-				ctx:            t.Context(),
 				options: &compile.Settings{
 					RuntimeConfig: wazero.NewRuntimeConfig(),
 				},
@@ -507,7 +455,6 @@ func TestCompilerOptions_DefaultsAndValidation(t *testing.T) {
 		t.Run("nil handler and logger", func(t *testing.T) {
 			c := &Compiler{
 				entryPointName: "test",
-				ctx:            t.Context(),
 				logHandler:     nil,
 				logger:         nil,
 				options: &compile.Settings{
@@ -523,7 +470,6 @@ func TestCompilerOptions_DefaultsAndValidation(t *testing.T) {
 			c := &Compiler{
 				entryPointName: "",
 				logHandler:     slog.NewTextHandler(bytes.NewBuffer(nil), nil),
-				ctx:            t.Context(),
 				options: &compile.Settings{
 					RuntimeConfig: wazero.NewRuntimeConfig(),
 				},
@@ -538,7 +484,6 @@ func TestCompilerOptions_DefaultsAndValidation(t *testing.T) {
 			c := &Compiler{
 				entryPointName: "test",
 				logHandler:     slog.NewTextHandler(bytes.NewBuffer(nil), nil),
-				ctx:            t.Context(),
 				options:        nil,
 			}
 
@@ -551,7 +496,6 @@ func TestCompilerOptions_DefaultsAndValidation(t *testing.T) {
 			c := &Compiler{
 				entryPointName: "test",
 				logHandler:     slog.NewTextHandler(bytes.NewBuffer(nil), nil),
-				ctx:            t.Context(),
 				options: &compile.Settings{
 					RuntimeConfig: nil,
 				},
@@ -560,21 +504,6 @@ func TestCompilerOptions_DefaultsAndValidation(t *testing.T) {
 			err := c.validate()
 			require.Error(t, err)
 			require.Contains(t, err.Error(), "runtime config cannot be nil")
-		})
-
-		t.Run("nil context", func(t *testing.T) {
-			c := &Compiler{
-				entryPointName: "test",
-				logHandler:     slog.NewTextHandler(bytes.NewBuffer(nil), nil),
-				ctx:            nil,
-				options: &compile.Settings{
-					RuntimeConfig: wazero.NewRuntimeConfig(),
-				},
-			}
-
-			err := c.validate()
-			require.Error(t, err)
-			require.Contains(t, err.Error(), "context cannot be nil")
 		})
 	})
 }
@@ -896,33 +825,6 @@ func TestCompilerOptions(t *testing.T) {
 				require.Equal(t, hostFuncs, c.options.HostFunctions)
 			})
 		})
-
-		t.Run("WithContext option", func(t *testing.T) {
-			ctx := t.Context()
-
-			t.Run("valid context", func(t *testing.T) {
-				c := &Compiler{}
-				c.applyDefaults()
-				opt := WithContext(ctx)
-				err := opt(c)
-
-				require.NoError(t, err)
-				require.Equal(t, ctx, c.ctx)
-			})
-
-			t.Run("nil context", func(t *testing.T) {
-				c := &Compiler{}
-				c.applyDefaults()
-				// We need to test our validation of nil contexts but without passing nil directly
-				// to satisfy the linter. Use a type conversion trick to create a nil context.
-				var nilContext context.Context
-				nilOpt := WithContext(nilContext)
-				err := nilOpt(c)
-
-				require.Error(t, err)
-				require.Contains(t, err.Error(), "context cannot be nil")
-			})
-		})
 	})
 
 	t.Run("Defaults and Validation", func(t *testing.T) {
@@ -938,7 +840,6 @@ func TestCompilerOptions(t *testing.T) {
 			require.NotNil(t, c.options.RuntimeConfig)
 			require.NotNil(t, c.options.HostFunctions)
 			require.Empty(t, c.options.HostFunctions)
-			require.NotNil(t, c.ctx)
 		})
 
 		t.Run("defaults - entry point handling", func(t *testing.T) {
@@ -946,7 +847,6 @@ func TestCompilerOptions(t *testing.T) {
 				c := &Compiler{
 					entryPointName: "",
 					options:        &compile.Settings{},
-					ctx:            t.Context(),
 				}
 				c.applyDefaults()
 
@@ -957,7 +857,6 @@ func TestCompilerOptions(t *testing.T) {
 				c := &Compiler{
 					entryPointName: "initialValue",
 					options:        &compile.Settings{},
-					ctx:            t.Context(),
 				}
 
 				require.Equal(t, "initialValue", c.entryPointName)
@@ -973,7 +872,6 @@ func TestCompilerOptions(t *testing.T) {
 				c := &Compiler{
 					entryPointName: customEntryPoint,
 					options:        &compile.Settings{},
-					ctx:            t.Context(),
 				}
 
 				c.applyDefaults()

@@ -120,7 +120,7 @@ func TestCompiler_Compile(t *testing.T) {
 			reader := newMockScriptReaderCloser(wasmBytes)
 			reader.On("Close").Return(nil)
 
-			execContent, err := comp.Compile(reader)
+			execContent, err := comp.Compile(t.Context(), reader)
 			require.NoError(t, err)
 			require.NotNil(t, execContent)
 
@@ -164,7 +164,7 @@ func TestCompiler_Compile(t *testing.T) {
 			reader := newMockScriptReaderCloser(wasmBytes)
 			reader.On("Close").Return(nil)
 
-			execContent, err := comp.Compile(reader)
+			execContent, err := comp.Compile(t.Context(), reader)
 			require.NoError(t, err)
 			require.NotNil(t, execContent)
 
@@ -208,7 +208,7 @@ func TestCompiler_Compile(t *testing.T) {
 			reader := newMockScriptReaderCloser(wasmBytes)
 			reader.On("Close").Return(nil)
 
-			execContent, err := comp.Compile(reader)
+			execContent, err := comp.Compile(t.Context(), reader)
 			require.NoError(t, err)
 			require.NotNil(t, execContent)
 
@@ -231,7 +231,7 @@ func TestCompiler_Compile(t *testing.T) {
 			require.NoError(t, err)
 			require.NotNil(t, comp)
 
-			execContent, err := comp.Compile(nil)
+			execContent, err := comp.Compile(t.Context(), nil)
 			require.Error(t, err)
 			require.Nil(t, execContent)
 			require.ErrorIs(t, err, ErrContentNil)
@@ -248,7 +248,7 @@ func TestCompiler_Compile(t *testing.T) {
 			reader := newMockScriptReaderCloser([]byte{})
 			reader.On("Close").Return(nil)
 
-			execContent, err := comp.Compile(reader)
+			execContent, err := comp.Compile(t.Context(), reader)
 			require.Error(t, err)
 			require.Nil(t, execContent)
 			require.ErrorIs(t, err, ErrContentNil)
@@ -267,7 +267,7 @@ func TestCompiler_Compile(t *testing.T) {
 			reader := newMockScriptReaderCloser([]byte("not-wasm"))
 			reader.On("Close").Return(nil)
 
-			execContent, err := comp.Compile(reader)
+			execContent, err := comp.Compile(t.Context(), reader)
 			require.Error(t, err)
 			require.Nil(t, execContent)
 			require.ErrorIs(t, err, ErrValidationFailed)
@@ -287,7 +287,7 @@ func TestCompiler_Compile(t *testing.T) {
 			reader := newMockScriptReaderCloser(wasmBytes)
 			reader.On("Close").Return(nil)
 
-			execContent, err := comp.Compile(reader)
+			execContent, err := comp.Compile(t.Context(), reader)
 			require.Error(t, err)
 			require.Nil(t, execContent)
 			require.ErrorIs(t, err, ErrValidationFailed)
@@ -309,28 +309,29 @@ func TestCompiler_Compile_Branches(t *testing.T) {
 		comp := createTestCompiler(t, "main")
 		reader := &errReader{readErr: errors.New("read kaboom")}
 
-		execContent, err := comp.Compile(reader)
+		execContent, err := comp.Compile(t.Context(), reader)
 		require.Error(t, err)
 		require.Nil(t, execContent)
 		require.ErrorContains(t, err, "failed to read script")
 		require.ErrorContains(t, err, "read kaboom")
 	})
 
-	t.Run("scriptReader.Close fails", func(t *testing.T) {
+	t.Run("scriptReader.Close error is silenced", func(t *testing.T) {
 		t.Parallel()
 		comp := createTestCompiler(t, "main")
-		// Read succeeds (returns EOF on first Read with empty buffer is fine for
-		// io.ReadAll, but we want non-empty bytes so Close error is the only failure).
+		// Close errors are logged via the deferred cleanup, not returned. The
+		// "anything" bytes still fail validation; we assert that error
+		// propagates (not the close error).
 		reader := &readCloseErr{
 			buf:      bytes.NewReader([]byte("anything")),
 			closeErr: errors.New("close kaboom"),
 		}
 
-		execContent, err := comp.Compile(reader)
+		execContent, err := comp.Compile(t.Context(), reader)
 		require.Error(t, err)
 		require.Nil(t, execContent)
-		require.ErrorContains(t, err, "failed to close reader")
-		require.ErrorContains(t, err, "close kaboom")
+		require.ErrorIs(t, err, ErrValidationFailed)
+		require.NotContains(t, err.Error(), "close kaboom")
 	})
 
 	t.Run("compileFn returns nil plugin without error", func(t *testing.T) {
@@ -347,7 +348,7 @@ func TestCompiler_Compile_Branches(t *testing.T) {
 		reader := newMockScriptReaderCloser([]byte("any-bytes"))
 		reader.On("Close").Return(nil)
 
-		execContent, err := comp.Compile(reader)
+		execContent, err := comp.Compile(t.Context(), reader)
 		require.Error(t, err)
 		require.Nil(t, execContent)
 		require.ErrorIs(t, err, ErrBytecodeNil)
@@ -373,7 +374,7 @@ func TestCompiler_Compile_Branches(t *testing.T) {
 		reader := newMockScriptReaderCloser([]byte("any-bytes"))
 		reader.On("Close").Return(nil)
 
-		execContent, err := comp.Compile(reader)
+		execContent, err := comp.Compile(t.Context(), reader)
 		require.Error(t, err)
 		require.Nil(t, execContent)
 		require.ErrorIs(t, err, ErrValidationFailed)
@@ -405,7 +406,7 @@ func TestCompiler_Compile_Branches(t *testing.T) {
 		reader := newMockScriptReaderCloser([]byte("any-bytes"))
 		reader.On("Close").Return(nil)
 
-		execContent, err := comp.Compile(reader)
+		execContent, err := comp.Compile(t.Context(), reader)
 		require.NoError(t, err, "instance.Close error must not propagate")
 		require.NotNil(t, execContent)
 		plugin.AssertExpectations(t)
@@ -435,7 +436,7 @@ func TestCompiler_Compile_Branches(t *testing.T) {
 		reader := newMockScriptReaderCloser([]byte("any-bytes"))
 		reader.On("Close").Return(nil)
 
-		execContent, err := comp.Compile(reader)
+		execContent, err := comp.Compile(t.Context(), reader)
 		require.Error(t, err)
 		require.Nil(t, execContent)
 		require.ErrorIs(t, err, ErrValidationFailed)

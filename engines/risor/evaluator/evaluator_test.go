@@ -81,6 +81,7 @@ func (m *MockContent) EngineType() types.Type {
 
 // Helper function to create a test executable unit
 func createTestExecutable(
+	ctx context.Context,
 	handler slog.Handler,
 	ld loader.Loader,
 	globals []string,
@@ -93,7 +94,7 @@ func createTestExecutable(
 	if err != nil {
 		return nil, fmt.Errorf("failed to create compiler: %w", err)
 	}
-	return script.NewExecutableUnit(handler, "test-id", ld, c, provider)
+	return script.NewExecutableUnit(ctx, handler, "test-id", ld, c, provider)
 }
 
 // TestEvaluator_Evaluate tests evaluating Risor scripts
@@ -168,7 +169,7 @@ func TestEvaluator_Evaluate(t *testing.T) {
 				ctxProvider := data.NewContextProvider(constants.EvalData)
 
 				// Create executable unit and evaluator
-				exe, err := createTestExecutable(handler, ld, []string{constants.Ctx}, ctxProvider)
+				exe, err := createTestExecutable(t.Context(), handler, ld, []string{constants.Ctx}, ctxProvider)
 				require.NoError(t, err)
 				evaluator := New(handler, exe)
 				require.NotNil(t, evaluator)
@@ -544,7 +545,7 @@ range(1000000000).each(x => x)
 	ld, err := loader.NewFromString(script)
 	require.NoError(t, err)
 	ctxProvider := data.NewContextProvider(constants.EvalData)
-	exe, err := createTestExecutable(handler, ld, []string{constants.Ctx}, ctxProvider)
+	exe, err := createTestExecutable(t.Context(), handler, ld, []string{constants.Ctx}, ctxProvider)
 	require.NoError(t, err)
 	eval := New(handler, exe)
 	require.NotNil(t, eval)
@@ -589,7 +590,7 @@ func TestEval_ErrorTypeExposesRisorDetails(t *testing.T) {
 		ld, err := loader.NewFromString(script)
 		require.NoError(t, err)
 		ctxProvider := data.NewContextProvider(constants.EvalData)
-		exe, err := createTestExecutable(handler, ld, []string{constants.Ctx}, ctxProvider)
+		exe, err := createTestExecutable(t.Context(), handler, ld, []string{constants.Ctx}, ctxProvider)
 		require.NoError(t, err)
 		eval := New(handler, exe)
 		require.NotNil(t, eval)

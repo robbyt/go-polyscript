@@ -10,7 +10,7 @@ import (
 func TestCompileSuccess(t *testing.T) {
 	scriptContent := `true`
 
-	code, err := Compile(&scriptContent, nil)
+	code, err := Compile(t.Context(), &scriptContent, nil)
 	require.NoError(t, err)
 	require.NotNil(t, code)
 }
@@ -21,7 +21,7 @@ func TestCompileSyntaxError(t *testing.T) {
 		"Hello, World!
 	`
 
-	code, err := Compile(&scriptContent, nil)
+	code, err := Compile(t.Context(), &scriptContent, nil)
 	require.Error(t, err)
 	require.Nil(t, code)
 	require.ErrorIs(t, err, ErrCompileFailed)
@@ -34,14 +34,14 @@ func TestCompileWithGlobals(t *testing.T) {
 	`
 
 	globals := []string{"request"}
-	code, err := CompileWithGlobals(&scriptContent, globals)
+	code, err := CompileWithGlobals(t.Context(), &scriptContent, globals)
 	require.NoError(t, err)
 	require.NotNil(t, code)
 }
 
 // TestCompileNilContent tests the handling of nil script content
 func TestCompileNilContent(t *testing.T) {
-	code, err := Compile(nil, nil)
+	code, err := Compile(t.Context(), nil, nil)
 	require.Error(t, err)
 	require.Nil(t, code)
 	require.ErrorIs(t, err, ErrContentNil)
@@ -50,7 +50,7 @@ func TestCompileNilContent(t *testing.T) {
 // TestCompileWithGlobalsNilContent tests the handling of nil script content with globals
 func TestCompileWithGlobalsNilContent(t *testing.T) {
 	globals := []string{"request"}
-	code, err := CompileWithGlobals(nil, globals)
+	code, err := CompileWithGlobals(t.Context(), nil, globals)
 	require.Error(t, err)
 	require.Nil(t, code)
 	require.ErrorIs(t, err, ErrContentNil)
@@ -63,7 +63,7 @@ func TestCompileWithGlobalsSyntaxError(t *testing.T) {
 	`
 
 	globals := []string{"request"}
-	code, err := CompileWithGlobals(&scriptContent, globals)
+	code, err := CompileWithGlobals(t.Context(), &scriptContent, globals)
 	require.Error(t, err)
 	require.Nil(t, code)
 	require.ErrorIs(t, err, ErrCompileFailed)

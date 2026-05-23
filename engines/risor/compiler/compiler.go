@@ -1,6 +1,7 @@
 package compiler
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"log/slog"
@@ -48,25 +49,26 @@ func (c *Compiler) String() string {
 }
 
 // Compile turns the provided script content into runnable bytecode.
-func (c *Compiler) Compile(scriptLoader io.ReadCloser) (script.ExecutableContent, error) {
+// Cancelling ctx halts the Risor parser.
+func (c *Compiler) Compile(ctx context.Context, scriptLoader io.ReadCloser) (script.ExecutableContent, error) {
 	if scriptLoader == nil {
 		return nil, ErrContentNil
 	}
+	defer func() {
+		if err := scriptLoader.Close(); err != nil {
+			c.logger.WithGroup("compile").Warn("failed to close script reader", "error", err)
+		}
+	}()
 
 	scriptBodyBytes, err := io.ReadAll(scriptLoader)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read script: %w", err)
 	}
 
-	err = scriptLoader.Close()
-	if err != nil {
-		return nil, fmt.Errorf("failed to close reader: %w", err)
-	}
-
-	return c.compile(scriptBodyBytes)
+	return c.compile(ctx, scriptBodyBytes)
 }
 
-func (c *Compiler) compile(scriptBodyBytes []byte) (*executable, error) {
+func (c *Compiler) compile(ctx context.Context, scriptBodyBytes []byte) (*executable, error) {
 	logger := c.logger.WithGroup("compile")
 	if len(scriptBodyBytes) == 0 {
 		return nil, ErrContentNil
@@ -96,7 +98,7 @@ func (c *Compiler) compile(scriptBodyBytes []byte) (*executable, error) {
 
 	logger.Debug("Starting Risor compilation", "scriptLength", len(trimmedScript))
 
-	bc, err := compile.CompileWithGlobals(&scriptContent, c.globals)
+	bc, err := compile.CompileWithGlobals(ctx, &scriptContent, c.globals)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrValidationFailed, err)
 	}

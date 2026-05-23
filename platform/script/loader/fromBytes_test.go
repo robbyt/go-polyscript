@@ -100,7 +100,7 @@ func TestFromBytes_GetReader(t *testing.T) {
 		loader, err := NewFromBytes(content)
 		require.NoError(t, err)
 
-		reader, err := loader.GetReader()
+		reader, err := loader.GetReader(t.Context())
 		require.NoError(t, err)
 
 		data, err := io.ReadAll(reader)
@@ -115,7 +115,7 @@ func TestFromBytes_GetReader(t *testing.T) {
 		require.NoError(t, err)
 
 		// First read
-		reader1, err := loader.GetReader()
+		reader1, err := loader.GetReader(t.Context())
 		require.NoError(t, err)
 		data1, err := io.ReadAll(reader1)
 		require.NoError(t, err)
@@ -123,7 +123,7 @@ func TestFromBytes_GetReader(t *testing.T) {
 		require.NoError(t, reader1.Close())
 
 		// Second read
-		reader2, err := loader.GetReader()
+		reader2, err := loader.GetReader(t.Context())
 		require.NoError(t, err)
 		data2, err := io.ReadAll(reader2)
 		require.NoError(t, err)
@@ -136,7 +136,7 @@ func TestFromBytes_GetReader(t *testing.T) {
 		loader, err := NewFromBytes(content)
 		require.NoError(t, err)
 
-		reader, err := loader.GetReader()
+		reader, err := loader.GetReader(t.Context())
 		require.NoError(t, err)
 		t.Cleanup(func() {
 			require.NoError(t, reader.Close(), "Failed to close reader")
@@ -160,7 +160,7 @@ func TestFromBytes_GetReader(t *testing.T) {
 		loader, err := NewFromBytes(content)
 		require.NoError(t, err)
 
-		reader, err := loader.GetReader()
+		reader, err := loader.GetReader(t.Context())
 		require.NoError(t, err)
 		data, err := io.ReadAll(reader)
 		require.NoError(t, err)

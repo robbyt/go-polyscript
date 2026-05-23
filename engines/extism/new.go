@@ -32,6 +32,7 @@
 package extism
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -95,7 +96,10 @@ func FromExtismLoader(ldr loader.Loader, opts ...Option) (*evaluator.Evaluator, 
 		execUnitID = u.String()
 	}
 
-	execUnit, err := script.NewExecutableUnit(cfg.handler, execUnitID, ldr, comp, provider)
+	// FromExtismLoader is a one-shot startup constructor; compile uses a
+	// fresh Background context. Callers needing cancellable compile
+	// should drive script.NewExecutableUnit directly.
+	execUnit, err := script.NewExecutableUnit(context.Background(), cfg.handler, execUnitID, ldr, comp, provider)
 	if err != nil {
 		return nil, err
 	}

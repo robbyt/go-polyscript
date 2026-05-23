@@ -225,22 +225,13 @@ func NewFromHTTPWithOptions(rawURL string, options *HTTPOptions) (*FromHTTP, err
 	}, nil
 }
 
-// GetReader returns a reader for the HTTP content.
-// This method is part of the Loader interface and is used internally by
-// the polyscript system to fetch the script content.
+// GetReader returns a reader for the HTTP content. The ctx flows into
+// the HTTP request and the authenticator so a cancelled ctx aborts the
+// fetch.
 //
 // The returned io.ReadCloser must be closed by the caller when done.
 // HTTP errors are handled and converted to appropriate error types.
-func (l *FromHTTP) GetReader() (io.ReadCloser, error) {
-	return l.GetReaderWithContext(context.Background())
-}
-
-// GetReaderWithContext returns a reader for the HTTP content with context support.
-// This allows for request cancellation and timeouts via context.
-//
-// The returned io.ReadCloser must be closed by the caller when done.
-// HTTP errors are handled and converted to appropriate error types.
-func (l *FromHTTP) GetReaderWithContext(ctx context.Context) (io.ReadCloser, error) {
+func (l *FromHTTP) GetReader(ctx context.Context) (io.ReadCloser, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, l.url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
@@ -342,9 +333,8 @@ func (l *FromHTTP) GetSourceURL() *url.URL {
 // it never performs a network request.
 //
 // The "SHA256: <prefix>" form is included only after the body has been
-// fetched at least once via [FromHTTP.GetReader] (or
-// [FromHTTP.GetReaderWithContext]) and the response was buffered through
-// [FromHTTP.cappedBody]. Until then — or when [HTTPOptions.MaxBodySize]
+// fetched at least once via [FromHTTP.GetReader] and the response was
+// buffered through [FromHTTP.cappedBody]. Until then — or when [HTTPOptions.MaxBodySize]
 // is negative (which disables buffering) — String returns the
 // no-checksum form.
 func (l *FromHTTP) String() string {

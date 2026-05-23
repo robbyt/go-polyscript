@@ -42,6 +42,7 @@ func evalBuilder(t *testing.T, scriptContent string) (*script.ExecutableUnit, *E
 	require.NoError(t, err, "Failed to create compiler")
 
 	exe, err := script.NewExecutableUnit(
+		t.Context(),
 		handler,
 		scriptContent,
 		loader,
@@ -378,7 +379,8 @@ result = spin()
 	select {
 	case err := <-done:
 		require.Error(t, err)
-		require.True(t,
+		require.True(
+			t,
 			errors.Is(err, context.Canceled) ||
 				strings.Contains(err.Error(), "context canceled") ||
 				strings.Contains(err.Error(), "cancel"),

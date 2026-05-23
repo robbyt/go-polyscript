@@ -19,7 +19,6 @@ type compileFunc func(ctx context.Context, wasmBytes []byte, opts *compile.Setti
 // Compiler implements the script.Compiler interface for WASM modules
 type Compiler struct {
 	entryPointName string
-	ctx            context.Context
 	options        *compile.Settings
 	logHandler     slog.Handler
 	logger         *slog.Logger
@@ -56,22 +55,23 @@ func (c *Compiler) String() string {
 	return "extism.Compiler"
 }
 
-// Compile implements script.Compiler
-func (c *Compiler) Compile(scriptReader io.ReadCloser) (script.ExecutableContent, error) {
+// Compile implements script.Compiler. Cancelling ctx halts the WASM
+// compilation and the entry-point probe.
+func (c *Compiler) Compile(ctx context.Context, scriptReader io.ReadCloser) (script.ExecutableContent, error) {
 	logger := c.logger.WithGroup("compile")
 
 	if scriptReader == nil {
 		return nil, ErrContentNil
 	}
+	defer func() {
+		if err := scriptReader.Close(); err != nil {
+			logger.Warn("failed to close script reader", "error", err)
+		}
+	}()
 
 	scriptBytes, err := io.ReadAll(scriptReader)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read script: %w", err)
-	}
-
-	err = scriptReader.Close()
-	if err != nil {
-		return nil, fmt.Errorf("failed to close reader: %w", err)
 	}
 
 	if len(scriptBytes) == 0 {
@@ -82,7 +82,7 @@ func (c *Compiler) Compile(scriptReader io.ReadCloser) (script.ExecutableContent
 	logger.Debug("Starting WASM compilation", "scriptLength", len(scriptBytes))
 
 	// Compile the WASM module using the configured compile function (defaults to compile.CompileBytes)
-	plugin, err := c.compileFn(c.ctx, scriptBytes, c.options)
+	plugin, err := c.compileFn(ctx, scriptBytes, c.options)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrValidationFailed, err)
 	}
@@ -92,12 +92,14 @@ func (c *Compiler) Compile(scriptReader io.ReadCloser) (script.ExecutableContent
 	}
 
 	// Create a temporary instance to verify the entry point exists
-	instance, err := plugin.Instance(c.ctx, extismSDK.PluginInstanceConfig{})
+	instance, err := plugin.Instance(ctx, extismSDK.PluginInstanceConfig{})
 	if err != nil {
 		return nil, fmt.Errorf("%w: failed to create test instance: %w", ErrValidationFailed, err)
 	}
 	defer func() {
-		if err := instance.Close(c.ctx); err != nil {
+		// Use a cancel-immune ctx for cleanup so a cancelled compile ctx
+		// doesn't abort the plugin instance Close and leak resources.
+		if err := instance.Close(context.WithoutCancel(ctx)); err != nil {
 			logger.Warn("Failed to close Extism plugin instance in compiler", "error", err)
 		}
 	}()
