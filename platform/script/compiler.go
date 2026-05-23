@@ -11,6 +11,8 @@ import (
 type Compiler interface {
 	// Compile checks if a script is valid and returns it as executable content.
 	// The returned ExecutableContent contains the validated and possibly compiled
-	// script ready for execution. Cancellation of ctx halts the parser/compiler.
+	// script ready for execution. Implementations whose underlying parser is
+	// ctx-aware (Risor, Extism) honor cancellation; Starlark's parser is
+	// synchronous and ignores ctx.
 	Compile(ctx context.Context, scriptReader io.ReadCloser) (ExecutableContent, error)
 }

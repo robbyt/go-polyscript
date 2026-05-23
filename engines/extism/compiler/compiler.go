@@ -97,7 +97,9 @@ func (c *Compiler) Compile(ctx context.Context, scriptReader io.ReadCloser) (scr
 		return nil, fmt.Errorf("%w: failed to create test instance: %w", ErrValidationFailed, err)
 	}
 	defer func() {
-		if err := instance.Close(ctx); err != nil {
+		// Use a cancel-immune ctx for cleanup so a cancelled compile ctx
+		// doesn't abort the plugin instance Close and leak resources.
+		if err := instance.Close(context.WithoutCancel(ctx)); err != nil {
 			logger.Warn("Failed to close Extism plugin instance in compiler", "error", err)
 		}
 	}()

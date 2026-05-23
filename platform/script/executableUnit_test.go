@@ -27,6 +27,9 @@ type mockLoader struct {
 
 func (m *mockLoader) GetReader(ctx context.Context) (io.ReadCloser, error) {
 	args := m.Called(ctx)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
 	return args.Get(0).(io.ReadCloser), args.Error(1)
 }
 
@@ -306,10 +309,10 @@ func TestNewVersion(t *testing.T) {
 	})
 
 	t.Run("GetReaderError", func(t *testing.T) {
-		mockReader := new(mockReadCloser)
-
+		// Real loaders follow the Go convention: nil reader on error.
+		// Modeling it that way here keeps the mock contract honest.
 		mockLoader := new(mockLoader)
-		mockLoader.On("GetReader", mock.Anything).Return(mockReader, errors.New("get reader error")).Once()
+		mockLoader.On("GetReader", mock.Anything).Return(nil, errors.New("get reader error")).Once()
 
 		exe, err := NewExecutableUnit(
 			t.Context(),
@@ -321,8 +324,6 @@ func TestNewVersion(t *testing.T) {
 		)
 		require.Error(t, err)
 		require.Nil(t, exe)
-
-		mockReader.AssertExpectations(t)
 		mockLoader.AssertExpectations(t)
 	})
 
