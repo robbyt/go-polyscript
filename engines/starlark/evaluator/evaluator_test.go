@@ -41,7 +41,7 @@ func evalBuilder(t *testing.T, scriptContent string) (*script.ExecutableUnit, *E
 	)
 	require.NoError(t, err, "Failed to create compiler")
 
-	exe, err := script.NewExecutableUnit(
+	exe, err := script.NewExecutableUnit(t.Context(), 
 		handler,
 		scriptContent,
 		loader,

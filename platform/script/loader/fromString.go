@@ -1,6 +1,7 @@
 package loader
 
 import (
+	"context"
 	"encoding/base64"
 	"fmt"
 	"io"
@@ -60,7 +61,9 @@ func (l *FromString) String() string {
 	return fmt.Sprintf("loader.FromString{Chars: %d}", len(l.content))
 }
 
-func (l *FromString) GetReader() (io.ReadCloser, error) {
+// GetReader returns a new reader over the stored string. The ctx is
+// unused: the string is already in memory.
+func (l *FromString) GetReader(_ context.Context) (io.ReadCloser, error) {
 	return io.NopCloser(strings.NewReader(l.content)), nil
 }
 

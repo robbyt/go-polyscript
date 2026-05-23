@@ -79,10 +79,10 @@ func TestCompiler(t *testing.T) {
 			reader.On("Close").Return(nil).Maybe()
 
 			// Set expectations
-			mockCompiler.On("Compile", reader).Return(tt.mockReturn, tt.mockError)
+			mockCompiler.On("Compile", mock.Anything, reader).Return(tt.mockReturn, tt.mockError)
 
 			// Execute test
-			result, err := mockCompiler.Compile(reader)
+			result, err := mockCompiler.Compile(t.Context(), reader)
 
 			// Verify results
 			if tt.expectError {

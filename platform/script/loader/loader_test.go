@@ -47,7 +47,7 @@ func verifyLoader(t *testing.T, loader Loader, expectedURLString string) {
 	}
 
 	// Test getting a reader
-	reader, err := loader.GetReader()
+	reader, err := loader.GetReader(t.Context())
 	if err == nil {
 		// If no error, verify reader works and cleanup
 		require.NotNil(t, reader)
@@ -78,7 +78,7 @@ func verifyMultipleReads(t *testing.T, loader Loader, expectedContent string) {
 	t.Helper()
 
 	// First read
-	reader1, err := loader.GetReader()
+	reader1, err := loader.GetReader(t.Context())
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		require.NoError(t, reader1.Close(), "Failed to close first reader")
@@ -89,7 +89,7 @@ func verifyMultipleReads(t *testing.T, loader Loader, expectedContent string) {
 	require.Equal(t, expectedContent, string(content1))
 
 	// Second read
-	reader2, err := loader.GetReader()
+	reader2, err := loader.GetReader(t.Context())
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		require.NoError(t, reader2.Close(), "Failed to close second reader")

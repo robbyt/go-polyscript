@@ -1,6 +1,7 @@
 package loader
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"log/slog"
@@ -61,7 +62,9 @@ func (l *FromDisk) String() string {
 	noChkSum := fmt.Sprintf("loader.FromDisk{Path: %s}", l.path)
 
 	if l.sourceURL != nil {
-		reader, err := l.GetReader()
+		// os.Open directly so String() doesn't need to fabricate a ctx;
+		// the file is read synchronously for the SHA256 checksum.
+		reader, err := os.Open(l.sourceURL.Path)
 		if err != nil {
 			return noChkSum
 		}
@@ -86,8 +89,9 @@ func (l *FromDisk) String() string {
 	return fmt.Sprintf("loader.FromDisk{Path: %s, SHA256: %s}", l.path, chksum)
 }
 
-func (l *FromDisk) GetReader() (io.ReadCloser, error) {
-	// Just return a reader for the file
+// GetReader opens the backing file. ctx is accepted for interface
+// conformance; os.Open itself is synchronous and doesn't honor it.
+func (l *FromDisk) GetReader(_ context.Context) (io.ReadCloser, error) {
 	return os.Open(l.sourceURL.Path)
 }
 

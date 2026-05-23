@@ -2,6 +2,7 @@ package loader
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"net/url"
@@ -67,8 +68,9 @@ func (l *FromIoReader) String() string {
 	)
 }
 
-// GetReader returns a new reader for the stored content.
-func (l *FromIoReader) GetReader() (io.ReadCloser, error) {
+// GetReader returns a new reader for the stored content. The ctx is
+// unused: the bytes were buffered at construction.
+func (l *FromIoReader) GetReader(_ context.Context) (io.ReadCloser, error) {
 	return io.NopCloser(bytes.NewReader(l.content)), nil
 }
 

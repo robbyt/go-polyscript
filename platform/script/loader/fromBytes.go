@@ -2,6 +2,7 @@ package loader
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"net/url"
@@ -46,8 +47,9 @@ func (l *FromBytes) String() string {
 	return fmt.Sprintf("loader.FromBytes{Bytes: %d}", len(l.content))
 }
 
-// GetReader returns a new reader for the stored content.
-func (l *FromBytes) GetReader() (io.ReadCloser, error) {
+// GetReader returns a new reader for the stored content. The ctx is
+// unused: bytes are already in memory.
+func (l *FromBytes) GetReader(_ context.Context) (io.ReadCloser, error) {
 	return io.NopCloser(bytes.NewReader(l.content)), nil
 }
 

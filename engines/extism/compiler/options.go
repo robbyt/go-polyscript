@@ -1,7 +1,6 @@
 package compiler
 
 import (
-	"context"
 	"fmt"
 	"log/slog"
 
@@ -96,17 +95,6 @@ func WithHostFunctions(funcs []extismSDK.HostFunction) FunctionalOption {
 	}
 }
 
-// WithContext creates an option to set a custom context for the Extism compiler.
-func WithContext(ctx context.Context) FunctionalOption {
-	return func(c *Compiler) error {
-		if ctx == nil {
-			return fmt.Errorf("context cannot be nil")
-		}
-		c.ctx = ctx
-		return nil
-	}
-}
-
 // applyDefaults sets the default values for a compiler.
 func (c *Compiler) applyDefaults() {
 	// Set default entry point
@@ -131,11 +119,6 @@ func (c *Compiler) applyDefaults() {
 
 	// Default WASI to true (EnableWASI is a bool so we don't need to check if it's nil)
 	c.options.EnableWASI = true
-
-	// Default context
-	if c.ctx == nil {
-		c.ctx = context.Background()
-	}
 
 	// Default compile function (test seam); production path is compile.CompileBytes
 	if c.compileFn == nil {
@@ -165,11 +148,6 @@ func (c *Compiler) validate() error {
 	// Runtime config cannot be nil
 	if c.options == nil || c.options.RuntimeConfig == nil {
 		return fmt.Errorf("runtime config cannot be nil")
-	}
-
-	// Context cannot be nil
-	if c.ctx == nil {
-		return fmt.Errorf("context cannot be nil")
 	}
 
 	return nil

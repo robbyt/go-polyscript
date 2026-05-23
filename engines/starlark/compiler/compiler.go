@@ -1,6 +1,7 @@
 package compiler
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"log/slog"
@@ -47,7 +48,9 @@ func (c *Compiler) String() string {
 }
 
 // Compile turns the provided script content into runnable bytecode.
-func (c *Compiler) Compile(scriptReader io.ReadCloser) (script.ExecutableContent, error) {
+// Starlark's underlying parser is synchronous; ctx is accepted for
+// interface conformance but the compile step itself does not honor it.
+func (c *Compiler) Compile(_ context.Context, scriptReader io.ReadCloser) (script.ExecutableContent, error) {
 	if scriptReader == nil {
 		return nil, ErrContentNil
 	}

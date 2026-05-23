@@ -1,6 +1,7 @@
 package extism
 
 import (
+	"context"
 	"io"
 	"net/url"
 
@@ -19,8 +20,8 @@ func (m *loaderMock) GetSourceURL() *url.URL {
 	return args.Get(0).(*url.URL)
 }
 
-func (m *loaderMock) GetReader() (io.ReadCloser, error) {
-	args := m.Called()
+func (m *loaderMock) GetReader(ctx context.Context) (io.ReadCloser, error) {
+	args := m.Called(ctx)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}

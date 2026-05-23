@@ -1,6 +1,7 @@
 package evaluator
 
 import (
+	"context"
 	"io"
 	"net/url"
 	"strings"
@@ -17,8 +18,8 @@ import (
 // in evaluator_test.go (which has a non-matching GetSourceURL signature).
 type unitLoaderMock struct{ mock.Mock }
 
-func (m *unitLoaderMock) GetReader() (io.ReadCloser, error) {
-	args := m.Called()
+func (m *unitLoaderMock) GetReader(ctx context.Context) (io.ReadCloser, error) {
+	args := m.Called(ctx)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
@@ -37,8 +38,8 @@ func (m *unitLoaderMock) GetSourceURL() *url.URL {
 // ExecutableContent (which may be nil).
 type compilerMock struct{ mock.Mock }
 
-func (m *compilerMock) Compile(r io.ReadCloser) (script.ExecutableContent, error) {
-	args := m.Called(r)
+func (m *compilerMock) Compile(ctx context.Context, r io.ReadCloser) (script.ExecutableContent, error) {
+	args := m.Called(ctx, r)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
@@ -62,11 +63,11 @@ func newExe(
 		id = t.Name()
 	}
 	ldr := new(unitLoaderMock)
-	ldr.On("GetReader").
+	ldr.On("GetReader", mock.Anything).
 		Return(io.NopCloser(strings.NewReader("dummy")), nil)
 	cmp := new(compilerMock)
-	cmp.On("Compile", mock.Anything).Return(content, nil)
-	exe, err := script.NewExecutableUnit(nil, id, ldr, cmp, provider)
+	cmp.On("Compile", mock.Anything, mock.Anything).Return(content, nil)
+	exe, err := script.NewExecutableUnit(t.Context(), nil, id, ldr, cmp, provider)
 	require.NoError(t, err)
 	return exe
 }

@@ -1,6 +1,7 @@
 package script
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -32,7 +33,11 @@ type ExecutableUnit struct {
 // NewExecutableUnit creates a new ExecutableUnit from the provided loader and compiler.
 // The dataProvider parameter provides runtime data for script evaluation.
 // A nil handler is permitted and inherits from slog.Default.
+// The supplied ctx flows into the loader (for IO cancellation) and the
+// compiler (for parse/compile cancellation); it is not retained on the
+// returned unit.
 func NewExecutableUnit(
+	ctx context.Context,
 	handler slog.Handler,
 	versionID string,
 	scriptLoader loader.Loader,
@@ -45,12 +50,12 @@ func NewExecutableUnit(
 		return nil, errors.New("compiler is nil")
 	}
 
-	reader, err := scriptLoader.GetReader()
+	reader, err := scriptLoader.GetReader(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get reader from loader: %w", err)
 	}
 
-	exe, err := compiler.Compile(reader)
+	exe, err := compiler.Compile(ctx, reader)
 	if err != nil {
 		return nil, fmt.Errorf("compiler failed: %w", err)
 	}

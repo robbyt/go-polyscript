@@ -368,7 +368,7 @@ func TestInferFromString(t *testing.T) {
 				assert.IsType(t, tc.expectedType, result)
 
 				// Verify content
-				reader, err := result.GetReader()
+				reader, err := result.GetReader(t.Context())
 				require.NoError(t, err)
 				defer func() {
 					assert.NoError(t, reader.Close())
@@ -423,7 +423,7 @@ func TestInferLoader_Integration(t *testing.T) {
 				inferredLoader, err := InferLoader(tc.input)
 				require.NoError(t, err)
 
-				reader, err := inferredLoader.GetReader()
+				reader, err := inferredLoader.GetReader(t.Context())
 				require.NoError(t, err)
 
 				defer func() {
@@ -488,7 +488,7 @@ func TestInferLoader_Integration(t *testing.T) {
 		assert.IsType(t, (*FromDisk)(nil), result)
 
 		// Verify the content can be read
-		reader, err := result.GetReader()
+		reader, err := result.GetReader(t.Context())
 		require.NoError(t, err)
 		t.Cleanup(func() {
 			assert.NoError(t, reader.Close())
@@ -560,7 +560,7 @@ process()`,
 			)
 
 			// Verify content can be read correctly
-			reader, err := result.GetReader()
+			reader, err := result.GetReader(t.Context())
 			require.NoError(t, err)
 			defer func() {
 				assert.NoError(t, reader.Close())

@@ -1,6 +1,7 @@
 package script
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -24,8 +25,8 @@ type mockLoader struct {
 	mock.Mock
 }
 
-func (m *mockLoader) GetReader() (io.ReadCloser, error) {
-	args := m.Called()
+func (m *mockLoader) GetReader(ctx context.Context) (io.ReadCloser, error) {
+	args := m.Called(ctx)
 	return args.Get(0).(io.ReadCloser), args.Error(1)
 }
 
@@ -107,19 +108,20 @@ func TestNewVersion(t *testing.T) {
 		lod, err := loader.NewFromString(scriptContent)
 		require.NoError(t, err, "Expected no error when creating loader")
 
-		reader, err := lod.GetReader()
+		reader, err := lod.GetReader(t.Context())
 		require.NoError(t, err, "Expected no error when getting reader")
 
 		// Create mock loader instead of real loader
 		mockLoader := new(mockLoader)
-		mockLoader.On("GetReader").Return(reader, nil)
+		mockLoader.On("GetReader", mock.Anything).Return(reader, nil)
 
 		// Setup mock compiler with same reader instance
 		comp := new(MockCompiler)
-		comp.On("Compile", reader).Return(&MockExecutableContent{}, nil)
+		comp.On("Compile", mock.Anything, reader).Return(&MockExecutableContent{}, nil)
 
 		// Create executable unit
 		exe, err := NewExecutableUnit(
+			t.Context(),
 			logHandler,
 			t.Name(),
 			mockLoader,
@@ -140,14 +142,15 @@ func TestNewVersion(t *testing.T) {
 		lod, err := loader.NewFromString(scriptBody)
 		require.NoError(t, err, "Expected no error when creating a new loader with valid content")
 
-		reader, err := lod.GetReader()
+		reader, err := lod.GetReader(t.Context())
 		require.NoError(t, err, "Expected no error when getting reader")
 
 		comp := new(MockCompiler)
 		mockContent := new(MockExecutableContent)
-		comp.On("Compile", reader).Return(mockContent, nil).Once()
+		comp.On("Compile", mock.Anything, reader).Return(mockContent, nil).Once()
 
 		exe, err := NewExecutableUnit(
+			t.Context(),
 			logHandler,
 			t.Name(),
 			lod,
@@ -181,14 +184,15 @@ func TestNewVersion(t *testing.T) {
 		lod, err := loader.NewFromString(scriptBody)
 		require.NoError(t, err, "Expected no error when creating a new loader with empty content")
 
-		reader, err := lod.GetReader()
+		reader, err := lod.GetReader(t.Context())
 		require.NoError(t, err, "Expected no error when getting reader")
 
 		comp := new(MockCompiler)
 		validationError := errors.New("validation failed")
-		comp.On("Compile", reader).Return(nil, validationError).Once()
+		comp.On("Compile", mock.Anything, reader).Return(nil, validationError).Once()
 
 		exe, err := NewExecutableUnit(
+			t.Context(),
 			logHandler,
 			t.Name(),
 			lod,
@@ -210,22 +214,23 @@ func TestNewVersion(t *testing.T) {
 		lod, err := loader.NewFromString(scriptContent)
 		require.NoError(t, err, "Expected no error when creating loader")
 
-		reader, err := lod.GetReader()
+		reader, err := lod.GetReader(t.Context())
 		require.NoError(t, err, "Expected no error when getting reader")
 
 		// Create mock loader instead of real loader
 		mockLoader := new(mockLoader)
-		mockLoader.On("GetReader").Return(reader, nil)
+		mockLoader.On("GetReader", mock.Anything).Return(reader, nil)
 
 		// Setup mock compiler with same reader instance
 		mockCompiler := new(MockCompiler)
 		mockContent := new(MockExecutableContent)
 		// Add expectation for GetSource
 		mockContent.On("GetSource").Return(scriptContent)
-		mockCompiler.On("Compile", reader).Return(mockContent, nil)
+		mockCompiler.On("Compile", mock.Anything, reader).Return(mockContent, nil)
 
 		// Create executable unit with empty ID
 		exe, err := NewExecutableUnit(
+			t.Context(),
 			logHandler,
 			"",
 			mockLoader,
@@ -252,6 +257,7 @@ func TestNewVersion(t *testing.T) {
 
 	t.Run("NilCompiler", func(t *testing.T) {
 		exe, err := NewExecutableUnit(
+			t.Context(),
 			logHandler,
 			"test",
 			&mockLoader{},
@@ -276,13 +282,14 @@ func TestNewVersion(t *testing.T) {
 
 		// Setup mock loader with source URL
 		mockLoader := new(mockLoader)
-		mockLoader.On("GetReader").Return(mockReader, nil)
+		mockLoader.On("GetReader", mock.Anything).Return(mockReader, nil)
 
 		// Setup mock compiler with expected error
 		mockCompiler := new(MockCompiler)
-		mockCompiler.On("Compile", mockReader).Return(nil, errors.New("empty content"))
+		mockCompiler.On("Compile", mock.Anything, mockReader).Return(nil, errors.New("empty content"))
 		// Create executable unit
 		exe, err := NewExecutableUnit(
+			t.Context(),
 			logHandler,
 			"test",
 			mockLoader,
@@ -302,9 +309,10 @@ func TestNewVersion(t *testing.T) {
 		mockReader := new(mockReadCloser)
 
 		mockLoader := new(mockLoader)
-		mockLoader.On("GetReader").Return(mockReader, errors.New("get reader error")).Once()
+		mockLoader.On("GetReader", mock.Anything).Return(mockReader, errors.New("get reader error")).Once()
 
 		exe, err := NewExecutableUnit(
+			t.Context(),
 			logHandler,
 			"test",
 			mockLoader,
@@ -324,14 +332,15 @@ func TestNewVersion(t *testing.T) {
 
 		// Setup mock loader
 		mockLoader := new(mockLoader)
-		mockLoader.On("GetReader").Return(mockReader, nil).Once()
+		mockLoader.On("GetReader", mock.Anything).Return(mockReader, nil).Once()
 
 		// Setup mock compiler with same reader instance
 		mockCompiler := new(MockCompiler)
-		mockCompiler.On("Compile", mockReader).Return(nil, errors.New("compile failed")).Once()
+		mockCompiler.On("Compile", mock.Anything, mockReader).Return(nil, errors.New("compile failed")).Once()
 
 		// Create executable unit
 		exe, err := NewExecutableUnit(
+			t.Context(),
 			logHandler,
 			"test",
 			mockLoader,
@@ -393,10 +402,10 @@ func TestNewVersionWithScriptData(t *testing.T) {
 		lod, err := loader.NewFromString(scriptContent)
 		require.NoError(t, err, "Expected no error when creating loader")
 
-		reader, err := lod.GetReader()
+		reader, err := lod.GetReader(t.Context())
 		require.NoError(t, err, "Expected no error when getting reader")
 
-		mockCompiler.On("Compile", reader).Return(mockContent, nil).Once()
+		mockCompiler.On("Compile", mock.Anything, reader).Return(mockContent, nil).Once()
 
 		// Create loader directly from string instead of file
 		loader, err := loader.NewFromString(scriptContent)
@@ -410,6 +419,7 @@ func TestNewVersionWithScriptData(t *testing.T) {
 
 		// Create executable unit
 		exe, err := NewExecutableUnit(
+			t.Context(),
 			logHandler,
 			t.Name(),
 			loader,
@@ -434,15 +444,16 @@ func TestNewVersionWithScriptData(t *testing.T) {
 		lod, err := loader.NewFromString(scriptBody)
 		require.NoError(t, err, "Expected no error when creating a new loader with valid content")
 
-		reader, err := lod.GetReader()
+		reader, err := lod.GetReader(t.Context())
 		require.NoError(t, err, "Expected no error when getting reader")
 
 		comp := new(MockCompiler)
 		mockContent := new(MockExecutableContent)
 
-		comp.On("Compile", reader).Return(mockContent, nil).Once()
+		comp.On("Compile", mock.Anything, reader).Return(mockContent, nil).Once()
 
 		exe, err := NewExecutableUnit(
+			t.Context(),
 			logHandler,
 			t.Name(),
 			lod,
@@ -474,16 +485,16 @@ func TestNewExecutableUnit_NilHandler(t *testing.T) {
 	lod, err := loader.NewFromString("any content")
 	require.NoError(t, err)
 
-	reader, err := lod.GetReader()
+	reader, err := lod.GetReader(t.Context())
 	require.NoError(t, err)
 
 	mockLdr := new(mockLoader)
-	mockLdr.On("GetReader").Return(reader, nil)
+	mockLdr.On("GetReader", mock.Anything).Return(reader, nil)
 
 	comp := new(MockCompiler)
-	comp.On("Compile", reader).Return(&MockExecutableContent{}, nil)
+	comp.On("Compile", mock.Anything, reader).Return(&MockExecutableContent{}, nil)
 
-	exe, err := NewExecutableUnit(nil, t.Name(), mockLdr, comp, data.NewStaticProvider(emptyScriptData))
+	exe, err := NewExecutableUnit(t.Context(), nil, t.Name(), mockLdr, comp, data.NewStaticProvider(emptyScriptData))
 	require.NoError(t, err)
 	require.NotNil(t, exe)
 	require.Equal(t, t.Name(), exe.GetID())

@@ -77,7 +77,7 @@ func TestNewFromIoReader(t *testing.T) {
 				}
 
 				// Use GetReader to verify the content
-				reader, err := loader.GetReader()
+				reader, err := loader.GetReader(t.Context())
 				require.NoError(t, err)
 				content, err := io.ReadAll(reader)
 				require.NoError(t, err)
@@ -144,7 +144,7 @@ func TestFromIoReader_GetReader(t *testing.T) {
 		require.NoError(t, err)
 
 		// First read
-		reader1, err := loader.GetReader()
+		reader1, err := loader.GetReader(t.Context())
 		require.NoError(t, err)
 		content1, err := io.ReadAll(reader1)
 		require.NoError(t, err)
@@ -152,7 +152,7 @@ func TestFromIoReader_GetReader(t *testing.T) {
 		require.NoError(t, reader1.Close())
 
 		// Second read should work the same way
-		reader2, err := loader.GetReader()
+		reader2, err := loader.GetReader(t.Context())
 		require.NoError(t, err)
 		content2, err := io.ReadAll(reader2)
 		require.NoError(t, err)
@@ -166,9 +166,9 @@ func TestFromIoReader_GetReader(t *testing.T) {
 		require.NoError(t, err)
 
 		// Get two readers
-		reader1, err := loader.GetReader()
+		reader1, err := loader.GetReader(t.Context())
 		require.NoError(t, err)
-		reader2, err := loader.GetReader()
+		reader2, err := loader.GetReader(t.Context())
 		require.NoError(t, err)
 
 		// Read partial content from first reader

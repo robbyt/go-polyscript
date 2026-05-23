@@ -14,6 +14,7 @@ import (
 	"github.com/robbyt/go-polyscript/platform/data"
 	"github.com/robbyt/go-polyscript/platform/script/loader"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -40,7 +41,7 @@ func newErrorLoader(t *testing.T, msg string) *loaderMock {
 	mockURL, err := url.Parse("file:///test-starlark-file.star")
 	require.NoError(t, err)
 	mockLoader.On("GetSourceURL").Return(mockURL)
-	mockLoader.On("GetReader").Return(nil, errors.New(msg))
+	mockLoader.On("GetReader", mock.Anything).Return(nil, errors.New(msg))
 	return mockLoader
 }
 
@@ -137,7 +138,7 @@ func TestFromStarlarkLoader_DiskLoader(t *testing.T) {
 	require.NotNil(t, eval)
 	assert.Equal(t, "starlark.Evaluator", eval.String())
 
-	reader, err := diskLoader.GetReader()
+	reader, err := diskLoader.GetReader(t.Context())
 	require.NoError(t, err)
 	content, err := io.ReadAll(reader)
 	require.NoError(t, err)

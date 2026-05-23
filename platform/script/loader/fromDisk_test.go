@@ -156,7 +156,7 @@ func TestFromDisk_GetReader(t *testing.T) {
 		require.NoError(t, err, "Failed to create loader")
 
 		// Get and read from reader
-		reader, err := loader.GetReader()
+		reader, err := loader.GetReader(t.Context())
 		require.NoError(t, err, "Failed to get reader")
 
 		verifyReaderContent(t, reader, testContent)
@@ -185,7 +185,7 @@ func TestFromDisk_GetReader(t *testing.T) {
 		loader, err := NewFromDisk(nonExistingFile)
 		require.NoError(t, err)
 
-		reader, err := loader.GetReader()
+		reader, err := loader.GetReader(t.Context())
 		require.Error(t, err)
 		require.Nil(t, reader)
 		require.Contains(t, err.Error(), "no such file or directory")

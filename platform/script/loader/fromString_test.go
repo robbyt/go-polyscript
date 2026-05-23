@@ -99,7 +99,7 @@ func TestFromString_GetReader(t *testing.T) {
 		loader, err := NewFromString(content)
 		require.NoError(t, err)
 
-		reader, err := loader.GetReader()
+		reader, err := loader.GetReader(t.Context())
 		require.NoError(t, err)
 
 		verifyReaderContent(t, reader, content)
@@ -118,7 +118,7 @@ func TestFromString_GetReader(t *testing.T) {
 		loader, err := NewFromString(content)
 		require.NoError(t, err)
 
-		reader, err := loader.GetReader()
+		reader, err := loader.GetReader(t.Context())
 		require.NoError(t, err)
 		t.Cleanup(func() {
 			require.NoError(t, reader.Close(), "Failed to close reader")
@@ -217,7 +217,7 @@ func TestNewFromStringBase64(t *testing.T) {
 		loader, err := NewFromStringBase64(encodedScript)
 		require.NoError(t, err)
 
-		reader, err := loader.GetReader()
+		reader, err := loader.GetReader(t.Context())
 		require.NoError(t, err)
 
 		verifyReaderContent(t, reader, script)
@@ -227,7 +227,7 @@ func TestNewFromStringBase64(t *testing.T) {
 		loader, err := NewFromStringBase64(script)
 		require.NoError(t, err)
 
-		reader, err := loader.GetReader()
+		reader, err := loader.GetReader(t.Context())
 		require.NoError(t, err)
 
 		verifyReaderContent(t, reader, script)
@@ -250,7 +250,7 @@ func TestNewFromStringBase64(t *testing.T) {
 		loader, err := NewFromStringBase64(contentWithWhitespace)
 		require.NoError(t, err)
 
-		reader, err := loader.GetReader()
+		reader, err := loader.GetReader(t.Context())
 		require.NoError(t, err)
 
 		verifyReaderContent(t, reader, script)

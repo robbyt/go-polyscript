@@ -379,7 +379,7 @@ func TestFromHTTP_GetReader(t *testing.T) {
 		require.NoError(t, err)
 
 		// Use real server with helper
-		reader, err := loader.GetReader()
+		reader, err := loader.GetReader(t.Context())
 		require.NoError(t, err)
 		verifyReaderContent(t, reader, testScript)
 	})
@@ -397,7 +397,7 @@ func TestFromHTTP_GetReader(t *testing.T) {
 		loader, err := NewFromHTTP(testURL)
 		require.NoError(t, err)
 
-		reader, err := loader.GetReader()
+		reader, err := loader.GetReader(t.Context())
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "HTTP 401")
 		require.Nil(t, reader)
@@ -416,7 +416,7 @@ func TestFromHTTP_GetReader(t *testing.T) {
 		loader, err := NewFromHTTP(testURL)
 		require.NoError(t, err)
 
-		reader, err := loader.GetReader()
+		reader, err := loader.GetReader(t.Context())
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "HTTP 404")
 		require.Nil(t, reader)
@@ -437,14 +437,14 @@ func TestFromHTTP_GetReader(t *testing.T) {
 		}
 		loader.client = mockClient
 
-		reader, err := loader.GetReader()
+		reader, err := loader.GetReader(t.Context())
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "failed to execute HTTP request")
 		require.Nil(t, reader)
 	})
 }
 
-func TestFromHTTP_GetReaderWithContext(t *testing.T) {
+func TestFromHTTP_GetReaderCancellation(t *testing.T) {
 	t.Parallel()
 	const testScript = FunctionContent
 
@@ -463,7 +463,7 @@ func TestFromHTTP_GetReaderWithContext(t *testing.T) {
 		require.NoError(t, err)
 
 		ctx := t.Context()
-		reader, err := loader.GetReaderWithContext(ctx)
+		reader, err := loader.GetReader(ctx)
 		require.NoError(t, err)
 		require.NotNil(t, reader)
 		verifyReaderContent(t, reader, testScript)
@@ -496,7 +496,7 @@ func TestFromHTTP_GetReaderWithContext(t *testing.T) {
 		}
 		loader.client = mockClient
 
-		reader, err := loader.GetReaderWithContext(ctx)
+		reader, err := loader.GetReader(ctx)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "context canceled")
 		require.Nil(t, reader)
@@ -532,7 +532,7 @@ func TestFromHTTP_GetReaderWithContext(t *testing.T) {
 		}
 		loader.client = mockClient
 
-		reader, err := loader.GetReaderWithContext(ctx)
+		reader, err := loader.GetReader(ctx)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "context deadline exceeded")
 		require.Nil(t, reader)
@@ -559,7 +559,7 @@ func TestFromHTTP_String(t *testing.T) {
 		// Issue #96: String() no longer fetches on its own. The SHA is
 		// cached during the production GetReader path; drain a reader
 		// here to populate it.
-		r, err := loader.GetReader()
+		r, err := loader.GetReader(t.Context())
 		require.NoError(t, err)
 		_, copyErr := io.Copy(io.Discard, r)
 		require.NoError(t, copyErr)
@@ -646,7 +646,7 @@ func TestFromHTTP_String_NoNetworkRoundTrip(t *testing.T) {
 		loader, err := NewFromHTTP(server.URL + "/script.js")
 		require.NoError(t, err)
 
-		r, err := loader.GetReader()
+		r, err := loader.GetReader(t.Context())
 		require.NoError(t, err)
 		_, copyErr := io.Copy(io.Discard, r)
 		require.NoError(t, copyErr)
@@ -680,7 +680,7 @@ func TestFromHTTP_String_NoNetworkRoundTrip(t *testing.T) {
 			}()
 			go func() {
 				defer wg.Done()
-				r, err := loader.GetReader()
+				r, err := loader.GetReader(t.Context())
 				if err != nil {
 					return
 				}
@@ -706,7 +706,7 @@ func TestFromHTTP_String_NoNetworkRoundTrip(t *testing.T) {
 		loader, err := NewFromHTTPWithOptions(server.URL+"/script.js", opts)
 		require.NoError(t, err)
 
-		r, err := loader.GetReader()
+		r, err := loader.GetReader(t.Context())
 		require.NoError(t, err)
 		_, copyErr := io.Copy(io.Discard, r)
 		require.NoError(t, copyErr)
@@ -836,7 +836,7 @@ func TestFromHTTP_MaxBodySize(t *testing.T) {
 		loader, err := NewFromHTTPWithOptions(server.URL+"/s", opts)
 		require.NoError(t, err)
 
-		reader, err := loader.GetReader()
+		reader, err := loader.GetReader(t.Context())
 		require.NoError(t, err)
 		require.NotNil(t, reader)
 		require.NoError(t, reader.Close())
@@ -850,7 +850,7 @@ func TestFromHTTP_MaxBodySize(t *testing.T) {
 		loader, err := NewFromHTTPWithOptions(server.URL+"/s", opts)
 		require.NoError(t, err)
 
-		reader, err := loader.GetReader()
+		reader, err := loader.GetReader(t.Context())
 		require.NoError(t, err)
 		require.NotNil(t, reader)
 		require.NoError(t, reader.Close())
@@ -864,7 +864,7 @@ func TestFromHTTP_MaxBodySize(t *testing.T) {
 		loader, err := NewFromHTTPWithOptions(server.URL+"/s", opts)
 		require.NoError(t, err)
 
-		reader, err := loader.GetReader()
+		reader, err := loader.GetReader(t.Context())
 		require.Error(t, err)
 		require.Nil(t, reader)
 		require.ErrorIs(t, err, ErrScriptTooLarge)
@@ -880,7 +880,7 @@ func TestFromHTTP_MaxBodySize(t *testing.T) {
 		loader, err := NewFromHTTPWithOptions(server.URL+"/s", opts)
 		require.NoError(t, err)
 
-		reader, err := loader.GetReader()
+		reader, err := loader.GetReader(t.Context())
 		require.NoError(t, err)
 		require.NotNil(t, reader)
 		require.NoError(t, reader.Close())
@@ -902,7 +902,7 @@ func TestFromHTTP_MaxBodySize(t *testing.T) {
 		loader, err := NewFromHTTPWithOptions(server.URL+"/s", opts)
 		require.NoError(t, err)
 
-		reader, err := loader.GetReader()
+		reader, err := loader.GetReader(t.Context())
 		require.Error(t, err)
 		require.Nil(t, reader)
 		require.ErrorIs(t, err, ErrScriptTooLarge)
@@ -916,7 +916,7 @@ func TestFromHTTP_MaxBodySize(t *testing.T) {
 		loader, err := NewFromHTTP(server.URL + "/s")
 		require.NoError(t, err)
 
-		reader, err := loader.GetReader()
+		reader, err := loader.GetReader(t.Context())
 		require.Error(t, err)
 		require.Nil(t, reader)
 		require.ErrorIs(t, err, ErrScriptTooLarge)

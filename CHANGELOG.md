@@ -58,6 +58,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **BREAKING**: `data.Setter.AddDataToContext` no longer takes a variadic.
   Signature is now `AddDataToContext(ctx, data map[string]any) (context.Context, error)`.
   Callers with multiple sources must merge them first.
+- **BREAKING**: `Compiler.Compile` and `Loader.GetReader` now take a
+  `context.Context` as the first argument. `NewExecutableUnit` gains a leading
+  `ctx` too. The Extism compiler's `WithContext` option and the FromHTTP
+  loader's `GetReaderWithContext` helper are removed (now redundant).
 
 ### Deprecated
 - The twelve legacy top-level constructors (`FromRisorFile`,

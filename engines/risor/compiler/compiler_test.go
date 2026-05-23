@@ -145,7 +145,7 @@ main()
 				}
 
 				// Execute test
-				execContent, err := comp.Compile(reader)
+				execContent, err := comp.Compile(t.Context(), reader)
 				require.NoError(t, err, "Did not expect an error but got one")
 				require.NotNil(t, execContent, "Expected execContent to be non-nil")
 				require.Equal(
@@ -218,7 +218,7 @@ main()
 				}
 
 				// Execute test
-				execContent, err := comp.Compile(reader)
+				execContent, err := comp.Compile(t.Context(), reader)
 				require.Error(t, err, "Expected an error but got none")
 				require.Nil(t, execContent, "Expected execContent to be nil")
 				require.ErrorIs(t, err, tt.err, "Expected error %v, got %v", tt.err, err)
@@ -235,7 +235,7 @@ main()
 			require.NoError(t, err)
 			require.NotNil(t, comp, "Expected compiler to be non-nil")
 
-			execContent, err := comp.Compile(nil)
+			execContent, err := comp.Compile(t.Context(), nil)
 			require.Error(t, err, "Expected an error but got none")
 			require.Nil(t, execContent, "Expected execContent to be nil")
 			require.ErrorIs(t, err, ErrContentNil, "Expected error to be ErrContentNil")
@@ -251,7 +251,7 @@ main()
 
 			// Create a reader that will return an error
 			reader := &mockErrorReader{}
-			execContent, err := comp.Compile(reader)
+			execContent, err := comp.Compile(t.Context(), reader)
 			require.Error(t, err, "Expected an error but got none")
 			require.Nil(t, execContent, "Expected execContent to be nil")
 			require.Contains(
@@ -273,7 +273,7 @@ main()
 			reader := newMockScriptReaderCloser(`"Hello, World!"`)
 			reader.On("Close").Return(errors.New("test error")).Once()
 
-			execContent, err := comp.Compile(reader)
+			execContent, err := comp.Compile(t.Context(), reader)
 			require.Error(t, err, "Expected an error but got none")
 			require.Nil(t, execContent, "Expected execContent to be nil")
 			require.Contains(
@@ -295,7 +295,7 @@ main()
 
 		// Here we test that we can directly call the compile method with a byteslice
 		scriptBytes := []byte(`"Hello, World!"`)
-		executable, err := comp.compile(scriptBytes)
+		executable, err := comp.compile(t.Context(), scriptBytes)
 		require.NoError(t, err, "Did not expect an error but got one")
 		require.NotNil(t, executable, "Expected execContent to be non-nil")
 		require.Equal(
@@ -349,7 +349,7 @@ func TestCompilerOptions(t *testing.T) {
 			mockReader.On("Close").Return(nil)
 		}
 
-		execContent, err := comp.Compile(reader)
+		execContent, err := comp.Compile(t.Context(), reader)
 		require.NoError(t, err)
 		require.NotNil(t, execContent)
 	})
@@ -367,7 +367,7 @@ func TestCompilerOptions(t *testing.T) {
 			mockReader.On("Close").Return(nil)
 		}
 
-		execContent, err := comp.Compile(reader)
+		execContent, err := comp.Compile(t.Context(), reader)
 		require.NoError(t, err)
 		require.NotNil(t, execContent)
 	})
@@ -390,7 +390,7 @@ func TestCompileError(t *testing.T) {
 	require.NotNil(t, comp, "Expected compiler to be non-nil")
 
 	// Execute test with nil reader
-	execContent, err := comp.Compile(nil)
+	execContent, err := comp.Compile(t.Context(), nil)
 	require.Error(t, err, "Expected an error but got none")
 	require.Nil(t, execContent, "Expected execContent to be nil")
 	require.ErrorIs(t, err, ErrContentNil, "Expected error to be ErrContentNil")
@@ -406,7 +406,7 @@ func TestCompileWithBytecode(t *testing.T) {
 
 	// Here we test that we can directly call the compile method with a byteslice
 	scriptBytes := []byte(`"Hello, World!"`)
-	executable, err := comp.compile(scriptBytes)
+	executable, err := comp.compile(t.Context(), scriptBytes)
 	require.NoError(t, err, "Did not expect an error but got one")
 	require.NotNil(t, executable, "Expected execContent to be non-nil")
 	require.Equal(t, string(scriptBytes), executable.GetSource(), "Script content does not match")
@@ -430,7 +430,7 @@ func TestCompileIOError(t *testing.T) {
 
 	// Create a reader that will return an error
 	reader := &mockErrorReader{}
-	execContent, err := comp.Compile(reader)
+	execContent, err := comp.Compile(t.Context(), reader)
 	require.Error(t, err, "Expected an error but got none")
 	require.Nil(t, execContent, "Expected execContent to be nil")
 	require.Contains(
@@ -453,7 +453,7 @@ func TestCompileCloseError(t *testing.T) {
 	reader := newMockScriptReaderCloser(`"Hello, World!"`)
 	reader.On("Close").Return(errors.New("test error")).Once()
 
-	execContent, err := comp.Compile(reader)
+	execContent, err := comp.Compile(t.Context(), reader)
 	require.Error(t, err, "Expected an error but got none")
 	require.Nil(t, execContent, "Expected execContent to be nil")
 	require.Contains(
