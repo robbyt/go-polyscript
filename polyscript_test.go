@@ -28,7 +28,7 @@ type mockPreparer struct {
 
 func (m *mockPreparer) AddDataToContext(
 	ctx context.Context,
-	data ...map[string]any,
+	data map[string]any,
 ) (context.Context, error) {
 	args := m.Called(ctx, data)
 	return args.Get(0).(context.Context), args.Error(1)

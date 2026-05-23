@@ -5,6 +5,7 @@ import (
 	_ "embed"
 	"fmt"
 	"log/slog"
+	"maps"
 	"net/http"
 	"net/url"
 	"os"
@@ -74,12 +75,14 @@ func prepareRuntimeData(
 		"user_data": userData,
 	}
 
+	// Merge request and metadata into a single map before handing it to the
+	// evaluator. AddDataToContext takes one map; callers with multiple
+	// sources should compose them first.
+	runtimeData := maps.Clone(requestMeta)
+	runtimeData["request"] = httpReq
+
 	// Add the request metadata to the context using the data.Provider
-	enrichedCtx, err := evaluator.AddDataToContext(
-		ctx,
-		map[string]any{"request": httpReq},
-		requestMeta,
-	)
+	enrichedCtx, err := evaluator.AddDataToContext(ctx, runtimeData)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare context: %w", err)
 	}

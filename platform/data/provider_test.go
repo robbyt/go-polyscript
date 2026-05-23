@@ -254,14 +254,13 @@ func TestProvider_AddDataToContext(t *testing.T) {
 		assert.Equal(t, ctx, newCtx, "Context should remain unchanged")
 	})
 
-	// Test with multiple data items
-	t.Run("context provider with multiple data items", func(t *testing.T) {
+	// Test that multiple keys in a single map work
+	t.Run("context provider with multiple keys in one map", func(t *testing.T) {
 		provider := NewContextProvider(constants.EvalData)
 		ctx := t.Context()
 
 		newCtx, err := provider.AddDataToContext(ctx,
-			map[string]any{"key1": "value1"},
-			map[string]any{"key2": "value2"})
+			map[string]any{"key1": "value1", "key2": "value2"})
 
 		require.NoError(t, err)
 		assert.NotEqual(t, ctx, newCtx, "Context should be modified")

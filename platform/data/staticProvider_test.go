@@ -172,15 +172,13 @@ func TestStaticProvider_AddDataToContext(t *testing.T) {
 			"Error should be ErrStaticProviderNoRuntimeUpdates")
 	})
 
-	t.Run("multiple args returns error", func(t *testing.T) {
+	t.Run("multi-key map returns error", func(t *testing.T) {
 		provider := NewStaticProvider(simpleData)
 		ctx := t.Context()
 
 		newCtx, err := provider.AddDataToContext(
 			ctx,
-			map[string]any{"key": "value"},
-			map[string]any{"str": "string"},
-			map[string]any{"num": 42},
+			map[string]any{"key": "value", "str": "string", "num": 42},
 		)
 
 		require.Error(t, err, "StaticProvider should reject all attempts to add data")

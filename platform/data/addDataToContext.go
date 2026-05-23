@@ -14,7 +14,7 @@ import (
 //   - ctx: The base context to enrich
 //   - logger: A logger instance for recording operations
 //   - provider: The data provider to use for storing data
-//   - d: Variable list of data items to add to the context
+//   - d: The data map to add to the context
 //
 // Returns:
 //   - enrichedCtx: The context with added data
@@ -23,7 +23,7 @@ func AddDataToContextHelper(
 	ctx context.Context,
 	logger *slog.Logger,
 	provider Provider,
-	d ...map[string]any,
+	d map[string]any,
 ) (context.Context, error) {
 	if logger == nil {
 		logger = slog.Default()
@@ -35,7 +35,7 @@ func AddDataToContextHelper(
 	}
 
 	// Use the data provider plugin to store the raw data
-	enrichedCtx, err := provider.AddDataToContext(ctx, d...)
+	enrichedCtx, err := provider.AddDataToContext(ctx, d)
 	if err != nil {
 		return ctx, fmt.Errorf("failed to prepare context: %w", err)
 	}
@@ -50,10 +50,10 @@ func AddDataToContextFromProvider(
 	ctx context.Context,
 	logger *slog.Logger,
 	provider Provider,
-	d ...map[string]any,
+	d map[string]any,
 ) (context.Context, error) {
 	if provider == nil {
 		return ctx, fmt.Errorf("no data provider available")
 	}
-	return AddDataToContextHelper(ctx, logger, provider, d...)
+	return AddDataToContextHelper(ctx, logger, provider, d)
 }

@@ -1036,11 +1036,11 @@ let config_data = ctx["config"]
 
 			// Use explicit keys as recommended in the documentation
 			ctx := t.Context()
-			enrichedCtx, err := evaluator.AddDataToContext(ctx,
-				map[string]any{"request": createTestRequest()},
-				map[string]any{"user": map[string]any{"name": "TestUser", "id": 123}},
-				map[string]any{"config": map[string]any{"debug": true}},
-			)
+			enrichedCtx, err := evaluator.AddDataToContext(ctx, map[string]any{
+				"request": createTestRequest(),
+				"user":    map[string]any{"name": "TestUser", "id": 123},
+				"config":  map[string]any{"debug": true},
+			})
 			require.NoError(t, err)
 
 			// Execute

@@ -77,7 +77,7 @@ func (p *ContextProvider) GetData(ctx context.Context) (map[string]any, error) {
 // the returned context threaded forward for any subsequent enrichment.
 func (p *ContextProvider) AddDataToContext(
 	ctx context.Context,
-	data ...map[string]any,
+	data map[string]any,
 ) (context.Context, error) {
 	if p.contextKey == "" {
 		return ctx, fmt.Errorf("context key is empty")
@@ -95,25 +95,19 @@ func (p *ContextProvider) AddDataToContext(
 		}
 	}
 
-	for _, dataMap := range data {
-		if dataMap == nil {
+	for key, value := range data {
+		if key == "" {
+			errz = append(errz, fmt.Errorf("empty keys are not allowed"))
 			continue
 		}
 
-		for key, value := range dataMap {
-			if key == "" {
-				errz = append(errz, fmt.Errorf("empty keys are not allowed"))
-				continue
-			}
-
-			processedValue, err := p.processValue(value)
-			if err != nil {
-				errz = append(errz, fmt.Errorf("processing value for key '%s': %w", key, err))
-				continue
-			}
-
-			p.mergeIntoMap(toStore, key, processedValue, &errz)
+		processedValue, err := p.processValue(value)
+		if err != nil {
+			errz = append(errz, fmt.Errorf("processing value for key '%s': %w", key, err))
+			continue
 		}
+
+		p.mergeIntoMap(toStore, key, processedValue, &errz)
 	}
 
 	newCtx := context.WithValue(ctx, p.contextKey, toStore)

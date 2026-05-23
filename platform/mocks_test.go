@@ -32,7 +32,7 @@ func (m *mockEvaluator) Load(newVersion script.ExecutableUnit) error {
 
 func (m *mockEvaluator) AddDataToContext(
 	ctx context.Context,
-	d ...map[string]any,
+	d map[string]any,
 ) (context.Context, error) {
 	args := m.Called(ctx, d)
 	return args.Get(0).(context.Context), args.Error(1)

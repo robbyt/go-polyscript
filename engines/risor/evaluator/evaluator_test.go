@@ -39,7 +39,7 @@ func (m *MockProvider) GetData(ctx context.Context) (map[string]any, error) {
 
 func (m *MockProvider) AddDataToContext(
 	ctx context.Context,
-	data ...map[string]any,
+	data map[string]any,
 ) (context.Context, error) {
 	args := m.Called(ctx, data)
 	if ctx, ok := args.Get(0).(context.Context); ok {
@@ -422,7 +422,7 @@ func TestEvaluator_AddDataToContext(t *testing.T) {
 	tests := []struct {
 		name         string
 		setupExe     func(t *testing.T) *script.ExecutableUnit
-		inputs       []map[string]any
+		input        map[string]any
 		wantError    bool
 		errorMessage string
 	}{
@@ -442,7 +442,7 @@ func TestEvaluator_AddDataToContext(t *testing.T) {
 
 				return newExe(t, "with-provider", nil, mockProvider)
 			},
-			inputs:    []map[string]any{{"test": "data"}},
+			input:     map[string]any{"test": "data"},
 			wantError: false,
 		},
 		{
@@ -457,7 +457,7 @@ func TestEvaluator_AddDataToContext(t *testing.T) {
 
 				return newExe(t, "with-provider-error", nil, mockProvider)
 			},
-			inputs:       []map[string]any{{"test": "data"}},
+			input:        map[string]any{"test": "data"},
 			wantError:    true,
 			errorMessage: "provider error",
 		},
@@ -467,7 +467,7 @@ func TestEvaluator_AddDataToContext(t *testing.T) {
 				t.Helper()
 				return newExe(t, "nil-provider", nil, nil)
 			},
-			inputs:       []map[string]any{{"test": "data"}},
+			input:        map[string]any{"test": "data"},
 			wantError:    true,
 			errorMessage: "no data provider available",
 		},
@@ -477,7 +477,7 @@ func TestEvaluator_AddDataToContext(t *testing.T) {
 				t.Helper()
 				return nil
 			},
-			inputs:       []map[string]any{{"test": "data"}},
+			input:        map[string]any{"test": "data"},
 			wantError:    true,
 			errorMessage: "no data provider available",
 		},
@@ -497,7 +497,7 @@ func TestEvaluator_AddDataToContext(t *testing.T) {
 			}
 
 			ctx := t.Context()
-			result, err := evaluator.AddDataToContext(ctx, tt.inputs...)
+			result, err := evaluator.AddDataToContext(ctx, tt.input)
 
 			if tt.wantError {
 				require.Error(t, err)

@@ -25,7 +25,7 @@ type mockDataPreparer struct {
 
 func (m *mockDataPreparer) AddDataToContext(
 	ctx context.Context,
-	data ...map[string]any,
+	data map[string]any,
 ) (context.Context, error) {
 	args := m.Called(ctx, data)
 	return args.Get(0).(context.Context), args.Error(1)
@@ -48,7 +48,7 @@ func (m *mockEvaluatorWithPreparer) Eval(
 
 func (m *mockEvaluatorWithPreparer) AddDataToContext(
 	ctx context.Context,
-	data ...map[string]any,
+	data map[string]any,
 ) (context.Context, error) {
 	args := m.Called(ctx, data)
 	return args.Get(0).(context.Context), args.Error(1)
@@ -176,9 +176,7 @@ func TestEvalDataPreparerInterfaceDirectImplementation(t *testing.T) {
 	// Call AddDataToContext
 	resultCtx, err := dataPreparer.AddDataToContext(
 		ctx,
-		map[string]any{"data1": data1},
-		map[string]any{"data2": data2},
-		map[string]any{"data3": data3},
+		map[string]any{"data1": data1, "data2": data2, "data3": data3},
 	)
 	require.NoError(t, err, "AddDataToContext should not return an error")
 	require.NotNil(t, resultCtx, "Enriched context should not be nil")
