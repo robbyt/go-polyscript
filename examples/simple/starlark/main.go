@@ -25,6 +25,7 @@ func runStarlarkExample(logger *slog.Logger) (map[string]any, error) {
 	}
 
 	evaluator, err := polyscript.New[polyscript.Starlark](
+		context.Background(),
 		polyscript.FromString(starlarkScript),
 		polyscript.WithStaticData[polyscript.Starlark](input),
 		polyscript.WithLogHandler[polyscript.Starlark](logger.Handler()),

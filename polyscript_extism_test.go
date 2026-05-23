@@ -20,6 +20,7 @@ func TestExtismFromBytes(t *testing.T) {
 
 	t.Run("success with embedded wasmdata", func(t *testing.T) {
 		eval, err := polyscript.New[polyscript.Extism](
+			t.Context(),
 			polyscript.FromBytes(wasmdata.TestModule),
 			polyscript.WithEntryPoint(wasmdata.EntrypointGreet),
 		)
@@ -29,6 +30,7 @@ func TestExtismFromBytes(t *testing.T) {
 
 	t.Run("empty bytes", func(t *testing.T) {
 		eval, err := polyscript.New[polyscript.Extism](
+			t.Context(),
 			polyscript.FromBytes([]byte{}),
 			polyscript.WithEntryPoint(wasmdata.EntrypointGreet),
 		)
@@ -50,6 +52,7 @@ func TestExtismFromBytesWithData(t *testing.T) {
 		}
 
 		eval, err := polyscript.New[polyscript.Extism](
+			t.Context(),
 			polyscript.FromBytes(wasmdata.TestModule),
 			polyscript.WithEntryPoint(wasmdata.EntrypointGreet),
 			polyscript.WithStaticData[polyscript.Extism](staticData),
@@ -76,6 +79,7 @@ func TestExtismFromFile(t *testing.T) {
 
 	t.Run("valid", func(t *testing.T) {
 		eval, err := polyscript.New[polyscript.Extism](
+			t.Context(),
 			polyscript.FromFile(wasmPath),
 			polyscript.WithEntryPoint(wasmdata.EntrypointGreet),
 		)
@@ -93,6 +97,7 @@ func TestExtismFromFile(t *testing.T) {
 
 	t.Run("invalid path", func(t *testing.T) {
 		_, err := polyscript.New[polyscript.Extism](
+			t.Context(),
 			polyscript.FromFile("non-existent-file.wasm"),
 			polyscript.WithEntryPoint(wasmdata.EntrypointGreet),
 		)
@@ -101,6 +106,7 @@ func TestExtismFromFile(t *testing.T) {
 
 	t.Run("with static data", func(t *testing.T) {
 		eval, err := polyscript.New[polyscript.Extism](
+			t.Context(),
 			polyscript.FromFile(wasmPath),
 			polyscript.WithEntryPoint(wasmdata.EntrypointGreet),
 			polyscript.WithStaticData[polyscript.Extism](map[string]any{"input": "Test User"}),
@@ -119,6 +125,7 @@ func TestExtismDataIntegrationScenarios(t *testing.T) {
 
 	t.Run("ExtismWithData", func(t *testing.T) {
 		eval, err := polyscript.New[polyscript.Extism](
+			t.Context(),
 			polyscript.FromFile(wasmPath),
 			polyscript.WithEntryPoint(wasmdata.EntrypointGreet),
 			polyscript.WithStaticData[polyscript.Extism](map[string]any{"input": "Test User"}),
@@ -136,6 +143,7 @@ func TestExtismDataIntegrationScenarios(t *testing.T) {
 		assert.Equal(t, "Hello, Test User!", resultMap["greeting"])
 
 		evalNoInput, err := polyscript.New[polyscript.Extism](
+			t.Context(),
 			polyscript.FromFile(wasmPath),
 			polyscript.WithEntryPoint(wasmdata.EntrypointGreet),
 			polyscript.WithStaticData[polyscript.Extism](map[string]any{
@@ -160,6 +168,7 @@ func TestExtismEvalEndToEnd(t *testing.T) {
 	require.NoError(t, os.WriteFile(wasmPath, wasmData, 0o644))
 
 	eval, err := polyscript.New[polyscript.Extism](
+		t.Context(),
 		polyscript.FromFile(wasmPath),
 		polyscript.WithEntryPoint(wasmdata.EntrypointGreet),
 		polyscript.WithStaticData[polyscript.Extism](map[string]any{"input": "Test User"}),

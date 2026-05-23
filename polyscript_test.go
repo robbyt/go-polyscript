@@ -6,11 +6,14 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/robbyt/go-polyscript"
 	"github.com/robbyt/go-polyscript/platform"
@@ -84,14 +87,14 @@ func prepareAndEval(
 
 // stringEngineFn is a small adapter so a table-driven test can mix engines that
 // share the (script-content, log-handler) shape.
-type stringEngineFn func(content string, h slog.Handler) (platform.Evaluator, error)
+type stringEngineFn func(ctx context.Context, content string, h slog.Handler) (platform.Evaluator, error)
 
-func risorString(content string, h slog.Handler) (platform.Evaluator, error) {
-	return polyscript.New[polyscript.Risor](polyscript.FromString(content), polyscript.WithLogHandler[polyscript.Risor](h))
+func risorString(ctx context.Context, content string, h slog.Handler) (platform.Evaluator, error) {
+	return polyscript.New[polyscript.Risor](ctx, polyscript.FromString(content), polyscript.WithLogHandler[polyscript.Risor](h))
 }
 
-func starlarkString(content string, h slog.Handler) (platform.Evaluator, error) {
-	return polyscript.New[polyscript.Starlark](polyscript.FromString(content), polyscript.WithLogHandler[polyscript.Starlark](h))
+func starlarkString(ctx context.Context, content string, h slog.Handler) (platform.Evaluator, error) {
+	return polyscript.New[polyscript.Starlark](ctx, polyscript.FromString(content), polyscript.WithLogHandler[polyscript.Starlark](h))
 }
 
 func TestEngineEvaluatorsFromString(t *testing.T) {
@@ -108,7 +111,7 @@ func TestEngineEvaluatorsFromString(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			eval, err := tc.creator(tc.content, nil)
+			eval, err := tc.creator(t.Context(), tc.content, nil)
 			require.NoError(t, err)
 			require.NotNil(t, eval)
 		})
@@ -132,7 +135,7 @@ func TestFromStringValidation(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			eval, err := tc.creator(tc.content, nil)
+			eval, err := tc.creator(t.Context(), tc.content, nil)
 			if tc.expectError {
 				require.Error(t, err)
 				return
@@ -158,7 +161,7 @@ _ = result`
 	require.NoError(t, os.WriteFile(starlarkPath, []byte(starlarkContent), 0o644))
 
 	t.Run("Risor file - valid", func(t *testing.T) {
-		eval, err := polyscript.New[polyscript.Risor](polyscript.FromFile(risorPath))
+		eval, err := polyscript.New[polyscript.Risor](t.Context(), polyscript.FromFile(risorPath))
 		require.NoError(t, err)
 		require.NotNil(t, eval)
 
@@ -168,12 +171,13 @@ _ = result`
 	})
 
 	t.Run("Risor file - invalid path", func(t *testing.T) {
-		_, err := polyscript.New[polyscript.Risor](polyscript.FromFile("non-existent-file.risor"))
+		_, err := polyscript.New[polyscript.Risor](t.Context(), polyscript.FromFile("non-existent-file.risor"))
 		require.Error(t, err)
 	})
 
 	t.Run("Risor file - with static data", func(t *testing.T) {
 		eval, err := polyscript.New[polyscript.Risor](
+			t.Context(),
 			polyscript.FromFile(risorPath),
 			polyscript.WithStaticData[polyscript.Risor](map[string]any{"test_key": "test_value"}),
 		)
@@ -182,7 +186,7 @@ _ = result`
 	})
 
 	t.Run("Starlark file - valid", func(t *testing.T) {
-		eval, err := polyscript.New[polyscript.Starlark](polyscript.FromFile(starlarkPath))
+		eval, err := polyscript.New[polyscript.Starlark](t.Context(), polyscript.FromFile(starlarkPath))
 		require.NoError(t, err)
 		require.NotNil(t, eval)
 
@@ -192,12 +196,13 @@ _ = result`
 	})
 
 	t.Run("Starlark file - invalid path", func(t *testing.T) {
-		_, err := polyscript.New[polyscript.Starlark](polyscript.FromFile("non-existent-file.star"))
+		_, err := polyscript.New[polyscript.Starlark](t.Context(), polyscript.FromFile("non-existent-file.star"))
 		require.Error(t, err)
 	})
 
 	t.Run("Starlark file - with static data", func(t *testing.T) {
 		eval, err := polyscript.New[polyscript.Starlark](
+			t.Context(),
 			polyscript.FromFile(starlarkPath),
 			polyscript.WithStaticData[polyscript.Starlark](map[string]any{"test_key": "test_value"}),
 		)
@@ -213,6 +218,7 @@ func TestDataProviders(t *testing.T) {
 		script := `print(ctx["static_key"], ", ", ctx["dynamic_key"])`
 
 		eval, err := polyscript.New[polyscript.Starlark](
+			t.Context(),
 			polyscript.FromString(script),
 			polyscript.WithStaticData[polyscript.Starlark](map[string]any{"static_key": "static_value"}),
 		)
@@ -242,6 +248,7 @@ func TestEvalHelpers(t *testing.T) {
         `
 
 		eval, err := polyscript.New[polyscript.Risor](
+			t.Context(),
 			polyscript.FromString(script),
 			polyscript.WithStaticData[polyscript.Risor](map[string]any{}),
 		)
@@ -330,6 +337,7 @@ func TestEvalHelpers(t *testing.T) {
         `
 
 		eval, err := polyscript.New[polyscript.Risor](
+			t.Context(),
 			polyscript.FromString(script),
 			polyscript.WithStaticData[polyscript.Risor](map[string]any{}),
 		)
@@ -351,13 +359,13 @@ func TestEvalHelpers(t *testing.T) {
 			t.Errorf("length is unexpected type %T", v)
 		}
 
-		nilEval, err := polyscript.New[polyscript.Risor](polyscript.FromString(`nil`))
+		nilEval, err := polyscript.New[polyscript.Risor](t.Context(), polyscript.FromString(`nil`))
 		require.NoError(t, err)
 		nilResult, err := evalAndExtractMap(t, t.Context(), nilEval)
 		require.NoError(t, err)
 		assert.Equal(t, map[string]any{}, nilResult)
 
-		numEval, err := polyscript.New[polyscript.Risor](polyscript.FromString(`42`))
+		numEval, err := polyscript.New[polyscript.Risor](t.Context(), polyscript.FromString(`42`))
 		require.NoError(t, err)
 		_, err = evalAndExtractMap(t, t.Context(), numEval)
 		require.Error(t, err)
@@ -412,6 +420,7 @@ _ = result`
         `
 
 		eval, err := polyscript.New[polyscript.Risor](
+			t.Context(),
 			polyscript.FromString(risorScript),
 			polyscript.WithStaticData[polyscript.Risor](staticData),
 		)
@@ -443,6 +452,7 @@ _ = result`
 
 	t.Run("StarlarkWithData", func(t *testing.T) {
 		eval, err := polyscript.New[polyscript.Starlark](
+			t.Context(),
 			polyscript.FromFile(starlarkPath),
 			polyscript.WithStaticData[polyscript.Starlark](staticData),
 		)
@@ -470,19 +480,19 @@ func TestCreateEvaluatorEdgeCases(t *testing.T) {
 	t.Parallel()
 
 	t.Run("Empty Script Content Error", func(t *testing.T) {
-		_, err := polyscript.New[polyscript.Risor](polyscript.FromString(""))
+		_, err := polyscript.New[polyscript.Risor](t.Context(), polyscript.FromString(""))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "empty")
 	})
 
 	t.Run("Invalid Path Error", func(t *testing.T) {
-		_, err := polyscript.New[polyscript.Risor](polyscript.FromFile("/path/does/not/exist.risor"))
+		_, err := polyscript.New[polyscript.Risor](t.Context(), polyscript.FromFile("/path/does/not/exist.risor"))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "no such file or directory")
 	})
 
 	t.Run("InvalidScriptTest", func(t *testing.T) {
-		_, err := polyscript.New[polyscript.Risor](polyscript.FromString("this is not valid risor code }{"))
+		_, err := polyscript.New[polyscript.Risor](t.Context(), polyscript.FromString("this is not valid risor code }{"))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "compile")
 	})
@@ -513,4 +523,51 @@ func TestFromStringLoader(t *testing.T) {
 		require.NotNil(t, l)
 		require.NotNil(t, l.GetSourceURL())
 	})
+}
+
+// TestNew_CompileCancelled proves the headline behavior of #145: a
+// cancellable ctx supplied to polyscript.New[E] reaches the engine
+// compile path. Risor's parser checks ctx; Extism's WASM compile of the
+// small embedded test module completes too fast to observe a
+// pre-cancelled ctx so it's covered via the HTTP-loader test below.
+func TestNew_CompileCancelled(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	_, err := polyscript.New[polyscript.Risor](ctx, polyscript.FromString(`"hi"`))
+	require.Error(t, err)
+	require.ErrorIs(t, err, context.Canceled)
+}
+
+// TestNew_HTTPLoaderCancelled proves the cancellable ctx actually
+// reaches the HTTP loader's fetch — the precise scenario #145 set out
+// to fix. The server delays the response past the ctx deadline; the
+// fetch must abort with context.DeadlineExceeded rather than hanging.
+func TestNew_HTTPLoaderCancelled(t *testing.T) {
+	t.Parallel()
+
+	// Stall the server long enough for the ctx timeout to fire.
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		select {
+		case <-r.Context().Done():
+		case <-time.After(2 * time.Second):
+		}
+	}))
+	t.Cleanup(server.Close)
+
+	ldr, err := loader.NewFromHTTP(server.URL)
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithTimeout(t.Context(), 50*time.Millisecond)
+	t.Cleanup(cancel)
+
+	start := time.Now()
+	_, err = polyscript.New[polyscript.Risor](ctx, polyscript.FromLoader(ldr))
+	require.Error(t, err)
+	require.ErrorIs(t, err, context.DeadlineExceeded)
+	// Sanity check: the abort happened near the deadline, not after the
+	// full 2s server stall.
+	assert.Less(t, time.Since(start), time.Second, "fetch should abort near the ctx deadline, not wait for the server")
 }

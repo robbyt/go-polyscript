@@ -31,6 +31,7 @@ func TestReadmeQuickStart(t *testing.T) {
 	`
 
 	evaluator, err := polyscript.New[polyscript.Risor](
+		t.Context(),
 		polyscript.FromString(script),
 		polyscript.WithStaticData[polyscript.Risor](map[string]any{"name": "World"}),
 	)
@@ -66,6 +67,7 @@ func TestReadmeStaticProvider(t *testing.T) {
 	`
 
 	evaluator, err := polyscript.New[polyscript.Risor](
+		t.Context(),
 		polyscript.FromString(script),
 		polyscript.WithStaticData[polyscript.Risor](map[string]any{"name": "cats", "excited": true}),
 	)
@@ -92,7 +94,7 @@ func TestReadmeContextProvider(t *testing.T) {
 		}
 	`
 
-	evaluator, err := polyscript.New[polyscript.Risor](polyscript.FromString(script))
+	evaluator, err := polyscript.New[polyscript.Risor](t.Context(), polyscript.FromString(script))
 	require.NoError(t, err, "Should create evaluator successfully")
 
 	runtimeData := map[string]any{"name": "Billie Jean", "relationship": false}
@@ -134,6 +136,7 @@ func TestReadmeCombiningStaticAndDynamic(t *testing.T) {
 	}
 
 	evaluator, err := polyscript.New[polyscript.Risor](
+		t.Context(),
 		polyscript.FromString(script),
 		polyscript.WithStaticData[polyscript.Risor](staticData),
 	)
@@ -167,6 +170,7 @@ _ = result
 `
 
 	evaluator, err := polyscript.New[polyscript.Starlark](
+		t.Context(),
 		polyscript.FromString(scriptContent),
 		polyscript.WithStaticData[polyscript.Starlark](map[string]any{"name": "World"}),
 	)
@@ -185,6 +189,7 @@ func TestReadmeExtism(t *testing.T) {
 	t.Parallel()
 
 	evaluator, err := polyscript.New[polyscript.Extism](
+		t.Context(),
 		polyscript.FromBytes(wasmdata.TestModule),
 		polyscript.WithEntryPoint(wasmdata.EntrypointGreet),
 		polyscript.WithStaticData[polyscript.Extism](map[string]any{"input": "World"}),

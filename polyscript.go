@@ -48,6 +48,7 @@
 package polyscript
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -222,19 +223,22 @@ func WithExitOutputMaxBytes(n int) Option[Extism] {
 
 // New constructs an evaluator for the engine selected via the type parameter:
 //
-//	eval, err := polyscript.New[polyscript.Risor](polyscript.FromString(script))
+//	eval, err := polyscript.New[polyscript.Risor](ctx, polyscript.FromString(script))
 //
-//	eval, err := polyscript.New[polyscript.Extism](
+//	eval, err := polyscript.New[polyscript.Extism](ctx,
 //	    polyscript.FromBytes(wasmBytes),
 //	    polyscript.WithEntryPoint("greet"),
 //	    polyscript.WithStaticData[polyscript.Extism](map[string]any{"input": "World"}),
 //	)
 //
+// The supplied ctx flows into the loader's I/O (e.g. HTTP fetch) and the
+// compiler's parser (Risor, Extism); cancelling it halts those operations.
+//
 // Shared options ([WithStaticData], [WithLogHandler]) work for any engine but
 // usually need an explicit type argument; see "A note on type arguments" in
 // the package doc. [WithEntryPoint] is bound to [Extism]; passing it to
 // [Risor] or [Starlark] is a compile error.
-func New[E Engine](src Source, opts ...Option[E]) (platform.Evaluator, error) {
+func New[E Engine](ctx context.Context, src Source, opts ...Option[E]) (platform.Evaluator, error) {
 	cfg := &config{}
 	for _, o := range opts {
 		if o != nil {
@@ -253,33 +257,33 @@ func New[E Engine](src Source, opts ...Option[E]) (platform.Evaluator, error) {
 
 	switch any(e).(type) {
 	case Risor:
-		return newRisor(ldr, cfg)
+		return newRisor(ctx, ldr, cfg)
 	case Starlark:
-		return newStarlark(ldr, cfg)
+		return newStarlark(ctx, ldr, cfg)
 	case Extism:
-		return newExtism(ldr, cfg)
+		return newExtism(ctx, ldr, cfg)
 	default:
 		return nil, fmt.Errorf("polyscript.New: unsupported engine type %T", e)
 	}
 }
 
-func newRisor(ldr loader.Loader, cfg *config) (platform.Evaluator, error) {
+func newRisor(ctx context.Context, ldr loader.Loader, cfg *config) (platform.Evaluator, error) {
 	opts := []risorMachine.Option{risorMachine.WithLogHandler(cfg.handler)}
 	if cfg.staticData != nil {
 		opts = append(opts, risorMachine.WithStaticData(cfg.staticData))
 	}
-	return risorMachine.FromRisorLoader(ldr, opts...)
+	return risorMachine.FromRisorLoader(ctx, ldr, opts...)
 }
 
-func newStarlark(ldr loader.Loader, cfg *config) (platform.Evaluator, error) {
+func newStarlark(ctx context.Context, ldr loader.Loader, cfg *config) (platform.Evaluator, error) {
 	opts := []starlarkMachine.Option{starlarkMachine.WithLogHandler(cfg.handler)}
 	if cfg.staticData != nil {
 		opts = append(opts, starlarkMachine.WithStaticData(cfg.staticData))
 	}
-	return starlarkMachine.FromStarlarkLoader(ldr, opts...)
+	return starlarkMachine.FromStarlarkLoader(ctx, ldr, opts...)
 }
 
-func newExtism(ldr loader.Loader, cfg *config) (platform.Evaluator, error) {
+func newExtism(ctx context.Context, ldr loader.Loader, cfg *config) (platform.Evaluator, error) {
 	opts := []extismMachine.Option{
 		extismMachine.WithEntryPoint(cfg.entryPoint),
 		extismMachine.WithLogHandler(cfg.handler),
@@ -288,5 +292,5 @@ func newExtism(ldr loader.Loader, cfg *config) (platform.Evaluator, error) {
 	if cfg.staticData != nil {
 		opts = append(opts, extismMachine.WithStaticData(cfg.staticData))
 	}
-	return extismMachine.FromExtismLoader(ldr, opts...)
+	return extismMachine.FromExtismLoader(ctx, ldr, opts...)
 }

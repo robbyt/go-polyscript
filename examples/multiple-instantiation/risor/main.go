@@ -25,6 +25,7 @@ func createEvaluator(logger *slog.Logger) (RisorEvaluator, error) {
 	}
 
 	evaluator, err := polyscript.New[polyscript.Risor](
+		context.Background(),
 		polyscript.FromString(risorScript),
 		polyscript.WithLogHandler[polyscript.Risor](logger.Handler()),
 	)

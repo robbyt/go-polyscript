@@ -23,6 +23,7 @@ func createEvaluator(logger *slog.Logger) (ExtismEvaluator, error) {
 	}
 
 	evaluator, err := polyscript.New[polyscript.Extism](
+		context.Background(),
 		polyscript.FromBytes(wasmdata.TestModule),
 		polyscript.WithEntryPoint(wasmdata.EntrypointGreet),
 		polyscript.WithLogHandler[polyscript.Extism](logger.Handler()),

@@ -47,10 +47,14 @@ import (
 // evaluator from this package. Configure it with the With* options:
 //
 //	eval, err := risor.FromRisorLoader(
+//	    ctx,
 //	    ldr,
 //	    risor.WithLogHandler(slog.Default().Handler()),
 //	    risor.WithStaticData(map[string]any{"version": "1.0.0"}),
 //	)
+//
+// The supplied ctx flows into the loader's I/O and the Risor parser;
+// cancelling it halts compilation in flight.
 //
 // All options are optional. With no options the evaluator inherits the
 // default slog handler (via [helpers.SetupLogger]) and uses a
@@ -59,7 +63,7 @@ import (
 // If both [WithStaticData] and [WithDataProvider] are supplied,
 // [WithDataProvider] takes precedence — pass exactly one of them per
 // call to keep intent unambiguous.
-func FromRisorLoader(ldr loader.Loader, opts ...Option) (*evaluator.Evaluator, error) {
+func FromRisorLoader(ctx context.Context, ldr loader.Loader, opts ...Option) (*evaluator.Evaluator, error) {
 	cfg := &config{}
 	for _, opt := range opts {
 		if opt != nil {
@@ -83,10 +87,7 @@ func FromRisorLoader(ldr loader.Loader, opts ...Option) (*evaluator.Evaluator, e
 		execUnitID = u.String()
 	}
 
-	// FromRisorLoader is a one-shot startup constructor; compile uses a
-	// fresh Background context. Callers needing cancellable compile
-	// should drive script.NewExecutableUnit directly.
-	execUnit, err := script.NewExecutableUnit(context.Background(), cfg.handler, execUnitID, ldr, comp, provider)
+	execUnit, err := script.NewExecutableUnit(ctx, cfg.handler, execUnitID, ldr, comp, provider)
 	if err != nil {
 		return nil, err
 	}

@@ -7,6 +7,7 @@
 package polyscript
 
 import (
+	"context"
 	"log/slog"
 
 	extismMachine "github.com/robbyt/go-polyscript/engines/extism"
@@ -35,7 +36,7 @@ func FromExtismFile(
 		return nil, err
 	}
 
-	return extismMachine.FromExtismLoader(l,
+	return extismMachine.FromExtismLoader(context.Background(), l,
 		extismMachine.WithLogHandler(logHandler),
 		extismMachine.WithEntryPoint(entryPoint),
 	)
@@ -57,7 +58,7 @@ func FromExtismFileWithData(
 		return nil, err
 	}
 
-	return extismMachine.FromExtismLoader(l,
+	return extismMachine.FromExtismLoader(context.Background(), l,
 		extismMachine.WithLogHandler(logHandler),
 		extismMachine.WithStaticData(staticData),
 		extismMachine.WithEntryPoint(entryPoint),
@@ -77,7 +78,7 @@ func FromExtismBytes(
 		return nil, err
 	}
 
-	return extismMachine.FromExtismLoader(l,
+	return extismMachine.FromExtismLoader(context.Background(), l,
 		extismMachine.WithLogHandler(logHandler),
 		extismMachine.WithEntryPoint(entryPoint),
 	)
@@ -99,7 +100,7 @@ func FromExtismBytesWithData(
 		return nil, err
 	}
 
-	return extismMachine.FromExtismLoader(l,
+	return extismMachine.FromExtismLoader(context.Background(), l,
 		extismMachine.WithLogHandler(logHandler),
 		extismMachine.WithStaticData(staticData),
 		extismMachine.WithEntryPoint(entryPoint),
@@ -118,7 +119,7 @@ func FromRisorFile(
 		return nil, err
 	}
 
-	return risorMachine.FromRisorLoader(l, risorMachine.WithLogHandler(logHandler))
+	return risorMachine.FromRisorLoader(context.Background(), l, risorMachine.WithLogHandler(logHandler))
 }
 
 // FromRisorFileWithData creates a Risor evaluator with both static and dynamic
@@ -135,7 +136,7 @@ func FromRisorFileWithData(
 		return nil, err
 	}
 
-	return risorMachine.FromRisorLoader(l,
+	return risorMachine.FromRisorLoader(context.Background(), l,
 		risorMachine.WithLogHandler(logHandler),
 		risorMachine.WithStaticData(staticData),
 	)
@@ -153,7 +154,7 @@ func FromRisorString(
 		return nil, err
 	}
 
-	return risorMachine.FromRisorLoader(l, risorMachine.WithLogHandler(logHandler))
+	return risorMachine.FromRisorLoader(context.Background(), l, risorMachine.WithLogHandler(logHandler))
 }
 
 // FromRisorStringWithData creates a Risor evaluator with both static and
@@ -170,7 +171,7 @@ func FromRisorStringWithData(
 		return nil, err
 	}
 
-	return risorMachine.FromRisorLoader(l,
+	return risorMachine.FromRisorLoader(context.Background(), l,
 		risorMachine.WithLogHandler(logHandler),
 		risorMachine.WithStaticData(staticData),
 	)
@@ -188,7 +189,7 @@ func FromStarlarkFile(
 		return nil, err
 	}
 
-	return starlarkMachine.FromStarlarkLoader(l, starlarkMachine.WithLogHandler(logHandler))
+	return starlarkMachine.FromStarlarkLoader(context.Background(), l, starlarkMachine.WithLogHandler(logHandler))
 }
 
 // FromStarlarkFileWithData creates a Starlark evaluator with both static and
@@ -205,7 +206,7 @@ func FromStarlarkFileWithData(
 		return nil, err
 	}
 
-	return starlarkMachine.FromStarlarkLoader(l,
+	return starlarkMachine.FromStarlarkLoader(context.Background(), l,
 		starlarkMachine.WithLogHandler(logHandler),
 		starlarkMachine.WithStaticData(staticData),
 	)
@@ -223,7 +224,7 @@ func FromStarlarkString(
 		return nil, err
 	}
 
-	return starlarkMachine.FromStarlarkLoader(l, starlarkMachine.WithLogHandler(logHandler))
+	return starlarkMachine.FromStarlarkLoader(context.Background(), l, starlarkMachine.WithLogHandler(logHandler))
 }
 
 // FromStarlarkStringWithData creates a Starlark evaluator with both static and
@@ -240,7 +241,7 @@ func FromStarlarkStringWithData(
 		return nil, err
 	}
 
-	return starlarkMachine.FromStarlarkLoader(l,
+	return starlarkMachine.FromStarlarkLoader(context.Background(), l,
 		starlarkMachine.WithLogHandler(logHandler),
 		starlarkMachine.WithStaticData(staticData),
 	)

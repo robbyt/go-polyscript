@@ -29,6 +29,7 @@ func createStarlarkEvaluator(
 	staticData map[string]any,
 ) (StarlarkEvaluator, error) {
 	return polyscript.New[polyscript.Starlark](
+		context.Background(),
 		polyscript.FromString(scriptContent),
 		polyscript.WithStaticData[polyscript.Starlark](staticData),
 		polyscript.WithLogHandler[polyscript.Starlark](logger.Handler()),

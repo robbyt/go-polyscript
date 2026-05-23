@@ -62,6 +62,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `context.Context` as the first argument. `NewExecutableUnit` gains a leading
   `ctx` too. The Extism compiler's `WithContext` option and the FromHTTP
   loader's `GetReaderWithContext` helper are removed (now redundant).
+- **BREAKING**: `polyscript.New[E]`, `extism.FromExtismLoader`,
+  `risor.FromRisorLoader`, and `starlark.FromStarlarkLoader` now take a
+  `context.Context` as the first argument. Cancelling that ctx reaches the
+  loader's I/O and (where the parser supports it) the compile path.
 
 ### Deprecated
 - The twelve legacy top-level constructors (`FromRisorFile`,

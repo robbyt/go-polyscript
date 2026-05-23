@@ -16,7 +16,7 @@ func TestNewRisor(t *testing.T) {
 	t.Parallel()
 
 	t.Run("FromString minimal", func(t *testing.T) {
-		eval, err := polyscript.New[polyscript.Risor](polyscript.FromString(`"hello"`))
+		eval, err := polyscript.New[polyscript.Risor](t.Context(), polyscript.FromString(`"hello"`))
 		require.NoError(t, err)
 		require.NotNil(t, eval)
 	})
@@ -24,6 +24,7 @@ func TestNewRisor(t *testing.T) {
 	t.Run("FromString with static data", func(t *testing.T) {
 		script := `{"name": ctx["name"], "length": len(ctx["name"])}`
 		eval, err := polyscript.New[polyscript.Risor](
+			t.Context(),
 			polyscript.FromString(script),
 			polyscript.WithStaticData[polyscript.Risor](map[string]any{"name": "World"}),
 		)
@@ -38,7 +39,7 @@ func TestNewRisor(t *testing.T) {
 
 	t.Run("FromString with dynamic runtime data", func(t *testing.T) {
 		script := `{"name": ctx["name"]}`
-		eval, err := polyscript.New[polyscript.Risor](polyscript.FromString(script))
+		eval, err := polyscript.New[polyscript.Risor](t.Context(), polyscript.FromString(script))
 		require.NoError(t, err)
 
 		ctx, err := eval.AddDataToContext(t.Context(), map[string]any{"name": "Robert"})
@@ -55,18 +56,18 @@ func TestNewRisor(t *testing.T) {
 		path := filepath.Join(dir, "script.risor")
 		require.NoError(t, os.WriteFile(path, []byte(`{"ok": true}`), 0o600))
 
-		eval, err := polyscript.New[polyscript.Risor](polyscript.FromFile(path))
+		eval, err := polyscript.New[polyscript.Risor](t.Context(), polyscript.FromFile(path))
 		require.NoError(t, err)
 		require.NotNil(t, eval)
 	})
 
 	t.Run("empty string surfaces error from source", func(t *testing.T) {
-		_, err := polyscript.New[polyscript.Risor](polyscript.FromString(""))
+		_, err := polyscript.New[polyscript.Risor](t.Context(), polyscript.FromString(""))
 		require.Error(t, err)
 	})
 
 	t.Run("zero-value Source errors", func(t *testing.T) {
-		_, err := polyscript.New[polyscript.Risor](polyscript.Source{})
+		_, err := polyscript.New[polyscript.Risor](t.Context(), polyscript.Source{})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "zero-value Source")
 	})
@@ -76,7 +77,7 @@ func TestNewStarlark(t *testing.T) {
 	t.Parallel()
 
 	t.Run("FromString minimal", func(t *testing.T) {
-		eval, err := polyscript.New[polyscript.Starlark](polyscript.FromString(`_ = "hello"`))
+		eval, err := polyscript.New[polyscript.Starlark](t.Context(), polyscript.FromString(`_ = "hello"`))
 		require.NoError(t, err)
 		require.NotNil(t, eval)
 	})
@@ -85,6 +86,7 @@ func TestNewStarlark(t *testing.T) {
 		script := `result = {"name": ctx["name"]}
 _ = result`
 		eval, err := polyscript.New[polyscript.Starlark](
+			t.Context(),
 			polyscript.FromString(script),
 			polyscript.WithStaticData[polyscript.Starlark](map[string]any{"name": "World"}),
 		)
@@ -103,6 +105,7 @@ func TestNewExtism(t *testing.T) {
 
 	t.Run("FromBytes with entry point", func(t *testing.T) {
 		eval, err := polyscript.New[polyscript.Extism](
+			t.Context(),
 			polyscript.FromBytes(wasmdata.TestModule),
 			polyscript.WithEntryPoint(wasmdata.EntrypointGreet),
 			polyscript.WithStaticData[polyscript.Extism](map[string]any{"input": "World"}),
@@ -117,7 +120,7 @@ func TestNewExtism(t *testing.T) {
 	})
 
 	t.Run("missing entry point errors", func(t *testing.T) {
-		_, err := polyscript.New[polyscript.Extism](polyscript.FromBytes(wasmdata.TestModule))
+		_, err := polyscript.New[polyscript.Extism](t.Context(), polyscript.FromBytes(wasmdata.TestModule))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "entry point is required")
 	})
@@ -125,7 +128,7 @@ func TestNewExtism(t *testing.T) {
 	t.Run("missing entry point errors before resolving source", func(t *testing.T) {
 		// The missing-entrypoint check must short-circuit before we try to
 		// read empty bytes, so the user gets the more informative error.
-		_, err := polyscript.New[polyscript.Extism](polyscript.FromBytes(nil))
+		_, err := polyscript.New[polyscript.Extism](t.Context(), polyscript.FromBytes(nil))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "entry point is required")
 	})
@@ -136,6 +139,7 @@ func TestNewExtism(t *testing.T) {
 		require.NoError(t, os.WriteFile(path, wasmdata.TestModule, 0o600))
 
 		eval, err := polyscript.New[polyscript.Extism](
+			t.Context(),
 			polyscript.FromFile(path),
 			polyscript.WithEntryPoint(wasmdata.EntrypointGreet),
 			polyscript.WithStaticData[polyscript.Extism](map[string]any{"input": "Test"}),
@@ -157,6 +161,7 @@ func TestNewExtism(t *testing.T) {
 		// engines/extism/evaluator/evaluator_test.go (issue #122).
 		for _, n := range []int{-1, 0, 42, 8 * 1024} {
 			eval, err := polyscript.New[polyscript.Extism](
+				t.Context(),
 				polyscript.FromBytes(wasmdata.TestModule),
 				polyscript.WithEntryPoint(wasmdata.EntrypointGreet),
 				polyscript.WithExitOutputMaxBytes(n),
@@ -180,13 +185,13 @@ func TestFromLoader(t *testing.T) {
 		ldr, err := loader.NewFromString(`"ok"`)
 		require.NoError(t, err)
 
-		eval, err := polyscript.New[polyscript.Risor](polyscript.FromLoader(ldr))
+		eval, err := polyscript.New[polyscript.Risor](t.Context(), polyscript.FromLoader(ldr))
 		require.NoError(t, err)
 		require.NotNil(t, eval)
 	})
 
 	t.Run("nil loader errors", func(t *testing.T) {
-		_, err := polyscript.New[polyscript.Risor](polyscript.FromLoader(nil))
+		_, err := polyscript.New[polyscript.Risor](t.Context(), polyscript.FromLoader(nil))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "nil loader")
 	})
@@ -199,7 +204,7 @@ func TestFromLoader(t *testing.T) {
 		var typedNil *loader.FromString
 		var l loader.Loader = typedNil
 
-		_, err := polyscript.New[polyscript.Risor](polyscript.FromLoader(l))
+		_, err := polyscript.New[polyscript.Risor](t.Context(), polyscript.FromLoader(l))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "nil loader")
 	})
@@ -210,6 +215,7 @@ func TestOptionsCompose(t *testing.T) {
 
 	t.Run("nil Option is ignored", func(t *testing.T) {
 		eval, err := polyscript.New[polyscript.Risor](
+			t.Context(),
 			polyscript.FromString(`"ok"`),
 			nil,
 			polyscript.WithStaticData[polyscript.Risor](map[string]any{"k": "v"}),
@@ -220,6 +226,7 @@ func TestOptionsCompose(t *testing.T) {
 
 	t.Run("WithLogHandler accepts nil", func(t *testing.T) {
 		eval, err := polyscript.New[polyscript.Risor](
+			t.Context(),
 			polyscript.FromString(`"ok"`),
 			polyscript.WithLogHandler[polyscript.Risor](nil),
 		)
@@ -229,6 +236,7 @@ func TestOptionsCompose(t *testing.T) {
 
 	t.Run("later option wins for static data", func(t *testing.T) {
 		eval, err := polyscript.New[polyscript.Risor](
+			t.Context(),
 			polyscript.FromString(`{"k": ctx["k"]}`),
 			polyscript.WithStaticData[polyscript.Risor](map[string]any{"k": "first"}),
 			polyscript.WithStaticData[polyscript.Risor](map[string]any{"k": "second"}),
@@ -260,6 +268,7 @@ func TestFromBytesIsolatesCallerSlice(t *testing.T) {
 	}
 
 	eval, err := polyscript.New[polyscript.Extism](
+		t.Context(),
 		src,
 		polyscript.WithEntryPoint(wasmdata.EntrypointGreet),
 		polyscript.WithStaticData[polyscript.Extism](map[string]any{"input": "World"}),
@@ -289,7 +298,7 @@ func TestSourceErrorPropagation(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := polyscript.New[polyscript.Risor](tc.source)
+			_, err := polyscript.New[polyscript.Risor](t.Context(), tc.source)
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), tc.want)
 		})

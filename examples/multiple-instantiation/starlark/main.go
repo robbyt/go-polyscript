@@ -25,6 +25,7 @@ func createEvaluator(logger *slog.Logger) (StarlarkEvaluator, error) {
 	}
 
 	evaluator, err := polyscript.New[polyscript.Starlark](
+		context.Background(),
 		polyscript.FromString(starlarkScript),
 		polyscript.WithLogHandler[polyscript.Starlark](logger.Handler()),
 	)

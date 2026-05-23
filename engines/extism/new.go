@@ -69,7 +69,10 @@ var ErrEntryPointRequired = errors.New("extism: entry point is required (use Wit
 // If both [WithStaticData] and [WithDataProvider] are supplied,
 // [WithDataProvider] takes precedence — pass exactly one of them per
 // call to keep intent unambiguous.
-func FromExtismLoader(ldr loader.Loader, opts ...Option) (*evaluator.Evaluator, error) {
+//
+// The supplied ctx flows into the loader's I/O and the Extism SDK's
+// WASM compile + entry-point probe; cancelling it halts both.
+func FromExtismLoader(ctx context.Context, ldr loader.Loader, opts ...Option) (*evaluator.Evaluator, error) {
 	cfg := &config{}
 	for _, opt := range opts {
 		if opt != nil {
@@ -96,10 +99,7 @@ func FromExtismLoader(ldr loader.Loader, opts ...Option) (*evaluator.Evaluator, 
 		execUnitID = u.String()
 	}
 
-	// FromExtismLoader is a one-shot startup constructor; compile uses a
-	// fresh Background context. Callers needing cancellable compile
-	// should drive script.NewExecutableUnit directly.
-	execUnit, err := script.NewExecutableUnit(context.Background(), cfg.handler, execUnitID, ldr, comp, provider)
+	execUnit, err := script.NewExecutableUnit(ctx, cfg.handler, execUnitID, ldr, comp, provider)
 	if err != nil {
 		return nil, err
 	}

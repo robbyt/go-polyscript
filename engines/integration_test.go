@@ -452,7 +452,7 @@ let user_data = ctx["user_data"]
 				ctxProvider := data.NewContextProvider(constants.EvalData)
 				scriptLoader, err := loader.NewFromString(script)
 				require.NoError(t, err)
-				evaluator, err := risorEngine.FromRisorLoader(scriptLoader,
+				evaluator, err := risorEngine.FromRisorLoader(t.Context(), scriptLoader,
 					risorEngine.WithLogHandler(handler),
 					risorEngine.WithDataProvider(ctxProvider))
 				require.NoError(t, err)
@@ -510,7 +510,7 @@ _ = result
 				ctxProvider := data.NewContextProvider(constants.EvalData)
 				scriptLoader, err := loader.NewFromString(script)
 				require.NoError(t, err)
-				evaluator, err := starlarkEngine.FromStarlarkLoader(scriptLoader,
+				evaluator, err := starlarkEngine.FromStarlarkLoader(t.Context(), scriptLoader,
 					starlarkEngine.WithLogHandler(handler),
 					starlarkEngine.WithDataProvider(ctxProvider))
 				require.NoError(t, err)
@@ -554,7 +554,7 @@ _ = result
 			ctxProvider := data.NewContextProvider(constants.EvalData)
 			scriptLoader, err := loader.NewFromBytes(wasmdata.TestModule)
 			require.NoError(t, err)
-			evaluator, err := extismEngine.FromExtismLoader(scriptLoader,
+			evaluator, err := extismEngine.FromExtismLoader(t.Context(), scriptLoader,
 				extismEngine.WithLogHandler(handler),
 				extismEngine.WithDataProvider(ctxProvider),
 				extismEngine.WithEntryPoint(wasmdata.EntrypointGreet),
@@ -614,7 +614,7 @@ let max_retries = ctx["constants"]["max_retries"]
 			staticProvider := data.NewStaticProvider(staticData)
 			scriptLoader, err := loader.NewFromString(script)
 			require.NoError(t, err)
-			evaluator, err := risorEngine.FromRisorLoader(scriptLoader,
+			evaluator, err := risorEngine.FromRisorLoader(t.Context(), scriptLoader,
 				risorEngine.WithLogHandler(handler),
 				risorEngine.WithDataProvider(staticProvider))
 			require.NoError(t, err)
@@ -651,7 +651,7 @@ _ = result
 			staticProvider := data.NewStaticProvider(staticData)
 			scriptLoader, err := loader.NewFromString(script)
 			require.NoError(t, err)
-			evaluator, err := starlarkEngine.FromStarlarkLoader(scriptLoader,
+			evaluator, err := starlarkEngine.FromStarlarkLoader(t.Context(), scriptLoader,
 				starlarkEngine.WithLogHandler(handler),
 				starlarkEngine.WithDataProvider(staticProvider))
 			require.NoError(t, err)
@@ -680,7 +680,7 @@ _ = result
 			})
 			scriptLoader, err := loader.NewFromBytes(wasmdata.TestModule)
 			require.NoError(t, err)
-			evaluator, err := extismEngine.FromExtismLoader(scriptLoader,
+			evaluator, err := extismEngine.FromExtismLoader(t.Context(), scriptLoader,
 				extismEngine.WithLogHandler(handler),
 				extismEngine.WithDataProvider(staticProvider),
 				extismEngine.WithEntryPoint(wasmdata.EntrypointGreet),
@@ -734,7 +734,7 @@ let request_id = ctx["request_id"]
 
 				scriptLoader, err := loader.NewFromString(script)
 				require.NoError(t, err)
-				evaluator, err := risorEngine.FromRisorLoader(scriptLoader,
+				evaluator, err := risorEngine.FromRisorLoader(t.Context(), scriptLoader,
 					risorEngine.WithLogHandler(handler),
 					risorEngine.WithDataProvider(compositeProvider))
 				require.NoError(t, err)
@@ -781,7 +781,7 @@ _ = result
 
 				scriptLoader, err := loader.NewFromString(script)
 				require.NoError(t, err)
-				evaluator, err := starlarkEngine.FromStarlarkLoader(scriptLoader,
+				evaluator, err := starlarkEngine.FromStarlarkLoader(t.Context(), scriptLoader,
 					starlarkEngine.WithLogHandler(handler),
 					starlarkEngine.WithDataProvider(compositeProvider))
 				require.NoError(t, err)
@@ -826,7 +826,7 @@ _ = result
 
 			scriptLoader, err := loader.NewFromBytes(wasmdata.TestModule)
 			require.NoError(t, err)
-			evaluator, err := extismEngine.FromExtismLoader(scriptLoader,
+			evaluator, err := extismEngine.FromExtismLoader(t.Context(), scriptLoader,
 				extismEngine.WithLogHandler(handler),
 				extismEngine.WithDataProvider(compositeProvider),
 				extismEngine.WithEntryPoint(wasmdata.EntrypointGreet),
@@ -897,7 +897,7 @@ let content_type = ctx["request"]["Headers"]["Content-Type"][0]
 				ctxProvider := data.NewContextProvider(constants.EvalData)
 				scriptLoader, err := loader.NewFromString(script)
 				require.NoError(t, err)
-				evaluator, err := risorEngine.FromRisorLoader(scriptLoader,
+				evaluator, err := risorEngine.FromRisorLoader(t.Context(), scriptLoader,
 					risorEngine.WithLogHandler(handler),
 					risorEngine.WithDataProvider(ctxProvider))
 				require.NoError(t, err)
@@ -946,7 +946,7 @@ _ = result
 				ctxProvider := data.NewContextProvider(constants.EvalData)
 				scriptLoader, err := loader.NewFromString(script)
 				require.NoError(t, err)
-				evaluator, err := starlarkEngine.FromStarlarkLoader(scriptLoader,
+				evaluator, err := starlarkEngine.FromStarlarkLoader(t.Context(), scriptLoader,
 					starlarkEngine.WithLogHandler(handler),
 					starlarkEngine.WithDataProvider(ctxProvider))
 				require.NoError(t, err)
@@ -978,7 +978,7 @@ _ = result
 			ctxProvider := data.NewContextProvider(constants.EvalData)
 			scriptLoader, err := loader.NewFromBytes(wasmdata.TestModule)
 			require.NoError(t, err)
-			evaluator, err := extismEngine.FromExtismLoader(scriptLoader,
+			evaluator, err := extismEngine.FromExtismLoader(t.Context(), scriptLoader,
 				extismEngine.WithLogHandler(handler),
 				extismEngine.WithDataProvider(ctxProvider),
 				extismEngine.WithEntryPoint(wasmdata.EntrypointGreet),
@@ -1029,7 +1029,7 @@ let config_data = ctx["config"]
 			ctxProvider := data.NewContextProvider(constants.EvalData)
 			scriptLoader, err := loader.NewFromString(script)
 			require.NoError(t, err)
-			evaluator, err := risorEngine.FromRisorLoader(scriptLoader,
+			evaluator, err := risorEngine.FromRisorLoader(t.Context(), scriptLoader,
 				risorEngine.WithLogHandler(handler),
 				risorEngine.WithDataProvider(ctxProvider))
 			require.NoError(t, err)
