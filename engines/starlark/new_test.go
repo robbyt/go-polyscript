@@ -46,7 +46,7 @@ func newErrorLoader(t *testing.T, msg string) *loaderMock {
 }
 
 func TestFromStarlarkLoader_NoOptions(t *testing.T) {
-	eval, err := FromStarlarkLoader(newTestLoader(t))
+	eval, err := FromStarlarkLoader(t.Context(), newTestLoader(t))
 	require.NoError(t, err)
 	require.NotNil(t, eval)
 	assert.Equal(t, "starlark.Evaluator", eval.String())
@@ -54,13 +54,13 @@ func TestFromStarlarkLoader_NoOptions(t *testing.T) {
 
 func TestFromStarlarkLoader_WithLogHandler(t *testing.T) {
 	handler := slog.NewTextHandler(os.Stdout, nil)
-	eval, err := FromStarlarkLoader(newTestLoader(t), WithLogHandler(handler))
+	eval, err := FromStarlarkLoader(t.Context(), newTestLoader(t), WithLogHandler(handler))
 	require.NoError(t, err)
 	require.NotNil(t, eval)
 }
 
 func TestFromStarlarkLoader_NilLogHandler(t *testing.T) {
-	eval, err := FromStarlarkLoader(newTestLoader(t), WithLogHandler(nil))
+	eval, err := FromStarlarkLoader(t.Context(), newTestLoader(t), WithLogHandler(nil))
 	require.NoError(t, err)
 	require.NotNil(t, eval)
 }
@@ -70,27 +70,27 @@ func TestFromStarlarkLoader_WithStaticData(t *testing.T) {
 		"version": "1.0.0",
 		"config":  map[string]any{"timeout": 30, "retry": true},
 	}
-	eval, err := FromStarlarkLoader(newTestLoader(t), WithStaticData(staticData))
+	eval, err := FromStarlarkLoader(t.Context(), newTestLoader(t), WithStaticData(staticData))
 	require.NoError(t, err)
 	require.NotNil(t, eval)
 }
 
 func TestFromStarlarkLoader_EmptyStaticData(t *testing.T) {
-	eval, err := FromStarlarkLoader(newTestLoader(t), WithStaticData(map[string]any{}))
+	eval, err := FromStarlarkLoader(t.Context(), newTestLoader(t), WithStaticData(map[string]any{}))
 	require.NoError(t, err)
 	require.NotNil(t, eval)
 }
 
 func TestFromStarlarkLoader_WithDataProvider(t *testing.T) {
 	provider := data.NewContextProvider("test_key")
-	eval, err := FromStarlarkLoader(newTestLoader(t), WithDataProvider(provider))
+	eval, err := FromStarlarkLoader(t.Context(), newTestLoader(t), WithDataProvider(provider))
 	require.NoError(t, err)
 	require.NotNil(t, eval)
 }
 
 func TestFromStarlarkLoader_DataProviderBeatsStaticData(t *testing.T) {
 	provider := data.NewContextProvider("sentinel")
-	eval, err := FromStarlarkLoader(
+	eval, err := FromStarlarkLoader(t.Context(), 
 		newTestLoader(t),
 		WithStaticData(map[string]any{"ignored": true}),
 		WithDataProvider(provider),
@@ -101,14 +101,14 @@ func TestFromStarlarkLoader_DataProviderBeatsStaticData(t *testing.T) {
 
 func TestFromStarlarkLoader_NilOption(t *testing.T) {
 	var nilOpt Option
-	eval, err := FromStarlarkLoader(newTestLoader(t), nilOpt, WithStaticData(map[string]any{"k": "v"}))
+	eval, err := FromStarlarkLoader(t.Context(), newTestLoader(t), nilOpt, WithStaticData(map[string]any{"k": "v"}))
 	require.NoError(t, err)
 	require.NotNil(t, eval)
 }
 
 func TestFromStarlarkLoader_LoaderError(t *testing.T) {
 	mockLoader := newErrorLoader(t, "failed to load script")
-	eval, err := FromStarlarkLoader(mockLoader)
+	eval, err := FromStarlarkLoader(t.Context(), mockLoader)
 	require.Error(t, err)
 	require.Nil(t, eval)
 	assert.Contains(t, err.Error(), "failed to load script")
@@ -118,7 +118,7 @@ func TestFromStarlarkLoader_LoaderError(t *testing.T) {
 func TestFromStarlarkLoader_InvalidScript(t *testing.T) {
 	invalidLoader, err := loader.NewFromString(`this is { not valid } Starlark syntax`)
 	require.NoError(t, err)
-	eval, err := FromStarlarkLoader(invalidLoader)
+	eval, err := FromStarlarkLoader(t.Context(), invalidLoader)
 	require.Error(t, err)
 	require.Nil(t, eval)
 	assert.ErrorIs(t, err, compiler.ErrValidationFailed)
@@ -133,7 +133,7 @@ func TestFromStarlarkLoader_DiskLoader(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, diskLoader)
 
-	eval, err := FromStarlarkLoader(diskLoader)
+	eval, err := FromStarlarkLoader(t.Context(), diskLoader)
 	require.NoError(t, err)
 	require.NotNil(t, eval)
 	assert.Equal(t, "starlark.Evaluator", eval.String())
@@ -154,7 +154,7 @@ _ = result
 	scriptLoader, err := loader.NewFromString(script)
 	require.NoError(t, err)
 
-	eval, err := FromStarlarkLoader(
+	eval, err := FromStarlarkLoader(t.Context(), 
 		scriptLoader,
 		WithStaticData(map[string]any{"name": "World"}),
 	)
@@ -178,7 +178,7 @@ func TestFromStarlarkLoader_DefaultsToSlogDefault(t *testing.T) {
 	scriptLoader, err := loader.NewFromString(`_ = "ok"`)
 	require.NoError(t, err)
 
-	eval, err := FromStarlarkLoader(scriptLoader)
+	eval, err := FromStarlarkLoader(t.Context(), scriptLoader)
 	require.NoError(t, err)
 	require.NotNil(t, eval)
 }

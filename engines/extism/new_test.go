@@ -2,6 +2,7 @@ package extism
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -42,7 +43,7 @@ func newErrorLoader(t *testing.T, msg string) *loaderMock {
 
 func TestFromExtismLoader_RequiresEntryPoint(t *testing.T) {
 	mockLoader := new(loaderMock)
-	eval, err := FromExtismLoader(mockLoader)
+	eval, err := FromExtismLoader(t.Context(), mockLoader)
 	require.Error(t, err)
 	require.Nil(t, eval)
 	require.ErrorIs(t, err, ErrEntryPointRequired)
@@ -53,7 +54,7 @@ func TestFromExtismLoader_RequiresEntryPoint(t *testing.T) {
 
 func TestFromExtismLoader_EmptyEntryPointStillRejected(t *testing.T) {
 	mockLoader := new(loaderMock)
-	eval, err := FromExtismLoader(mockLoader, WithEntryPoint(""))
+	eval, err := FromExtismLoader(t.Context(), mockLoader, WithEntryPoint(""))
 	require.Error(t, err)
 	require.Nil(t, eval)
 	require.ErrorIs(t, err, ErrEntryPointRequired)
@@ -61,7 +62,7 @@ func TestFromExtismLoader_EmptyEntryPointStillRejected(t *testing.T) {
 
 func TestFromExtismLoader_NoOptionsBeyondEntryPoint(t *testing.T) {
 	mockLoader := newWASMLoader(t)
-	eval, err := FromExtismLoader(mockLoader, WithEntryPoint(wasmdata.EntrypointGreet))
+	eval, err := FromExtismLoader(t.Context(), mockLoader, WithEntryPoint(wasmdata.EntrypointGreet))
 	require.NoError(t, err)
 	require.NotNil(t, eval)
 	assert.Equal(t, "extism.Evaluator", eval.String())
@@ -71,7 +72,7 @@ func TestFromExtismLoader_NoOptionsBeyondEntryPoint(t *testing.T) {
 func TestFromExtismLoader_WithLogHandler(t *testing.T) {
 	mockLoader := newWASMLoader(t)
 	handler := slog.NewTextHandler(os.Stdout, nil)
-	eval, err := FromExtismLoader(mockLoader,
+	eval, err := FromExtismLoader(t.Context(), mockLoader,
 		WithEntryPoint(wasmdata.EntrypointGreet),
 		WithLogHandler(handler),
 	)
@@ -82,7 +83,7 @@ func TestFromExtismLoader_WithLogHandler(t *testing.T) {
 
 func TestFromExtismLoader_NilLogHandler(t *testing.T) {
 	mockLoader := newWASMLoader(t)
-	eval, err := FromExtismLoader(mockLoader,
+	eval, err := FromExtismLoader(t.Context(), mockLoader,
 		WithEntryPoint(wasmdata.EntrypointGreet),
 		WithLogHandler(nil),
 	)
@@ -93,7 +94,7 @@ func TestFromExtismLoader_NilLogHandler(t *testing.T) {
 
 func TestFromExtismLoader_WithStaticData(t *testing.T) {
 	mockLoader := newWASMLoader(t)
-	eval, err := FromExtismLoader(mockLoader,
+	eval, err := FromExtismLoader(t.Context(), mockLoader,
 		WithEntryPoint(wasmdata.EntrypointGreet),
 		WithStaticData(map[string]any{"input": "World"}),
 	)
@@ -105,7 +106,7 @@ func TestFromExtismLoader_WithStaticData(t *testing.T) {
 func TestFromExtismLoader_WithDataProvider(t *testing.T) {
 	mockLoader := newWASMLoader(t)
 	provider := data.NewContextProvider("test_key")
-	eval, err := FromExtismLoader(mockLoader,
+	eval, err := FromExtismLoader(t.Context(), mockLoader,
 		WithEntryPoint(wasmdata.EntrypointGreet),
 		WithDataProvider(provider),
 	)
@@ -117,7 +118,7 @@ func TestFromExtismLoader_WithDataProvider(t *testing.T) {
 func TestFromExtismLoader_DataProviderBeatsStaticData(t *testing.T) {
 	mockLoader := newWASMLoader(t)
 	provider := data.NewContextProvider("sentinel")
-	eval, err := FromExtismLoader(mockLoader,
+	eval, err := FromExtismLoader(t.Context(), mockLoader,
 		WithEntryPoint(wasmdata.EntrypointGreet),
 		WithStaticData(map[string]any{"ignored": true}),
 		WithDataProvider(provider),
@@ -130,7 +131,7 @@ func TestFromExtismLoader_DataProviderBeatsStaticData(t *testing.T) {
 func TestFromExtismLoader_NilOption(t *testing.T) {
 	mockLoader := newWASMLoader(t)
 	var nilOpt Option
-	eval, err := FromExtismLoader(mockLoader,
+	eval, err := FromExtismLoader(t.Context(), mockLoader,
 		nilOpt,
 		WithEntryPoint(wasmdata.EntrypointGreet),
 	)
@@ -140,7 +141,7 @@ func TestFromExtismLoader_NilOption(t *testing.T) {
 
 func TestFromExtismLoader_LoaderError(t *testing.T) {
 	mockLoader := newErrorLoader(t, "failed to load WASM")
-	eval, err := FromExtismLoader(mockLoader, WithEntryPoint(wasmdata.EntrypointGreet))
+	eval, err := FromExtismLoader(t.Context(), mockLoader, WithEntryPoint(wasmdata.EntrypointGreet))
 	require.Error(t, err)
 	require.Nil(t, eval)
 	mockLoader.AssertExpectations(t)
@@ -151,7 +152,7 @@ func TestFromExtismLoader_NilSourceURL(t *testing.T) {
 	mockLoader.On("GetSourceURL").Return(nil)
 	mockLoader.On("GetReader", mock.Anything).Return(io.NopCloser(bytes.NewReader(wasmdata.TestModule)), nil)
 
-	eval, err := FromExtismLoader(mockLoader, WithEntryPoint(wasmdata.EntrypointGreet))
+	eval, err := FromExtismLoader(t.Context(), mockLoader, WithEntryPoint(wasmdata.EntrypointGreet))
 	require.NoError(t, err)
 	require.NotNil(t, eval)
 	mockLoader.AssertExpectations(t)
@@ -166,7 +167,7 @@ func TestFromExtismLoader_DiskLoader(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, diskLoader)
 
-	eval, err := FromExtismLoader(diskLoader, WithEntryPoint(wasmdata.EntrypointGreet))
+	eval, err := FromExtismLoader(t.Context(), diskLoader, WithEntryPoint(wasmdata.EntrypointGreet))
 	require.NoError(t, err)
 	require.NotNil(t, eval)
 	assert.Equal(t, "extism.Evaluator", eval.String())
@@ -176,7 +177,7 @@ func TestFromExtismLoader_RunsEndToEnd(t *testing.T) {
 	scriptLoader, err := loader.NewFromBytes(wasmdata.TestModule)
 	require.NoError(t, err)
 
-	eval, err := FromExtismLoader(
+	eval, err := FromExtismLoader(t.Context(), 
 		scriptLoader,
 		WithEntryPoint(wasmdata.EntrypointGreet),
 		WithStaticData(map[string]any{"input": "World"}),
@@ -203,7 +204,7 @@ func TestFromExtismLoader_DefaultsToSlogDefault(t *testing.T) {
 	scriptLoader, err := loader.NewFromBytes(wasmdata.TestModule)
 	require.NoError(t, err)
 
-	eval, err := FromExtismLoader(scriptLoader, WithEntryPoint(wasmdata.EntrypointGreet))
+	eval, err := FromExtismLoader(t.Context(), scriptLoader, WithEntryPoint(wasmdata.EntrypointGreet))
 	require.NoError(t, err)
 	require.NotNil(t, eval)
 }
@@ -223,4 +224,25 @@ func TestNewCompiler(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, comp)
 	})
+}
+
+// TestFromExtismLoader_LoaderCancelled verifies that ctx cancellation
+// during the loader IO phase aborts the constructor. This is the
+// headline behavior of #145 for engines whose WASM compile is too fast
+// to reliably observe a pre-cancelled ctx (the wazero compile of the
+// small embedded test module completes in microseconds).
+func TestFromExtismLoader_LoaderCancelled(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel() // pre-cancel; the loader's GetReader call observes it.
+
+	mockLoader := new(loaderMock)
+	mockLoader.On("GetSourceURL").Return((*url.URL)(nil))
+	mockLoader.On("GetReader", mock.Anything).Return(nil, ctx.Err())
+
+	eval, err := FromExtismLoader(ctx, mockLoader, WithEntryPoint(wasmdata.EntrypointGreet))
+	require.Error(t, err)
+	require.Nil(t, eval)
+	require.ErrorIs(t, err, context.Canceled)
 }

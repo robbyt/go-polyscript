@@ -59,7 +59,10 @@ import (
 // If both [WithStaticData] and [WithDataProvider] are supplied,
 // [WithDataProvider] takes precedence — pass exactly one of them per
 // call to keep intent unambiguous.
-func FromStarlarkLoader(ldr loader.Loader, opts ...Option) (*evaluator.Evaluator, error) {
+//
+// The supplied ctx flows into the loader's I/O; Starlark's parser is
+// synchronous and does not observe ctx during compile.
+func FromStarlarkLoader(ctx context.Context, ldr loader.Loader, opts ...Option) (*evaluator.Evaluator, error) {
 	cfg := &config{}
 	for _, opt := range opts {
 		if opt != nil {
@@ -83,10 +86,7 @@ func FromStarlarkLoader(ldr loader.Loader, opts ...Option) (*evaluator.Evaluator
 		execUnitID = u.String()
 	}
 
-	// FromStarlarkLoader is a one-shot startup constructor; compile uses a
-	// fresh Background context. Callers needing cancellable compile
-	// should drive script.NewExecutableUnit directly.
-	execUnit, err := script.NewExecutableUnit(context.Background(), cfg.handler, execUnitID, ldr, comp, provider)
+	execUnit, err := script.NewExecutableUnit(ctx, cfg.handler, execUnitID, ldr, comp, provider)
 	if err != nil {
 		return nil, err
 	}

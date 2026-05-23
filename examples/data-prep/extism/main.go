@@ -110,6 +110,7 @@ func run() error {
 	}
 
 	evaluator, err := polyscript.New[polyscript.Extism](
+		context.Background(),
 		polyscript.FromBytes(wasmdata.TestModule),
 		polyscript.WithEntryPoint(wasmdata.EntrypointGreet),
 		polyscript.WithStaticData[polyscript.Extism](staticData),

@@ -26,6 +26,7 @@ func createRisorEvaluator(
 	staticData map[string]any,
 ) (RisorEvaluator, error) {
 	return polyscript.New[polyscript.Risor](
+		context.Background(),
 		polyscript.FromString(scriptContent),
 		polyscript.WithStaticData[polyscript.Risor](staticData),
 		polyscript.WithLogHandler[polyscript.Risor](logger.Handler()),

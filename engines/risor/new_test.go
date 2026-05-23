@@ -2,6 +2,7 @@ package risor
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -47,7 +48,7 @@ func newErrorLoader(t *testing.T, msg string) *loaderMock {
 
 func TestFromRisorLoader_NoOptions(t *testing.T) {
 	// Without WithLogHandler the evaluator inherits slog.Default(); no error.
-	eval, err := FromRisorLoader(newTestLoader(t))
+	eval, err := FromRisorLoader(t.Context(), newTestLoader(t))
 	require.NoError(t, err)
 	require.NotNil(t, eval)
 	assert.Equal(t, "risor.Evaluator", eval.String())
@@ -55,14 +56,14 @@ func TestFromRisorLoader_NoOptions(t *testing.T) {
 
 func TestFromRisorLoader_WithLogHandler(t *testing.T) {
 	handler := slog.NewTextHandler(os.Stdout, nil)
-	eval, err := FromRisorLoader(newTestLoader(t), WithLogHandler(handler))
+	eval, err := FromRisorLoader(t.Context(), newTestLoader(t), WithLogHandler(handler))
 	require.NoError(t, err)
 	require.NotNil(t, eval)
 }
 
 func TestFromRisorLoader_NilLogHandler(t *testing.T) {
 	// Explicitly passing nil is treated the same as omitting the option.
-	eval, err := FromRisorLoader(newTestLoader(t), WithLogHandler(nil))
+	eval, err := FromRisorLoader(t.Context(), newTestLoader(t), WithLogHandler(nil))
 	require.NoError(t, err)
 	require.NotNil(t, eval)
 }
@@ -72,28 +73,28 @@ func TestFromRisorLoader_WithStaticData(t *testing.T) {
 		"version": "1.0.0",
 		"config":  map[string]any{"timeout": 30, "retry": true},
 	}
-	eval, err := FromRisorLoader(newTestLoader(t), WithStaticData(staticData))
+	eval, err := FromRisorLoader(t.Context(), newTestLoader(t), WithStaticData(staticData))
 	require.NoError(t, err)
 	require.NotNil(t, eval)
 }
 
 func TestFromRisorLoader_EmptyStaticData(t *testing.T) {
 	// Empty (but non-nil) map still composes a CompositeProvider; should succeed.
-	eval, err := FromRisorLoader(newTestLoader(t), WithStaticData(map[string]any{}))
+	eval, err := FromRisorLoader(t.Context(), newTestLoader(t), WithStaticData(map[string]any{}))
 	require.NoError(t, err)
 	require.NotNil(t, eval)
 }
 
 func TestFromRisorLoader_WithDataProvider(t *testing.T) {
 	provider := data.NewContextProvider("test_key")
-	eval, err := FromRisorLoader(newTestLoader(t), WithDataProvider(provider))
+	eval, err := FromRisorLoader(t.Context(), newTestLoader(t), WithDataProvider(provider))
 	require.NoError(t, err)
 	require.NotNil(t, eval)
 }
 
 func TestFromRisorLoader_DataProviderBeatsStaticData(t *testing.T) {
 	provider := data.NewContextProvider("sentinel")
-	eval, err := FromRisorLoader(
+	eval, err := FromRisorLoader(t.Context(), 
 		newTestLoader(t),
 		WithStaticData(map[string]any{"ignored": true}),
 		WithDataProvider(provider),
@@ -105,14 +106,14 @@ func TestFromRisorLoader_DataProviderBeatsStaticData(t *testing.T) {
 func TestFromRisorLoader_NilOption(t *testing.T) {
 	// nil options should be ignored, not panic.
 	var nilOpt Option
-	eval, err := FromRisorLoader(newTestLoader(t), nilOpt, WithStaticData(map[string]any{"k": "v"}))
+	eval, err := FromRisorLoader(t.Context(), newTestLoader(t), nilOpt, WithStaticData(map[string]any{"k": "v"}))
 	require.NoError(t, err)
 	require.NotNil(t, eval)
 }
 
 func TestFromRisorLoader_LoaderError(t *testing.T) {
 	mockLoader := newErrorLoader(t, "failed to load script")
-	eval, err := FromRisorLoader(mockLoader)
+	eval, err := FromRisorLoader(t.Context(), mockLoader)
 	require.Error(t, err)
 	require.Nil(t, eval)
 	assert.Contains(t, err.Error(), "failed to load script")
@@ -128,7 +129,7 @@ func TestFromRisorLoader_DiskLoader(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, diskLoader)
 
-	eval, err := FromRisorLoader(diskLoader)
+	eval, err := FromRisorLoader(t.Context(), diskLoader)
 	require.NoError(t, err)
 	require.NotNil(t, eval)
 	assert.Equal(t, "risor.Evaluator", eval.String())
@@ -147,7 +148,7 @@ func TestFromRisorLoader_RunsEndToEnd(t *testing.T) {
 	scriptLoader, err := loader.NewFromString(script)
 	require.NoError(t, err)
 
-	eval, err := FromRisorLoader(
+	eval, err := FromRisorLoader(t.Context(), 
 		scriptLoader,
 		WithStaticData(map[string]any{"name": "World"}),
 	)
@@ -171,7 +172,7 @@ func TestFromRisorLoader_DefaultsToSlogDefault(t *testing.T) {
 	scriptLoader, err := loader.NewFromString(`"hi"`)
 	require.NoError(t, err)
 
-	eval, err := FromRisorLoader(scriptLoader)
+	eval, err := FromRisorLoader(t.Context(), scriptLoader)
 	require.NoError(t, err)
 	require.NotNil(t, eval)
 }
@@ -191,4 +192,20 @@ func TestNewCompiler(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, comp)
 	})
+}
+
+// TestFromRisorLoader_CompileCancelled verifies that a pre-cancelled ctx
+// causes the Risor parser to abort during compile. This is the headline
+// behavior of #145: a cancellable ctx now actually reaches the parser
+// instead of being swallowed by an inline context.Background().
+func TestFromRisorLoader_CompileCancelled(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel() // pre-cancel before construction
+
+	eval, err := FromRisorLoader(ctx, newTestLoader(t))
+	require.Error(t, err, "expected an error when ctx is pre-cancelled")
+	require.Nil(t, eval)
+	require.ErrorIs(t, err, context.Canceled)
 }
