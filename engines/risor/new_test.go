@@ -94,7 +94,8 @@ func TestFromRisorLoader_WithDataProvider(t *testing.T) {
 
 func TestFromRisorLoader_DataProviderBeatsStaticData(t *testing.T) {
 	provider := data.NewContextProvider("sentinel")
-	eval, err := FromRisorLoader(t.Context(), 
+	eval, err := FromRisorLoader(
+		t.Context(),
 		newTestLoader(t),
 		WithStaticData(map[string]any{"ignored": true}),
 		WithDataProvider(provider),
@@ -148,7 +149,8 @@ func TestFromRisorLoader_RunsEndToEnd(t *testing.T) {
 	scriptLoader, err := loader.NewFromString(script)
 	require.NoError(t, err)
 
-	eval, err := FromRisorLoader(t.Context(), 
+	eval, err := FromRisorLoader(
+		t.Context(),
 		scriptLoader,
 		WithStaticData(map[string]any{"name": "World"}),
 	)

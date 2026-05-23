@@ -72,7 +72,8 @@ func TestFromExtismLoader_NoOptionsBeyondEntryPoint(t *testing.T) {
 func TestFromExtismLoader_WithLogHandler(t *testing.T) {
 	mockLoader := newWASMLoader(t)
 	handler := slog.NewTextHandler(os.Stdout, nil)
-	eval, err := FromExtismLoader(t.Context(), mockLoader,
+	eval, err := FromExtismLoader(
+		t.Context(), mockLoader,
 		WithEntryPoint(wasmdata.EntrypointGreet),
 		WithLogHandler(handler),
 	)
@@ -83,7 +84,8 @@ func TestFromExtismLoader_WithLogHandler(t *testing.T) {
 
 func TestFromExtismLoader_NilLogHandler(t *testing.T) {
 	mockLoader := newWASMLoader(t)
-	eval, err := FromExtismLoader(t.Context(), mockLoader,
+	eval, err := FromExtismLoader(
+		t.Context(), mockLoader,
 		WithEntryPoint(wasmdata.EntrypointGreet),
 		WithLogHandler(nil),
 	)
@@ -94,7 +96,8 @@ func TestFromExtismLoader_NilLogHandler(t *testing.T) {
 
 func TestFromExtismLoader_WithStaticData(t *testing.T) {
 	mockLoader := newWASMLoader(t)
-	eval, err := FromExtismLoader(t.Context(), mockLoader,
+	eval, err := FromExtismLoader(
+		t.Context(), mockLoader,
 		WithEntryPoint(wasmdata.EntrypointGreet),
 		WithStaticData(map[string]any{"input": "World"}),
 	)
@@ -106,7 +109,8 @@ func TestFromExtismLoader_WithStaticData(t *testing.T) {
 func TestFromExtismLoader_WithDataProvider(t *testing.T) {
 	mockLoader := newWASMLoader(t)
 	provider := data.NewContextProvider("test_key")
-	eval, err := FromExtismLoader(t.Context(), mockLoader,
+	eval, err := FromExtismLoader(
+		t.Context(), mockLoader,
 		WithEntryPoint(wasmdata.EntrypointGreet),
 		WithDataProvider(provider),
 	)
@@ -118,7 +122,8 @@ func TestFromExtismLoader_WithDataProvider(t *testing.T) {
 func TestFromExtismLoader_DataProviderBeatsStaticData(t *testing.T) {
 	mockLoader := newWASMLoader(t)
 	provider := data.NewContextProvider("sentinel")
-	eval, err := FromExtismLoader(t.Context(), mockLoader,
+	eval, err := FromExtismLoader(
+		t.Context(), mockLoader,
 		WithEntryPoint(wasmdata.EntrypointGreet),
 		WithStaticData(map[string]any{"ignored": true}),
 		WithDataProvider(provider),
@@ -131,7 +136,8 @@ func TestFromExtismLoader_DataProviderBeatsStaticData(t *testing.T) {
 func TestFromExtismLoader_NilOption(t *testing.T) {
 	mockLoader := newWASMLoader(t)
 	var nilOpt Option
-	eval, err := FromExtismLoader(t.Context(), mockLoader,
+	eval, err := FromExtismLoader(
+		t.Context(), mockLoader,
 		nilOpt,
 		WithEntryPoint(wasmdata.EntrypointGreet),
 	)
@@ -177,7 +183,8 @@ func TestFromExtismLoader_RunsEndToEnd(t *testing.T) {
 	scriptLoader, err := loader.NewFromBytes(wasmdata.TestModule)
 	require.NoError(t, err)
 
-	eval, err := FromExtismLoader(t.Context(), 
+	eval, err := FromExtismLoader(
+		t.Context(),
 		scriptLoader,
 		WithEntryPoint(wasmdata.EntrypointGreet),
 		WithStaticData(map[string]any{"input": "World"}),

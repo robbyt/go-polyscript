@@ -90,7 +90,8 @@ func TestFromStarlarkLoader_WithDataProvider(t *testing.T) {
 
 func TestFromStarlarkLoader_DataProviderBeatsStaticData(t *testing.T) {
 	provider := data.NewContextProvider("sentinel")
-	eval, err := FromStarlarkLoader(t.Context(), 
+	eval, err := FromStarlarkLoader(
+		t.Context(),
 		newTestLoader(t),
 		WithStaticData(map[string]any{"ignored": true}),
 		WithDataProvider(provider),
@@ -154,7 +155,8 @@ _ = result
 	scriptLoader, err := loader.NewFromString(script)
 	require.NoError(t, err)
 
-	eval, err := FromStarlarkLoader(t.Context(), 
+	eval, err := FromStarlarkLoader(
+		t.Context(),
 		scriptLoader,
 		WithStaticData(map[string]any{"name": "World"}),
 	)
