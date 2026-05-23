@@ -232,10 +232,9 @@ func TestContextProvider_AddDataToContext(t *testing.T) {
 		ctx := t.Context()
 
 		newCtx, err := provider.AddDataToContext(ctx,
-			map[string]any{"key1": "value1"},
-			map[string]any{"key2": "value2"})
+			map[string]any{"key1": "value1", "key2": "value2"})
 
-		require.NoError(t, err, "Should not return error with multiple map items")
+		require.NoError(t, err, "Should not return error with merged data")
 		assert.NotEqual(t, ctx, newCtx, "Context should be modified")
 
 		data, err := provider.GetData(newCtx)

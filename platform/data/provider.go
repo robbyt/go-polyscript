@@ -17,17 +17,18 @@ type Setter interface {
 	// It processes input data according to the engine implementation and stores it
 	// in the context using the ExecutableUnit's DataProvider.
 	//
-	// The variadic data parameter accepts maps with string keys and arbitrary values.
-	// HTTP requests, structs, and other types should be wrapped in maps with descriptive keys.
+	// The data map accepts string keys and arbitrary values. HTTP requests, structs,
+	// and other types should be wrapped in maps with descriptive keys. Pass a single
+	// map; merge ahead of time when you have multiple sources.
 	//
 	// Example:
-	//  scriptData := map[string]any{"greeting": "Hello, World!"}
-	//  enrichedCtx, err := evaluator.AddDataToContext(ctx, map[string]any{"request": request}, scriptData)
+	//  scriptData := map[string]any{"greeting": "Hello, World!", "request": request}
+	//  enrichedCtx, err := evaluator.AddDataToContext(ctx, scriptData)
 	//  if err != nil {
 	//      return err
 	//  }
 	//  result, err := evaluator.Eval(enrichedCtx)
-	AddDataToContext(ctx context.Context, data ...map[string]any) (context.Context, error)
+	AddDataToContext(ctx context.Context, data map[string]any) (context.Context, error)
 }
 
 // Provider defines the interface for accessing runtime data for script execution.

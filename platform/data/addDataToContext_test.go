@@ -107,7 +107,7 @@ func TestAddDataToContextHelper(t *testing.T) {
 		req := createTestRequestHelper()
 
 		enrichedCtx, err := AddDataToContextHelper(baseCtx, logger, provider,
-			map[string]any{"key": "value"}, map[string]any{"request": req})
+			map[string]any{"key": "value", "request": req})
 
 		require.NoError(t, err)
 		assert.NotEqual(t, baseCtx, enrichedCtx, "Context should be modified")
@@ -218,8 +218,7 @@ func TestAddDataToContextWithErrorHandling(t *testing.T) {
 
 		// Add a mix of valid and invalid data to trigger an error
 		enrichedCtx, err := AddDataToContextHelper(baseCtx, logger, provider,
-			map[string]any{"valid": "data"},
-			map[string]any{"": "empty-key"}, // Empty key will trigger an error
+			map[string]any{"valid": "data", "": "empty-key"}, // Empty key triggers an error
 		)
 
 		// Should return an error

@@ -55,7 +55,7 @@ func (m *MockProvider) GetData(ctx context.Context) (map[string]any, error) {
 
 func (m *MockProvider) AddDataToContext(
 	ctx context.Context,
-	data ...map[string]any,
+	data map[string]any,
 ) (context.Context, error) {
 	args := m.Called(ctx, data)
 	newCtx, _ := args.Get(0).(context.Context)

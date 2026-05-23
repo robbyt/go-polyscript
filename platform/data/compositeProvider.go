@@ -85,10 +85,10 @@ func deepMerge(src, dst map[string]any) map[string]any {
 //	staticProvider := NewStaticProvider(map[string]any{"config": configData})
 //	contextProvider := NewContextProvider(constants.EvalData)
 //	composite := NewCompositeProvider(staticProvider, contextProvider)
-//	ctx, err := composite.AddDataToContext(ctx, req, userData)
+//	ctx, err := composite.AddDataToContext(ctx, userData)
 func (p *CompositeProvider) AddDataToContext(
 	ctx context.Context,
-	data ...map[string]any,
+	data map[string]any,
 ) (context.Context, error) {
 	// Start with the original context
 	finalCtx := ctx
@@ -116,7 +116,7 @@ func (p *CompositeProvider) AddDataToContext(
 			staticCount++
 		}
 
-		nextCtx, err := provider.AddDataToContext(finalCtx, data...)
+		nextCtx, err := provider.AddDataToContext(finalCtx, data)
 		if err != nil {
 			// Handle StaticProvider errors separately
 			if isStaticProvider && errors.Is(err, ErrStaticProviderNoRuntimeUpdates) {

@@ -230,7 +230,7 @@ func (be *Evaluator) Eval(ctx context.Context) (platform.EvaluatorResponse, erro
 // which can be eventually passed to the Eval method.
 func (be *Evaluator) AddDataToContext(
 	ctx context.Context,
-	d ...map[string]any,
+	d map[string]any,
 ) (context.Context, error) {
-	return data.AddDataToContextFromProvider(ctx, be.logger.WithGroup("AddDataToContext"), be.getDataProvider(), d...)
+	return data.AddDataToContextFromProvider(ctx, be.logger.WithGroup("AddDataToContext"), be.getDataProvider(), d)
 }

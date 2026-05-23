@@ -55,6 +55,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Added `AsMap() (map[string]any, error)`; on type mismatch the error wraps
   a per-engine `evaluator.ErrAsMapTypeMismatch` sentinel.
   ([#141](https://github.com/robbyt/go-polyscript/pull/141))
+- **BREAKING**: `data.Setter.AddDataToContext` no longer takes a variadic.
+  Signature is now `AddDataToContext(ctx, data map[string]any) (context.Context, error)`.
+  Callers with multiple sources must merge them first.
 
 ### Deprecated
 - The twelve legacy top-level constructors (`FromRisorFile`,
