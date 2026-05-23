@@ -172,7 +172,7 @@ func TestStaticProvider_AddDataToContext(t *testing.T) {
 			"Error should be ErrStaticProviderNoRuntimeUpdates")
 	})
 
-	t.Run("multiple args returns error", func(t *testing.T) {
+	t.Run("multi-key map returns error", func(t *testing.T) {
 		provider := NewStaticProvider(simpleData)
 		ctx := t.Context()
 
