@@ -312,7 +312,6 @@ func TestCompilerOptions_Options(t *testing.T) {
 			require.Equal(t, hostFuncs, c.options.HostFunctions)
 		})
 	})
-
 }
 
 // TestCompilerOptions_SetupLogger tests the setupLogger method
@@ -506,7 +505,6 @@ func TestCompilerOptions_DefaultsAndValidation(t *testing.T) {
 			require.Error(t, err)
 			require.Contains(t, err.Error(), "runtime config cannot be nil")
 		})
-
 	})
 }
 
@@ -827,7 +825,6 @@ func TestCompilerOptions(t *testing.T) {
 				require.Equal(t, hostFuncs, c.options.HostFunctions)
 			})
 		})
-
 	})
 
 	t.Run("Defaults and Validation", func(t *testing.T) {
