@@ -2,11 +2,15 @@ package data
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"maps"
+	"strings"
 	"testing"
 
 	"github.com/robbyt/go-polyscript/platform/constants"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -866,4 +870,138 @@ func TestCompositeProvider_GetData_TypedNilNestedMap(t *testing.T) {
 	result, err := composite.GetData(t.Context())
 	require.NoError(t, err)
 	assert.Equal(t, map[string]any{"cfg": map[string]any{"debug": true}}, result)
+}
+
+// TestCompositeProvider_AddDataToContext_EdgeCases pins subtle behaviors of
+// AddDataToContext that are easy to break when refactoring it.
+func TestCompositeProvider_AddDataToContext_EdgeCases(t *testing.T) {
+	t.Parallel()
+
+	type ctxKey struct{}
+
+	t.Run("non-static provider returning the static sentinel is a regular error", func(t *testing.T) {
+		provider := new(MockProvider)
+		provider.On("AddDataToContext", mock.Anything, mock.Anything).
+			Return(nil, ErrStaticProviderNoRuntimeUpdates)
+
+		baseCtx := t.Context()
+		ctx, err := NewCompositeProvider(provider).AddDataToContext(baseCtx, map[string]any{"k": "v"})
+		require.ErrorIs(t, err, ErrStaticProviderNoRuntimeUpdates)
+		assert.Equal(t, baseCtx, ctx, "original ctx should be returned on failure")
+		provider.AssertExpectations(t)
+	})
+
+	t.Run("failing provider's returned ctx is not passed on", func(t *testing.T) {
+		baseCtx := t.Context()
+		failing := new(MockProvider)
+		failing.On("AddDataToContext", mock.Anything, mock.Anything).
+			Return(context.WithValue(baseCtx, ctxKey{}, "leaked"), assert.AnError)
+
+		var seen context.Context
+		next := new(MockProvider)
+		next.On("AddDataToContext", mock.Anything, mock.Anything).
+			Run(func(args mock.Arguments) { seen = args.Get(0).(context.Context) }).
+			Return(baseCtx, nil)
+
+		_, err := NewCompositeProvider(failing, next).AddDataToContext(baseCtx, map[string]any{"k": "v"})
+		require.NoError(t, err, "a later success hides the earlier failure (see #160)")
+		require.NotNil(t, seen)
+		assert.Nil(t, seen.Value(ctxKey{}), "next provider should not see the failing provider's ctx")
+		failing.AssertExpectations(t)
+		next.AssertExpectations(t)
+	})
+
+	t.Run("error index counts nil slots", func(t *testing.T) {
+		failing := new(MockProvider)
+		failing.On("AddDataToContext", mock.Anything, mock.Anything).Return(nil, assert.AnError)
+
+		_, err := NewCompositeProvider(nil, failing).AddDataToContext(t.Context(), map[string]any{"k": "v"})
+		require.ErrorIs(t, err, assert.AnError)
+		assert.True(t, strings.HasPrefix(err.Error(), "error from provider 1: "), "got %q", err.Error())
+		failing.AssertExpectations(t)
+	})
+
+	t.Run("nil slots are not counted as providers", func(t *testing.T) {
+		// With the nil slot ignored, only static providers remain, so their
+		// rejection is reported.
+		composite := NewCompositeProvider(nil, NewStaticProvider(map[string]any{"k": "v"}))
+		_, err := composite.AddDataToContext(t.Context(), map[string]any{"k": "v"})
+		require.ErrorIs(t, err, ErrStaticProviderNoRuntimeUpdates)
+	})
+
+	t.Run("all failures are joined", func(t *testing.T) {
+		errA := errors.New("first failure")
+		errB := errors.New("second failure")
+		first := new(MockProvider)
+		first.On("AddDataToContext", mock.Anything, mock.Anything).Return(nil, errA)
+		second := new(MockProvider)
+		second.On("AddDataToContext", mock.Anything, mock.Anything).Return(nil, errB)
+
+		_, err := NewCompositeProvider(first, second).AddDataToContext(t.Context(), map[string]any{"k": "v"})
+		require.ErrorIs(t, err, errA)
+		require.ErrorIs(t, err, errB)
+		assert.Equal(t,
+			"error from provider 0: first failure\nerror from provider 1: second failure",
+			err.Error())
+		first.AssertExpectations(t)
+		second.AssertExpectations(t)
+	})
+
+	t.Run("static rejections are not reported alongside other failures", func(t *testing.T) {
+		failing := new(MockProvider)
+		failing.On("AddDataToContext", mock.Anything, mock.Anything).Return(nil, assert.AnError)
+
+		composite := NewCompositeProvider(NewStaticProvider(map[string]any{"k": "v"}), failing)
+		_, err := composite.AddDataToContext(t.Context(), map[string]any{"k": "v"})
+		require.ErrorIs(t, err, assert.AnError)
+		require.NotErrorIs(t, err, ErrStaticProviderNoRuntimeUpdates)
+		failing.AssertExpectations(t)
+	})
+}
+
+// TestAddDataTally_FinalErr covers the outcome rules of AddDataToContext
+// directly. The "partial failure" row documents current behavior that #160
+// is expected to change.
+func TestAddDataTally_FinalErr(t *testing.T) {
+	t.Parallel()
+
+	staticErr := fmt.Errorf("error from provider 0: %w", ErrStaticProviderNoRuntimeUpdates)
+	otherErr := fmt.Errorf("error from provider 1: %w", assert.AnError)
+
+	tests := []struct {
+		name    string
+		tally   addDataTally
+		wantErr error
+	}{
+		{name: "no providers", tally: addDataTally{}},
+		{
+			name:    "only static providers, all rejected",
+			tally:   addDataTally{staticCount: 1, staticErrs: []error{staticErr}},
+			wantErr: ErrStaticProviderNoRuntimeUpdates,
+		},
+		{
+			name:  "static rejected, other provider succeeded",
+			tally: addDataTally{staticCount: 1, totalCount: 1, successCount: 1, staticErrs: []error{staticErr}},
+		},
+		{
+			name:    "all non-static providers failed",
+			tally:   addDataTally{totalCount: 1, errs: []error{otherErr}},
+			wantErr: assert.AnError,
+		},
+		{
+			name:  "partial failure is not reported (#160)",
+			tally: addDataTally{totalCount: 2, successCount: 1, errs: []error{otherErr}},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			err := tc.tally.finalErr()
+			if tc.wantErr == nil {
+				require.NoError(t, err)
+				return
+			}
+			require.ErrorIs(t, err, tc.wantErr)
+		})
+	}
 }
