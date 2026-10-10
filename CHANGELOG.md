@@ -107,6 +107,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ([#140](https://github.com/robbyt/go-polyscript/pull/140))
 
 ### Fixed
+- Risor `compiler.WithGlobals` with any name other than `ctx` made every
+  `Eval` fail with "missing required globals". Declared globals without a
+  value are now supplied as `nil` at evaluation time.
+  ([#158](https://github.com/robbyt/go-polyscript/issues/158))
 - `RequestToMap` no longer mutates the caller's `*http.Request`. The URL
   is now resolved through a local sentinel (`resolveURL`) and the body is
   read without write-back. Body remains consume-once, documented in the

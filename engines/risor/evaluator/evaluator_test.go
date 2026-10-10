@@ -693,3 +693,54 @@ func TestEval_ErrorTypeExposesRisorDetails(t *testing.T) {
 		require.NotErrorAs(t, err, &rErr)
 	})
 }
+
+// TestEval_DeclaredGlobals is the regression test for issue #158: globals
+// declared with compiler.WithGlobals beyond "ctx" used to make every Eval
+// fail with "missing required globals".
+func TestEval_DeclaredGlobals(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		script   string
+		globals  []string
+		expected any
+	}{
+		{
+			name:     "declared global unused by script",
+			script:   `ctx["name"]`,
+			globals:  []string{constants.Ctx, "extra"},
+			expected: "World",
+		},
+		{
+			name:     "declared global reads as nil",
+			script:   `extra == nil`,
+			globals:  []string{constants.Ctx, "extra"},
+			expected: true,
+		},
+		{
+			name:     "only a non-ctx global declared",
+			script:   `extra == nil`,
+			globals:  []string{"extra"},
+			expected: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			handler := slog.NewTextHandler(io.Discard, nil)
+			ld, err := loader.NewFromString(tc.script)
+			require.NoError(t, err)
+			exe, err := createTestExecutable(
+				t.Context(), handler, ld, tc.globals,
+				data.NewContextProvider(constants.EvalData),
+			)
+			require.NoError(t, err)
+
+			ctx := context.WithValue(t.Context(), constants.EvalData, map[string]any{"name": "World"})
+			result, err := New(handler, exe).Eval(ctx)
+			require.NoError(t, err)
+			assert.Equal(t, tc.expected, result.Interface())
+		})
+	}
+}
