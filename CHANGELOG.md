@@ -129,7 +129,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `go test -race` when Extism modules are compiled concurrently. Fixed
   upstream in [tetratelabs/wazero#2536](https://github.com/tetratelabs/wazero/pull/2536)
   but unreleased. go-polyscript's own tests work around it with a `TestMain`
-  warm-up; see `engines/README.md` for workarounds in your app.
+  warm-up in every test package that creates runtimes; see
+  `engines/README.md` for workarounds in your app.
 
 ### Fixed
 - Risor `compiler.WithGlobals` with any name other than `ctx` made every

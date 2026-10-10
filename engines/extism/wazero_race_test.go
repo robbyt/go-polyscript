@@ -12,8 +12,8 @@ import (
 const wazeroModule = "github.com/tetratelabs/wazero"
 
 // workaroundWazeroVersion is the wazero release that needs the TestMain
-// warm-ups in the root and engines test packages, because of the version
-// cache race fixed upstream in https://github.com/tetratelabs/wazero/pull/2536.
+// warm-ups from internal/wazerorace, because of the version cache race fixed
+// upstream in https://github.com/tetratelabs/wazero/pull/2536.
 const workaroundWazeroVersion = "v1.12.0"
 
 // TestWazeroRaceWorkaroundStillNeeded fails when the wazero dependency
@@ -32,9 +32,9 @@ func TestWazeroRaceWorkaroundStillNeeded(t *testing.T) {
 	require.Equal(t, workaroundWazeroVersion, version,
 		"wazero version changed: reassess the race workaround for "+
 			"tetratelabs/wazero#2536. If this version includes the fix, delete "+
-			"the TestMain warm-ups (main_test.go in the root and engines "+
-			"packages), the known-issue notes in engines/README.md, README.md "+
-			"and CHANGELOG.md, and this test.")
+			"internal/wazerorace and every wazerorace_main_test.go that calls "+
+			"it, the known-issue notes in engines/README.md, README.md and "+
+			"CHANGELOG.md, and this test.")
 }
 
 // wazeroFromBuildInfo returns the wazero version recorded in the test

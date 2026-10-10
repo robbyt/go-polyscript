@@ -155,8 +155,10 @@ which is not in a wazero release yet. Until it is, apps that compile Extism
 modules concurrently under `-race` can hit it. Two workarounds:
 
 - Create and close one wazero runtime before the parallel work starts, e.g. in
-  `TestMain`. This is what go-polyscript's own tests do (`main_test.go` in the
-  root and `engines` packages):
+  `TestMain`. Each test package is its own binary, so every package whose
+  tests create runtimes needs its own warm-up. This is what go-polyscript's
+  own tests do (`internal/wazerorace`, called from `wazerorace_main_test.go`
+  in each such package):
   ```go
   func TestMain(m *testing.M) {
       ctx := context.Background()
@@ -171,8 +173,8 @@ modules concurrently under `-race` can hit it. Two workarounds:
   `go.mod`, e.g. `go get github.com/tetratelabs/wazero@6edbb8c01a`.
 
 `engines/extism/wazero_race_test.go` fails as soon as the wazero dependency
-changes, as a reminder to remove this note and the warm-ups once a release
-with the fix lands.
+changes, as a reminder to remove this note, `internal/wazerorace` and its
+callers once a release with the fix lands.
 
 ## Script Return Value Handling
 
