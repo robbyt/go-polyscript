@@ -13,6 +13,11 @@ type Settings struct {
 	RuntimeConfig wazero.RuntimeConfig
 	// HostFunctions are additional host functions to be registered with the plugin
 	HostFunctions []extismSDK.HostFunction
+	// DisableCloseOnContextDone turns off wazero's context termination
+	// checks. By default they are compiled in, so cancelling the call ctx
+	// stops a running guest, at a per-call cost. Either way, it overrides
+	// the setting in RuntimeConfig.
+	DisableCloseOnContextDone bool
 }
 
 // WithDefaultCompileSettings returns the default compilation options

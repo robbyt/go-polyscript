@@ -182,6 +182,19 @@ func TestCompilerOptions_Options(t *testing.T) {
 		})
 	})
 
+	t.Run("WithCloseOnContextDone", func(t *testing.T) {
+		for _, enabled := range []bool{true, false} {
+			c := &Compiler{}
+			require.NoError(t, WithCloseOnContextDone(enabled)(c))
+			require.NotNil(t, c.options, "options should be initialized")
+			require.Equal(t, !enabled, c.options.DisableCloseOnContextDone)
+		}
+
+		c, err := New(WithEntryPoint("main"))
+		require.NoError(t, err)
+		require.False(t, c.options.DisableCloseOnContextDone, "enabled by default")
+	})
+
 	// WithRuntimeConfig tests
 	t.Run("WithRuntimeConfig", func(t *testing.T) {
 		// Success case

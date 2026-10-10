@@ -278,6 +278,70 @@ func TestCompileOptionsDefaults(t *testing.T) {
 	assert.Empty(t, opts.HostFunctions)
 }
 
+// recordingRuntimeConfig records the values passed to WithCloseOnContextDone,
+// since wazero.RuntimeConfig exposes no getter for it.
+type recordingRuntimeConfig struct {
+	wazero.RuntimeConfig
+	closeOnContextDone []bool
+}
+
+func (r *recordingRuntimeConfig) WithCloseOnContextDone(ensure bool) wazero.RuntimeConfig {
+	r.closeOnContextDone = append(r.closeOnContextDone, ensure)
+	return r.RuntimeConfig.WithCloseOnContextDone(ensure)
+}
+
+func TestRuntimeConfigFor(t *testing.T) {
+	t.Parallel()
+
+	t.Run("nil runtime config", func(t *testing.T) {
+		cfg := runtimeConfigFor(&Settings{})
+		require.NotNil(t, cfg, "a nil RuntimeConfig should fall back to a default config")
+	})
+
+	tests := []struct {
+		name     string
+		base     wazero.RuntimeConfig
+		disable  bool
+		expected bool
+	}{
+		{
+			name:     "default enables termination",
+			base:     wazero.NewRuntimeConfig(),
+			expected: true,
+		},
+		{
+			name:     "caller config with termination off is enabled",
+			base:     wazero.NewRuntimeConfig().WithCloseOnContextDone(false),
+			expected: true,
+		},
+		{
+			name:     "disable turns termination off",
+			base:     wazero.NewRuntimeConfig(),
+			disable:  true,
+			expected: false,
+		},
+		{
+			name:     "disable overrides caller config with termination on",
+			base:     wazero.NewRuntimeConfig().WithCloseOnContextDone(true),
+			disable:  true,
+			expected: false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			rec := &recordingRuntimeConfig{RuntimeConfig: tc.base}
+			cfg := runtimeConfigFor(&Settings{
+				RuntimeConfig:             rec,
+				DisableCloseOnContextDone: tc.disable,
+			})
+			require.NotNil(t, cfg)
+			assert.Equal(t, []bool{tc.expected}, rec.closeOnContextDone,
+				"WithCloseOnContextDone should be applied once with the compiler's setting")
+		})
+	}
+}
+
 func TestCompileWithHostFunctions(t *testing.T) {
 	ctx := t.Context()
 	wasmBytes := wasmdata.TestModule

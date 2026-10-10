@@ -105,6 +105,7 @@ The older `FromRisorString*`, `FromStarlark*`, and `FromExtism*` constructors st
 | `WithStaticData[E](map)`           | All engines             | Bakes a fixed data map into the evaluator at construction time      |
 | `WithLogHandler[E](handler)`       | All engines             | Routes diagnostic logs through the given `slog.Handler`             |
 | `WithEntryPoint(name)`             | `Extism` only (compile-time enforced) | Sets the WASM function name to invoke; required for Extism |
+| `WithContextTermination(bool)`     | `Extism` only (compile-time enforced) | Whether cancelling the `Eval` ctx stops a running guest. On by default; wazero's termination checks roughly double per-call time on small modules, so pass `false` for trusted modules on hot paths that never need a timeout |
 
 > **Note on type arguments.** `WithStaticData` and `WithLogHandler` are generic over the engine. Go's current type inference can't always infer `E` for them when the surrounding `New[E]` call has a non-variadic `Source` parameter, so these helpers usually need an explicit type argument: `polyscript.WithStaticData[polyscript.Risor](data)`. `WithEntryPoint` is bound to `Extism` and never needs one — passing it to `New[polyscript.Risor]` or `New[polyscript.Starlark]` is a compile error rather than a silent no-op.
 

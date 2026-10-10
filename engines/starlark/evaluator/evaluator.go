@@ -85,6 +85,35 @@ func (be *Evaluator) prepareGlobals(
 	return mergedGlobals
 }
 
+// newThread returns a Starlark thread whose print() output goes to logger
+// and which is cancelled when ctx is done. The caller must call the returned
+// stop func once the thread has finished, to release the ctx registration.
+func newThread(ctx context.Context, logger *slog.Logger, name string) (*starlarkLib.Thread, func() bool) {
+	thread := &starlarkLib.Thread{
+		Name: name,
+		Print: func(thread *starlarkLib.Thread, msg string) {
+			logger.InfoContext(ctx, msg, "starlark-thread", thread.Name)
+		},
+	}
+
+	// context.AfterFunc avoids a goroutine leak when ctx is never cancelled
+	// (e.g., context.Background()).
+	stop := context.AfterFunc(ctx, func() {
+		thread.Cancel(ctx.Err().Error())
+	})
+	return thread, stop
+}
+
+// withCtxErr adds ctx.Err() to the chain of a script error when ctx is done,
+// so callers can detect a cancelled or timed-out Eval with errors.Is. The
+// Starlark error only carries the cancellation reason as text.
+func withCtxErr(ctx context.Context, err error) error {
+	if ctxErr := ctx.Err(); ctxErr != nil {
+		return fmt.Errorf("execution cancelled: %w (%w)", ctxErr, err)
+	}
+	return err
+}
+
 // exec executes the bytecode with the provided globals
 func (be *Evaluator) exec(
 	ctx context.Context,
@@ -94,19 +123,7 @@ func (be *Evaluator) exec(
 	logger := be.logger.WithGroup("exec")
 	startTime := time.Now()
 
-	// Create thread with cancellation support
-	thread := &starlarkLib.Thread{
-		Name: "eval",
-		Print: func(thread *starlarkLib.Thread, msg string) {
-			logger.InfoContext(ctx, msg, "starlark-thread", thread.Name)
-		},
-	}
-
-	// Set up cancellation from context using AfterFunc to avoid goroutine leak
-	// when context is never cancelled (e.g., context.Background())
-	stop := context.AfterFunc(ctx, func() {
-		thread.Cancel(ctx.Err().Error())
-	})
+	thread, stop := newThread(ctx, logger, "eval")
 	defer stop()
 
 	// Execute the program
@@ -116,10 +133,10 @@ func (be *Evaluator) exec(
 	if err != nil {
 		var evalErr *starlarkLib.EvalError
 		errors.As(err, &evalErr)
-		return nil, &Error{
+		return nil, withCtxErr(ctx, &Error{
 			Msg:     fmt.Sprintf("starlark execution error: %s", err),
 			EvalErr: evalErr,
-		}
+		})
 	}
 
 	// Get the main value from globals
@@ -208,19 +225,25 @@ func (be *Evaluator) Eval(ctx context.Context) (platform.EvaluatorResponse, erro
 	// idiom. Diverges from Risor by design — see engines/README.md "Script Return
 	// Value Handling".
 	if callable, ok := result.Value.(starlarkLib.Callable); ok {
-		thread := &starlarkLib.Thread{Name: "func"}
+		if err := ctx.Err(); err != nil {
+			return nil, fmt.Errorf("execution cancelled: %w", err)
+		}
+		thread, stop := newThread(ctx, be.logger.WithGroup("exec"), "func")
+		defer stop()
+		callStart := time.Now()
 		val, err := starlarkLib.Call(thread, callable, nil, nil)
+		execTime := result.execTime + time.Since(callStart)
 		if err != nil {
 			var evalErr *starlarkLib.EvalError
 			errors.As(err, &evalErr)
-			return nil, &Error{
+			return nil, withCtxErr(ctx, &Error{
 				Msg:     fmt.Sprintf("error calling function: %s", err),
 				EvalErr: evalErr,
-			}
+			})
 		}
 		// "Freeze" the value to prevent any further modifications
 		val.Freeze()
-		return newEvalResult(be.logHandler, val, result.execTime, exeID), nil
+		return newEvalResult(be.logHandler, val, execTime, exeID), nil
 	}
 
 	return result, nil

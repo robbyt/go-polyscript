@@ -7,6 +7,7 @@ import (
 
 	extismSDK "github.com/extism/go-sdk"
 	"github.com/robbyt/go-polyscript/engines/extism/adapters"
+	"github.com/tetratelabs/wazero"
 )
 
 // CompileBase64 creates a compiled Extism plugin from base64-encoded WASM content
@@ -57,7 +58,7 @@ func compile(
 	// Configure the plugin
 	config := extismSDK.PluginConfig{
 		EnableWasi:    opts.EnableWASI,
-		RuntimeConfig: opts.RuntimeConfig,
+		RuntimeConfig: runtimeConfigFor(opts),
 	}
 
 	// Create compiled plugin using the SDK
@@ -68,4 +69,17 @@ func compile(
 
 	// Wrap the SDK plugin with our adapter
 	return adapters.NewCompiledPluginAdapter(plugin), nil
+}
+
+// runtimeConfigFor returns the wazero runtime config to compile with. Modules
+// close when the call ctx is done unless DisableCloseOnContextDone is set, so
+// cancelling or timing out an Eval stops a running guest. The setting
+// overrides whatever a caller-supplied RuntimeConfig had. wazero only inserts
+// the termination checks when this is set at compile time.
+func runtimeConfigFor(opts *Settings) wazero.RuntimeConfig {
+	runtimeConfig := opts.RuntimeConfig
+	if runtimeConfig == nil {
+		runtimeConfig = wazero.NewRuntimeConfig()
+	}
+	return runtimeConfig.WithCloseOnContextDone(!opts.DisableCloseOnContextDone)
 }

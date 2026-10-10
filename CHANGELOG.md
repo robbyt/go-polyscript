@@ -82,6 +82,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `WithRedirectForwardHeaders(...)`.
 - `loader.NewFromHTTPWithOptions` now treats nil options as
   `DefaultHTTPOptions()` instead of panicking.
+- Extism now compiles modules with wazero's `WithCloseOnContextDone(true)`,
+  including when a custom `RuntimeConfig` is supplied, so cancelling or
+  timing out the ctx passed to `Eval` stops a running guest. The termination
+  checks cost per-call time (about 95µs → 175µs per `Eval` on the test
+  module); turn them off with `polyscript.WithContextTermination(false)`,
+  `extism.WithContextTermination(false)` or
+  `compiler.WithCloseOnContextDone(false)`.
+  ([#155](https://github.com/robbyt/go-polyscript/issues/155))
 
 ### Security
 - The HTTP loader leaked custom auth headers (`WithHeaderAuth`,
@@ -133,6 +141,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   nil map" when one provider returns a typed-nil nested map
   (`map[string]any(nil)`) and a later provider has a map at the same key.
   ([#153](https://github.com/robbyt/go-polyscript/issues/153))
+- Extism ignored ctx cancellation and timeouts during WASM execution: the
+  guest kept running and the "context handles timeout" comment was wrong.
+  See the Changed entry above. ([#155](https://github.com/robbyt/go-polyscript/issues/155))
+- When an Extism call fails after its ctx is done, the error now wraps both
+  `ctx.Err()` and the call's own error instead of dropping the latter, and
+  the instance is closed with a cancel-immune ctx.
+  ([#165](https://github.com/robbyt/go-polyscript/issues/165))
+- Starlark's auto-invoked callable result (a script ending in a `def`) now
+  runs on a thread that honors ctx cancellation and sends `print()` to the
+  evaluator's logger instead of stderr. `ExecTime()` now includes the call.
+  A Starlark Eval stopped by its ctx now returns an error that wraps
+  `ctx.Err()`, so `errors.Is(err, context.Canceled)` works, while keeping
+  the Starlark error details.
+  ([#156](https://github.com/robbyt/go-polyscript/issues/156))
 - `RequestToMap` no longer mutates the caller's `*http.Request`. The URL
   is now resolved through a local sentinel (`resolveURL`) and the body is
   read without write-back. Body remains consume-once, documented in the

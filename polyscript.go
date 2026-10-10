@@ -176,6 +176,7 @@ type config struct {
 	staticData         map[string]any
 	entryPoint         string
 	exitOutputMaxBytes int
+	noCtxTermination   bool
 }
 
 // WithStaticData attaches a fixed map of values that the script will see
@@ -215,6 +216,18 @@ func WithEntryPoint(name string) Option[Extism] {
 // compile-time error rather than a silent no-op.
 func WithExitOutputMaxBytes(n int) Option[Extism] {
 	return func(c *config) { c.exitOutputMaxBytes = n }
+}
+
+// WithContextTermination controls whether cancelling or timing out the ctx
+// passed to Eval stops a running WASM guest. It is enabled by default.
+// wazero implements it with termination checks compiled into the module,
+// which make each call slower; pass false for trusted modules on hot paths
+// that never need a timeout.
+//
+// Bound to [Extism] — passing it to [New[Risor]] or [New[Starlark]] is a
+// compile-time error rather than a silent no-op.
+func WithContextTermination(enabled bool) Option[Extism] {
+	return func(c *config) { c.noCtxTermination = !enabled }
 }
 
 // ----------------------------------------------------------------------------
@@ -288,6 +301,7 @@ func newExtism(ctx context.Context, ldr loader.Loader, cfg *config) (platform.Ev
 		extismMachine.WithEntryPoint(cfg.entryPoint),
 		extismMachine.WithLogHandler(cfg.handler),
 		extismMachine.WithExitOutputMaxBytes(cfg.exitOutputMaxBytes),
+		extismMachine.WithContextTermination(!cfg.noCtxTermination),
 	}
 	if cfg.staticData != nil {
 		opts = append(opts, extismMachine.WithStaticData(cfg.staticData))
