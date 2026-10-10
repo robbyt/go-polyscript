@@ -20,6 +20,8 @@ import (
 	"math"
 	"net/http"
 	"net/url"
+	"slices"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -31,6 +33,13 @@ import (
 // 10 MiB is large enough for any realistic script while keeping a single
 // rogue response from exhausting memory.
 const DefaultMaxBodySize int64 = 10 << 20
+
+// maxRedirects matches net/http's default limit on redirects per request.
+const maxRedirects = 10
+
+// userAgentHeader is the header the loader sets a default for and always
+// keeps across redirects.
+const userAgentHeader = "User-Agent"
 
 // HTTPOptions contains configuration options for HTTP loader.
 // Use DefaultHTTPOptions() to get sensible defaults, then modify as needed.
@@ -64,6 +73,28 @@ type HTTPOptions struct {
 	// as DefaultMaxBodySize; a negative value disables the cap. Bodies
 	// larger than the limit cause GetReader to return ErrScriptTooLarge.
 	MaxBodySize int64
+
+	// AllowCrossOriginRedirects lets the loader follow redirects to a
+	// different scheme, host, or port than the original URL. Default is
+	// false: such redirects fail with ErrRedirectNotAllowed, except an
+	// http-to-https upgrade on the same host. Redirects from https to http
+	// are refused regardless of this setting.
+	//
+	// When a followed redirect leaves the original origin, the loader
+	// strips every header it set itself (Headers and anything the
+	// Authenticator added) plus Referer, so credentials are not sent to
+	// the new host. User-Agent is kept. Use RedirectForwardHeaders to keep
+	// specific headers. A later redirect back to the original origin gets
+	// the stripped headers back.
+	AllowCrossOriginRedirects bool
+
+	// RedirectForwardHeaders lists headers that are still sent when a
+	// redirect leaves the original origin. Names are case-insensitive.
+	// This includes Authorization and Cookie, which net/http drops on its
+	// own when the host changes. Only headers the loader set are
+	// forwarded. Only meaningful with AllowCrossOriginRedirects. Default
+	// is empty.
+	RedirectForwardHeaders []string
 }
 
 // DefaultHTTPOptions returns default options for HTTP loader.
@@ -75,6 +106,7 @@ type HTTPOptions struct {
 // - Authenticator: NoAuth (no authentication)
 // - Headers: empty map (initialized, ready for values)
 // - MaxBodySize: DefaultMaxBodySize (10 MiB)
+// - AllowCrossOriginRedirects: false (cross-origin redirects are refused)
 func DefaultHTTPOptions() *HTTPOptions {
 	return &HTTPOptions{
 		Timeout:            30 * time.Second,
@@ -129,6 +161,24 @@ func (o *HTTPOptions) WithMaxBodySize(n int64) *HTTPOptions {
 	return &newOpts
 }
 
+// WithAllowCrossOriginRedirects returns a copy of options with cross-origin
+// redirects allowed or refused. See HTTPOptions.AllowCrossOriginRedirects
+// for the security implications of allowing them.
+func (o *HTTPOptions) WithAllowCrossOriginRedirects(allow bool) *HTTPOptions {
+	newOpts := *o
+	newOpts.AllowCrossOriginRedirects = allow
+	return &newOpts
+}
+
+// WithRedirectForwardHeaders returns a copy of options that keeps the named
+// headers when a redirect leaves the original origin. See
+// HTTPOptions.RedirectForwardHeaders.
+func (o *HTTPOptions) WithRedirectForwardHeaders(names ...string) *HTTPOptions {
+	newOpts := *o
+	newOpts.RedirectForwardHeaders = slices.Clone(names)
+	return &newOpts
+}
+
 type httpRequester interface {
 	Do(req *http.Request) (*http.Response, error)
 }
@@ -180,7 +230,13 @@ func NewFromHTTP(rawURL string) (*FromHTTP, error) {
 //	// With custom timeout
 //	options := loader.DefaultHTTPOptions().WithTimeout(10 * time.Second)
 //	loader, err := loader.NewFromHTTPWithOptions("https://localhost:8080/script.js", options)
+//
+// A nil options is treated as DefaultHTTPOptions().
 func NewFromHTTPWithOptions(rawURL string, options *HTTPOptions) (*FromHTTP, error) {
+	if options == nil {
+		options = DefaultHTTPOptions()
+	}
+
 	sourceURL, err := url.Parse(rawURL)
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse URL: %w", err)
@@ -193,6 +249,10 @@ func NewFromHTTPWithOptions(rawURL string, options *HTTPOptions) (*FromHTTP, err
 	// Create HTTP client with specified options
 	client := &http.Client{
 		Timeout: options.Timeout,
+		CheckRedirect: redirectPolicy(
+			options.AllowCrossOriginRedirects,
+			options.RedirectForwardHeaders,
+		),
 	}
 
 	// Configure TLS if needed
@@ -225,6 +285,115 @@ func NewFromHTTPWithOptions(rawURL string, options *HTTPOptions) (*FromHTTP, err
 	}, nil
 }
 
+// loaderHeadersKey is the context key under which GetReader records the
+// headers it set, as an http.Header, for redirectPolicy to strip or restore.
+type loaderHeadersKey struct{}
+
+// redirectPolicy returns an http.Client CheckRedirect func. It refuses
+// redirects that downgrade from https to http, and, unless allowCrossOrigin
+// is set, redirects that leave the origin of the original request. An
+// http-to-https upgrade on the same host is always allowed. When a followed
+// redirect leaves the original origin, the headers GetReader set and Referer
+// are removed, except those named in forward. A hop back to the original
+// origin gets the headers GetReader set back.
+func redirectPolicy(allowCrossOrigin bool, forward []string) func(*http.Request, []*http.Request) error {
+	keep := make(map[string]struct{}, len(forward))
+	for _, name := range forward {
+		keep[http.CanonicalHeaderKey(name)] = struct{}{}
+	}
+
+	return func(req *http.Request, via []*http.Request) error {
+		if len(via) >= maxRedirects {
+			return fmt.Errorf("stopped after %d redirects", maxRedirects)
+		}
+		if err := checkNoDowngrade(via[len(via)-1].URL, req.URL); err != nil {
+			return err
+		}
+
+		orig := via[0].URL
+		if sameOrigin(orig, req.URL) || isHTTPSUpgrade(orig, req.URL) {
+			restoreLoaderHeaders(req, nil)
+			return nil
+		}
+		if !allowCrossOrigin {
+			return fmt.Errorf(
+				"%w: cross-origin redirect from %s to %s",
+				ErrRedirectNotAllowed, orig.Redacted(), req.URL.Redacted(),
+			)
+		}
+
+		stripLoaderHeaders(req, keep)
+		return nil
+	}
+}
+
+// checkNoDowngrade refuses a redirect hop from https to any other scheme.
+func checkNoDowngrade(prev, next *url.URL) error {
+	if prev.Scheme == "https" && next.Scheme != "https" {
+		return fmt.Errorf(
+			"%w: https downgrade from %s to %s",
+			ErrRedirectNotAllowed, prev.Redacted(), next.Redacted(),
+		)
+	}
+	return nil
+}
+
+// stripLoaderHeaders removes the headers GetReader set, and Referer, from a
+// redirect that leaves the original origin, except those named in keep,
+// which are restored to the values GetReader set.
+func stripLoaderHeaders(req *http.Request, keep map[string]struct{}) {
+	restoreLoaderHeaders(req, keep)
+	if _, ok := keep["Referer"]; !ok {
+		req.Header.Del("Referer")
+	}
+}
+
+// restoreLoaderHeaders sets each header GetReader set on a redirect hop to
+// its original value, or removes it when keep is non-nil and does not name
+// it. net/http copies the original request's headers onto every redirect
+// before calling CheckRedirect, but once the host changes it drops
+// Authorization, Cookie, and similar headers for that hop and every later
+// one, so this runs per hop and sets the final header state itself.
+func restoreLoaderHeaders(req *http.Request, keep map[string]struct{}) {
+	loaderHeaders, _ := req.Context().Value(loaderHeadersKey{}).(http.Header)
+	for name, values := range loaderHeaders {
+		if _, ok := keep[http.CanonicalHeaderKey(name)]; keep != nil && !ok {
+			req.Header.Del(name)
+			continue
+		}
+		req.Header[name] = slices.Clone(values)
+	}
+}
+
+// sameOrigin reports whether a and b share scheme, host, and effective port.
+func sameOrigin(a, b *url.URL) bool {
+	return a.Scheme == b.Scheme &&
+		strings.EqualFold(a.Hostname(), b.Hostname()) &&
+		effectivePort(a) == effectivePort(b)
+}
+
+// isHTTPSUpgrade reports whether b is the https form of the http URL a on
+// the same host, both using their scheme's default port.
+func isHTTPSUpgrade(a, b *url.URL) bool {
+	return a.Scheme == "http" && b.Scheme == "https" &&
+		strings.EqualFold(a.Hostname(), b.Hostname()) &&
+		effectivePort(a) == "80" && effectivePort(b) == "443"
+}
+
+// effectivePort returns the URL's port, or the scheme default when unset.
+func effectivePort(u *url.URL) string {
+	if port := u.Port(); port != "" {
+		return port
+	}
+	switch u.Scheme {
+	case "http":
+		return "80"
+	case "https":
+		return "443"
+	}
+	return ""
+}
+
 // GetReader returns a reader for the HTTP content. The ctx flows into
 // the HTTP request and the authenticator so a cancelled ctx aborts the
 // fetch.
@@ -249,9 +418,16 @@ func (l *FromHTTP) GetReader(ctx context.Context) (io.ReadCloser, error) {
 		req.Header.Set(key, value)
 	}
 
+	// Record the headers set so far (the request started with none) so
+	// redirectPolicy can strip them if a redirect leaves the origin, and
+	// restore them where net/http dropped them. User-Agent is always kept.
+	loaderHeaders := req.Header.Clone()
+	loaderHeaders.Del(userAgentHeader)
+	req = req.WithContext(context.WithValue(ctx, loaderHeadersKey{}, loaderHeaders))
+
 	// Set a default User-Agent if not specified
-	if req.Header.Get("User-Agent") == "" {
-		req.Header.Set("User-Agent", "go-polyscript/http-loader")
+	if req.Header.Get(userAgentHeader) == "" {
+		req.Header.Set(userAgentHeader, "go-polyscript/http-loader")
 	}
 
 	resp, err := l.client.Do(req)

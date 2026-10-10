@@ -72,6 +72,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `helpers.SetupLogger`, removing the last ad-hoc nil-logger fallbacks.
   ([#173](https://github.com/robbyt/go-polyscript/pull/173))
 
+- **BREAKING**: The HTTP loader no longer follows redirects to a different
+  origin (scheme, host or port), and never follows a redirect from https
+  to http. Such redirects fail with the new `loader.ErrRedirectNotAllowed`.
+  An http-to-https upgrade on the same host is still followed. Opt back in
+  with `HTTPOptions.WithAllowCrossOriginRedirects(true)`; on a cross-origin
+  hop the loader then strips the headers it set (custom `Headers`,
+  authenticator headers) and `Referer`, except those named via the new
+  `WithRedirectForwardHeaders(...)`.
+- `loader.NewFromHTTPWithOptions` now treats nil options as
+  `DefaultHTTPOptions()` instead of panicking.
+
+### Security
+- The HTTP loader leaked custom auth headers (`WithHeaderAuth`,
+  `HTTPOptions.Headers`) to the target of a cross-host redirect, because
+  net/http strips only `Authorization` and `Cookie` (and keeps even those
+  for the same hostname on another port). Cross-origin redirects are now
+  refused by default, and stripped of loader-set headers when allowed. ([#154](https://github.com/robbyt/go-polyscript/issues/154))
+
 ### Deprecated
 - The twelve legacy top-level constructors (`FromRisorFile`,
   `FromRisorString`, `FromStarlarkFile`, `FromStarlarkString`,

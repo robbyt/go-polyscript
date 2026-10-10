@@ -5,8 +5,10 @@ import (
 	"crypto/tls"
 	"errors"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -921,4 +923,446 @@ func TestFromHTTP_MaxBodySize(t *testing.T) {
 		require.Nil(t, reader)
 		require.ErrorIs(t, err, ErrScriptTooLarge)
 	})
+}
+
+func TestFromHTTP_Redirects(t *testing.T) {
+	t.Parallel()
+
+	const apiKey = "secret-key"
+
+	// newTarget returns a server that serves a script and records the
+	// X-API-Key header of every request it receives.
+	newTarget := func(t *testing.T, newServer func(http.Handler) *httptest.Server) (*httptest.Server, *atomic.Value, *atomic.Int32) {
+		t.Helper()
+		var gotKey atomic.Value
+		var hits atomic.Int32
+		srv := newServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			hits.Add(1)
+			gotKey.Store(r.Header.Get("X-API-Key"))
+			_, err := w.Write([]byte("print('ok')"))
+			assert.NoError(t, err)
+		}))
+		t.Cleanup(srv.Close)
+		return srv, &gotKey, &hits
+	}
+
+	// newRedirector returns a server that redirects every request to target.
+	newRedirector := func(t *testing.T, newServer func(http.Handler) *httptest.Server, target string) *httptest.Server {
+		t.Helper()
+		srv := newServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, target, http.StatusFound)
+		}))
+		t.Cleanup(srv.Close)
+		return srv
+	}
+
+	headerAuth := func(allowCrossOrigin bool) *HTTPOptions {
+		opts := DefaultHTTPOptions().
+			WithHeaderAuth(map[string]string{"X-API-Key": apiKey}).
+			WithAllowCrossOriginRedirects(allowCrossOrigin)
+		opts.InsecureSkipVerify = true
+		return opts
+	}
+
+	readAll := func(t *testing.T, l *FromHTTP) (string, error) {
+		t.Helper()
+		reader, err := l.GetReader(t.Context())
+		if err != nil {
+			return "", err
+		}
+		defer func() { assert.NoError(t, reader.Close()) }()
+		body, err := io.ReadAll(reader)
+		require.NoError(t, err)
+		return string(body), nil
+	}
+
+	t.Run("same-origin redirect is followed with headers", func(t *testing.T) {
+		var gotKey atomic.Value
+		mux := http.NewServeMux()
+		mux.HandleFunc("/start", func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, "/script", http.StatusFound)
+		})
+		mux.HandleFunc("/script", func(w http.ResponseWriter, r *http.Request) {
+			gotKey.Store(r.Header.Get("X-API-Key"))
+			_, err := w.Write([]byte("print('ok')"))
+			assert.NoError(t, err)
+		})
+		srv := httptest.NewServer(mux)
+		t.Cleanup(srv.Close)
+
+		l, err := NewFromHTTPWithOptions(srv.URL+"/start", headerAuth(false))
+		require.NoError(t, err)
+		body, err := readAll(t, l)
+		require.NoError(t, err)
+		assert.Equal(t, "print('ok')", body)
+		assert.Equal(t, apiKey, gotKey.Load(), "same-origin target should receive the header")
+	})
+
+	t.Run("cross-origin redirect is refused by default", func(t *testing.T) {
+		target, _, hits := newTarget(t, httptest.NewServer)
+		redirector := newRedirector(t, httptest.NewServer, target.URL)
+
+		l, err := NewFromHTTPWithOptions(redirector.URL, headerAuth(false))
+		require.NoError(t, err)
+		_, err = readAll(t, l)
+		require.ErrorIs(t, err, ErrRedirectNotAllowed)
+		assert.Zero(t, hits.Load(), "cross-origin target should never be contacted")
+	})
+
+	t.Run("cross-origin redirect is followed when allowed, without loader headers", func(t *testing.T) {
+		var got atomic.Pointer[http.Header]
+		target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			h := r.Header.Clone()
+			got.Store(&h)
+			_, err := w.Write([]byte("print('ok')"))
+			assert.NoError(t, err)
+		}))
+		t.Cleanup(target.Close)
+		redirector := newRedirector(t, httptest.NewServer, target.URL)
+
+		opts := DefaultHTTPOptions().
+			WithBearerAuth("bearer-token").
+			WithAllowCrossOriginRedirects(true)
+		opts.Headers = map[string]string{"X-API-Key": apiKey, "X-Trace-Id": "trace-1"}
+
+		l, err := NewFromHTTPWithOptions(redirector.URL, opts)
+		require.NoError(t, err)
+		body, err := readAll(t, l)
+		require.NoError(t, err)
+		assert.Equal(t, "print('ok')", body)
+
+		h := got.Load()
+		require.NotNil(t, h, "target should be reached")
+		// httptest servers share 127.0.0.1, which net/http treats as the
+		// same host and so would forward Authorization on its own.
+		assert.Empty(t, h.Get("Authorization"), "authenticator header should be stripped")
+		assert.Empty(t, h.Get("X-API-Key"), "custom header should be stripped")
+		assert.Empty(t, h.Get("X-Trace-Id"), "custom header should be stripped")
+		assert.Empty(t, h.Get("Referer"), "referer should be stripped")
+		assert.Equal(t, "go-polyscript/http-loader", h.Get("User-Agent"))
+	})
+
+	t.Run("allowlisted headers are forwarded across origins", func(t *testing.T) {
+		var got atomic.Pointer[http.Header]
+		target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			h := r.Header.Clone()
+			got.Store(&h)
+			_, err := w.Write([]byte("print('ok')"))
+			assert.NoError(t, err)
+		}))
+		t.Cleanup(target.Close)
+		redirector := newRedirector(t, httptest.NewServer, target.URL)
+
+		opts := DefaultHTTPOptions().
+			WithHeaderAuth(map[string]string{"X-API-Key": apiKey}).
+			WithAllowCrossOriginRedirects(true).
+			WithRedirectForwardHeaders("x-trace-id")
+		opts.Headers = map[string]string{"X-Trace-Id": "trace-1"}
+
+		l, err := NewFromHTTPWithOptions(redirector.URL, opts)
+		require.NoError(t, err)
+		_, err = readAll(t, l)
+		require.NoError(t, err)
+
+		h := got.Load()
+		require.NotNil(t, h, "target should be reached")
+		assert.Empty(t, h.Get("X-API-Key"), "auth header should be stripped")
+		assert.Equal(t, "trace-1", h.Get("X-Trace-Id"), "allowlisted header should be forwarded")
+	})
+
+	// The cases below redirect to otherHost, a different hostname than the
+	// 127.0.0.1 of the origin server, so net/http applies its own
+	// cross-host stripping of Authorization before the loader's policy.
+	const otherHost = "other.test"
+
+	// recordHeaders returns a server that serves a script and records the
+	// headers of every request it receives, by path.
+	recordHeaders := func(t *testing.T, handler http.Handler) (*httptest.Server, *sync.Map) {
+		t.Helper()
+		var got sync.Map
+		mux := http.NewServeMux()
+		mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+			got.Store(r.URL.Path, r.Header.Clone())
+			if handler != nil {
+				handler.ServeHTTP(w, r)
+				return
+			}
+			_, err := w.Write([]byte("print('ok')"))
+			assert.NoError(t, err)
+		})
+		srv := httptest.NewServer(mux)
+		t.Cleanup(srv.Close)
+		return srv, &got
+	}
+
+	headerAt := func(t *testing.T, got *sync.Map, path string) http.Header {
+		t.Helper()
+		h, ok := got.Load(path)
+		require.True(t, ok, "%s should be reached", path)
+		return h.(http.Header)
+	}
+
+	t.Run("allowlisted Authorization is forwarded to a different host", func(t *testing.T) {
+		target, got := recordHeaders(t, nil)
+		redirector := newRedirector(t, httptest.NewServer, "http://"+otherHost+"/script")
+
+		opts := DefaultHTTPOptions().
+			WithBearerAuth("bearer-token").
+			WithAllowCrossOriginRedirects(true).
+			WithRedirectForwardHeaders("authorization")
+		l, err := NewFromHTTPWithOptions(redirector.URL, opts)
+		require.NoError(t, err)
+		routeHost(t, l, otherHost, target)
+
+		_, err = readAll(t, l)
+		require.NoError(t, err)
+		assert.Equal(t, "Bearer bearer-token", headerAt(t, got, "/script").Get("Authorization"))
+	})
+
+	t.Run("Authorization is not forwarded to a different host by default", func(t *testing.T) {
+		target, got := recordHeaders(t, nil)
+		redirector := newRedirector(t, httptest.NewServer, "http://"+otherHost+"/script")
+
+		opts := DefaultHTTPOptions().
+			WithBearerAuth("bearer-token").
+			WithAllowCrossOriginRedirects(true)
+		l, err := NewFromHTTPWithOptions(redirector.URL, opts)
+		require.NoError(t, err)
+		routeHost(t, l, otherHost, target)
+
+		_, err = readAll(t, l)
+		require.NoError(t, err)
+		assert.Empty(t, headerAt(t, got, "/script").Get("Authorization"))
+	})
+
+	t.Run("redirect back to the original host gets Authorization back", func(t *testing.T) {
+		var originURL string
+		origin, originGot := recordHeaders(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path == "/start" {
+				http.Redirect(w, r, "http://"+otherHost+"/hop", http.StatusFound)
+				return
+			}
+			_, err := w.Write([]byte("print('ok')"))
+			assert.NoError(t, err)
+		}))
+		originURL = origin.URL
+		hop, hopGot := recordHeaders(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, originURL+"/script", http.StatusFound)
+		}))
+
+		opts := DefaultHTTPOptions().
+			WithBearerAuth("bearer-token").
+			WithAllowCrossOriginRedirects(true)
+		l, err := NewFromHTTPWithOptions(origin.URL+"/start", opts)
+		require.NoError(t, err)
+		routeHost(t, l, otherHost, hop)
+
+		_, err = readAll(t, l)
+		require.NoError(t, err)
+		assert.Empty(t, headerAt(t, hopGot, "/hop").Get("Authorization"), "other host should not get it")
+		assert.Equal(t, "Bearer bearer-token", headerAt(t, originGot, "/script").Get("Authorization"),
+			"original host should get it back")
+	})
+
+	t.Run("configured User-Agent is kept across origins", func(t *testing.T) {
+		target, got := recordHeaders(t, nil)
+		redirector := newRedirector(t, httptest.NewServer, "http://"+otherHost+"/script")
+
+		opts := DefaultHTTPOptions().WithAllowCrossOriginRedirects(true)
+		opts.Headers = map[string]string{"User-Agent": "custom/1"}
+		l, err := NewFromHTTPWithOptions(redirector.URL, opts)
+		require.NoError(t, err)
+		routeHost(t, l, otherHost, target)
+
+		_, err = readAll(t, l)
+		require.NoError(t, err)
+		assert.Equal(t, "custom/1", headerAt(t, got, "/script").Get("User-Agent"))
+	})
+
+	t.Run("https to http downgrade is refused even when allowed", func(t *testing.T) {
+		target, _, hits := newTarget(t, httptest.NewServer)
+		redirector := newRedirector(t, httptest.NewTLSServer, target.URL)
+
+		l, err := NewFromHTTPWithOptions(redirector.URL, headerAuth(true))
+		require.NoError(t, err)
+		_, err = readAll(t, l)
+		require.ErrorIs(t, err, ErrRedirectNotAllowed)
+		assert.Zero(t, hits.Load(), "downgraded target should never be contacted")
+	})
+
+	t.Run("https to http downgrade later in a chain is refused", func(t *testing.T) {
+		target, _, hits := newTarget(t, httptest.NewServer)
+		hop := newRedirector(t, httptest.NewTLSServer, target.URL)
+		redirector := newRedirector(t, httptest.NewTLSServer, hop.URL)
+
+		l, err := NewFromHTTPWithOptions(redirector.URL, headerAuth(true))
+		require.NoError(t, err)
+		_, err = readAll(t, l)
+		require.ErrorIs(t, err, ErrRedirectNotAllowed)
+		assert.Zero(t, hits.Load(), "downgraded target should never be contacted")
+	})
+}
+
+// routeHost makes the loader's client dial srv for requests to host, so a
+// test can redirect to a hostname other than 127.0.0.1. Other hosts dial
+// normally. The client's CheckRedirect and Timeout are kept.
+func routeHost(t *testing.T, l *FromHTTP, host string, srv *httptest.Server) {
+	t.Helper()
+	client, ok := l.client.(*http.Client)
+	require.True(t, ok, "loader client should be an *http.Client")
+
+	srvAddr := srv.Listener.Addr().String()
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.Proxy = nil
+	var dialer net.Dialer
+	transport.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
+		if h, _, err := net.SplitHostPort(addr); err == nil && h == host {
+			addr = srvAddr
+		}
+		return dialer.DialContext(ctx, network, addr)
+	}
+	t.Cleanup(transport.CloseIdleConnections)
+	client.Transport = transport
+}
+
+func TestRedirectPolicy(t *testing.T) {
+	t.Parallel()
+
+	newReq := func(t *testing.T, rawURL string) *http.Request {
+		t.Helper()
+		req, err := http.NewRequest(http.MethodGet, rawURL, nil)
+		require.NoError(t, err)
+		return req
+	}
+
+	tests := []struct {
+		name             string
+		via              []string
+		next             string
+		allowCrossOrigin bool
+		wantErr          bool
+	}{
+		{"same origin", []string{"https://example.com/a"}, "https://example.com/b", false, false},
+		{"explicit default port", []string{"https://example.com/a"}, "https://example.com:443/b", false, false},
+		{"host case differs", []string{"https://Example.COM/a"}, "https://example.com/b", false, false},
+		{"http to https upgrade", []string{"http://example.com/a"}, "https://example.com/b", false, false},
+		{"upgrade with non-default port", []string{"http://example.com:8080/a"}, "https://example.com:8443/b", false, true},
+		{"different host", []string{"https://example.com/a"}, "https://evil.example/b", false, true},
+		{"different port", []string{"https://example.com/a"}, "https://example.com:8443/b", false, true},
+		{"different host allowed", []string{"https://example.com/a"}, "https://cdn.example/b", true, false},
+		{"downgrade refused", []string{"https://example.com/a"}, "http://example.com/b", false, true},
+		{"downgrade refused when allowed", []string{"https://example.com/a"}, "http://example.com/b", true, true},
+		{
+			"left origin earlier in chain",
+			[]string{"https://example.com/a", "https://example.com/b"},
+			"https://evil.example/c", false, true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			via := make([]*http.Request, 0, len(tc.via))
+			for _, u := range tc.via {
+				via = append(via, newReq(t, u))
+			}
+			err := redirectPolicy(tc.allowCrossOrigin, nil)(newReq(t, tc.next), via)
+			if tc.wantErr {
+				require.ErrorIs(t, err, ErrRedirectNotAllowed)
+				return
+			}
+			require.NoError(t, err)
+		})
+	}
+
+	t.Run("stops after max redirects", func(t *testing.T) {
+		via := make([]*http.Request, maxRedirects)
+		for i := range via {
+			via[i] = newReq(t, "https://example.com/a")
+		}
+		err := redirectPolicy(true, nil)(newReq(t, "https://example.com/b"), via)
+		require.Error(t, err)
+		assert.NotErrorIs(t, err, ErrRedirectNotAllowed)
+	})
+}
+
+func TestRedirectPolicy_StripsHeaders(t *testing.T) {
+	t.Parallel()
+
+	newReq := func(t *testing.T, ctx context.Context, rawURL string) *http.Request {
+		t.Helper()
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
+		require.NoError(t, err)
+		req.Header.Set("X-API-Key", "secret")
+		req.Header.Set("X-Trace-Id", "trace-1")
+		req.Header.Set("Referer", "https://example.com/a?token=secret")
+		req.Header.Set("User-Agent", "go-polyscript/http-loader")
+		return req
+	}
+	ctx := context.WithValue(t.Context(), loaderHeadersKey{}, http.Header{
+		"X-Api-Key":     {"secret"},
+		"X-Trace-Id":    {"trace-1"},
+		"Authorization": {"Bearer token"},
+	})
+	via := []*http.Request{newReq(t, ctx, "https://example.com/a")}
+
+	t.Run("same origin keeps headers", func(t *testing.T) {
+		req := newReq(t, ctx, "https://example.com/b")
+		require.NoError(t, redirectPolicy(true, nil)(req, via))
+		assert.Equal(t, "secret", req.Header.Get("X-API-Key"))
+		assert.NotEmpty(t, req.Header.Get("Referer"))
+	})
+
+	t.Run("cross origin strips loader headers and referer", func(t *testing.T) {
+		req := newReq(t, ctx, "https://cdn.example/b")
+		require.NoError(t, redirectPolicy(true, nil)(req, via))
+		assert.Empty(t, req.Header.Get("X-API-Key"))
+		assert.Empty(t, req.Header.Get("X-Trace-Id"))
+		assert.Empty(t, req.Header.Get("Referer"))
+		assert.Equal(t, "go-polyscript/http-loader", req.Header.Get("User-Agent"))
+	})
+
+	t.Run("cross origin keeps allowlisted headers", func(t *testing.T) {
+		req := newReq(t, ctx, "https://cdn.example/b")
+		require.NoError(t, redirectPolicy(true, []string{"x-trace-id", "referer"})(req, via))
+		assert.Empty(t, req.Header.Get("X-API-Key"))
+		assert.Empty(t, req.Header.Get("Authorization"))
+		assert.Equal(t, "trace-1", req.Header.Get("X-Trace-Id"))
+		assert.NotEmpty(t, req.Header.Get("Referer"))
+	})
+
+	// net/http drops Authorization before CheckRedirect when the host
+	// changes, so the request below arrives without it.
+	t.Run("cross origin restores an allowlisted header net/http dropped", func(t *testing.T) {
+		req := newReq(t, ctx, "https://cdn.example/b")
+		require.NoError(t, redirectPolicy(true, []string{"authorization"})(req, via))
+		assert.Equal(t, "Bearer token", req.Header.Get("Authorization"))
+		assert.Empty(t, req.Header.Get("X-API-Key"))
+	})
+
+	t.Run("back to the original origin restores dropped headers", func(t *testing.T) {
+		hop := newReq(t, ctx, "https://cdn.example/b")
+		req := newReq(t, ctx, "https://example.com/c")
+		req.Header.Del("X-API-Key")
+		require.NoError(t, redirectPolicy(true, nil)(req, append(slices.Clone(via), hop)))
+		assert.Equal(t, "Bearer token", req.Header.Get("Authorization"))
+		assert.Equal(t, "secret", req.Header.Get("X-API-Key"))
+	})
+}
+
+func TestHTTPOptions_WithRedirectForwardHeaders(t *testing.T) {
+	t.Parallel()
+
+	names := []string{"X-Trace-Id"}
+	opts := DefaultHTTPOptions().WithRedirectForwardHeaders(names...)
+	names[0] = "mutated"
+	assert.Equal(t, []string{"X-Trace-Id"}, opts.RedirectForwardHeaders, "builder should copy its input")
+}
+
+func TestNewFromHTTPWithOptions_NilOptions(t *testing.T) {
+	t.Parallel()
+
+	l, err := NewFromHTTPWithOptions("https://example.com/script.risor", nil)
+	require.NoError(t, err)
+	assert.Equal(t, DefaultHTTPOptions().Timeout, l.options.Timeout)
+	assert.False(t, l.options.AllowCrossOriginRedirects)
 }
