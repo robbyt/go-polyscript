@@ -13,16 +13,21 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"testing"
 
 	"github.com/tetratelabs/wazero"
 )
 
-// Run primes wazero's version cache by creating and closing one runtime,
-// then runs the tests. It returns the exit code for os.Exit.
-func Run(m *testing.M) int {
+// warmUp creates and closes one runtime so wazero caches its version. It is
+// a variable so tests can make it fail.
+var warmUp = func() error {
 	ctx := context.Background()
-	if err := wazero.NewRuntime(ctx).Close(ctx); err != nil {
+	return wazero.NewRuntime(ctx).Close(ctx)
+}
+
+// Run primes wazero's version cache, then runs the tests by calling m.Run.
+// Pass the *testing.M from TestMain. It returns the exit code for os.Exit.
+func Run(m interface{ Run() int }) int {
+	if err := warmUp(); err != nil {
 		fmt.Fprintln(os.Stderr, "wazero warm-up failed:", err)
 		return 1
 	}
