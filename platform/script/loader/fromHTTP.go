@@ -17,7 +17,6 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"maps"
 	"math"
 	"net/http"
 	"net/url"
@@ -81,12 +80,16 @@ type HTTPOptions struct {
 	// strips every header it set itself (Headers and anything the
 	// Authenticator added) plus Referer, so credentials are not sent to
 	// the new host. User-Agent is kept. Use RedirectForwardHeaders to keep
-	// specific headers.
+	// specific headers. A later redirect back to the original origin gets
+	// the stripped headers back.
 	AllowCrossOriginRedirects bool
 
 	// RedirectForwardHeaders lists headers that are still sent when a
 	// redirect leaves the original origin. Names are case-insensitive.
-	// Only meaningful with AllowCrossOriginRedirects. Default is empty.
+	// This includes Authorization and Cookie, which net/http drops on its
+	// own when the host changes. Only headers the loader set are
+	// forwarded. Only meaningful with AllowCrossOriginRedirects. Default
+	// is empty.
 	RedirectForwardHeaders []string
 }
 
@@ -279,7 +282,7 @@ func NewFromHTTPWithOptions(rawURL string, options *HTTPOptions) (*FromHTTP, err
 }
 
 // loaderHeadersKey is the context key under which GetReader records the
-// names of the headers it set, for redirectPolicy to strip.
+// headers it set, as an http.Header, for redirectPolicy to strip or restore.
 type loaderHeadersKey struct{}
 
 // redirectPolicy returns an http.Client CheckRedirect func. It refuses
@@ -287,7 +290,8 @@ type loaderHeadersKey struct{}
 // is set, redirects that leave the origin of the original request. An
 // http-to-https upgrade on the same host is always allowed. When a followed
 // redirect leaves the original origin, the headers GetReader set and Referer
-// are removed, except those named in forward.
+// are removed, except those named in forward. A hop back to the original
+// origin gets the headers GetReader set back.
 func redirectPolicy(allowCrossOrigin bool, forward []string) func(*http.Request, []*http.Request) error {
 	keep := make(map[string]struct{}, len(forward))
 	for _, name := range forward {
@@ -304,6 +308,7 @@ func redirectPolicy(allowCrossOrigin bool, forward []string) func(*http.Request,
 
 		orig := via[0].URL
 		if sameOrigin(orig, req.URL) || isHTTPSUpgrade(orig, req.URL) {
+			restoreLoaderHeaders(req, nil)
 			return nil
 		}
 		if !allowCrossOrigin {
@@ -330,15 +335,29 @@ func checkNoDowngrade(prev, next *url.URL) error {
 }
 
 // stripLoaderHeaders removes the headers GetReader set, and Referer, from a
-// redirect that leaves the original origin, except those named in keep.
-// net/http copies the original request's headers onto every redirect before
-// calling CheckRedirect, so this runs per hop.
+// redirect that leaves the original origin, except those named in keep,
+// which are restored to the values GetReader set.
 func stripLoaderHeaders(req *http.Request, keep map[string]struct{}) {
-	names, _ := req.Context().Value(loaderHeadersKey{}).([]string)
-	for _, name := range append(slices.Clone(names), "Referer") {
-		if _, ok := keep[http.CanonicalHeaderKey(name)]; !ok {
+	restoreLoaderHeaders(req, keep)
+	if _, ok := keep["Referer"]; !ok {
+		req.Header.Del("Referer")
+	}
+}
+
+// restoreLoaderHeaders sets each header GetReader set on a redirect hop to
+// its original value, or removes it when keep is non-nil and does not name
+// it. net/http copies the original request's headers onto every redirect
+// before calling CheckRedirect, but once the host changes it drops
+// Authorization, Cookie, and similar headers for that hop and every later
+// one, so this runs per hop and sets the final header state itself.
+func restoreLoaderHeaders(req *http.Request, keep map[string]struct{}) {
+	loaderHeaders, _ := req.Context().Value(loaderHeadersKey{}).(http.Header)
+	for name, values := range loaderHeaders {
+		if _, ok := keep[http.CanonicalHeaderKey(name)]; keep != nil && !ok {
 			req.Header.Del(name)
+			continue
 		}
+		req.Header[name] = slices.Clone(values)
 	}
 }
 
@@ -396,8 +415,10 @@ func (l *FromHTTP) GetReader(ctx context.Context) (io.ReadCloser, error) {
 	}
 
 	// Record the headers set so far (the request started with none) so
-	// redirectPolicy can strip them if a redirect leaves the origin.
-	loaderHeaders := slices.Collect(maps.Keys(req.Header))
+	// redirectPolicy can strip them if a redirect leaves the origin, and
+	// restore them where net/http dropped them. User-Agent is always kept.
+	loaderHeaders := req.Header.Clone()
+	loaderHeaders.Del("User-Agent")
 	req = req.WithContext(context.WithValue(ctx, loaderHeadersKey{}, loaderHeaders))
 
 	// Set a default User-Agent if not specified
