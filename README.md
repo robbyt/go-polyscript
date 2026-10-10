@@ -149,6 +149,8 @@ if err != nil {
 evaluator, err := polyscript.New[polyscript.Risor](polyscript.FromLoader(httpLoader))
 ```
 
+The HTTP loader follows redirects only within the original origin (same scheme, host and port), plus an http-to-https upgrade on the same host. Any other redirect fails with `loader.ErrRedirectNotAllowed`, so custom auth headers are never sent to another host. `WithAllowCrossOriginRedirects(true)` lifts that restriction. When a followed redirect leaves the original origin, the loader strips every header it set (custom `Headers` and anything the authenticator added) plus `Referer`, keeping only `User-Agent` and the names passed to `WithRedirectForwardHeaders(...)`. Redirects from https to http are always refused.
+
 ### Capturing diagnostic logs
 
 ```go

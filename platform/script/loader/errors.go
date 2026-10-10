@@ -8,4 +8,5 @@ var (
 	ErrScriptNotAvailable = errors.New("script not available")
 	ErrInputEmpty         = errors.New("input is empty")
 	ErrScriptTooLarge     = errors.New("script exceeds maximum body size")
+	ErrRedirectNotAllowed = errors.New("redirect not allowed")
 )
