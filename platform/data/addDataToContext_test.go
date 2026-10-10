@@ -13,14 +13,14 @@ import (
 func TestAddDataToContextHelper(t *testing.T) {
 	t.Parallel()
 
-	// Create a test logger that discards output
-	logger := slog.Default()
+	// Use the default slog handler for tests
+	handler := slog.Default().Handler()
 
 	t.Run("nil provider returns error", func(t *testing.T) {
 		baseCtx := t.Context()
 		enrichedCtx, err := AddDataToContextHelper(
 			baseCtx,
-			logger,
+			handler,
 			nil,
 			map[string]any{"key": "value"},
 		)
@@ -35,7 +35,7 @@ func TestAddDataToContextHelper(t *testing.T) {
 
 		enrichedCtx, err := AddDataToContextHelper(
 			baseCtx,
-			logger,
+			handler,
 			provider,
 			map[string]any{"key": "value"},
 		)
@@ -51,7 +51,7 @@ func TestAddDataToContextHelper(t *testing.T) {
 
 		enrichedCtx, err := AddDataToContextHelper(
 			baseCtx,
-			logger,
+			handler,
 			provider,
 			map[string]any{"key": "value"},
 		)
@@ -78,7 +78,7 @@ func TestAddDataToContextHelper(t *testing.T) {
 		// Wrap request in map
 		enrichedCtx, err := AddDataToContextHelper(
 			baseCtx,
-			logger,
+			handler,
 			provider,
 			map[string]any{"request": req},
 		)
@@ -106,7 +106,7 @@ func TestAddDataToContextHelper(t *testing.T) {
 		baseCtx := t.Context()
 		req := createTestRequestHelper()
 
-		enrichedCtx, err := AddDataToContextHelper(baseCtx, logger, provider,
+		enrichedCtx, err := AddDataToContextHelper(baseCtx, handler, provider,
 			map[string]any{"key": "value", "request": req})
 
 		require.NoError(t, err)
@@ -136,7 +136,7 @@ func TestAddDataToContextHelper(t *testing.T) {
 
 		enrichedCtx, err := AddDataToContextHelper(
 			baseCtx,
-			logger,
+			handler,
 			provider,
 			map[string]any{"": 42}, // Empty key should cause an error
 		)
@@ -156,7 +156,7 @@ func TestAddDataToContextHelper(t *testing.T) {
 		)
 		baseCtx := t.Context()
 
-		enrichedCtx, err := AddDataToContextHelper(baseCtx, logger, provider,
+		enrichedCtx, err := AddDataToContextHelper(baseCtx, handler, provider,
 			map[string]any{"key": "value"})
 
 		require.NoError(t, err)
@@ -178,11 +178,11 @@ func TestAddDataToContextHelper(t *testing.T) {
 func TestAddDataToContextFromProvider(t *testing.T) {
 	t.Parallel()
 
-	logger := slog.Default()
+	handler := slog.Default().Handler()
 
 	t.Run("nil provider returns error", func(t *testing.T) {
 		ctx := t.Context()
-		result, err := AddDataToContextFromProvider(ctx, logger, nil, map[string]any{"key": "value"})
+		result, err := AddDataToContextFromProvider(ctx, handler, nil, map[string]any{"key": "value"})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "no data provider available")
 		assert.Equal(t, ctx, result)
@@ -192,7 +192,7 @@ func TestAddDataToContextFromProvider(t *testing.T) {
 		provider := NewContextProvider(constants.EvalData)
 		ctx := t.Context()
 
-		result, err := AddDataToContextFromProvider(ctx, logger, provider, map[string]any{"key": "value"})
+		result, err := AddDataToContextFromProvider(ctx, handler, provider, map[string]any{"key": "value"})
 		require.NoError(t, err)
 		assert.NotEqual(t, ctx, result)
 
@@ -208,8 +208,8 @@ func TestAddDataToContextFromProvider(t *testing.T) {
 func TestAddDataToContextWithErrorHandling(t *testing.T) {
 	t.Parallel()
 
-	// Create a test logger that discards output
-	logger := slog.Default()
+	// Use the default slog handler for tests
+	handler := slog.Default().Handler()
 
 	t.Run("provider returns error and keeps original context", func(t *testing.T) {
 		// Create a context provider
@@ -217,7 +217,7 @@ func TestAddDataToContextWithErrorHandling(t *testing.T) {
 		baseCtx := t.Context()
 
 		// Add a mix of valid and invalid data to trigger an error
-		enrichedCtx, err := AddDataToContextHelper(baseCtx, logger, provider,
+		enrichedCtx, err := AddDataToContextHelper(baseCtx, handler, provider,
 			map[string]any{"valid": "data", "": "empty-key"}, // Empty key triggers an error
 		)
 

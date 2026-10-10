@@ -62,7 +62,7 @@ func (be *Evaluator) getDataProvider() data.Provider {
 // loadInputData retrieves input data using the data provider in the executable unit.
 // Returns a map that will be used as input for the WASM module.
 func (be *Evaluator) loadInputData(ctx context.Context) (map[string]any, error) {
-	return data.LoadInputData(ctx, be.logger.WithGroup("loadInputData"), be.getDataProvider())
+	return data.LoadInputData(ctx, be.logHandler.WithGroup("Evaluator"), be.getDataProvider())
 }
 
 // defaultExitOutputMaxBytes is the cap applied when an Evaluator is built
@@ -246,5 +246,5 @@ func (be *Evaluator) AddDataToContext(
 	ctx context.Context,
 	d map[string]any,
 ) (context.Context, error) {
-	return data.AddDataToContextFromProvider(ctx, be.logger.WithGroup("AddDataToContext"), be.getDataProvider(), d)
+	return data.AddDataToContextFromProvider(ctx, be.logHandler.WithGroup("Evaluator"), be.getDataProvider(), d)
 }

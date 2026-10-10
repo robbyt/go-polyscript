@@ -3,19 +3,23 @@ package data
 import (
 	"context"
 	"log/slog"
+
+	"github.com/robbyt/go-polyscript/internal/helpers"
 )
 
 // LoadInputData retrieves input data using the given data provider.
 // If the provider is nil, it returns an empty map. This function consolidates
 // the common data-loading logic used across all engine evaluators.
+//
+// Pass nil for handler to inherit from slog.Default() via [helpers.SetupLogger];
+// pass an explicit slog.Handler to honor the host's configuration. Records emitted
+// from this function carry a "LoadInputData" sub-group.
 func LoadInputData(
 	ctx context.Context,
-	logger *slog.Logger,
+	handler slog.Handler,
 	provider Provider,
 ) (map[string]any, error) {
-	if logger == nil {
-		logger = slog.Default()
-	}
+	_, logger := helpers.SetupLogger(handler, "data", "LoadInputData")
 
 	// If no data provider, return empty map
 	if provider == nil {
