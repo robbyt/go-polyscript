@@ -298,13 +298,8 @@ func redirectPolicy(allowCrossOrigin bool, forward []string) func(*http.Request,
 		if len(via) >= maxRedirects {
 			return fmt.Errorf("stopped after %d redirects", maxRedirects)
 		}
-
-		prev := via[len(via)-1].URL
-		if prev.Scheme == "https" && req.URL.Scheme != "https" {
-			return fmt.Errorf(
-				"%w: https downgrade from %s to %s",
-				ErrRedirectNotAllowed, prev.Redacted(), req.URL.Redacted(),
-			)
+		if err := checkNoDowngrade(via[len(via)-1].URL, req.URL); err != nil {
+			return err
 		}
 
 		orig := via[0].URL
@@ -318,18 +313,32 @@ func redirectPolicy(allowCrossOrigin bool, forward []string) func(*http.Request,
 			)
 		}
 
-		// net/http copies the original request's headers onto every
-		// redirect before calling CheckRedirect, so strip them per hop.
-		names, _ := req.Context().Value(loaderHeadersKey{}).([]string)
-		for _, name := range names {
-			if _, ok := keep[http.CanonicalHeaderKey(name)]; !ok {
-				req.Header.Del(name)
-			}
-		}
-		if _, ok := keep["Referer"]; !ok {
-			req.Header.Del("Referer")
-		}
+		stripLoaderHeaders(req, keep)
 		return nil
+	}
+}
+
+// checkNoDowngrade refuses a redirect hop from https to any other scheme.
+func checkNoDowngrade(prev, next *url.URL) error {
+	if prev.Scheme == "https" && next.Scheme != "https" {
+		return fmt.Errorf(
+			"%w: https downgrade from %s to %s",
+			ErrRedirectNotAllowed, prev.Redacted(), next.Redacted(),
+		)
+	}
+	return nil
+}
+
+// stripLoaderHeaders removes the headers GetReader set, and Referer, from a
+// redirect that leaves the original origin, except those named in keep.
+// net/http copies the original request's headers onto every redirect before
+// calling CheckRedirect, so this runs per hop.
+func stripLoaderHeaders(req *http.Request, keep map[string]struct{}) {
+	names, _ := req.Context().Value(loaderHeadersKey{}).([]string)
+	for _, name := range append(slices.Clone(names), "Referer") {
+		if _, ok := keep[http.CanonicalHeaderKey(name)]; !ok {
+			req.Header.Del(name)
+		}
 	}
 }
 
