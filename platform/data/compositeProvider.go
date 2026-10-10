@@ -49,6 +49,11 @@ func (p *CompositeProvider) GetData(ctx context.Context) (map[string]any, error)
 // Arrays and other data types are replaced entirely, not merged.
 func deepMerge(src, dst map[string]any) map[string]any {
 	result := maps.Clone(src)
+	// maps.Clone(nil) is nil, which a typed-nil nested map in src reaches
+	// via the recursion below; writing to it would panic.
+	if result == nil {
+		result = make(map[string]any, len(dst))
+	}
 
 	for k, dstVal := range dst {
 		srcVal, exists := result[k]
@@ -92,13 +97,7 @@ func (p *CompositeProvider) AddDataToContext(
 ) (context.Context, error) {
 	// Start with the original context
 	finalCtx := ctx
-
-	// Track errors and successes
-	var errs []error
-	var staticErrs []error
-	successCount := 0
-	totalCount := 0
-	staticCount := 0
+	var tally addDataTally
 
 	// Try to add data to each provider
 	for i, provider := range p.providers {
@@ -108,43 +107,79 @@ func (p *CompositeProvider) AddDataToContext(
 
 		// Check if this is a StaticProvider (which always returns errors on AddDataToContext)
 		_, isStaticProvider := provider.(*StaticProvider)
-
-		// If it's not a StaticProvider, count it toward our total
-		if !isStaticProvider {
-			totalCount++
-		} else {
-			staticCount++
-		}
+		tally.countProvider(isStaticProvider)
 
 		nextCtx, err := provider.AddDataToContext(finalCtx, data)
 		if err != nil {
-			// Handle StaticProvider errors separately
-			if isStaticProvider && errors.Is(err, ErrStaticProviderNoRuntimeUpdates) {
-				staticErrs = append(staticErrs, fmt.Errorf("error from provider %d: %w", i, err))
-				continue
-			}
-
-			// For other errors, collect them
-			errs = append(errs, fmt.Errorf("error from provider %d: %w", i, err))
+			// A failing provider's returned context is discarded.
+			tally.recordError(i, isStaticProvider, err)
 			continue
 		}
 
 		// Success - update the context and count
 		finalCtx = nextCtx
-		successCount++
+		tally.recordSuccess()
 	}
 
-	// Special case: If we only have StaticProviders and they all gave errors,
-	// return the StaticProvider errors to satisfy the test case
-	if staticCount > 0 && totalCount == 0 && len(staticErrs) > 0 {
-		return ctx, errors.Join(staticErrs...)
-	}
-
-	// If all non-StaticProvider providers failed, return an error
-	if totalCount > 0 && successCount == 0 && len(errs) > 0 {
-		return ctx, errors.Join(errs...)
+	if err := tally.finalErr(); err != nil {
+		return ctx, err
 	}
 
 	// Return the most updated context with no error
 	return finalCtx, nil
+}
+
+// addDataTally accumulates the per-provider outcomes of
+// CompositeProvider.AddDataToContext so the final result can be decided
+// after every provider has been tried.
+type addDataTally struct {
+	errs         []error // errors from non-static providers (and any non-sentinel StaticProvider error)
+	staticErrs   []error // ErrStaticProviderNoRuntimeUpdates errors from StaticProviders
+	successCount int     // providers that returned no error
+	totalCount   int     // non-nil providers that are not a *StaticProvider
+	staticCount  int     // providers that are a *StaticProvider
+}
+
+// countProvider records that a non-nil provider is about to be tried.
+// StaticProviders are counted separately because they always reject runtime data.
+func (t *addDataTally) countProvider(isStaticProvider bool) {
+	if isStaticProvider {
+		t.staticCount++
+		return
+	}
+	t.totalCount++
+}
+
+// recordSuccess records that a provider accepted the data.
+func (t *addDataTally) recordSuccess() {
+	t.successCount++
+}
+
+// recordError wraps err with the provider's index in the providers list
+// (nil slots included) and files it as either an expected StaticProvider
+// rejection or a regular provider error.
+func (t *addDataTally) recordError(i int, isStaticProvider bool, err error) {
+	wrapped := fmt.Errorf("error from provider %d: %w", i, err)
+	if isStaticProvider && errors.Is(err, ErrStaticProviderNoRuntimeUpdates) {
+		t.staticErrs = append(t.staticErrs, wrapped)
+		return
+	}
+	t.errs = append(t.errs, wrapped)
+}
+
+// finalErr returns the error AddDataToContext should report, or nil when
+// the accumulated context should be returned.
+func (t *addDataTally) finalErr() error {
+	// If every non-nil provider is a StaticProvider, they all rejected the
+	// runtime data, so report their errors
+	if t.staticCount > 0 && t.totalCount == 0 && len(t.staticErrs) > 0 {
+		return errors.Join(t.staticErrs...)
+	}
+
+	// If all non-StaticProvider providers failed, return an error
+	if t.totalCount > 0 && t.successCount == 0 && len(t.errs) > 0 {
+		return errors.Join(t.errs...)
+	}
+
+	return nil
 }
