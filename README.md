@@ -294,6 +294,8 @@ result, _ := evaluator.Eval(context.Background())
 
 Extism uses the Wazero WASM runtime for providing WASI abstractions, and an easy input/output memory sharing data system. Read more about writing WASM plugins for the Extism/Wazero runtime using the Extism PDK here: [extism.org](https://extism.org/docs/concepts/pdk)
 
+> **Known issue:** wazero v1.12.0 has a data race that `go test -race` can report when Extism modules are compiled concurrently. See [engines/README.md](engines/README.md#known-issue-wazero-data-race-under--race) for the cause and workarounds.
+
 ```go
 import (
 	"context"

@@ -132,6 +132,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   "Script Return Value Handling" section in `engines/README.md`.
   ([#140](https://github.com/robbyt/go-polyscript/pull/140))
 
+### Known Issues
+- wazero v1.12.0 has a data race in its lazy version cache, reported by
+  `go test -race` when Extism modules are compiled concurrently. Fixed
+  upstream in [tetratelabs/wazero#2536](https://github.com/tetratelabs/wazero/pull/2536)
+  but unreleased. go-polyscript's own tests work around it with a `TestMain`
+  warm-up in every test package that creates runtimes; see
+  `engines/README.md` for workarounds in your app.
+
 ### Fixed
 - Risor `compiler.WithGlobals` with any name other than `ctx` made every
   `Eval` fail with "missing required globals". Declared globals without a
