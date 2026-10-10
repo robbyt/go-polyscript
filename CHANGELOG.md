@@ -66,6 +66,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `risor.FromRisorLoader`, and `starlark.FromStarlarkLoader` now take a
   `context.Context` as the first argument. Cancelling that ctx reaches the
   loader's I/O and (where the parser supports it) the compile path.
+- **BREAKING**: `data.LoadInputData`, `data.AddDataToContextHelper`, and
+  `data.AddDataToContextFromProvider` now take a `slog.Handler` instead of a
+  `*slog.Logger`. A nil handler inherits from `slog.Default()` via
+  `helpers.SetupLogger`, removing the last ad-hoc nil-logger fallbacks.
+  ([#173](https://github.com/robbyt/go-polyscript/pull/173))
 
 ### Deprecated
 - The twelve legacy top-level constructors (`FromRisorFile`,

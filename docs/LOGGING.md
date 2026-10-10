@@ -117,6 +117,8 @@ helpers.SetupLogger(handler, "extism", "Compiler")
 helpers.SetupLogger(handler, "extism", "Evaluator")
 helpers.SetupLogger(handler, "extism", "execResult")
 helpers.SetupLogger(handler, "script", "ExecutableUnit")
+helpers.SetupLogger(handler, "data", "LoadInputData")
+helpers.SetupLogger(handler, "data", "AddDataToContext")
 ```
 
 `slog.Handler.WithGroup` prepends a group qualifier to every attribute key
@@ -248,6 +250,9 @@ host code
             └─ engines/<engine>/evaluator.New(h, execUnit)
                  └─ helpers.SetupLogger(h, "<engine>", "Evaluator")
                       and execResult uses "<engine>.execResult"
+                      and the platform/data helpers it calls receive
+                      the Evaluator-grouped handler:
+                      └─ helpers.SetupLogger(h, "data", "LoadInputData" | "AddDataToContext")
 
 platform/script.NewExecutableUnit(h, ...) — separately:
   └─ helpers.SetupLogger(h, "script", "ExecutableUnit")
