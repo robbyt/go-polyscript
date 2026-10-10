@@ -37,6 +37,10 @@ const DefaultMaxBodySize int64 = 10 << 20
 // maxRedirects matches net/http's default limit on redirects per request.
 const maxRedirects = 10
 
+// userAgentHeader is the header the loader sets a default for and always
+// keeps across redirects.
+const userAgentHeader = "User-Agent"
+
 // HTTPOptions contains configuration options for HTTP loader.
 // Use DefaultHTTPOptions() to get sensible defaults, then modify as needed.
 //
@@ -418,12 +422,12 @@ func (l *FromHTTP) GetReader(ctx context.Context) (io.ReadCloser, error) {
 	// redirectPolicy can strip them if a redirect leaves the origin, and
 	// restore them where net/http dropped them. User-Agent is always kept.
 	loaderHeaders := req.Header.Clone()
-	loaderHeaders.Del("User-Agent")
+	loaderHeaders.Del(userAgentHeader)
 	req = req.WithContext(context.WithValue(ctx, loaderHeadersKey{}, loaderHeaders))
 
 	// Set a default User-Agent if not specified
-	if req.Header.Get("User-Agent") == "" {
-		req.Header.Set("User-Agent", "go-polyscript/http-loader")
+	if req.Header.Get(userAgentHeader) == "" {
+		req.Header.Set(userAgentHeader, "go-polyscript/http-loader")
 	}
 
 	resp, err := l.client.Do(req)
