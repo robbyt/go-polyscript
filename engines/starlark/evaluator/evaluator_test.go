@@ -1,9 +1,11 @@
 package evaluator
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http/httptest"
 	"os"
@@ -18,6 +20,7 @@ import (
 	"github.com/robbyt/go-polyscript/platform/data"
 	"github.com/robbyt/go-polyscript/platform/script"
 	"github.com/robbyt/go-polyscript/platform/script/loader"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
@@ -389,6 +392,92 @@ result = spin()
 	case <-time.After(2 * time.Second):
 		t.Fatal("Eval did not return within 2s after cancel; cancellation unresponsive")
 	}
+}
+
+// TestEval_AutoInvokedCallable covers the thread used to auto-invoke a
+// callable script result (issue #156): it must honor ctx cancellation and
+// route print() to the evaluator's logger, like the top-level thread.
+func TestEval_AutoInvokedCallable(t *testing.T) {
+	t.Parallel()
+
+	t.Run("cancellation halts the call", func(t *testing.T) {
+		t.Parallel()
+
+		// The loop runs only when the returned def is auto-invoked, not
+		// during prog.Init.
+		const scriptContent = `
+def spin():
+    for i in range(1000000000000):
+        pass
+    return "done"
+
+_ = spin
+`
+		_, eval := evalBuilder(t, scriptContent)
+
+		ctx, cancel := context.WithCancel(t.Context())
+		ctx = context.WithValue(ctx, constants.EvalData, map[string]any{})
+
+		done := make(chan error, 1)
+		go func() {
+			_, err := eval.Eval(ctx)
+			done <- err
+		}()
+
+		// Give the engine a moment to enter the spin loop, then cancel.
+		time.Sleep(50 * time.Millisecond)
+		cancel()
+
+		select {
+		case err := <-done:
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), context.Canceled.Error())
+		case <-time.After(2 * time.Second):
+			t.Fatal("Eval did not return within 2s after cancel; auto-invoked call ignores ctx")
+		}
+	})
+
+	t.Run("already cancelled ctx is not invoked", func(t *testing.T) {
+		t.Parallel()
+
+		const scriptContent = `
+def f():
+    return 1
+
+_ = f
+`
+		exe, _ := evalBuilder(t, scriptContent)
+		eval := New(slog.NewTextHandler(io.Discard, nil), exe)
+
+		ctx, cancel := context.WithCancel(t.Context())
+		ctx = context.WithValue(ctx, constants.EvalData, map[string]any{})
+		cancel()
+
+		_, err := eval.Eval(ctx)
+		require.ErrorIs(t, err, context.Canceled)
+	})
+
+	t.Run("print goes to the logger", func(t *testing.T) {
+		t.Parallel()
+
+		const scriptContent = `
+def f():
+    print("hello from callable")
+    return 1
+
+_ = f
+`
+		exe, _ := evalBuilder(t, scriptContent)
+		var buf bytes.Buffer
+		eval := New(slog.NewTextHandler(&buf, nil), exe)
+
+		ctx := context.WithValue(t.Context(), constants.EvalData, map[string]any{})
+		result, err := eval.Eval(ctx)
+		require.NoError(t, err)
+		assert.Equal(t, int64(1), result.Interface())
+		assert.Contains(t, buf.String(), "hello from callable")
+		assert.Contains(t, buf.String(), "starlark-thread=func")
+	})
 }
 
 // TestEval_ErrorTypeExposesStarlarkDetails verifies that errors returned from

@@ -70,8 +70,10 @@ var ErrEntryPointRequired = errors.New("extism: entry point is required (use Wit
 // [WithDataProvider] takes precedence — pass exactly one of them per
 // call to keep intent unambiguous.
 //
-// The supplied ctx flows into the loader's I/O and the Extism SDK's
-// WASM compile + entry-point probe; cancelling it halts both.
+// The supplied ctx flows into the loader's I/O, which stops when it is
+// cancelled, and into the Extism SDK's WASM compile and entry-point probe,
+// which wazero does not interrupt. Cancelling the ctx passed to Eval stops a
+// running guest.
 func FromExtismLoader(ctx context.Context, ldr loader.Loader, opts ...Option) (*evaluator.Evaluator, error) {
 	cfg := &config{}
 	for _, opt := range opts {
@@ -88,6 +90,7 @@ func FromExtismLoader(ctx context.Context, ldr loader.Loader, opts ...Option) (*
 	compilerOpts := []compiler.FunctionalOption{
 		compiler.WithEntryPoint(cfg.entryPoint),
 		compiler.WithLogHandler(cfg.handler),
+		compiler.WithCloseOnContextDone(!cfg.noCtxTermination),
 	}
 	comp, err := NewCompiler(compilerOpts...)
 	if err != nil {

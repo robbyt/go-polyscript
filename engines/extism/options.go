@@ -16,6 +16,7 @@ type config struct {
 	dataProvider       data.Provider
 	entryPoint         string
 	exitOutputMaxBytes int
+	noCtxTermination   bool
 }
 
 // WithLogHandler sets the slog.Handler used for diagnostic logging by the
@@ -63,4 +64,13 @@ func WithEntryPoint(name string) Option {
 // Mirrors the cap semantics of HTTPOptions.MaxBodySize.
 func WithExitOutputMaxBytes(n int) Option {
 	return func(c *config) { c.exitOutputMaxBytes = n }
+}
+
+// WithContextTermination controls whether cancelling or timing out the ctx
+// passed to Eval stops a running WASM guest. It is enabled by default.
+// wazero implements it with termination checks compiled into the module,
+// which make each call slower; pass false for trusted modules on hot paths
+// that never need a timeout.
+func WithContextTermination(enabled bool) Option {
+	return func(c *config) { c.noCtxTermination = !enabled }
 }

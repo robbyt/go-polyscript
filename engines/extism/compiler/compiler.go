@@ -55,8 +55,10 @@ func (c *Compiler) String() string {
 	return "extism.Compiler"
 }
 
-// Compile implements script.Compiler. Cancelling ctx halts the WASM
-// compilation and the entry-point probe.
+// Compile implements script.Compiler. The ctx is passed to the Extism SDK
+// for WASM compilation and the entry-point probe; wazero does not check it
+// during compilation, so cancelling it does not interrupt a compile in
+// progress.
 func (c *Compiler) Compile(ctx context.Context, scriptReader io.ReadCloser) (script.ExecutableContent, error) {
 	logger := c.logger.WithGroup("compile")
 

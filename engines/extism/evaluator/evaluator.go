@@ -107,13 +107,14 @@ func execHelper(
 	inputJSON []byte,
 	exitOutputMaxBytes int,
 ) (any, time.Duration, error) {
-	// Call the function (context handles timeout)
+	// Call the function. The runtime is compiled with CloseOnContextDone, so
+	// a cancelled or expired ctx stops the guest mid-execution.
 	startTime := time.Now()
 	exit, output, err := instance.CallWithContext(ctx, entryPoint, inputJSON)
 	execTime := time.Since(startTime)
 	if err != nil {
 		if ctx.Err() != nil {
-			return nil, execTime, fmt.Errorf("execution cancelled: %w", ctx.Err())
+			return nil, execTime, fmt.Errorf("execution cancelled: %w (call error: %w)", ctx.Err(), err)
 		}
 		return nil, execTime, fmt.Errorf("execution failed: %w", err)
 	}
@@ -159,7 +160,9 @@ func (be *Evaluator) exec(
 		return nil, fmt.Errorf("failed to create plugin instance: %w", err)
 	}
 	defer func() {
-		if err := instance.Close(ctx); err != nil {
+		// Use a cancel-immune ctx for cleanup so a cancelled Eval ctx
+		// doesn't abort the instance Close.
+		if err := instance.Close(context.WithoutCancel(ctx)); err != nil {
 			logger.Warn("Failed to close Extism plugin instance", "error", err)
 		}
 	}()

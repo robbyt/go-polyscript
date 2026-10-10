@@ -176,6 +176,27 @@ func TestNewExtism(t *testing.T) {
 			assert.Equal(t, "Hello, Cap!", got["greeting"], "cap=%d", n)
 		}
 	})
+
+	t.Run("WithContextTermination is accepted either way and Eval still works", func(t *testing.T) {
+		// Cancellation itself is covered by
+		// engines/extism/cancellation_test.go (issue #155).
+		for _, enabled := range []bool{true, false} {
+			eval, err := polyscript.New[polyscript.Extism](
+				t.Context(),
+				polyscript.FromBytes(wasmdata.TestModule),
+				polyscript.WithEntryPoint(wasmdata.EntrypointGreet),
+				polyscript.WithContextTermination(enabled),
+				polyscript.WithStaticData[polyscript.Extism](map[string]any{"input": "Term"}),
+			)
+			require.NoError(t, err, "enabled=%v", enabled)
+
+			result, err := eval.Eval(t.Context())
+			require.NoError(t, err, "enabled=%v", enabled)
+			got, err := result.AsMap()
+			require.NoError(t, err, "enabled=%v", enabled)
+			assert.Equal(t, "Hello, Term!", got["greeting"], "enabled=%v", enabled)
+		}
+	})
 }
 
 func TestFromLoader(t *testing.T) {

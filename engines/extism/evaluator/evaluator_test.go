@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"os"
 	"testing"
+	"time"
 
 	extismSDK "github.com/extism/go-sdk"
 	"github.com/robbyt/go-polyscript/engines/extism/adapters"
@@ -106,8 +107,12 @@ func (m *mockPluginInstance) CallWithContext(
 	if m.cancelFunc != nil {
 		m.cancelFunc()
 	}
-	// Check if the context was canceled
+	// Check if the context was canceled; prefer the configured call error,
+	// mirroring wazero, which reports its own error when it stops a guest.
 	if ctx.Err() != nil {
+		if m.callErr != nil {
+			return 0, nil, m.callErr
+		}
 		return 0, nil, ctx.Err()
 	}
 	return m.exitCode, m.output, m.callErr
@@ -735,10 +740,24 @@ func TestEvaluator_Evaluate(t *testing.T) {
 						assert.NotNil(t, result)
 					}
 
-					// Execution time should always be measured
-					assert.Positive(t, execTime.Nanoseconds())
+					// Execution time should always be measured. A mocked call
+					// can complete within the clock's resolution, so zero is
+					// valid.
+					assert.GreaterOrEqual(t, execTime, time.Duration(0))
 				})
 			}
+		})
+
+		t.Run("exec helper keeps call error on cancellation", func(t *testing.T) {
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			callErr := errors.New("module closed with context canceled")
+			mockInstance := &mockPluginInstance{cancelFunc: cancel, callErr: callErr}
+
+			logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+			_, _, err := execHelper(ctx, logger, mockInstance, "main", []byte(`{}`), 0)
+			require.ErrorIs(t, err, context.Canceled)
+			require.ErrorIs(t, err, callErr)
 		})
 	})
 }
