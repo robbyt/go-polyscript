@@ -139,6 +139,41 @@ data := map[string]any{
 }
 ```
 
+### Known Issue: wazero Data Race Under `-race`
+
+wazero v1.12.0, the WASM runtime under the Extism engine, looks up and caches
+its own version the first time a runtime is created. If two runtimes are
+created at the same moment (for example, parallel tests that each compile an
+Extism module), both write that cache at once and Go's race detector reports a
+`DATA RACE` in `wazero/internal/version.GetWazeroVersion`. The write is
+harmless in practice, but it fails `go test -race`.
+
+This is fixed upstream in
+[tetratelabs/wazero#2536](https://github.com/tetratelabs/wazero/pull/2536)
+(commit [`6edbb8c`](https://github.com/tetratelabs/wazero/commit/6edbb8c01a)),
+which is not in a wazero release yet. Until it is, apps that compile Extism
+modules concurrently under `-race` can hit it. Two workarounds:
+
+- Create and close one wazero runtime before the parallel work starts, e.g. in
+  `TestMain`. This is what go-polyscript's own tests do (`main_test.go` in the
+  root and `engines` packages):
+  ```go
+  func TestMain(m *testing.M) {
+      ctx := context.Background()
+      if err := wazero.NewRuntime(ctx).Close(ctx); err != nil {
+          fmt.Fprintln(os.Stderr, "wazero warm-up failed:", err)
+          os.Exit(1)
+      }
+      os.Exit(m.Run())
+  }
+  ```
+- Require an unreleased wazero commit that includes the fix in your own
+  `go.mod`, e.g. `go get github.com/tetratelabs/wazero@6edbb8c01a`.
+
+`engines/extism/wazero_race_test.go` fails as soon as the wazero dependency
+changes, as a reminder to remove this note and the warm-ups once a release
+with the fix lands.
+
 ## Script Return Value Handling
 
 Each engine returns the script's final value to the caller, but they treat
