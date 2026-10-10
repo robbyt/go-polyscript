@@ -14,6 +14,10 @@ type FunctionalOption func(*Compiler) error
 // WithGlobals creates an option to declare additional global identifiers
 // the Risor script may reference at evaluation time.
 //
+// WithGlobals declares names only. At evaluation time the evaluator
+// supplies a value for the ctx global; any other declared global evaluates
+// as nil.
+//
 // WithGlobals is additive: each call appends to the compiler's existing
 // globals, deduplicating any names already present. Order-of-call no
 // longer matters when combined with [WithCtxGlobal]; both orderings

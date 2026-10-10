@@ -130,6 +130,15 @@ func (be *Evaluator) Eval(ctx context.Context) (platform.EvaluatorResponse, erro
 	// 3. Build the Risor environment with builtins and input data
 	runtimeEnv := internal.BuildRisorEnv(be.ctxKey, rawInputData)
 
+	// risor.Run rejects bytecode whose compile-time globals are missing
+	// from the environment, so declare every global the compiler was given
+	// (compiler.WithGlobals) that has no value here; it evaluates as nil.
+	for _, name := range risorByteCode.EnvKeys() {
+		if _, ok := runtimeEnv[name]; !ok {
+			runtimeEnv[name] = nil
+		}
+	}
+
 	// 4. Execute the program
 	result, err := be.exec(ctx, risorByteCode, runtimeEnv)
 	if err != nil {
