@@ -15,7 +15,8 @@ type Settings struct {
 	HostFunctions []extismSDK.HostFunction
 	// DisableCloseOnContextDone turns off wazero's context termination
 	// checks. By default they are compiled in, so cancelling the call ctx
-	// stops a running guest, at a per-call cost.
+	// stops a running guest, at a per-call cost. Either way, it overrides
+	// the setting in RuntimeConfig.
 	DisableCloseOnContextDone bool
 }
 

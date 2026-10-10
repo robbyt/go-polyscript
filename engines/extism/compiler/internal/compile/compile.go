@@ -55,22 +55,10 @@ func compile(
 		},
 	}
 
-	runtimeConfig := opts.RuntimeConfig
-	if runtimeConfig == nil {
-		runtimeConfig = wazero.NewRuntimeConfig()
-	}
-	// Unless disabled, close modules when the call ctx is done, including
-	// for a caller-supplied RuntimeConfig, so cancelling or timing out an
-	// Eval stops a running guest. wazero only inserts the termination
-	// checks when this is set at compile time.
-	if !opts.DisableCloseOnContextDone {
-		runtimeConfig = runtimeConfig.WithCloseOnContextDone(true)
-	}
-
 	// Configure the plugin
 	config := extismSDK.PluginConfig{
 		EnableWasi:    opts.EnableWASI,
-		RuntimeConfig: runtimeConfig,
+		RuntimeConfig: runtimeConfigFor(opts),
 	}
 
 	// Create compiled plugin using the SDK
@@ -81,4 +69,17 @@ func compile(
 
 	// Wrap the SDK plugin with our adapter
 	return adapters.NewCompiledPluginAdapter(plugin), nil
+}
+
+// runtimeConfigFor returns the wazero runtime config to compile with. Modules
+// close when the call ctx is done unless DisableCloseOnContextDone is set, so
+// cancelling or timing out an Eval stops a running guest. The setting
+// overrides whatever a caller-supplied RuntimeConfig had. wazero only inserts
+// the termination checks when this is set at compile time.
+func runtimeConfigFor(opts *Settings) wazero.RuntimeConfig {
+	runtimeConfig := opts.RuntimeConfig
+	if runtimeConfig == nil {
+		runtimeConfig = wazero.NewRuntimeConfig()
+	}
+	return runtimeConfig.WithCloseOnContextDone(!opts.DisableCloseOnContextDone)
 }

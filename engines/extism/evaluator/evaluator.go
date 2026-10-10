@@ -107,8 +107,8 @@ func execHelper(
 	inputJSON []byte,
 	exitOutputMaxBytes int,
 ) (any, time.Duration, error) {
-	// Call the function. The runtime is compiled with CloseOnContextDone, so
-	// a cancelled or expired ctx stops the guest mid-execution.
+	// Call the function. Unless the compiler disabled CloseOnContextDone, a
+	// cancelled or expired ctx stops the guest mid-execution.
 	startTime := time.Now()
 	exit, output, err := instance.CallWithContext(ctx, entryPoint, inputJSON)
 	execTime := time.Since(startTime)

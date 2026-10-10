@@ -71,8 +71,9 @@ func WithWASIEnabled(enabled bool) FunctionalOption {
 }
 
 // WithRuntimeConfig creates an option to set a custom wazero runtime configuration.
-// Unless disabled with [WithCloseOnContextDone], WithCloseOnContextDone(true) is
-// applied on top of it so that context cancellation stops a running guest.
+// Its CloseOnContextDone setting is ignored: the compiler applies its own
+// [WithCloseOnContextDone] setting (enabled by default) on top of it, so that
+// context cancellation stops a running guest.
 func WithRuntimeConfig(config wazero.RuntimeConfig) FunctionalOption {
 	return func(c *Compiler) error {
 		if config == nil {
@@ -90,7 +91,7 @@ func WithRuntimeConfig(config wazero.RuntimeConfig) FunctionalOption {
 // stops a running guest. It is enabled by default. wazero implements it with
 // termination checks compiled into the module, which make each call slower,
 // so disabling it can make sense for trusted modules on hot paths that never
-// need a timeout.
+// need a timeout. It applies to a config set with [WithRuntimeConfig] too.
 func WithCloseOnContextDone(enabled bool) FunctionalOption {
 	return func(c *Compiler) error {
 		if c.options == nil {
