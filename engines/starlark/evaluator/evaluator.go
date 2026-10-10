@@ -104,6 +104,16 @@ func newThread(ctx context.Context, logger *slog.Logger, name string) (*starlark
 	return thread, stop
 }
 
+// withCtxErr adds ctx.Err() to the chain of a script error when ctx is done,
+// so callers can detect a cancelled or timed-out Eval with errors.Is. The
+// Starlark error only carries the cancellation reason as text.
+func withCtxErr(ctx context.Context, err error) error {
+	if ctxErr := ctx.Err(); ctxErr != nil {
+		return fmt.Errorf("execution cancelled: %w (%w)", ctxErr, err)
+	}
+	return err
+}
+
 // exec executes the bytecode with the provided globals
 func (be *Evaluator) exec(
 	ctx context.Context,
@@ -123,10 +133,10 @@ func (be *Evaluator) exec(
 	if err != nil {
 		var evalErr *starlarkLib.EvalError
 		errors.As(err, &evalErr)
-		return nil, &Error{
+		return nil, withCtxErr(ctx, &Error{
 			Msg:     fmt.Sprintf("starlark execution error: %s", err),
 			EvalErr: evalErr,
-		}
+		})
 	}
 
 	// Get the main value from globals
@@ -226,10 +236,10 @@ func (be *Evaluator) Eval(ctx context.Context) (platform.EvaluatorResponse, erro
 		if err != nil {
 			var evalErr *starlarkLib.EvalError
 			errors.As(err, &evalErr)
-			return nil, &Error{
+			return nil, withCtxErr(ctx, &Error{
 				Msg:     fmt.Sprintf("error calling function: %s", err),
 				EvalErr: evalErr,
-			}
+			})
 		}
 		// "Freeze" the value to prevent any further modifications
 		val.Freeze()

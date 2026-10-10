@@ -151,6 +151,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Starlark's auto-invoked callable result (a script ending in a `def`) now
   runs on a thread that honors ctx cancellation and sends `print()` to the
   evaluator's logger instead of stderr. `ExecTime()` now includes the call.
+  A Starlark Eval stopped by its ctx now returns an error that wraps
+  `ctx.Err()`, so `errors.Is(err, context.Canceled)` works, while keeping
+  the Starlark error details.
   ([#156](https://github.com/robbyt/go-polyscript/issues/156))
 - `RequestToMap` no longer mutates the caller's `*http.Request`. The URL
   is now resolved through a local sentinel (`resolveURL`) and the body is

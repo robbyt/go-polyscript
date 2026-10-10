@@ -3,13 +3,11 @@ package evaluator
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"log/slog"
 	"net/http/httptest"
 	"os"
-	"strings"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -381,14 +379,8 @@ result = spin()
 
 	select {
 	case err := <-done:
-		require.Error(t, err)
-		require.True(
-			t,
-			errors.Is(err, context.Canceled) ||
-				strings.Contains(err.Error(), "context canceled") ||
-				strings.Contains(err.Error(), "cancel"),
-			"expected cancellation-shaped error, got: %v", err,
-		)
+		require.ErrorIs(t, err, context.Canceled)
+		assert.NotNil(t, GetErrorDetails(err), "the Starlark error details should be kept")
 	case <-time.After(2 * time.Second):
 		t.Fatal("Eval did not return within 2s after cancel; cancellation unresponsive")
 	}
@@ -430,8 +422,8 @@ _ = spin
 
 		select {
 		case err := <-done:
-			require.Error(t, err)
-			assert.Contains(t, err.Error(), context.Canceled.Error())
+			require.ErrorIs(t, err, context.Canceled)
+			assert.NotNil(t, GetErrorDetails(err), "the Starlark error details should be kept")
 		case <-time.After(2 * time.Second):
 			t.Fatal("Eval did not return within 2s after cancel; auto-invoked call ignores ctx")
 		}
