@@ -49,6 +49,11 @@ func (p *CompositeProvider) GetData(ctx context.Context) (map[string]any, error)
 // Arrays and other data types are replaced entirely, not merged.
 func deepMerge(src, dst map[string]any) map[string]any {
 	result := maps.Clone(src)
+	// maps.Clone(nil) is nil, which a typed-nil nested map in src reaches
+	// via the recursion below; writing to it would panic.
+	if result == nil {
+		result = make(map[string]any, len(dst))
+	}
 
 	for k, dstVal := range dst {
 		srcVal, exists := result[k]

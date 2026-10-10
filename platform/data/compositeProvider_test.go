@@ -2,6 +2,7 @@ package data
 
 import (
 	"context"
+	"maps"
 	"testing"
 
 	"github.com/robbyt/go-polyscript/platform/constants"
@@ -820,19 +821,49 @@ func TestCompositeProvider_DeepMerge(t *testing.T) {
 			},
 			description: "Deep nesting should merge correctly at all levels",
 		},
+		{
+			name:        "nil src",
+			src:         nil,
+			dst:         map[string]any{"key": "value"},
+			expected:    map[string]any{"key": "value"},
+			description: "A nil src should not panic",
+		},
+		{
+			name: "typed-nil nested map in src",
+			src:  map[string]any{"cfg": map[string]any(nil)},
+			dst:  map[string]any{"cfg": map[string]any{"debug": true}},
+			expected: map[string]any{
+				"cfg": map[string]any{"debug": true},
+			},
+			description: "A typed-nil nested map should merge like an empty one",
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			srcCopy := maps.Clone(tt.src)
 			result := deepMerge(tt.src, tt.dst)
 			assert.Equal(t, tt.expected, result, tt.description)
 
 			// Verify source was not modified (should be a new map)
-			srcCopy := make(map[string]any)
-			for k, v := range tt.src {
-				srcCopy[k] = v
-			}
 			assert.Equal(t, srcCopy, tt.src, "Source map should not be modified")
 		})
 	}
+}
+
+// TestCompositeProvider_GetData_TypedNilNestedMap is the regression test for
+// issue #153: a provider returning a typed-nil nested map followed by one
+// with a real map at the same key used to panic in deepMerge.
+func TestCompositeProvider_GetData_TypedNilNestedMap(t *testing.T) {
+	t.Parallel()
+
+	var nilCfg map[string]any
+	composite := NewCompositeProvider(
+		NewStaticProvider(map[string]any{"cfg": nilCfg}),
+		NewStaticProvider(map[string]any{"cfg": map[string]any{"debug": true}}),
+	)
+
+	result, err := composite.GetData(t.Context())
+	require.NoError(t, err)
+	assert.Equal(t, map[string]any{"cfg": map[string]any{"debug": true}}, result)
 }
