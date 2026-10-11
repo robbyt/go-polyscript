@@ -17,7 +17,7 @@ Reusing a compiled evaluator is **~2.25x faster** than recompiling the script on
 
 ```go
 // COMPILATION PHASE (expensive, do once)
-evaluator, err := polyscript.FromRisorString(script, options...)
+evaluator, err := polyscript.New[polyscript.Risor](ctx, polyscript.FromString(script), options...)
 
 // EXECUTION PHASE (cheap, do many times)
 result1, _ := evaluator.Eval(ctx1)

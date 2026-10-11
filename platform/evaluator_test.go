@@ -116,13 +116,15 @@ func TestEvalDataPreparerInterface(t *testing.T) {
 	// Create an evaluator with AddDataToContext capability
 	// The key name may be different in the new implementation
 	scriptData := map[string]any{"greeting": "Hello, World!"}
-	evaluator, err := polyscript.FromRisorStringWithData(`
+	evaluator, err := polyscript.New[polyscript.Risor](
+		t.Context(),
+		polyscript.FromString(`
 let method = ctx["request"]["Method"]
 let greeting = ctx["greeting"]
 method + " " + greeting
-`,
-		scriptData,
-		handler,
+`),
+		polyscript.WithStaticData[polyscript.Risor](scriptData),
+		polyscript.WithLogHandler[polyscript.Risor](handler),
 	)
 	require.NoError(t, err)
 	require.NotNil(t, evaluator)
@@ -273,9 +275,11 @@ func TestEvaluatorWithPrepErrors(t *testing.T) {
 
 	// Test with StaticProvider (only testing specific error cases)
 	staticData := map[string]any{"static": "data"}
-	evaluator, err := polyscript.FromRisorStringWithData(`ctx["static"]`,
-		staticData,
-		handler,
+	evaluator, err := polyscript.New[polyscript.Risor](
+		t.Context(),
+		polyscript.FromString(`ctx["static"]`),
+		polyscript.WithStaticData[polyscript.Risor](staticData),
+		polyscript.WithLogHandler[polyscript.Risor](handler),
 	)
 	require.NoError(t, err)
 

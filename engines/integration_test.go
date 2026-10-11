@@ -13,6 +13,7 @@ import (
 	"github.com/robbyt/go-polyscript/engines/extism/wasmdata"
 	risorEngine "github.com/robbyt/go-polyscript/engines/risor"
 	starlarkEngine "github.com/robbyt/go-polyscript/engines/starlark"
+	"github.com/robbyt/go-polyscript/platform"
 	"github.com/robbyt/go-polyscript/platform/constants"
 	"github.com/robbyt/go-polyscript/platform/data"
 	"github.com/robbyt/go-polyscript/platform/script/loader"
@@ -45,11 +46,8 @@ func TestEngineDataHandlingIntegration(t *testing.T) {
 		Level: slog.LevelWarn, // Reduce noise in tests
 	})
 
-	t.Run(
-		"risor_engine",
-		func(t *testing.T) {
-			// Risor script that accesses data via ctx variable
-			risorScript := `
+	// Risor script that accesses data via ctx variable
+	risorScript := `
 // Access data through ctx variable
 let name = ctx["name"]
 let version = ctx["version"]
@@ -69,37 +67,8 @@ let tags = ctx["tags"]
 }
 `
 
-			// Create evaluator with test data
-			evaluator, err := polyscript.FromRisorStringWithData(
-				risorScript,
-				testData,
-				handler,
-			)
-			require.NoError(t, err)
-
-			// Execute
-			result, err := evaluator.Eval(t.Context())
-			require.NoError(t, err)
-
-			// Verify results
-			resultMap, err := result.AsMap()
-			require.NoError(t, err)
-
-			assert.Equal(t, "risor", resultMap["engine"])
-			assert.Equal(t, "Integration Test", resultMap["name"])
-			assert.Equal(t, "1.0.0", resultMap["version"])
-			assert.Equal(t, true, resultMap["debug"])
-			assert.Equal(t, int64(30), resultMap["timeout"]) // Risor converts to int64
-			assert.Equal(t, int64(3), resultMap["tag_count"])
-			assert.Equal(t, "test", resultMap["first_tag"])
-		},
-	)
-
-	t.Run(
-		"starlark_engine",
-		func(t *testing.T) {
-			// Starlark script that accesses data via ctx dictionary
-			starlarkScript := `
+	// Starlark script that accesses data via ctx dictionary
+	starlarkScript := `
 # Access data through ctx dictionary
 name = ctx["name"]
 version = ctx["version"]
@@ -122,12 +91,43 @@ result = {
 _ = result
 `
 
+	tests := []struct {
+		name    string
+		engine  string
+		newEval func(t *testing.T) (platform.Evaluator, error)
+	}{
+		{
+			name:   "risor_engine",
+			engine: "risor",
+			newEval: func(t *testing.T) (platform.Evaluator, error) {
+				t.Helper()
+				return polyscript.New[polyscript.Risor](
+					t.Context(),
+					polyscript.FromString(risorScript),
+					polyscript.WithStaticData[polyscript.Risor](testData),
+					polyscript.WithLogHandler[polyscript.Risor](handler),
+				)
+			},
+		},
+		{
+			name:   "starlark_engine",
+			engine: "starlark",
+			newEval: func(t *testing.T) (platform.Evaluator, error) {
+				t.Helper()
+				return polyscript.New[polyscript.Starlark](
+					t.Context(),
+					polyscript.FromString(starlarkScript),
+					polyscript.WithStaticData[polyscript.Starlark](testData),
+					polyscript.WithLogHandler[polyscript.Starlark](handler),
+				)
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
 			// Create evaluator with test data
-			evaluator, err := polyscript.FromStarlarkStringWithData(
-				starlarkScript,
-				testData,
-				handler,
-			)
+			evaluator, err := tc.newEval(t)
 			require.NoError(t, err)
 
 			// Execute
@@ -138,15 +138,15 @@ _ = result
 			resultMap, err := result.AsMap()
 			require.NoError(t, err)
 
-			assert.Equal(t, "starlark", resultMap["engine"])
+			assert.Equal(t, tc.engine, resultMap["engine"])
 			assert.Equal(t, "Integration Test", resultMap["name"])
 			assert.Equal(t, "1.0.0", resultMap["version"])
 			assert.Equal(t, true, resultMap["debug"])
-			assert.Equal(t, int64(30), resultMap["timeout"]) // Starlark converts to int64
+			assert.Equal(t, int64(30), resultMap["timeout"]) // Both engines convert to int64
 			assert.Equal(t, int64(3), resultMap["tag_count"])
 			assert.Equal(t, "test", resultMap["first_tag"])
-		},
-	)
+		})
+	}
 
 	t.Run("extism_engine", func(t *testing.T) {
 		// For Extism, we need to structure the data to match what the WASM module expects
@@ -162,11 +162,12 @@ _ = result
 		}
 
 		// Create evaluator with WASM-specific data structure
-		evaluator, err := polyscript.FromExtismBytesWithData(
-			wasmdata.TestModule,
-			extismData,
-			handler,
-			wasmdata.EntrypointGreet,
+		evaluator, err := polyscript.New[polyscript.Extism](
+			t.Context(),
+			polyscript.FromBytes(wasmdata.TestModule),
+			polyscript.WithStaticData[polyscript.Extism](extismData),
+			polyscript.WithLogHandler[polyscript.Extism](handler),
+			polyscript.WithEntryPoint(wasmdata.EntrypointGreet),
 		)
 		require.NoError(t, err)
 
@@ -222,10 +223,11 @@ let action = ctx["action"]
 `
 
 		// Create evaluator with static data
-		evaluator, err := polyscript.FromRisorStringWithData(
-			risorScript,
-			staticData,
-			handler,
+		evaluator, err := polyscript.New[polyscript.Risor](
+			t.Context(),
+			polyscript.FromString(risorScript),
+			polyscript.WithStaticData[polyscript.Risor](staticData),
+			polyscript.WithLogHandler[polyscript.Risor](handler),
 		)
 		require.NoError(t, err)
 
@@ -265,10 +267,11 @@ _ = result
 `
 
 		// Create evaluator with static data
-		evaluator, err := polyscript.FromStarlarkStringWithData(
-			starlarkScript,
-			staticData,
-			handler,
+		evaluator, err := polyscript.New[polyscript.Starlark](
+			t.Context(),
+			polyscript.FromString(starlarkScript),
+			polyscript.WithStaticData[polyscript.Starlark](staticData),
+			polyscript.WithLogHandler[polyscript.Starlark](handler),
 		)
 		require.NoError(t, err)
 
@@ -305,11 +308,12 @@ _ = result
 		}
 
 		// Create evaluator with static data
-		evaluator, err := polyscript.FromExtismBytesWithData(
-			wasmdata.TestModule,
-			extismStaticData,
-			handler,
-			wasmdata.EntrypointGreet,
+		evaluator, err := polyscript.New[polyscript.Extism](
+			t.Context(),
+			polyscript.FromBytes(wasmdata.TestModule),
+			polyscript.WithStaticData[polyscript.Extism](extismStaticData),
+			polyscript.WithLogHandler[polyscript.Extism](handler),
+			polyscript.WithEntryPoint(wasmdata.EntrypointGreet),
 		)
 		require.NoError(t, err)
 
@@ -358,7 +362,12 @@ let debug = ctx["config"]["debug"]
 }
 `
 
-		evaluator, err := polyscript.FromRisorStringWithData(script, data, handler)
+		evaluator, err := polyscript.New[polyscript.Risor](
+			t.Context(),
+			polyscript.FromString(script),
+			polyscript.WithStaticData[polyscript.Risor](data),
+			polyscript.WithLogHandler[polyscript.Risor](handler),
+		)
 		require.NoError(t, err)
 
 		result, err := evaluator.Eval(t.Context())
@@ -384,7 +393,12 @@ result = {
 _ = result
 `
 
-		evaluator, err := polyscript.FromStarlarkStringWithData(script, data, handler)
+		evaluator, err := polyscript.New[polyscript.Starlark](
+			t.Context(),
+			polyscript.FromString(script),
+			polyscript.WithStaticData[polyscript.Starlark](data),
+			polyscript.WithLogHandler[polyscript.Starlark](handler),
+		)
 		require.NoError(t, err)
 
 		result, err := evaluator.Eval(t.Context())
@@ -405,11 +419,12 @@ _ = result
 			"config": map[string]any{"debug": true},
 		}
 
-		evaluator, err := polyscript.FromExtismBytesWithData(
-			wasmdata.TestModule,
-			extismData,
-			handler,
-			wasmdata.EntrypointGreet,
+		evaluator, err := polyscript.New[polyscript.Extism](
+			t.Context(),
+			polyscript.FromBytes(wasmdata.TestModule),
+			polyscript.WithStaticData[polyscript.Extism](extismData),
+			polyscript.WithLogHandler[polyscript.Extism](handler),
+			polyscript.WithEntryPoint(wasmdata.EntrypointGreet),
 		)
 		require.NoError(t, err)
 
