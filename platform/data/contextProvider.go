@@ -26,6 +26,9 @@ func NewContextProvider(contextKey constants.ContextKey) *ContextProvider {
 }
 
 // GetData extracts data from the context using the configured context key.
+// It returns a deep copy (see deepCopyMap) of the stored map, so callers and
+// script engines may mutate the result without affecting the context, its
+// parents, or any context derived from it.
 func (p *ContextProvider) GetData(ctx context.Context) (map[string]any, error) {
 	if p.contextKey == "" {
 		return nil, fmt.Errorf("context key is empty")
@@ -41,7 +44,7 @@ func (p *ContextProvider) GetData(ctx context.Context) (map[string]any, error) {
 		return nil, fmt.Errorf("invalid input data type: expected map[string]any, got %T", value)
 	}
 
-	return d, nil
+	return deepCopyMap(d), nil
 }
 
 // AddDataToContext merges the provided maps into the context.
@@ -58,16 +61,16 @@ func (p *ContextProvider) GetData(ctx context.Context) (map[string]any, error) {
 // chain. Existing data from the parent context is deep-copied at every
 // nesting level when forming the derived context, so concurrent
 // enrichments from goroutines that share a parent never race on shared
-// inner map storage.
+// inner map storage. GetData likewise returns a deep copy, so readers
+// that mutate their result never touch the stored data.
 //
-// Reference-typed values stored in the map (slices, pointers, channels,
-// function values, and maps OTHER than map[string]any) remain shared
-// with the source — ContextProvider never mutates them in place, but
-// callers should avoid mutating them after handing them to
-// AddDataToContext. The deep-copy guarantee applies specifically to
-// map[string]any values, which processValue and deepCopyMap recurse
-// into; other map types (e.g. map[string]string, map[any]any) are
-// stored as opaque values. Value types (int, string, struct, etc.) are
+// The deep-copy guarantee covers map[string]any and []any containers
+// (see deepCopyValue). Other reference-typed values stored in the map
+// (typed slices such as []string, pointers, channels, function values,
+// and maps OTHER than map[string]any) remain shared with the source —
+// ContextProvider never mutates them in place, but callers should avoid
+// mutating them after handing them to AddDataToContext or receiving them
+// from GetData. Value types (int, string, struct, etc.) are
 // copied as usual when stored in an `any` slot. *http.Request and
 // http.Request inputs are converted to map[string]any via
 // helpers.RequestToMap on the way in, so the underlying request is not
@@ -157,7 +160,9 @@ func (p *ContextProvider) mergeIntoMap(
 	// Special handling for map values - merge recursively
 	if newMap, ok := value.(map[string]any); ok {
 		if existingValue, exists := target[key]; exists {
-			if existingMap, ok := existingValue.(map[string]any); ok {
+			// A typed-nil existing map cannot be written to; the new map
+			// replaces it below instead.
+			if existingMap, ok := existingValue.(map[string]any); ok && existingMap != nil {
 				for k, v := range newMap {
 					p.mergeIntoMap(existingMap, k, v, errz)
 				}
@@ -168,30 +173,4 @@ func (p *ContextProvider) mergeIntoMap(
 
 	// Non-map values simply replace existing values
 	target[key] = value
-}
-
-// deepCopyMap returns a recursive copy of m. Nested map[string]any values
-// are allocated fresh at every level so the returned map shares no mutable
-// map storage with m.
-//
-// Always returns a non-nil map, even when m is nil or empty; this lets
-// AddDataToContext use the result directly without a separate guard
-// against a nil parent-context value.
-//
-// Non-map values are stored by assignment to an `any` slot. Value types
-// (int, string, struct, etc.) are copied as usual; reference types
-// (slices, pointers, channels, function values) remain shared with the
-// source. ContextProvider never mutates stored values in place; callers
-// should avoid mutating reference-typed values after handing them to
-// AddDataToContext.
-func deepCopyMap(m map[string]any) map[string]any {
-	out := make(map[string]any, len(m))
-	for k, v := range m {
-		if nested, ok := v.(map[string]any); ok {
-			out[k] = deepCopyMap(nested)
-		} else {
-			out[k] = v
-		}
-	}
-	return out
 }

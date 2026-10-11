@@ -872,6 +872,50 @@ func TestCompositeProvider_GetData_TypedNilNestedMap(t *testing.T) {
 	assert.Equal(t, map[string]any{"cfg": map[string]any{"debug": true}}, result)
 }
 
+// TestCompositeProvider_GetData_Isolation checks that the merged GetData
+// result shares no mutable storage with the underlying providers (#159).
+// Keys present in only one provider are stored by reference in deepMerge,
+// so this relies on each provider's GetData returning its own copy.
+func TestCompositeProvider_GetData_Isolation(t *testing.T) {
+	t.Parallel()
+
+	t.Run("static data only", func(t *testing.T) {
+		composite := NewCompositeProvider(NewStaticProvider(nestedFixtureHelper()))
+		assertGetDataIsolatedHelper(t, composite, t.Context(), nestedFixtureHelper())
+	})
+
+	t.Run("context data only", func(t *testing.T) {
+		ctxProvider := NewContextProvider(constants.EvalData)
+		composite := NewCompositeProvider(ctxProvider)
+		ctx, err := composite.AddDataToContext(t.Context(), nestedFixtureHelper())
+		require.NoError(t, err)
+		assertGetDataIsolatedHelper(t, composite, ctx, nestedFixtureHelper())
+	})
+
+	t.Run("merged static and context data", func(t *testing.T) {
+		static := NewStaticProvider(nestedFixtureHelper())
+		ctxProvider := NewContextProvider(constants.EvalData)
+		composite := NewCompositeProvider(static, ctxProvider)
+		ctx, err := composite.AddDataToContext(t.Context(), map[string]any{
+			"cfg": map[string]any{"y": 2},
+		})
+		require.NoError(t, err)
+
+		want := nestedFixtureHelper()
+		want["cfg"].(map[string]any)["y"] = 2
+		assertGetDataIsolatedHelper(t, composite, ctx, want)
+
+		staticData, err := static.GetData(ctx)
+		require.NoError(t, err)
+		assert.Equal(t, nestedFixtureHelper(), staticData, "static provider state must be unchanged")
+
+		ctxData, err := ctxProvider.GetData(ctx)
+		require.NoError(t, err)
+		assert.Equal(t, map[string]any{"cfg": map[string]any{"y": 2}}, ctxData,
+			"context provider state must be unchanged")
+	})
+}
+
 // TestCompositeProvider_AddDataToContext_EdgeCases pins subtle behaviors of
 // AddDataToContext that are easy to break when refactoring it.
 func TestCompositeProvider_AddDataToContext_EdgeCases(t *testing.T) {

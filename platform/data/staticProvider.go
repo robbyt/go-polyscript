@@ -3,7 +3,6 @@ package data
 import (
 	"context"
 	"errors"
-	"maps"
 )
 
 // ErrStaticProviderNoRuntimeUpdates is returned when trying to add runtime data to a StaticProvider.
@@ -19,19 +18,19 @@ type StaticProvider struct {
 }
 
 // NewStaticProvider creates a provider with fixed data.
-// Initializes with an empty map if nil is provided.
+// It stores a deep copy (see deepCopyMap) of data, so later changes to the
+// caller's map do not affect the provider. A nil map yields an empty provider.
 func NewStaticProvider(data map[string]any) *StaticProvider {
-	if len(data) == 0 {
-		data = make(map[string]any)
-	}
 	return &StaticProvider{
-		data: data,
+		data: deepCopyMap(data),
 	}
 }
 
-// GetData returns the static data map, cloned to prevent modification.
+// GetData returns a deep copy (see deepCopyMap) of the static data, so
+// callers and script engines may mutate the result, including nested maps
+// and []any slices, without affecting the provider.
 func (p *StaticProvider) GetData(_ context.Context) (map[string]any, error) {
-	return maps.Clone(p.data), nil
+	return deepCopyMap(p.data), nil
 }
 
 // AddDataToContext returns a sentinel error as StaticProvider doesn't support dynamic data.

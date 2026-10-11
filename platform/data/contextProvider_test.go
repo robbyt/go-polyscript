@@ -609,6 +609,25 @@ func TestContextProvider_AddDataToContext_TypedNilParent(t *testing.T) {
 	assert.Equal(t, "v", got["k"])
 }
 
+// TestContextProvider_AddDataToContext_TypedNilNestedParent covers a
+// typed-nil nested map in the parent context. deepCopyMap keeps nested nil
+// maps nil, so merging new data under that key must replace the nil map
+// rather than write into it.
+func TestContextProvider_AddDataToContext_TypedNilNestedParent(t *testing.T) {
+	t.Parallel()
+	p := NewContextProvider(constants.EvalData)
+
+	var typedNil map[string]any
+	parent := context.WithValue(t.Context(), constants.EvalData, map[string]any{"cfg": typedNil})
+
+	next, err := p.AddDataToContext(parent, map[string]any{"cfg": map[string]any{"k": "v"}})
+	require.NoError(t, err)
+
+	got, err := p.GetData(next)
+	require.NoError(t, err)
+	assert.Equal(t, map[string]any{"cfg": map[string]any{"k": "v"}}, got)
+}
+
 // TestContextProvider_AddDataToContext_Concurrent is the regression test
 // for the deep-copy fix in #93. Goroutines share an already-enriched
 // parent context whose value contains a nested map. Each goroutine
@@ -687,4 +706,24 @@ func TestContextProvider_AddDataToContext_Concurrent(t *testing.T) {
 	require.True(t, ok)
 	require.Equal(t, "from-parent", parentShared["baseline"])
 	require.Len(t, parentShared, 1, "parent.shared must hold only the baseline key; got %v", parentShared)
+}
+
+// TestContextProvider_GetData_Isolation checks that GetData returns a deep
+// copy of the stored map (#159): mutating the result at any nesting level
+// must not change what later GetData calls on the same context return.
+func TestContextProvider_GetData_Isolation(t *testing.T) {
+	t.Parallel()
+
+	p := NewContextProvider(constants.EvalData)
+
+	t.Run("data stored by AddDataToContext", func(t *testing.T) {
+		ctx, err := p.AddDataToContext(t.Context(), nestedFixtureHelper())
+		require.NoError(t, err)
+		assertGetDataIsolatedHelper(t, p, ctx, nestedFixtureHelper())
+	})
+
+	t.Run("data stored directly in the context", func(t *testing.T) {
+		ctx := context.WithValue(t.Context(), constants.EvalData, nestedFixtureHelper())
+		assertGetDataIsolatedHelper(t, p, ctx, nestedFixtureHelper())
+	})
 }

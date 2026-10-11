@@ -24,6 +24,12 @@ func NewCompositeProvider(providers ...Provider) *CompositeProvider {
 // Queries providers in sequence, with later providers overriding values from earlier ones.
 // Performs deep merging of nested maps for proper data composition.
 // Returns error on first provider failure.
+//
+// The merged map shares no mutable storage with the providers as long as
+// each provider's GetData returns a map the caller owns, as StaticProvider
+// and ContextProvider do. deepMerge stores values found in only one
+// provider by reference, so a custom provider that hands out its internal
+// map would be aliased by the result.
 func (p *CompositeProvider) GetData(ctx context.Context) (map[string]any, error) {
 	result := make(map[string]any)
 

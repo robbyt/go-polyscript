@@ -2,6 +2,7 @@ package data
 
 import (
 	"context"
+	"sync"
 	"testing"
 
 	"github.com/robbyt/go-polyscript/platform/constants"
@@ -391,4 +392,93 @@ func TestProvider_DeepMerge(t *testing.T) {
 		assert.Equal(t, srcCopy, src)
 		assert.Equal(t, dstCopy, dst)
 	})
+}
+
+// TestProvider_GetData_ConcurrentMutation is the -race regression test for
+// #159. Reader goroutines mutate their GetData results in place while writer
+// goroutines derive new contexts from the same parent with AddDataToContext.
+// When GetData handed out shared storage this raced and corrupted the
+// provider's data; with deep copies every goroutine owns its own maps.
+func TestProvider_GetData_ConcurrentMutation(t *testing.T) {
+	t.Parallel()
+
+	static := NewStaticProvider(map[string]any{"static": nestedFixtureHelper()})
+	ctxProvider := NewContextProvider(constants.EvalData)
+	composite := NewCompositeProvider(static, ctxProvider)
+
+	parent, err := composite.AddDataToContext(t.Context(), nestedFixtureHelper())
+	require.NoError(t, err)
+
+	wantComposite := nestedFixtureHelper()
+	wantComposite["static"] = nestedFixtureHelper()
+	readers := []struct {
+		name   string
+		getter Getter
+		want   map[string]any
+	}{
+		{"static", static, map[string]any{"static": nestedFixtureHelper()}},
+		{"context", ctxProvider, nestedFixtureHelper()},
+		{"composite", composite, wantComposite},
+	}
+
+	const goroutinesPerRole = 8
+	const iterations = 50
+
+	var wg sync.WaitGroup
+	for _, r := range readers {
+		for range goroutinesPerRole {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				for range iterations {
+					got, err := r.getter.GetData(parent)
+					if !assert.NoErrorf(t, err, "%s GetData", r.name) {
+						return
+					}
+					targets := []map[string]any{got}
+					if nested, ok := got["static"].(map[string]any); ok {
+						targets = append(targets, nested)
+					}
+					for _, target := range targets {
+						if _, ok := target["cfg"]; !ok {
+							continue
+						}
+						for _, m := range fixtureMutationsHelper {
+							m.mutate(target)
+						}
+					}
+				}
+			}()
+		}
+	}
+	for range goroutinesPerRole {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for j := range iterations {
+				next, err := composite.AddDataToContext(parent, map[string]any{
+					"cfg": map[string]any{"x": j},
+				})
+				if !assert.NoErrorf(t, err, "AddDataToContext iter %d", j) {
+					return
+				}
+				got, err := composite.GetData(next)
+				if !assert.NoErrorf(t, err, "GetData iter %d", j) {
+					return
+				}
+				cfg, ok := got["cfg"].(map[string]any)
+				if !assert.True(t, ok, "cfg should be a map") {
+					return
+				}
+				assert.Equal(t, j, cfg["x"])
+			}
+		}()
+	}
+	wg.Wait()
+
+	for _, r := range readers {
+		got, err := r.getter.GetData(parent)
+		require.NoError(t, err)
+		assert.Equal(t, r.want, got, "%s provider state must be unchanged", r.name)
+	}
 }
