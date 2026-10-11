@@ -933,15 +933,19 @@ func TestCompositeProvider_AddDataToContext_EdgeCases(t *testing.T) {
 
 	type ctxKey struct{}
 
-	t.Run("non-static provider returning the static sentinel is a regular error", func(t *testing.T) {
+	t.Run("any provider returning the static sentinel is a static rejection", func(t *testing.T) {
 		provider := new(MockProvider)
 		provider.On("AddDataToContext", mock.Anything, mock.Anything).
 			Return(nil, ErrStaticProviderNoRuntimeUpdates)
 
 		baseCtx := t.Context()
 		ctx, err := NewCompositeProvider(provider).AddDataToContext(baseCtx, map[string]any{"k": "v"})
-		require.ErrorIs(t, err, ErrStaticProviderNoRuntimeUpdates)
+		require.ErrorIs(t, err, ErrStaticProviderNoRuntimeUpdates, "with nothing else to store the data, the rejection is reported")
 		assert.Equal(t, baseCtx, ctx, "original ctx should be returned on failure")
+
+		ctxProvider := NewContextProvider(constants.EvalData)
+		_, err = NewCompositeProvider(provider, ctxProvider).AddDataToContext(baseCtx, map[string]any{"k": "v"})
+		require.NoError(t, err, "the rejection is expected when another provider stores the data")
 		provider.AssertExpectations(t)
 	})
 
@@ -1056,6 +1060,113 @@ func TestCompositeProvider_AddDataToContext_PartialFailure(t *testing.T) {
 	}
 }
 
+// TestCompositeProvider_AddDataToContext_Nested checks that a
+// CompositeProvider nested inside another one is judged by the error it
+// returns, not by its type: an inner composite of only StaticProviders
+// rejects runtime data like a StaticProvider does, and an empty inner
+// composite stores nothing, like a nil slot.
+func TestCompositeProvider_AddDataToContext_Nested(t *testing.T) {
+	t.Parallel()
+
+	staticOnly := func() Provider {
+		return NewCompositeProvider(NewStaticProvider(map[string]any{"a": 1}))
+	}
+	empty := func() Provider { return NewCompositeProvider() }
+
+	tests := []struct {
+		name      string
+		providers func(ctxProvider Provider) []Provider
+		wantErr   error // nil means success
+		wantData  bool  // whether ctxProvider's data should be in the returned ctx
+	}{
+		{
+			name:      "static-only inner composite alongside a context provider",
+			providers: func(cp Provider) []Provider { return []Provider{staticOnly(), cp} },
+			wantData:  true,
+		},
+		{
+			name:      "empty inner composite alongside a context provider",
+			providers: func(cp Provider) []Provider { return []Provider{empty(), cp} },
+			wantData:  true,
+		},
+		{
+			name: "doubly nested static-only composite alongside a context provider",
+			providers: func(cp Provider) []Provider {
+				return []Provider{NewCompositeProvider(staticOnly()), cp}
+			},
+			wantData: true,
+		},
+		{
+			name:      "only a static-only inner composite",
+			providers: func(Provider) []Provider { return []Provider{staticOnly()} },
+			wantErr:   ErrStaticProviderNoRuntimeUpdates,
+		},
+		{
+			name:      "only an empty inner composite",
+			providers: func(Provider) []Provider { return []Provider{empty()} },
+			wantErr:   ErrNoProviders,
+		},
+		{
+			name: "empty and static-only inner composites",
+			providers: func(Provider) []Provider {
+				return []Provider{empty(), staticOnly()}
+			},
+			wantErr: ErrStaticProviderNoRuntimeUpdates,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			ctxProvider := NewContextProvider(constants.EvalData)
+			outer := NewCompositeProvider(tc.providers(ctxProvider)...)
+
+			baseCtx := t.Context()
+			ctx, err := outer.AddDataToContext(baseCtx, map[string]any{"k": "v"})
+
+			if tc.wantErr != nil {
+				require.ErrorIs(t, err, tc.wantErr)
+				assert.Equal(t, baseCtx, ctx, "nothing stored, so the original ctx should be returned")
+			} else {
+				require.NoError(t, err, "inner composites that cannot store data should not fail the outer one")
+			}
+
+			got, err := ctxProvider.GetData(ctx)
+			require.NoError(t, err)
+			if tc.wantData {
+				assert.Equal(t, map[string]any{"k": "v"}, got)
+			} else {
+				assert.Empty(t, got)
+			}
+		})
+	}
+
+	t.Run("inner failure is still reported", func(t *testing.T) {
+		failing := new(MockProvider)
+		failing.On("AddDataToContext", mock.Anything, mock.Anything).Return(nil, assert.AnError)
+		ctxProvider := NewContextProvider(constants.EvalData)
+		outer := NewCompositeProvider(NewCompositeProvider(failing), ctxProvider)
+
+		ctx, err := outer.AddDataToContext(t.Context(), map[string]any{"k": "v"})
+		require.ErrorIs(t, err, assert.AnError)
+		got, getErr := ctxProvider.GetData(ctx)
+		require.NoError(t, getErr)
+		assert.Equal(t, "v", got["k"], "the outer context provider's data should still be stored")
+		failing.AssertExpectations(t)
+	})
+
+	t.Run("an error mixing a rejection with a real failure is a real failure", func(t *testing.T) {
+		mixed := new(MockProvider)
+		mixed.On("AddDataToContext", mock.Anything, mock.Anything).
+			Return(nil, errors.Join(ErrStaticProviderNoRuntimeUpdates, assert.AnError))
+		ctxProvider := NewContextProvider(constants.EvalData)
+
+		_, err := NewCompositeProvider(mixed, ctxProvider).
+			AddDataToContext(t.Context(), map[string]any{"k": "v"})
+		require.ErrorIs(t, err, assert.AnError, "the real failure must not be hidden by the rejection")
+		mixed.AssertExpectations(t)
+	})
+}
+
 // TestAddDataTally_FinalErr covers the outcome rules of AddDataToContext
 // directly.
 func TestAddDataTally_FinalErr(t *testing.T) {
@@ -1069,29 +1180,29 @@ func TestAddDataTally_FinalErr(t *testing.T) {
 		tally   addDataTally
 		wantErr error
 	}{
-		{name: "no providers", tally: addDataTally{}, wantErr: ErrNoProviders},
+		{name: "nothing to store into", tally: addDataTally{}, wantErr: ErrNoProviders},
 		{
 			name:    "only static providers, all rejected",
-			tally:   addDataTally{staticCount: 1, staticErrs: []error{staticErr}},
+			tally:   addDataTally{staticErrs: []error{staticErr}},
 			wantErr: ErrStaticProviderNoRuntimeUpdates,
 		},
 		{
 			name:  "static rejected, other provider succeeded",
-			tally: addDataTally{staticCount: 1, totalCount: 1, staticErrs: []error{staticErr}},
+			tally: addDataTally{stored: 1, staticErrs: []error{staticErr}},
 		},
 		{
 			name:    "all non-static providers failed",
-			tally:   addDataTally{totalCount: 1, errs: []error{otherErr}},
+			tally:   addDataTally{errs: []error{otherErr}},
 			wantErr: assert.AnError,
 		},
 		{
 			name:    "partial failure is reported (#160)",
-			tally:   addDataTally{totalCount: 2, errs: []error{otherErr}},
+			tally:   addDataTally{stored: 1, errs: []error{otherErr}},
 			wantErr: assert.AnError,
 		},
 		{
-			name:  "all non-static providers succeeded",
-			tally: addDataTally{totalCount: 2},
+			name:  "all providers succeeded",
+			tally: addDataTally{stored: 2},
 		},
 	}
 
@@ -1106,3 +1217,41 @@ func TestAddDataTally_FinalErr(t *testing.T) {
 		})
 	}
 }
+
+// TestOnlyWraps checks that onlyWraps accepts an error only when every
+// leaf of its wrap tree is the target sentinel.
+func TestOnlyWraps(t *testing.T) {
+	t.Parallel()
+
+	target := ErrStaticProviderNoRuntimeUpdates
+	wrapped := fmt.Errorf("error from provider 0: %w", target)
+
+	tests := []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{"nil", nil, false},
+		{"bare target", target, true},
+		{"wrapped target", wrapped, true},
+		{"joined targets", errors.Join(wrapped, target), true},
+		{"joined inside wrap", fmt.Errorf("outer: %w", errors.Join(wrapped)), true},
+		{"unrelated error", assert.AnError, false},
+		{"target joined with unrelated error", errors.Join(wrapped, assert.AnError), false},
+		{"wrap of both", fmt.Errorf("%w and %w", target, assert.AnError), false},
+		{"text-only mention", errors.New(target.Error()), false},
+		{"empty join", &emptyJoinError{}, false},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, onlyWraps(tc.err, target))
+		})
+	}
+}
+
+// emptyJoinError is a multi-error that wraps nothing.
+type emptyJoinError struct{}
+
+func (*emptyJoinError) Error() string   { return "empty" }
+func (*emptyJoinError) Unwrap() []error { return nil }

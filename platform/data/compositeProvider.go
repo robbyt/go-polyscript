@@ -95,18 +95,31 @@ func deepMerge(src, dst map[string]any) map[string]any {
 // continues through all providers even if some fail; a failing provider's
 // returned context is discarded.
 //
+// Providers are judged by the error they return, not by their type, so a
+// nested CompositeProvider or a wrapper around a StaticProvider is treated
+// like the providers it holds. Two errors are not failures:
+//   - ErrStaticProviderNoRuntimeUpdates (from a StaticProvider, or from a
+//     nested CompositeProvider holding only StaticProviders) is an expected
+//     rejection: that provider never stores runtime data.
+//   - ErrNoProviders (from a nested CompositeProvider with no providers)
+//     means there was nothing to store into, the same as a nil slot.
+//
+// An error counts as one of these only when every error it wraps (through
+// fmt.Errorf %w or errors.Join) is that sentinel; an error that also wraps
+// a real failure is a real failure.
+//
 // The result is decided once every provider has been tried:
-//   - No non-nil providers: the original ctx and ErrNoProviders.
-//   - Any provider failed (a StaticProvider's expected
-//     ErrStaticProviderNoRuntimeUpdates aside): the most updated context,
-//     carrying the data of every provider that succeeded, and all such
-//     failures joined with errors.Join. Callers that can tolerate partial
-//     storage may keep using the returned context.
-//   - Only StaticProviders: they never accept runtime data, so the original
-//     ctx and their joined ErrStaticProviderNoRuntimeUpdates errors.
-//   - Otherwise: the most updated context and nil. StaticProvider
-//     rejections are expected and not reported when another provider can
-//     store the data.
+//   - Any provider failed: the most updated context, carrying the data of
+//     every provider that succeeded, and all the failures joined with
+//     errors.Join. Expected rejections are not included. Callers that can
+//     tolerate partial storage may keep using the returned context.
+//   - Otherwise, if at least one provider stored the data: the most
+//     updated context and nil.
+//   - Otherwise, if some provider rejected the data as static: the
+//     original ctx and the joined ErrStaticProviderNoRuntimeUpdates errors.
+//   - Otherwise there was nothing to store into (no providers, only nil
+//     slots, or only empty nested composites): the original ctx and
+//     ErrNoProviders.
 //
 // Example:
 //
@@ -129,17 +142,14 @@ func (p *CompositeProvider) AddDataToContext(
 			continue
 		}
 
-		// Check if this is a StaticProvider (which always returns errors on AddDataToContext)
-		_, isStaticProvider := provider.(*StaticProvider)
-		tally.countProvider(isStaticProvider)
-
 		nextCtx, err := provider.AddDataToContext(finalCtx, data)
 		if err != nil {
 			// A failing provider's returned context is discarded.
-			tally.recordError(i, isStaticProvider, err)
+			tally.recordError(i, err)
 			continue
 		}
 
+		tally.stored++
 		finalCtx = nextCtx
 	}
 
@@ -151,49 +161,65 @@ func (p *CompositeProvider) AddDataToContext(
 // CompositeProvider.AddDataToContext so the final result can be decided
 // after every provider has been tried.
 type addDataTally struct {
-	errs        []error // errors from non-static providers (and any non-sentinel StaticProvider error)
-	staticErrs  []error // ErrStaticProviderNoRuntimeUpdates errors from StaticProviders
-	totalCount  int     // non-nil providers that are not a *StaticProvider
-	staticCount int     // providers that are a *StaticProvider
-}
-
-// countProvider records that a non-nil provider is about to be tried.
-// StaticProviders are counted separately because they always reject runtime data.
-func (t *addDataTally) countProvider(isStaticProvider bool) {
-	if isStaticProvider {
-		t.staticCount++
-		return
-	}
-	t.totalCount++
+	stored     int     // providers that accepted the data
+	errs       []error // real failures
+	staticErrs []error // expected ErrStaticProviderNoRuntimeUpdates rejections
 }
 
 // recordError wraps err with the provider's index in the providers list
-// (nil slots included) and files it as either an expected StaticProvider
-// rejection or a regular provider error.
-func (t *addDataTally) recordError(i int, isStaticProvider bool, err error) {
-	wrapped := fmt.Errorf("error from provider %d: %w", i, err)
-	if isStaticProvider && errors.Is(err, ErrStaticProviderNoRuntimeUpdates) {
-		t.staticErrs = append(t.staticErrs, wrapped)
-		return
+// (nil slots included) and files it as an expected static rejection, a
+// real failure, or, for a provider with nothing to store into, not at all.
+func (t *addDataTally) recordError(i int, err error) {
+	switch {
+	case onlyWraps(err, ErrNoProviders):
+		// e.g. an empty nested CompositeProvider; treated like a nil slot.
+	case onlyWraps(err, ErrStaticProviderNoRuntimeUpdates):
+		t.staticErrs = append(t.staticErrs, fmt.Errorf("error from provider %d: %w", i, err))
+	default:
+		t.errs = append(t.errs, fmt.Errorf("error from provider %d: %w", i, err))
 	}
-	t.errs = append(t.errs, wrapped)
 }
 
 // finalErr returns the error AddDataToContext should report alongside the
 // accumulated context, or nil when every provider that can store data did.
 func (t *addDataTally) finalErr() error {
 	switch {
-	case t.totalCount == 0 && t.staticCount == 0:
-		// Nothing to store the data in; don't let it vanish silently.
-		return ErrNoProviders
 	case len(t.errs) > 0:
 		// Any real failure is reported, even if other providers succeeded.
 		return errors.Join(t.errs...)
-	case t.totalCount == 0:
-		// Every non-nil provider is a StaticProvider, so they all rejected
-		// the runtime data.
+	case t.stored > 0:
+		// Static rejections are expected when another provider stored the data.
+		return nil
+	case len(t.staticErrs) > 0:
+		// Every provider that could have taken the data is static.
 		return errors.Join(t.staticErrs...)
 	default:
-		return nil
+		// Nothing to store the data in; don't let it vanish silently.
+		return ErrNoProviders
+	}
+}
+
+// onlyWraps reports whether every leaf of err's wrap tree, followed through
+// Unwrap() error and Unwrap() []error, is target. Unlike errors.Is, it is
+// false for an error that wraps target alongside an unrelated failure.
+func onlyWraps(err, target error) bool {
+	switch e := err.(type) { //nolint:errorlint // walks the wrap tree by hand on purpose
+	case nil:
+		return false
+	case interface{ Unwrap() []error }:
+		errs := e.Unwrap()
+		if len(errs) == 0 {
+			return false
+		}
+		for _, inner := range errs {
+			if !onlyWraps(inner, target) {
+				return false
+			}
+		}
+		return true
+	case interface{ Unwrap() error }:
+		return onlyWraps(e.Unwrap(), target)
+	default:
+		return errors.Is(err, target)
 	}
 }

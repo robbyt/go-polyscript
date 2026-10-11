@@ -183,13 +183,16 @@ During evaluation, the `CompositeProvider`:
 `GetData()` on `StaticProvider` and `ContextProvider` returns a deep copy (nested
 `map[string]any` and `[]any` values included), so the caller or engine can mutate
 the result without changing the provider's data. `NewStaticProvider` likewise keeps
-its own copy of the map you pass in.
+its own copy of the map you pass in, and `ContextProvider.AddDataToContext()` stores
+a copy of the data you pass in.
 
 `CompositeProvider.AddDataToContext()` passes the data to every provider. A
-`StaticProvider`'s rejection is ignored when another provider stores the data.
-Any other failure is returned (joined with `errors.Join`) together with the most
-updated context, which still carries the data from the providers that succeeded.
-A composite with no non-nil providers returns `data.ErrNoProviders`.
+`data.ErrStaticProviderNoRuntimeUpdates` rejection (from a `StaticProvider`, or a
+nested `CompositeProvider` holding only static providers) is ignored when another
+provider stores the data. Any other failure is returned (joined with `errors.Join`)
+together with the most updated context, which still carries the data from the
+providers that succeeded. A composite with nothing to store into (no non-nil
+providers, or only empty nested composites) returns `data.ErrNoProviders`.
 
 Example of the provider chain:
 
