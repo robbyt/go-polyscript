@@ -33,7 +33,9 @@ type Evaluator interface {
 	// once Close is called, without calling the data provider, while Close
 	// itself waits for in-flight Evals, including their data loading. Close's
 	// ctx cannot interrupt that wait; cancelling an Eval's ctx shortens it
-	// only if the data provider honours cancellation. A data provider must
-	// not call Close or Eval on the same evaluator.
+	// only if the Eval honours cancellation, both in its data provider and,
+	// for Extism, in the guest (the default unless ctx termination is
+	// disabled). A data provider must not call Close or Eval on the same
+	// evaluator.
 	Close(ctx context.Context) error
 }
