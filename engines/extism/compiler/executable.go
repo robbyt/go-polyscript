@@ -20,7 +20,12 @@ type Executable struct {
 	scriptBytes []byte
 	byteCode    adapters.CompiledPlugin
 	entryPoint  string
-	closed      atomic.Bool
+
+	// closing is set as soon as Close is called, before it waits for the
+	// write lock, so new users fail fast instead of queueing behind a
+	// pending Close. closed is set once the plugin has been released.
+	closing atomic.Bool
+	closed  atomic.Bool
 
 	// rwMutex is held for reading while the plugin is in use (see
 	// WithPlugin) and for writing by Close, so the runtime is never
@@ -50,18 +55,21 @@ func (e *Executable) GetSource() string {
 }
 
 // GetByteCode returns the compiled plugin as a generic interface, or nil
-// after Close.
+// once Close has been called.
 func (e *Executable) GetByteCode() any {
 	return e.GetExtismByteCode()
 }
 
 // GetExtismByteCode returns the compiled plugin with its proper type, or nil
-// after Close. The returned plugin is not protected against a concurrent
-// Close; use WithPlugin to run code against it safely.
+// once Close has been called. The returned plugin is not protected against a
+// concurrent Close; use WithPlugin to run code against it safely.
 func (e *Executable) GetExtismByteCode() adapters.CompiledPlugin {
+	if e.closing.Load() {
+		return nil
+	}
 	e.rwMutex.RLock()
 	defer e.rwMutex.RUnlock()
-	if e.closed.Load() {
+	if e.closing.Load() {
 		return nil
 	}
 	return e.byteCode
@@ -69,14 +77,21 @@ func (e *Executable) GetExtismByteCode() adapters.CompiledPlugin {
 
 // WithPlugin calls fn with the compiled plugin while holding a read lock, so
 // a concurrent Close waits for fn to return before releasing the runtime.
-// Concurrent WithPlugin calls do not block each other. It returns
-// ErrExecutableClosed if the Executable was closed, ErrBytecodeNil if it has
-// no plugin, and otherwise fn's error. fn must not call Close or other
-// methods of e that take its lock.
+// Concurrent WithPlugin calls do not block each other, and once Close has
+// been called new calls fail fast rather than waiting for it. It returns
+// ErrExecutableClosed if Close was called, ErrBytecodeNil if there is no
+// plugin, and otherwise fn's error. fn must not call Close or other methods
+// of e that take its lock.
 func (e *Executable) WithPlugin(fn func(plugin adapters.CompiledPlugin) error) error {
+	// Checked before RLock: sync.RWMutex blocks new readers while a writer
+	// waits, so without this a pending Close would stall every new Eval
+	// until in-flight ones return.
+	if e.closing.Load() {
+		return ErrExecutableClosed
+	}
 	e.rwMutex.RLock()
 	defer e.rwMutex.RUnlock()
-	if e.closed.Load() {
+	if e.closing.Load() {
 		return ErrExecutableClosed
 	}
 	if e.byteCode == nil {
@@ -85,7 +100,8 @@ func (e *Executable) WithPlugin(fn func(plugin adapters.CompiledPlugin) error) e
 	return fn(e.byteCode)
 }
 
-// IsClosed reports whether Close has been called.
+// IsClosed reports whether Close has released the plugin. It stays false
+// while a Close waits for in-flight WithPlugin calls.
 func (e *Executable) IsClosed() bool {
 	return e.closed.Load()
 }
@@ -100,19 +116,26 @@ func (e *Executable) GetEntryPoint() string {
 	return e.entryPoint
 }
 
-// Close releases the compiled plugin and its wazero runtime. It waits for
-// in-flight WithPlugin calls (i.e. running Evals) to return; cancel their
+// Close releases the compiled plugin and its wazero runtime. New WithPlugin
+// calls fail with ErrExecutableClosed as soon as Close is called, and Close
+// waits for in-flight ones (i.e. running Evals) to return; cancel their
 // contexts to stop long-running guests. Only the first call closes the
-// plugin and returns its error; later calls return nil. Safe on a nil
-// Executable.
+// plugin and returns its error; later calls wait for it and return nil. Safe
+// on a nil Executable.
 func (e *Executable) Close(ctx context.Context) error {
 	if e == nil {
 		return nil
 	}
+	e.closing.Store(true)
 	e.rwMutex.Lock()
 	defer e.rwMutex.Unlock()
 
-	if !e.closed.CompareAndSwap(false, true) || e.byteCode == nil {
+	// The write lock serializes Close calls, so check-then-set is safe.
+	if e.closed.Load() {
+		return nil
+	}
+	defer e.closed.Store(true)
+	if e.byteCode == nil {
 		return nil
 	}
 	return e.byteCode.Close(ctx)

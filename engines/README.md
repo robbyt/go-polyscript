@@ -52,7 +52,7 @@ This package contains engine implementations for executing scripts in various la
 
 7. **Shutdown**
    - `Evaluator.Close(ctx)` releases resources held by the compiled script by calling `ExecutableUnit.Close`, which closes the `ExecutableContent` if it implements `Close(context.Context) error`
-   - Extism: closes the compiled plugin and its wazero runtime. `Close` waits for in-flight `Eval` calls to return, and later `Eval` calls fail with `compiler.ErrExecutableClosed`
+   - Extism: closes the compiled plugin and its wazero runtime. `Close` waits for in-flight `Eval` calls to return, and `Eval` calls made once `Close` has been called (even while it waits) fail fast with `compiler.ErrExecutableClosed`
    - Risor and Starlark hold no releasable resources, so `Close` is a no-op and `Eval` keeps working
    - `Close` is safe to call more than once; call it (e.g. `defer evaluator.Close(ctx)`) when an evaluator is discarded, especially for evaluators built dynamically at runtime
 

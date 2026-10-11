@@ -284,6 +284,94 @@ func TestExecutable_WithPlugin(t *testing.T) {
 		mockPlugin.AssertExpectations(t)
 	})
 
+	t.Run("pending Close fails new users fast", func(t *testing.T) {
+		mockPlugin := new(MockCompiledPlugin)
+		mockPlugin.On("Close", mock.Anything).Return(nil).Once()
+
+		exe := NewExecutable(wasmBytes, mockPlugin, entryPoint)
+		require.NotNil(t, exe)
+
+		inUse := make(chan struct{})
+		release := make(chan struct{})
+		useDone := make(chan error, 1)
+		go func() {
+			useDone <- exe.WithPlugin(func(adapters.CompiledPlugin) error {
+				close(inUse)
+				<-release
+				return nil
+			})
+		}()
+		<-inUse
+
+		closeDone := make(chan error, 1)
+		go func() { closeDone <- exe.Close(t.Context()) }()
+		require.Eventually(t, exe.closing.Load, time.Second, time.Millisecond,
+			"Close should mark the executable as closing before waiting")
+
+		// A new user must not queue behind the pending Close.
+		newUseDone := make(chan error, 1)
+		go func() {
+			newUseDone <- exe.WithPlugin(func(adapters.CompiledPlugin) error {
+				t.Error("fn must not run once Close is pending")
+				return nil
+			})
+		}()
+		select {
+		case err := <-newUseDone:
+			require.ErrorIs(t, err, ErrExecutableClosed)
+		case <-time.After(time.Second):
+			t.Fatal("new WithPlugin blocked behind a pending Close")
+		}
+		assert.False(t, exe.IsClosed(), "runtime must not be released while still in use")
+
+		close(release)
+		require.NoError(t, <-useDone)
+		require.NoError(t, <-closeDone)
+		assert.True(t, exe.IsClosed())
+		mockPlugin.AssertExpectations(t)
+	})
+
+	t.Run("concurrent Close calls all wait for the release", func(t *testing.T) {
+		pluginClosed := make(chan struct{})
+		mockPlugin := new(MockCompiledPlugin)
+		mockPlugin.On("Close", mock.Anything).Return(nil).Once().
+			Run(func(mock.Arguments) { close(pluginClosed) })
+
+		exe := NewExecutable(wasmBytes, mockPlugin, entryPoint)
+		require.NotNil(t, exe)
+
+		inUse := make(chan struct{})
+		release := make(chan struct{})
+		useDone := make(chan error, 1)
+		go func() {
+			useDone <- exe.WithPlugin(func(adapters.CompiledPlugin) error {
+				close(inUse)
+				<-release
+				return nil
+			})
+		}()
+		<-inUse
+
+		firstClose := make(chan error, 1)
+		go func() { firstClose <- exe.Close(t.Context()) }()
+		require.Eventually(t, exe.closing.Load, time.Second, time.Millisecond)
+
+		secondClose := make(chan error, 1)
+		go func() { secondClose <- exe.Close(t.Context()) }()
+		select {
+		case <-secondClose:
+			t.Fatal("second Close returned before the runtime was released")
+		case <-time.After(50 * time.Millisecond):
+		}
+
+		close(release)
+		require.NoError(t, <-useDone)
+		require.NoError(t, <-firstClose)
+		require.NoError(t, <-secondClose)
+		<-pluginClosed
+		mockPlugin.AssertExpectations(t)
+	})
+
 	t.Run("concurrent users do not block each other", func(t *testing.T) {
 		exe := NewExecutable(wasmBytes, new(MockCompiledPlugin), entryPoint)
 		require.NotNil(t, exe)
