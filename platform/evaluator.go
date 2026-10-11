@@ -44,8 +44,10 @@ type Evaluator interface {
 	// An evaluator also closes itself this way when its lifetime ctx is done.
 	// That is the ctx passed to its constructor, unless a lifetime option
 	// supplied another. The lifetime ctx does not keep the evaluator in
-	// memory: one dropped without Close is closed once it is garbage
-	// collected, but Close releases its resources sooner.
+	// memory, and once a dropped evaluator is garbage collected the end of
+	// its lifetime no longer closes it. Resources that a dropped evaluator
+	// held are released by their owner's own cleanup, if it has one, once
+	// they become unreachable; Close releases them sooner.
 	//
 	// Since Close may wait for in-flight Evals, calling it from within an
 	// Eval, such as by a data provider, blocks until ctx is done. Each engine

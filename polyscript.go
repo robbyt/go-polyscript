@@ -58,10 +58,12 @@
 // none, the end of the lifetime changes nothing. To compile once and run
 // many times, pass a long-lived ctx, or keep a short ctx for loading and
 // compiling and pass the long-lived one with [WithLifetime]. The lifetime
-// ctx does not keep the evaluator in memory, but Close releases its
-// resources sooner than the garbage collector. If the lifetime ctx is
-// already done when construction finishes, New closes what it built and
-// returns an error.
+// ctx does not keep the evaluator in memory: once a dropped evaluator is
+// garbage collected, the end of the lifetime no longer closes it, and
+// whatever its engine held is released by that resource's own cleanup, if
+// it has one. Close releases it sooner. If the lifetime ctx is already done
+// when construction finishes, New closes what it built and returns an
+// error.
 //
 // # A note on type arguments
 //
@@ -245,8 +247,9 @@ func WithLogHandler[E Engine](h slog.Handler) Option[E] {
 // and pass a long-lived ctx, or context.Background() for no limit. If the ctx
 // is already done when construction finishes, New closes what it built and
 // returns an error. A nil ctx means the ctx passed to New. The ctx does not
-// keep the evaluator in memory; Close it when done rather than relying on
-// the garbage collector.
+// keep the evaluator in memory, and does not close one that has been garbage
+// collected; Close it when done rather than relying on the garbage
+// collector.
 //
 // The type parameter usually needs to be explicit; see "A note on type
 // arguments" in the package doc.

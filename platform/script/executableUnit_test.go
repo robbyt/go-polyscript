@@ -584,7 +584,7 @@ func TestExecutableUnit_Close(t *testing.T) {
 			require.NoError(t, exe.Close(t.Context()))
 			synctest.Wait()
 			assert.Equal(t, int32(1), content.closeCalls.Load(), "the hook and Close should close the content once between them")
-			runtime.KeepAlive(exe) // keep the unit reachable so its GC cleanup cannot run
+			runtime.KeepAlive(exe) // the hook holds the unit only weakly
 		})
 	})
 
@@ -643,16 +643,72 @@ func newUnitWithContent(t *testing.T, handler slog.Handler, content ExecutableCo
 	return exe
 }
 
-// bindUnusedUnit builds a unit around content, binds it to a new live
-// lifetime and drops it, so the only remaining reference to the unit is the
-// lifetime hook. It returns the func that ends the lifetime.
-func bindUnusedUnit(t *testing.T, content ExecutableContent) context.CancelFunc {
+// bindUnusedUnit builds a unit around content, binds it to a lifetime with
+// bind and drops it, so nothing but the lifetime hook can refer to the unit.
+// It returns a channel that is closed once the unit is garbage collected.
+func bindUnusedUnit(t *testing.T, content ExecutableContent, bind func(*ExecutableUnit) error) <-chan struct{} {
 	t.Helper()
 	exe := newUnitWithContent(t, nil, content)
-	lifetime, cancel := context.WithCancel(t.Context())
-	t.Cleanup(cancel)
-	require.NoError(t, exe.BindLifetime(lifetime))
-	return cancel
+	require.NoError(t, bind(exe))
+	collected := make(chan struct{})
+	runtime.AddCleanup(exe, func(ch chan struct{}) { close(ch) }, collected)
+	return collected
+}
+
+// bindTo returns a func that binds a unit to lifetime.
+func bindTo(lifetime context.Context) func(*ExecutableUnit) error {
+	return func(u *ExecutableUnit) error { return u.BindLifetime(lifetime) }
+}
+
+// gcTimeout bounds every wait for the garbage collector, so a regression
+// fails the test instead of hanging the suite.
+const gcTimeout = 5 * time.Second
+
+// waitCollected runs the garbage collector until done is closed, failing
+// the test if that takes longer than gcTimeout.
+func waitCollected(t *testing.T, done <-chan struct{}, what string) {
+	t.Helper()
+	deadline := time.After(gcTimeout)
+	for {
+		runtime.GC()
+		select {
+		case <-done:
+			return
+		case <-deadline:
+			require.FailNow(t, what+" should be garbage collected")
+		case <-time.After(10 * time.Millisecond):
+		}
+	}
+}
+
+// settleGC runs the garbage collector a few times and gives cleanups and
+// lifetime hooks time to run, so one that should not run gets the chance to.
+func settleGC() {
+	for range 5 {
+		runtime.GC()
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
+// stopCountingLifetime is a live lifetime that counts how often a hook
+// registered on it is unregistered.
+type stopCountingLifetime struct {
+	context.Context
+	stops atomic.Int32
+}
+
+// Value hides the embedded ctx's values, including its cancelCtx, so
+// context.AfterFunc registers its hook through AfterFunc below.
+func (*stopCountingLifetime) Value(any) any { return nil }
+
+// AfterFunc registers f on the embedded ctx and counts the calls to the
+// func that unregisters it.
+func (c *stopCountingLifetime) AfterFunc(f func()) func() bool {
+	stop := context.AfterFunc(c.Context, f)
+	return func() bool {
+		c.stops.Add(1)
+		return stop()
+	}
 }
 
 func TestExecutableUnit_BindLifetime(t *testing.T) {
@@ -676,7 +732,7 @@ func TestExecutableUnit_BindLifetime(t *testing.T) {
 			cancel()
 			synctest.Wait()
 			assert.Equal(t, int32(1), content.closeCalls.Load(), "the hook should fire only once")
-			runtime.KeepAlive(exe) // keep the unit reachable so its GC cleanup cannot close the content first
+			runtime.KeepAlive(exe) // the hook holds the unit only weakly
 		})
 	})
 
@@ -711,7 +767,7 @@ func TestExecutableUnit_BindLifetime(t *testing.T) {
 			synctest.Wait()
 			assert.Equal(t, int32(1), content.closeCalls.Load())
 			assert.Contains(t, logs.String(), "close kaboom", "a close error from the hook should be logged")
-			runtime.KeepAlive(exe)
+			runtime.KeepAlive(exe) // the hook holds the unit only weakly
 		})
 	})
 
@@ -747,62 +803,87 @@ func TestExecutableUnit_BindLifetime(t *testing.T) {
 			cancelSecond()
 			synctest.Wait()
 			assert.Equal(t, int32(1), content.closeCalls.Load())
+			runtime.KeepAlive(exe) // the hook holds the unit only weakly
+		})
+	})
+
+	t.Run("lifetime keeps neither an unused unit nor its content in memory", func(t *testing.T) {
+		content := &countingClosableContent{}
+		contentCollected := make(chan struct{})
+		runtime.AddCleanup(content, func(ch chan struct{}) { close(ch) }, contentCollected)
+		lifetime, cancel := context.WithCancel(t.Context())
+		defer cancel()
+
+		unitCollected := bindUnusedUnit(t, content, bindTo(lifetime))
+		waitCollected(t, unitCollected, "a unit bound to a live lifetime but no longer used")
+		waitCollected(t, contentCollected, "the content of a dropped unit that nobody retains")
+	})
+
+	t.Run("dropped unit unregisters its lifetime hook", func(t *testing.T) {
+		content := &countingClosableContent{}
+		lifetime := &stopCountingLifetime{Context: t.Context()}
+
+		waitCollected(t, bindUnusedUnit(t, content, bindTo(lifetime)), "a dropped unit")
+		require.Eventually(t, func() bool {
+			runtime.GC()
+			return lifetime.stops.Load() >= 1
+		}, gcTimeout, 10*time.Millisecond,
+			"collecting the unit should unregister its hook from the lifetime")
+		assert.Equal(t, int32(0), content.closeCalls.Load(), "unregistering the hook must not close the content")
+	})
+
+	t.Run("retained content outlives a dropped unit's lifetime", func(t *testing.T) {
+		// content stands for what a caller kept from GetContent: whoever
+		// retains it owns its release once the unit is gone.
+		content := &countingClosableContent{}
+		lifetime, cancel := context.WithCancel(t.Context())
+		defer cancel()
+
+		waitCollected(t, bindUnusedUnit(t, content, bindTo(lifetime)), "a dropped unit")
+		settleGC()
+		assert.Equal(t, int32(0), content.closeCalls.Load(), "collecting the unit must not close retained content")
+
+		cancel()
+		settleGC()
+		assert.Equal(t, int32(0), content.closeCalls.Load(),
+			"ending the lifetime of a collected unit must not close retained content")
+	})
+
+	t.Run("lifetime ending before a dropped unit is collected closes retained content", func(t *testing.T) {
+		synctest.Test(t, func(t *testing.T) {
+			content := &countingClosableContent{}
+			exe := newUnitWithContent(t, nil, content)
+			lifetime, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			require.NoError(t, exe.BindLifetime(lifetime))
+			retained := exe.GetContent()
+
+			// A dropped unit stays in memory until a garbage collection finds
+			// it unreachable, and until then its hook still reaches the close
+			// guard. Keeping exe alive below models that window
+			// deterministically: the end of the lifetime closes the content
+			// even though a caller retained it.
+			cancel()
+			synctest.Wait()
+			assert.Equal(t, int32(1), content.closeCalls.Load(),
+				"until the unit is collected, the end of its lifetime closes retained content")
+			assert.Same(t, content, retained)
 			runtime.KeepAlive(exe)
 		})
 	})
 
-	t.Run("lifetime does not keep an unused unit in memory", func(t *testing.T) {
+	t.Run("unit dropped as its lifetime ends closes its content at most once", func(t *testing.T) {
 		content := &countingClosableContent{}
-		collected := make(chan struct{})
-		runtime.AddCleanup(content, func(ch chan struct{}) { close(ch) }, collected)
-		bindUnusedUnit(t, content)
-
-		// The unit's cleanup closes the content and lets it go; only then can
-		// the content itself be collected.
-		deadline := time.After(5 * time.Second)
-		for {
-			runtime.GC()
-			select {
-			case <-collected:
-				return
-			case <-deadline:
-				t.Fatal("a unit bound to a live lifetime but no longer used should be garbage collected")
-			case <-time.After(10 * time.Millisecond):
-			}
-		}
-	})
-
-	t.Run("unused unit has its content closed once collected", func(t *testing.T) {
-		content := &countingClosableContent{}
-		cancel := bindUnusedUnit(t, content)
-		require.Eventually(t, func() bool {
-			runtime.GC()
-			return content.closeCalls.Load() == 1
-		}, 5*time.Second, 10*time.Millisecond, "collecting a bound, unclosed unit should close its content")
-
-		cancel()
-		time.Sleep(20 * time.Millisecond) // let a hook that wrongly survived run
-		assert.Equal(t, int32(1), content.closeCalls.Load(), "the lifetime hook must be gone once the unit is collected")
-	})
-
-	t.Run("unit dropped as its lifetime ends still has its content closed", func(t *testing.T) {
-		content := &countingClosableContent{}
-		cancel := bindUnusedUnit(t, content)
+		lifetime, cancel := context.WithCancel(t.Context())
+		defer cancel()
+		unitCollected := bindUnusedUnit(t, content, bindTo(lifetime))
 		// End the lifetime and collect the unit at once, so the hook and the
-		// unit's GC cleanup race; whichever wins, the content is closed once.
-		// This is a smoke test: the window where the unit is collected after
-		// the hook starts is too narrow to hit on demand. The guarantee itself
-		// is structural: the hook refers to the content, never to the unit.
+		// collection race. If the hook still reaches the unit's close guard
+		// it closes the content; if the unit is gone first it does nothing.
 		cancel()
-		require.Eventually(t, func() bool {
-			runtime.GC()
-			return content.closeCalls.Load() == 1
-		}, 5*time.Second, 10*time.Millisecond, "the content of a unit dropped as its lifetime ends should be closed")
-		for range 5 {
-			runtime.GC()
-			time.Sleep(10 * time.Millisecond)
-		}
-		assert.Equal(t, int32(1), content.closeCalls.Load(), "the content should be closed exactly once")
+		waitCollected(t, unitCollected, "a dropped unit")
+		settleGC()
+		assert.LessOrEqual(t, content.closeCalls.Load(), int32(1), "the content should be closed at most once")
 	})
 
 	t.Run("collecting a closed unit does not close its content again", func(t *testing.T) {
@@ -814,10 +895,7 @@ func TestExecutableUnit_BindLifetime(t *testing.T) {
 			require.NoError(t, exe.BindLifetime(lifetime))
 			require.NoError(t, exe.Close(lifetime))
 		}()
-		for range 5 {
-			runtime.GC()
-			time.Sleep(10 * time.Millisecond)
-		}
+		settleGC()
 		assert.Equal(t, int32(1), content.closeCalls.Load(), "only the explicit Close should close the content")
 	})
 
@@ -837,7 +915,7 @@ func TestExecutableUnit_BindLifetime(t *testing.T) {
 			cancelFirst()
 			synctest.Wait()
 			assert.Equal(t, int32(1), content.closeCalls.Load(), "the earlier lifetime's hook should be gone")
-			runtime.KeepAlive(exe) // keep the unit reachable so its GC cleanup cannot close the content first
+			runtime.KeepAlive(exe) // the hook holds the unit only weakly
 		})
 	})
 

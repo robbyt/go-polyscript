@@ -56,9 +56,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with a long-lived ctx or given one with `WithLifetime`. A lifetime ctx
   that is already done when construction finishes makes the constructor
   close what it built and return an error wrapping the ctx's error, on
-  every engine. The lifetime ctx does not keep the evaluator in memory, so
-  one dropped without `Close` is still garbage collected, and its runtime is
-  closed then. ([#162](https://github.com/robbyt/go-polyscript/issues/162))
+  every engine. The lifetime ctx does not keep the evaluator in memory, and
+  does not close one that has been garbage collected.
+  ([#162](https://github.com/robbyt/go-polyscript/issues/162))
+- Extism `compiler.Executable` releases its compiled plugin and wazero
+  runtime when it is garbage collected without having been closed, like
+  `os.File`; `Close` releases it sooner. Content retained from
+  `ExecutableUnit.GetContent` is no longer closed when the unit or evaluator
+  is garbage collected. The end of the lifetime ctx still closes it until the
+  dropped unit has been collected; after that, whoever retains it owns its
+  release. Retain the content itself: a plugin from `GetExtismByteCode` does
+  not keep the `Executable` alive, and is released when the `Executable` is
+  collected. ([#162](https://github.com/robbyt/go-polyscript/issues/162))
 - **BREAKING:** Extism `compiler.Executable.ByteCode` is unexported; use
   `GetExtismByteCode()` or the new `WithPlugin(ctx, fn)`, which holds the
   plugin open while `fn` runs.

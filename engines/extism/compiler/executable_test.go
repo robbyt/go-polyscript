@@ -3,7 +3,9 @@ package compiler
 import (
 	"context"
 	"errors"
+	"runtime"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -65,6 +67,15 @@ func (m *MockPluginInstance) Close(ctx context.Context) error {
 	return args.Error(0)
 }
 
+// newUnclosedMockPlugin returns a MockCompiledPlugin for an Executable the
+// test never closes. Such an Executable releases its plugin when it is
+// garbage collected, so the plugin allows that Close.
+func newUnclosedMockPlugin() *MockCompiledPlugin {
+	m := new(MockCompiledPlugin)
+	m.On("Close", mock.Anything).Return(nil).Maybe()
+	return m
+}
+
 // TestExecutable tests the functionality of Executable
 func TestExecutable(t *testing.T) {
 	t.Parallel()
@@ -76,7 +87,7 @@ func TestExecutable(t *testing.T) {
 		entryPoint := "run"
 
 		// Create a mock plugin
-		mockPlugin := new(MockCompiledPlugin)
+		mockPlugin := newUnclosedMockPlugin()
 
 		t.Run("valid creation", func(t *testing.T) {
 			exe := NewExecutable(wasmBytes, mockPlugin, entryPoint)
@@ -111,7 +122,7 @@ func TestExecutable(t *testing.T) {
 	t.Run("Getters", func(t *testing.T) {
 		wasmBytes := []byte("mock wasm bytes")
 		entryPoint := "run"
-		mockPlugin := new(MockCompiledPlugin)
+		mockPlugin := newUnclosedMockPlugin()
 
 		exe := NewExecutable(wasmBytes, mockPlugin, entryPoint)
 		require.NotNil(t, exe)
@@ -217,7 +228,7 @@ func TestExecutable_WithPlugin(t *testing.T) {
 	entryPoint := "run"
 
 	t.Run("passes the compiled plugin to fn", func(t *testing.T) {
-		mockPlugin := new(MockCompiledPlugin)
+		mockPlugin := newUnclosedMockPlugin()
 		exe := NewExecutable(wasmBytes, mockPlugin, entryPoint)
 		require.NotNil(t, exe)
 
@@ -233,7 +244,7 @@ func TestExecutable_WithPlugin(t *testing.T) {
 
 	t.Run("returns fn error", func(t *testing.T) {
 		fnErr := errors.New("fn kaboom")
-		exe := NewExecutable(wasmBytes, new(MockCompiledPlugin), entryPoint)
+		exe := NewExecutable(wasmBytes, newUnclosedMockPlugin(), entryPoint)
 		require.NotNil(t, exe)
 
 		err := exe.WithPlugin(t.Context(), func(adapters.CompiledPlugin) error { return fnErr })
@@ -403,7 +414,7 @@ func TestExecutable_WithPlugin(t *testing.T) {
 	})
 
 	t.Run("concurrent users do not block each other", func(t *testing.T) {
-		exe := NewExecutable(wasmBytes, new(MockCompiledPlugin), entryPoint)
+		exe := NewExecutable(wasmBytes, newUnclosedMockPlugin(), entryPoint)
 		require.NotNil(t, exe)
 
 		firstIn := make(chan struct{})
@@ -641,4 +652,111 @@ func TestExecutable_CloseContext(t *testing.T) {
 		assert.True(t, exe.IsClosed())
 		mockPlugin.AssertExpectations(t)
 	})
+}
+
+// dropExecutable builds an Executable around plugin and drops it, calling
+// use on it first. It returns a channel that is closed once the Executable
+// is garbage collected.
+func dropExecutable(t *testing.T, plugin adapters.CompiledPlugin, use func(*Executable)) <-chan struct{} {
+	t.Helper()
+	exe := NewExecutable([]byte("mock wasm bytes"), plugin, "run")
+	require.NotNil(t, exe)
+	use(exe)
+	collected := make(chan struct{})
+	runtime.AddCleanup(exe, func(ch chan struct{}) { close(ch) }, collected)
+	return collected
+}
+
+// settleGC runs the garbage collector a few times and gives cleanups time
+// to run, so one that should not run gets the chance to.
+func settleGC() {
+	for range 5 {
+		runtime.GC()
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
+func TestExecutable_GarbageCollection(t *testing.T) {
+	t.Parallel()
+
+	t.Run("dropped executable releases its plugin once collected", func(t *testing.T) {
+		var closeCalls atomic.Int32
+		mockPlugin := new(MockCompiledPlugin)
+		mockPlugin.On("Close", liveCtx()).Return(nil).Run(func(mock.Arguments) { closeCalls.Add(1) })
+
+		dropExecutable(t, mockPlugin, func(*Executable) {})
+		require.Eventually(t, func() bool {
+			runtime.GC()
+			return closeCalls.Load() == 1
+		}, closeTestTimeout, 10*time.Millisecond, "collecting an unclosed executable should release its plugin")
+		settleGC()
+		assert.Equal(t, int32(1), closeCalls.Load(), "the plugin should be released exactly once")
+		mockPlugin.AssertExpectations(t)
+	})
+
+	t.Run("retained bytecode does not keep a dropped executable open", func(t *testing.T) {
+		var closeCalls atomic.Int32
+		mockPlugin := new(MockCompiledPlugin)
+		mockPlugin.On("Close", liveCtx()).Return(nil).Run(func(mock.Arguments) { closeCalls.Add(1) })
+
+		var retained adapters.CompiledPlugin
+		collected := dropExecutable(t, mockPlugin, func(exe *Executable) {
+			retained = exe.GetExtismByteCode()
+		})
+		recvCollected(t, collected)
+		require.Eventually(t, func() bool {
+			runtime.GC()
+			return closeCalls.Load() == 1
+		}, closeTestTimeout, 10*time.Millisecond,
+			"collecting the executable should release its plugin even while a caller holds the plugin")
+		assert.Same(t, mockPlugin, retained)
+		mockPlugin.AssertExpectations(t)
+		runtime.KeepAlive(retained)
+	})
+
+	t.Run("collecting a closed executable does not release it again", func(t *testing.T) {
+		var closeCalls atomic.Int32
+		mockPlugin := new(MockCompiledPlugin)
+		mockPlugin.On("Close", liveCtx()).Return(nil).Run(func(mock.Arguments) { closeCalls.Add(1) })
+
+		collected := dropExecutable(t, mockPlugin, func(exe *Executable) {
+			require.NoError(t, exe.Close(t.Context()))
+		})
+		recvCollected(t, collected)
+		settleGC()
+		assert.Equal(t, int32(1), closeCalls.Load(), "only the explicit Close should release the plugin")
+		mockPlugin.AssertExpectations(t)
+	})
+
+	t.Run("executable used through WithPlugin stays open while reachable", func(t *testing.T) {
+		mockPlugin := new(MockCompiledPlugin)
+		exe := NewExecutable([]byte("mock wasm bytes"), mockPlugin, "run")
+		require.NotNil(t, exe)
+
+		settleGC()
+		require.NoError(t, exe.WithPlugin(t.Context(), func(adapters.CompiledPlugin) error { return nil }))
+		assert.False(t, exe.IsClosed())
+		mockPlugin.AssertNotCalled(t, "Close", mock.Anything)
+
+		mockPlugin.On("Close", liveCtx()).Return(nil).Once()
+		require.NoError(t, exe.Close(t.Context()))
+		mockPlugin.AssertExpectations(t)
+	})
+}
+
+// recvCollected runs the garbage collector until collected is closed,
+// failing the test if that takes longer than closeTestTimeout.
+func recvCollected(t *testing.T, collected <-chan struct{}) {
+	t.Helper()
+	deadline := time.After(closeTestTimeout)
+	for {
+		runtime.GC()
+		select {
+		case <-collected:
+			return
+		case <-deadline:
+			require.FailNow(t, "the executable should be garbage collected")
+		case <-time.After(10 * time.Millisecond):
+		}
+	}
 }

@@ -448,6 +448,11 @@ func TestCompiler_Compile_Branches(t *testing.T) {
 		require.NoError(t, err, "instance.Close error must not propagate")
 		require.NotNil(t, execContent)
 		plugin.AssertNotCalled(t, "Close", mock.Anything)
+
+		executable, ok := execContent.(*Executable)
+		require.True(t, ok, "Expected *Executable type")
+		plugin.On("Close", mock.Anything).Return(nil).Once()
+		require.NoError(t, executable.Close(t.Context()), "the compiled plugin is released by Close")
 		plugin.AssertExpectations(t)
 		instance.AssertExpectations(t)
 		reader.AssertExpectations(t)

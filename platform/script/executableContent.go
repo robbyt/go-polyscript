@@ -13,6 +13,16 @@ import (
 // error to release them. Like [io.Closer], its behavior after the first call
 // need not be defined: an [ExecutableUnit] calls it at most once, however
 // many times or ways the unit itself is closed.
+//
+// A unit closes its content only through Close or the end of its lifetime
+// (see [ExecutableUnit.BindLifetime]), never when the unit is garbage
+// collected. The end of the lifetime can still close the content until a
+// dropped unit has been collected; after that, a caller that retained the
+// content from GetContent keeps using it and owns its release. The value
+// GetByteCode returns need not keep the content alive, so a caller should
+// retain the content, not just its bytecode. Content that holds resources
+// should release them from its own cleanup (see [runtime.AddCleanup]) when
+// it becomes unreachable without being closed, as [os.File] does.
 type ExecutableContent interface {
 	// GetSource returns the original script content as a string.
 	// This is the source code before any compilation or execution.

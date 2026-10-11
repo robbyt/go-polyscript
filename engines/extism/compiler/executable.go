@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"runtime"
 	"sync"
 
 	"github.com/robbyt/go-polyscript/engines/extism/adapters"
@@ -16,11 +17,23 @@ var ErrExecutableClosed = errors.New("executable is closed")
 
 // Executable implements script.ExecutableContent for Extism WASM modules.
 // It owns the compiled plugin (and its wazero runtime) until it is released
-// by Close.
+// by Close. Like an [os.File], an Executable from NewExecutable that becomes
+// unreachable without being closed releases its plugin when it is garbage
+// collected; Close releases it sooner. Retaining an Executable, for example
+// from an ExecutableUnit's GetContent, keeps the garbage collector from
+// releasing it, and whoever retains it owns its release; the unit can still
+// close it through its own Close or the end of its lifetime until the unit
+// has been garbage collected. Retaining only the plugin from
+// GetExtismByteCode does not keep the Executable, or the plugin, open.
 type Executable struct {
 	scriptBytes []byte
 	byteCode    adapters.CompiledPlugin
 	entryPoint  string
+
+	// rel releases the plugin at most once, for both Close and the cleanup
+	// NewExecutable registers. It is built on first use for an Executable
+	// not made by NewExecutable.
+	rel *pluginRelease
 
 	// releaseOnce runs the release exactly once. The plugin is released
 	// once closing is set and inFlight is zero, by whichever of Close or the
@@ -39,7 +52,43 @@ type Executable struct {
 	releaseErr error
 }
 
-// NewExecutable creates a new Executable instance
+// pluginRelease closes a compiled plugin at most once. It does not refer to
+// the Executable, so the cleanup that releases an unreachable Executable can
+// hold it without keeping that Executable alive.
+type pluginRelease struct {
+	once   sync.Once
+	plugin adapters.CompiledPlugin
+	err    error
+}
+
+// release closes the plugin on the first call and returns that close's
+// error on every call. Concurrent callers wait for the first to finish.
+func (r *pluginRelease) release(ctx context.Context) error {
+	r.closeOnce(ctx)
+	return r.err
+}
+
+// closeOnce closes the plugin on the first call and stores its error.
+func (r *pluginRelease) closeOnce(ctx context.Context) {
+	r.once.Do(func() {
+		if r.plugin != nil {
+			r.err = r.plugin.Close(ctx)
+		}
+	})
+}
+
+// releaseUnreachable is the cleanup NewExecutable registers. It releases
+// the plugin of an Executable that was garbage collected without being
+// released; for one that was, it does nothing. Nothing is left to report a
+// release error to, so it is kept only in r.
+func releaseUnreachable(r *pluginRelease) {
+	r.closeOnce(context.Background())
+}
+
+// NewExecutable creates a new Executable instance. It returns nil if
+// scriptBytes is empty, byteCode is nil or entryPoint is empty. If the
+// Executable becomes unreachable without being closed, its plugin is
+// released when it is garbage collected.
 func NewExecutable(
 	scriptBytes []byte,
 	byteCode adapters.CompiledPlugin,
@@ -48,12 +97,15 @@ func NewExecutable(
 	if len(scriptBytes) == 0 || byteCode == nil || entryPoint == "" {
 		return nil
 	}
-	return &Executable{
+	e := &Executable{
 		scriptBytes: scriptBytes,
 		byteCode:    byteCode,
 		entryPoint:  entryPoint,
+		rel:         &pluginRelease{plugin: byteCode},
 		released:    make(chan struct{}),
 	}
+	runtime.AddCleanup(e, releaseUnreachable, e.rel)
+	return e
 }
 
 // GetSource returns the original script content
@@ -69,7 +121,8 @@ func (e *Executable) GetByteCode() any {
 
 // GetExtismByteCode returns the compiled plugin with its proper type, or nil
 // once Close has been called. The returned plugin is not protected against a
-// concurrent Close; use WithPlugin to run code against it safely.
+// concurrent Close, and does not keep the Executable from being garbage
+// collected and releasing it; use WithPlugin to run code against it safely.
 func (e *Executable) GetExtismByteCode() adapters.CompiledPlugin {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -138,15 +191,24 @@ func (e *Executable) releasedLocked() chan struct{} {
 // release closes the plugin and then the released channel. Callers pass a
 // ctx without cancellation, so the release is never cut short.
 func (e *Executable) release(ctx context.Context) {
-	var err error
-	if e.byteCode != nil {
-		err = e.byteCode.Close(ctx)
-	}
+	e.mu.Lock()
+	rel := e.relLocked()
+	e.mu.Unlock()
+	err := rel.release(ctx)
 	e.mu.Lock()
 	e.releaseErr = err
 	ch := e.releasedLocked()
 	e.mu.Unlock()
 	close(ch)
+}
+
+// relLocked returns the plugin's release, creating it for an Executable not
+// built by NewExecutable. e.mu must be held.
+func (e *Executable) relLocked() *pluginRelease {
+	if e.rel == nil {
+		e.rel = &pluginRelease{plugin: e.byteCode}
+	}
+	return e.rel
 }
 
 // IsClosed reports whether the plugin has been released, not merely that
@@ -182,7 +244,9 @@ func (e *Executable) GetEntryPoint() string {
 // once and concurrently: the plugin is released once, and every Close that
 // sees the release finish, including one called after it, returns its
 // error. Call Close again after one that gave up waiting to learn whether
-// the release failed. Safe on a nil Executable.
+// the release failed. Close releases the plugin sooner than the garbage
+// collector, which releases an unclosed Executable once it is unreachable.
+// Safe on a nil Executable.
 func (e *Executable) Close(ctx context.Context) error {
 	if e == nil {
 		return nil

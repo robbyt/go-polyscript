@@ -8,6 +8,7 @@ import (
 	"runtime"
 	"sync"
 	"time"
+	"weak"
 
 	engineTypes "github.com/robbyt/go-polyscript/engines/types"
 	"github.com/robbyt/go-polyscript/internal/helpers"
@@ -159,11 +160,19 @@ func (exe *ExecutableUnit) GetDataProvider() data.Provider {
 // not stored. Content without a Close method holds nothing to release, so
 // for it no hook is registered.
 //
-// The hook refers to the content, not the unit, so a long-lived lifetime
-// does not keep a unit that is no longer used in memory. If such a unit is
-// garbage collected while still bound and not closed, its hook is
-// unregistered and its content is closed then. Call Close to release the
-// content promptly instead of waiting for the garbage collector.
+// The hook holds the unit only weakly, so lifetime keeps neither the unit
+// nor its content in memory. A dropped unit is only known to be gone once
+// it has been garbage collected: until then, the end of lifetime still
+// closes the content, even if the unit is no longer reachable and a caller
+// retained the content. Once the unit is collected its hook is unregistered
+// and the end of lifetime no longer closes the content: a caller that
+// retained the content from GetContent can keep using it and owns its
+// release from then on. A caller that needs the content to outlive the unit
+// should therefore not bind the unit to a lifetime that may end first. Only
+// the content itself is covered: the bytecode from its GetByteCode need not
+// keep the content alive, so retain the content, not just its bytecode.
+// Content that holds resources should release them from its own cleanup
+// when it becomes unreachable, as [os.File] does; Close releases it sooner.
 //
 // If lifetime is done by the time the hook is registered, BindLifetime
 // closes the content before returning and returns an error that wraps
@@ -189,34 +198,59 @@ func (exe *ExecutableUnit) BindLifetime(lifetime context.Context) error {
 
 	release := context.WithoutCancel(lifetime)
 	if lifetime.Err() != nil {
-		exe.replaceLifetime(nil)
-		return lifetimeEndedError(lifetime, guard.Close(release))
+		return exe.closeForEndedLifetime(lifetime, guard, release)
 	}
 
-	logger := exe.logger
-	stop := context.AfterFunc(lifetime, func() {
-		if err := guard.Close(release); err != nil {
-			logger.Warn("failed to close content when its lifetime ended", "error", err)
-		}
-	})
+	stop := context.AfterFunc(lifetime, closeOnLifetimeEnd(weak.Make(guard), release, exe.logger))
 	// Check again now the hook is registered, so a lifetime that ends at any
 	// point before BindLifetime returns is reported instead of closing the
 	// content behind the caller's back. Whether or not the hook has started,
 	// the guard closes the content once and makes every caller wait for that
 	// close's result.
 	if lifetime.Err() != nil {
-		exe.replaceLifetime(nil)
 		stop()
-		return lifetimeEndedError(lifetime, guard.Close(release))
+		return exe.closeForEndedLifetime(lifetime, guard, release)
 	}
-	runtime.AddCleanup(exe, closeUnreachable, unreachableUnit{
-		stop:   stop,
-		closer: guard,
-		logger: logger,
-	})
+	// The hook cannot reach a collected guard, so unregister it then, so
+	// that a dropped unit leaves nothing behind in a long-lived lifetime.
+	runtime.AddCleanup(guard, unregisterHook, stop)
 
 	exe.replaceLifetime(stop)
 	return nil
+}
+
+// closeForEndedLifetime handles a lifetime that ended before BindLifetime
+// could finish: it drops any earlier lifetime, closes the content through
+// guard and reports both.
+func (exe *ExecutableUnit) closeForEndedLifetime(
+	lifetime context.Context,
+	guard *onceCloser,
+	release context.Context,
+) error {
+	exe.replaceLifetime(nil)
+	return lifetimeEndedError(lifetime, guard.Close(release))
+}
+
+// closeOnLifetimeEnd returns the hook BindLifetime registers on a lifetime.
+// It closes the content through guard if the unit that owns guard is still
+// alive, and does nothing once it has been garbage collected.
+func closeOnLifetimeEnd(guard weak.Pointer[onceCloser], release context.Context, logger *slog.Logger) func() {
+	return func() {
+		g := guard.Value()
+		if g == nil {
+			return
+		}
+		if err := g.Close(release); err != nil {
+			logger.Warn("failed to close content when its lifetime ended", "error", err)
+		}
+	}
+}
+
+// unregisterHook is the cleanup BindLifetime attaches to a unit's close
+// guard. It unregisters the lifetime hook, which refers to the guard only
+// weakly and so cannot keep it alive.
+func unregisterHook(stop func() bool) {
+	stop()
 }
 
 // replaceLifetime installs stop as the unit's lifetime hook, or none for a
@@ -229,30 +263,6 @@ func (exe *ExecutableUnit) replaceLifetime(stop func() bool) {
 	if previous != nil {
 		previous()
 	}
-}
-
-// unreachableUnit is what the cleanup registered by BindLifetime needs to
-// release a unit's content after the unit is garbage collected. It must not
-// refer to the unit itself.
-type unreachableUnit struct {
-	stop   func() bool
-	closer contentCloser
-	logger *slog.Logger
-}
-
-// closeUnreachable unregisters the lifetime hook of a garbage-collected
-// unit and closes its content, unless Close, the hook or a later
-// BindLifetime already stopped that hook. The close runs on its own
-// goroutine so a slow one does not hold up other cleanups.
-func closeUnreachable(u unreachableUnit) {
-	if !u.stop() {
-		return
-	}
-	go func() {
-		if err := u.closer.Close(context.Background()); err != nil {
-			u.logger.Warn("failed to close content of an unreachable unit", "error", err)
-		}
-	}()
 }
 
 // lifetimeEndedError reports that lifetime was done before the unit could be
@@ -277,10 +287,10 @@ func lifetimeEndedError(lifetime context.Context, closeErr error) error {
 // lifetime after Close does nothing.
 //
 // The content is closed at most once, using a [sync.Once]: the first close,
-// whether from Close, the lifetime hook or the garbage collector, calls the
-// content's Close with its own ctx, and every other Close, concurrent or
-// later, waits for that call and returns its result. So only the first
-// close's ctx bounds the wait. Safe on a nil unit.
+// whether from Close, the lifetime hook or BindLifetime, calls the content's
+// Close with its own ctx, and every other Close, concurrent or later, waits
+// for that call and returns its result. So only the first close's ctx bounds
+// the wait. Safe on a nil unit.
 func (exe *ExecutableUnit) Close(ctx context.Context) error {
 	if exe == nil {
 		return nil
