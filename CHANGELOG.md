@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `data.ErrNoProviders`, returned by `CompositeProvider.AddDataToContext`
+  when it holds no providers to store the data in.
+  ([#160](https://github.com/robbyt/go-polyscript/issues/160))
 - **BREAKING:** `Close(ctx)` on `platform.Evaluator`, implemented by every
   engine, and on `script.ExecutableUnit`. For Extism it releases the compiled
   module's wazero runtime. Once `Close` has been called, any new `Eval` fails
@@ -61,6 +64,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   every engine. Call `Close` or let the lifetime end: nothing releases an
   evaluator's resources when it is garbage collected.
   ([#162](https://github.com/robbyt/go-polyscript/issues/162))
+- **BREAKING:** `CompositeProvider.AddDataToContext` now returns the joined
+  errors whenever a provider fails, together with the context carrying
+  every successful provider's data, instead of returning `nil` as long as
+  one provider succeeded. Nested composites and wrapped static providers
+  are judged by the error they return, not by their type.
+  ([#160](https://github.com/robbyt/go-polyscript/issues/160))
+- `StaticProvider` and `ContextProvider` copy data on the way in and out:
+  `NewStaticProvider` stores a deep copy of the caller's map,
+  `ContextProvider.AddDataToContext` also rebuilds `[]any` values, and
+  `GetData` returns a deep copy (`map[string]any` and `[]any`, recursively).
+  Typed slices, other map types and pointers are still shared.
+  ([#159](https://github.com/robbyt/go-polyscript/issues/159))
 - **BREAKING:** Extism `compiler.Executable.ByteCode` is unexported; use
   `GetExtismByteCode()` or the new `WithPlugin(ctx, fn)`, which holds the
   plugin open while `fn` runs.
@@ -213,6 +228,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   directly can still hit it; see `engines/README.md` for workarounds.
 
 ### Fixed
+- `GetData` handed out the providers' internal maps (`ContextProvider`
+  returned the stored map, `StaticProvider` a shallow clone), so a caller
+  mutating the result corrupted the provider's data and raced with
+  concurrent readers.
+  ([#159](https://github.com/robbyt/go-polyscript/issues/159))
+- `CompositeProvider.AddDataToContext` silently dropped provider errors on
+  partial success, and an empty composite returned success while storing
+  nothing.
+  ([#160](https://github.com/robbyt/go-polyscript/issues/160))
 - Extism leaked wazero runtimes: nothing could close a compiled module, and
   the compiler did not close the plugin when the entry-point check or the
   test instance failed after a successful compile.
