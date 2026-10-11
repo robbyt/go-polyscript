@@ -26,6 +26,8 @@ package polyscript_test
 // marker.
 
 import (
+	"errors"
+	"fmt"
 	"go/ast"
 	"go/doc/comment"
 	"go/parser"
@@ -114,54 +116,110 @@ func normalize(s string) string {
 	return strings.Trim(strings.Join(lines, "\n"), "\n")
 }
 
-// readmeBlocks returns every Go code block in a Markdown file, each with the
-// source named by the snippet marker on the line above its fence. Fences
-// follow CommonMark, as GitHub renders them: a run of at least three
-// backticks or tildes opens a block, the first word of the info string after
-// it names the language (go or golang, in any case), and only a run of the
-// same character at least as long closes it.
+// errUnterminatedFence is returned by markdownBlocks for a code fence that
+// is never closed.
+var errUnterminatedFence = errors.New("unterminated code fence")
+
+// readmeBlocks returns every Go code block in a Markdown file; see
+// markdownBlocks.
 func readmeBlocks(t *testing.T, path string) []docBlock {
 	t.Helper()
 	raw, err := os.ReadFile(path)
 	require.NoError(t, err, "Should read %s", path)
-
-	var blocks []docBlock
-	var current *docBlock
-	var body []string
-	fence := "" // the opening fence run while inside a block
-	previous := ""
-	for i, line := range strings.Split(string(raw), "\n") {
-		trimmed := strings.TrimSpace(line)
-		switch {
-		case fence == "":
-			m := fenceOpen.FindStringSubmatch(trimmed)
-			if m == nil || (m[1][0] == '`' && strings.Contains(m[2], "`")) {
-				break
-			}
-			fence = m[1]
-			if isGoInfo(m[2]) {
-				current = &docBlock{where: path + ":" + strconv.Itoa(i+1)}
-				if marker := readmeMarker.FindStringSubmatch(previous); marker != nil {
-					current.source = marker[1]
-				}
-				body = nil
-			}
-		case len(trimmed) >= len(fence) && strings.Trim(trimmed, fence[:1]) == "":
-			fence = ""
-			if current != nil {
-				current.code = strings.Join(body, "\n")
-				blocks = append(blocks, *current)
-				current = nil
-			}
-		default:
-			body = append(body, line)
-		}
-		if trimmed != "" {
-			previous = trimmed
-		}
-	}
-	require.Empty(t, fence, "%s has an unterminated code fence", path)
+	blocks, err := markdownBlocks(path, string(raw))
+	require.NoError(t, err, "Should parse the code fences in %s", path)
 	return blocks
+}
+
+// markdownBlocks returns every Go code block in text, the Markdown content
+// of path, each with the source named by the snippet marker on the last
+// non-blank line above its fence. Fences follow CommonMark, as GitHub renders
+// them: a run of at least three backticks or tildes opens a block, the first
+// word of the info string after it names the language (go or golang, in any
+// case), and only a run of the same character at least as long closes it.
+func markdownBlocks(path, text string) ([]docBlock, error) {
+	r := &fenceReader{path: path}
+	for i, line := range strings.Split(text, "\n") {
+		r.readLine(i+1, line)
+	}
+	if r.fence != "" {
+		return nil, fmt.Errorf("%s: %w", path, errUnterminatedFence)
+	}
+	return r.blocks, nil
+}
+
+// fenceReader collects the Go code blocks of a Markdown file one line at a
+// time.
+type fenceReader struct {
+	path     string
+	blocks   []docBlock
+	fence    string    // the opening fence run while inside a block
+	current  *docBlock // the Go block being read; nil inside other blocks
+	body     []string  // the lines of current read so far
+	previous string    // the last non-blank line, for the snippet marker
+}
+
+// readLine handles line n (counting from 1) of the file.
+func (r *fenceReader) readLine(n int, line string) {
+	trimmed := strings.TrimSpace(line)
+	switch {
+	case r.fence == "":
+		r.open(n, trimmed)
+	case closesFence(trimmed, r.fence):
+		r.close()
+	case r.current != nil:
+		r.body = append(r.body, line)
+	}
+	if trimmed != "" {
+		r.previous = trimmed
+	}
+}
+
+// open starts a block when line n opens a fence, and starts collecting it
+// when the block is Go.
+func (r *fenceReader) open(n int, line string) {
+	fence, info, ok := openFence(line)
+	if !ok {
+		return
+	}
+	r.fence = fence
+	if !isGoInfo(info) {
+		return
+	}
+	r.current = &docBlock{where: r.path + ":" + strconv.Itoa(n)}
+	if marker := readmeMarker.FindStringSubmatch(r.previous); marker != nil {
+		r.current.source = marker[1]
+	}
+	r.body = nil
+}
+
+// close ends the current block, keeping it when it is Go.
+func (r *fenceReader) close() {
+	r.fence = ""
+	if r.current == nil {
+		return
+	}
+	r.current.code = strings.Join(r.body, "\n")
+	r.blocks = append(r.blocks, *r.current)
+	r.current = nil
+}
+
+// openFence returns the fence run and info string when line, with its
+// surrounding space trimmed, opens a fenced code block. A backtick fence
+// whose info string holds a backtick is inline code, not a fence.
+func openFence(line string) (fence, info string, ok bool) {
+	m := fenceOpen.FindStringSubmatch(line)
+	if m == nil || (m[1][0] == '`' && strings.Contains(m[2], "`")) {
+		return "", "", false
+	}
+	return m[1], m[2], true
+}
+
+// closesFence reports whether line, with its surrounding space trimmed,
+// closes a block opened by fence: a run of the same character, at least as
+// long, with nothing after it.
+func closesFence(line, fence string) bool {
+	return len(line) >= len(fence) && strings.Trim(line, fence[:1]) == ""
 }
 
 // isGoInfo reports whether a fence info string marks a Go code block.
@@ -441,6 +499,115 @@ func TestDocSnippets(t *testing.T) {
 	t.Run("every snippet is shown", func(t *testing.T) {
 		for _, source := range snippetSources(t) {
 			assert.True(t, shown[source], "%s is not shown in any doc; remove it or add it to a doc", source)
+		}
+	})
+}
+
+// TestMarkdownBlocks checks which fenced code blocks markdownBlocks collects
+// from Markdown text, and that it rejects an unterminated fence.
+func TestMarkdownBlocks(t *testing.T) {
+	t.Parallel()
+
+	const marker = "<!-- snippet: a.go#x -->"
+
+	t.Run("collects Go blocks", func(t *testing.T) {
+		tests := []struct {
+			name     string
+			markdown string
+			expected []docBlock
+		}{
+			{
+				name:     "backtick fence with a marker",
+				markdown: marker + "\n```go\nx := 1\n\ny := 2\n```\n",
+				expected: []docBlock{{where: "doc.md:2", source: "a.go#x", code: "x := 1\n\ny := 2"}},
+			},
+			{
+				name:     "tilde fence",
+				markdown: marker + "\n~~~go\nx := 1\n~~~\n",
+				expected: []docBlock{{where: "doc.md:2", source: "a.go#x", code: "x := 1"}},
+			},
+			{
+				name:     "golang, any case, with more info",
+				markdown: "```GoLang title=x\nx := 1\n```\n",
+				expected: []docBlock{{where: "doc.md:1", code: "x := 1"}},
+			},
+			{
+				name:     "indented fence and a marker above blank lines",
+				markdown: marker + "\n\n  ```go\n  x := 1\n  ```\n",
+				expected: []docBlock{{where: "doc.md:3", source: "a.go#x", code: "  x := 1"}},
+			},
+			{
+				name:     "marker not on the last non-blank line",
+				markdown: marker + "\ntext\n```go\nx := 1\n```\n",
+				expected: []docBlock{{where: "doc.md:3", code: "x := 1"}},
+			},
+			{
+				name:     "longer fence holds a shorter run",
+				markdown: "````go\n```\nx := 1\n````\n",
+				expected: []docBlock{{where: "doc.md:1", code: "```\nx := 1"}},
+			},
+			{
+				name:     "longer run closes a fence",
+				markdown: "```go\nx := 1\n`````\n",
+				expected: []docBlock{{where: "doc.md:1", code: "x := 1"}},
+			},
+			{
+				name:     "backticks do not close a tilde fence",
+				markdown: "~~~go\n```\nx := 1\n~~~\n",
+				expected: []docBlock{{where: "doc.md:1", code: "```\nx := 1"}},
+			},
+			{
+				name:     "a run with text after it does not close a fence",
+				markdown: "```go\n``` go\nx := 1\n```\n",
+				expected: []docBlock{{where: "doc.md:1", code: "``` go\nx := 1"}},
+			},
+			{
+				name:     "skips blocks that are not Go",
+				markdown: "```sh\ngo test\n```\n```\nplain\n```\n~~~json\n{}\n~~~\n" + marker + "\n```go\nx := 1\n```\n",
+				expected: []docBlock{{where: "doc.md:11", source: "a.go#x", code: "x := 1"}},
+			},
+			{
+				name:     "a Go fence inside another block is code",
+				markdown: "````md\n```go\nx := 1\n```\n````\n",
+				expected: nil,
+			},
+			{
+				name:     "inline code with a backtick is not a fence",
+				markdown: "```go` is inline\n```go\nx := 1\n```\n",
+				expected: []docBlock{{where: "doc.md:2", code: "x := 1"}},
+			},
+			{
+				name:     "two runs are not a fence",
+				markdown: "``go\nx := 1\n``\n",
+				expected: nil,
+			},
+		}
+		for _, tc := range tests {
+			t.Run(tc.name, func(t *testing.T) {
+				blocks, err := markdownBlocks("doc.md", tc.markdown)
+				require.NoError(t, err, "Should parse the fences")
+				assert.Equal(t, tc.expected, blocks, "Should collect the expected Go blocks")
+			})
+		}
+	})
+
+	t.Run("rejects an unterminated fence", func(t *testing.T) {
+		tests := []struct {
+			name     string
+			markdown string
+		}{
+			{"Go block", "```go\nx := 1\n"},
+			{"block that is not Go", "~~~sh\ngo test\n"},
+			{"closed by a shorter run", "````go\nx := 1\n```\n"},
+			{"closed by the other character", "```go\nx := 1\n~~~\n"},
+		}
+		for _, tc := range tests {
+			t.Run(tc.name, func(t *testing.T) {
+				blocks, err := markdownBlocks("doc.md", tc.markdown)
+				require.ErrorIs(t, err, errUnterminatedFence, "Should reject the unterminated fence")
+				assert.Contains(t, err.Error(), "doc.md", "The error should name the file")
+				assert.Nil(t, blocks, "Should return no blocks")
+			})
 		}
 	})
 }
