@@ -121,8 +121,8 @@ func TestResponseMethods(t *testing.T) {
 			handler := slog.NewTextHandler(os.Stdout, nil)
 			result := newEvalResult(handler, customValue, time.Second, "test-id")
 
-			// Should return ERROR for unknown types
-			assert.Equal(t, data.ERROR, result.Type())
+			// Should return UNKNOWN for unknown types
+			assert.Equal(t, data.UNKNOWN, result.Type())
 		})
 
 		t.Run("decoded guest output", func(t *testing.T) {

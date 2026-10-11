@@ -47,8 +47,8 @@ func (r *execResult) String() string {
 // iterators report data.LIST because Interface() returns them as []any, and
 // every callable kind (closure, builtin, go_func, partial) reports
 // data.FUNCTION. Risor types with no data.Types counterpart (time, module,
-// go_struct, and types defined by Risor modules) fall back to data.ERROR, the
-// same fallback the other engines use for unknown types; Interface() still
+// go_struct, and types defined by Risor modules) fall back to data.UNKNOWN, the
+// same fallback the other engines use; Interface() still
 // returns Risor's own Go conversion of those values (time.Time for a time).
 func (r *execResult) Type() data.Types {
 	if r.Object == nil {
@@ -78,7 +78,7 @@ func (r *execResult) Type() data.Types {
 		return data.ERROR
 	default:
 		r.logger.Error("Unknown type", "type", string(t))
-		return data.ERROR
+		return data.UNKNOWN
 	}
 }
 

@@ -49,7 +49,7 @@ func (r *execResult) String() string {
 
 // Type maps the Starlark type name to a data.Types constant. A range reports
 // data.LIST because Interface() returns it as []any. Types with no counterpart
-// report data.ERROR.
+// report data.UNKNOWN.
 func (r *execResult) Type() data.Types {
 	switch r.Value.Type() {
 	case "NoneType":
@@ -76,7 +76,7 @@ func (r *execResult) Type() data.Types {
 		return data.FUNCTION
 	default:
 		r.logger.Error("Unknown type", "type", r.Value.Type())
-		return data.ERROR
+		return data.UNKNOWN
 	}
 }
 

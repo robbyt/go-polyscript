@@ -110,6 +110,7 @@ func TestResponseMethods(t *testing.T) {
 			{"builtin type", "builtin_function_or_method", data.FUNCTION},
 			{"bytes type", "bytes", data.BYTES},
 			{"range type", "range", data.LIST},
+			{"unmapped type falls back to unknown", "struct", data.UNKNOWN},
 		}
 
 		for _, tc := range testCases {

@@ -769,7 +769,7 @@ func TestEval_ResultTypes(t *testing.T) {
 			map[string]any{"a": []any{[]any{int64(0)}}},
 		},
 		{"builtin", `len`, data.FUNCTION, nil},
-		{"module", `math`, data.ERROR, nil},
+		{"module", `math`, data.UNKNOWN, nil},
 	}
 
 	for _, tc := range tests {

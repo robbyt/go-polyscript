@@ -4,7 +4,7 @@ package data
 type Types string
 
 // These valid types as constants, limited for our use. Every engine's
-// EvaluatorResponse.Type() returns one of these values; ERROR doubles as the
+// EvaluatorResponse.Type() returns one of these values; UNKNOWN is the
 // fallback for results that have no counterpart in this list.
 const (
 	BOOL     Types = "bool"
@@ -19,4 +19,5 @@ const (
 	LIST     Types = "list"
 	TUPLE    Types = "tuple"
 	SET      Types = "set"
+	UNKNOWN  Types = "unknown"
 )

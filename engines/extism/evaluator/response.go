@@ -66,7 +66,7 @@ func (r *execResult) Type() data.Types {
 		return data.MAP
 	default:
 		r.logger.Error("Unknown type", "type", fmt.Sprintf("%T", v))
-		return data.ERROR
+		return data.UNKNOWN
 	}
 }
 

@@ -149,10 +149,10 @@ func TestResponseMethods(t *testing.T) {
 			{"go_func type", rObj.GOFUNC, data.FUNCTION},
 			{"partial type", rObj.PARTIAL, data.FUNCTION},
 			{"error type", rObj.ERROR, data.ERROR},
-			{"time type falls back to error", rObj.TIME, data.ERROR},
-			{"module type falls back to error", rObj.MODULE, data.ERROR},
-			{"go_struct type falls back to error", rObj.GOSTRUCT, data.ERROR},
-			{"module-defined type falls back to error", rObj.Type("regexp"), data.ERROR},
+			{"time type falls back to unknown", rObj.TIME, data.UNKNOWN},
+			{"module type falls back to unknown", rObj.MODULE, data.UNKNOWN},
+			{"go_struct type falls back to unknown", rObj.GOSTRUCT, data.UNKNOWN},
+			{"module-defined type falls back to unknown", rObj.Type("regexp"), data.UNKNOWN},
 		}
 
 		for _, tt := range tests {
@@ -209,7 +209,7 @@ func TestResponseMethods(t *testing.T) {
 				map[string]any{"a": int64(1)},
 			},
 			{"builtin", rObj.NewNoopBuiltin("noop"), data.FUNCTION, nil},
-			{"time falls back to error", rObj.NewTime(now), data.ERROR, now},
+			{"time falls back to unknown", rObj.NewTime(now), data.UNKNOWN, now},
 		}
 
 		for _, tt := range tests {
