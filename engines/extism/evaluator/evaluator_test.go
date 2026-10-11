@@ -334,6 +334,8 @@ func TestEvaluator_Evaluate(t *testing.T) {
 					mockPlugin := new(MockCompiledPlugin)
 					mockInstance := &mockPluginInstance{output: []byte(`{}`)}
 					mockPlugin.On("Instance", mock.Anything, mock.Anything).Return(mockInstance, nil)
+					// The executable is never closed, so its GC cleanup may close the plugin.
+					mockPlugin.On("Close", mock.Anything).Return(nil).Maybe()
 					content := createMockExecutable(mockPlugin, "main")
 					exe := newExe(t, "test-empty-input", content, &mockMapProvider{data: tt.data})
 
