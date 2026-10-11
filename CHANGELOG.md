@@ -136,9 +136,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - wazero v1.12.0 has a data race in its lazy version cache, reported by
   `go test -race` when Extism modules are compiled concurrently. Fixed
   upstream in [tetratelabs/wazero#2536](https://github.com/tetratelabs/wazero/pull/2536)
-  but unreleased. go-polyscript's own tests work around it with a `TestMain`
-  warm-up in every test package that creates runtimes; see
-  `engines/README.md` for workarounds in your app.
+  but unreleased. The Extism compiler now caches wazero's version once per
+  process before creating its first runtime, so concurrent compiles through
+  go-polyscript no longer race. Apps that also create wazero runtimes
+  directly can still hit it; see `engines/README.md` for workarounds.
 
 ### Fixed
 - Risor `compiler.WithGlobals` with any name other than `ctx` made every
