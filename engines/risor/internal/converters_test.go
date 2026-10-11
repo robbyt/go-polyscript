@@ -45,6 +45,24 @@ func TestBuildRisorEnv_UintRange(t *testing.T) {
 	big := uint64(math.MaxUint64)
 	inRange := uint64(math.MaxInt64)
 
+	type inner struct{ Big uint64 }
+	type outer struct {
+		Name   string
+		Inner  inner
+		Ptr    *inner
+		Nest   map[string]any
+		hidden uint64 // unexported: Risor cannot read it, so it is not checked
+	}
+	// node forms a pointer cycle, which Risor reads lazily without trouble.
+	type node struct {
+		Val  uint64
+		Next *node
+	}
+	cycle := &node{Val: 1}
+	cycle.Next = cycle
+	badCycle := &node{Val: 1}
+	badCycle.Next = &node{Val: big, Next: badCycle}
+
 	t.Run("out of range values are rejected", func(t *testing.T) {
 		tests := []struct {
 			name  string
@@ -62,6 +80,13 @@ func TestBuildRisorEnv_UintRange(t *testing.T) {
 			{"deeply nested", map[string]any{
 				"a": []any{map[string]any{"b": []map[string]any{{"c": big}}}},
 			}},
+			{"struct field", map[string]any{"s": inner{Big: big}}},
+			{"struct pointer field", map[string]any{"s": &inner{Big: big}}},
+			{"nested struct field", map[string]any{"s": outer{Inner: inner{Big: big}}}},
+			{"struct pointer in struct", map[string]any{"s": outer{Ptr: &inner{Big: big}}}},
+			{"map in struct field", map[string]any{"s": outer{Nest: map[string]any{"x": big}}}},
+			{"slice of structs", map[string]any{"l": []inner{{Big: 1}, {Big: big}}}},
+			{"struct in pointer cycle", map[string]any{"n": badCycle}},
 		}
 		for _, tc := range tests {
 			t.Run(tc.name, func(t *testing.T) {
@@ -78,6 +103,12 @@ func TestBuildRisorEnv_UintRange(t *testing.T) {
 		})
 		require.ErrorIs(t, err, ErrUintOverflow)
 		assert.Contains(t, err.Error(), `ctx["outer"]["list"][1]`)
+
+		_, err = BuildRisorEnv(constants.Ctx, map[string]any{
+			"s": outer{Nest: map[string]any{"x": big}},
+		})
+		require.ErrorIs(t, err, ErrUintOverflow)
+		assert.Contains(t, err.Error(), `ctx["s"].Nest["x"]`)
 	})
 
 	t.Run("in range values pass", func(t *testing.T) {
@@ -97,6 +128,12 @@ func TestBuildRisorEnv_UintRange(t *testing.T) {
 			{"signed and other scalars", map[string]any{
 				"i": int64(math.MinInt64), "f": 1.5, "s": "x", "b": true,
 			}},
+			{"struct in range", map[string]any{"s": &outer{
+				Name: "x", Inner: inner{Big: inRange}, Nest: map[string]any{"x": inRange},
+			}}},
+			{"unexported struct field is not checked", map[string]any{"s": outer{hidden: big}}},
+			{"nil struct pointer", map[string]any{"s": (*outer)(nil)}},
+			{"pointer cycle in range", map[string]any{"n": cycle}},
 		}
 		for _, tc := range tests {
 			t.Run(tc.name, func(t *testing.T) {

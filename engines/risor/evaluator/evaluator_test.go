@@ -835,8 +835,16 @@ func TestEval_ResultTypes(t *testing.T) {
 func TestEval_UintRange(t *testing.T) {
 	t.Parallel()
 
+	// Risor wraps structs as GoStruct and converts fields when a script reads
+	// them, so out-of-range fields must be caught up front as well.
+	type holder struct {
+		Big  uint64
+		Nest map[string]any
+	}
+
 	tests := []struct {
 		name     string
+		script   string
 		input    map[string]any
 		expected any
 		wantErr  error
@@ -852,8 +860,34 @@ func TestEval_UintRange(t *testing.T) {
 			wantErr: ErrUintOverflow,
 		},
 		{
+			name:    "struct field above max int64 is rejected",
+			script:  `ctx["big"].Big`,
+			input:   map[string]any{"big": holder{Big: math.MaxUint64}},
+			wantErr: ErrUintOverflow,
+		},
+		{
+			name:    "struct pointer field above max int64 is rejected",
+			script:  `ctx["big"].Big`,
+			input:   map[string]any{"big": &holder{Big: math.MaxUint64}},
+			wantErr: ErrUintOverflow,
+		},
+		{
+			name:   "map in struct field above max int64 is rejected",
+			script: `ctx["big"].Nest["x"]`,
+			input: map[string]any{"big": holder{
+				Nest: map[string]any{"x": uint64(math.MaxUint64)},
+			}},
+			wantErr: ErrUintOverflow,
+		},
+		{
 			name:     "uint64 at max int64 passes",
 			input:    map[string]any{"big": uint64(math.MaxInt64)},
+			expected: int64(math.MaxInt64),
+		},
+		{
+			name:     "struct field at max int64 passes",
+			script:   `ctx["big"].Big`,
+			input:    map[string]any{"big": &holder{Big: math.MaxInt64}},
 			expected: int64(math.MaxInt64),
 		},
 	}
@@ -861,7 +895,11 @@ func TestEval_UintRange(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			handler := slog.NewTextHandler(io.Discard, nil)
-			ld, err := loader.NewFromString(`ctx["big"]`)
+			script := tc.script
+			if script == "" {
+				script = `ctx["big"]`
+			}
+			ld, err := loader.NewFromString(script)
 			require.NoError(t, err)
 			exe, err := createTestExecutable(
 				t.Context(), handler, ld, []string{constants.Ctx},

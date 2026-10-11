@@ -28,27 +28,59 @@ func BuildRisorEnv(ctxKey string, inputData map[string]any) (map[string]any, err
 }
 
 // checkUintRange walks v the way Risor's TypeRegistry converts Go values
-// (maps, slices, arrays, pointers and interfaces) and rejects any unsigned
-// integer that does not fit in Risor's int64. Structs are skipped: Risor wraps
-// them as GoStruct proxies rather than converting their fields up front.
+// (maps, slices, arrays, pointers, interfaces and the exported fields of
+// structs, which Risor wraps as GoStruct and converts when a script reads
+// them) and rejects any unsigned integer that does not fit in Risor's int64.
 func checkUintRange(v reflect.Value, path string) error {
+	return (&uintChecker{seen: make(map[visit]struct{})}).check(v, path)
+}
+
+// visit identifies a pointer or map already walked by uintChecker.
+type visit struct {
+	typ reflect.Type
+	ptr uintptr
+}
+
+// uintChecker carries the visited set for checkUintRange, so cyclic data
+// (e.g. structs with parent pointers) terminates and shared values are
+// checked once.
+type uintChecker struct {
+	seen map[visit]struct{}
+}
+
+// markSeen records v and reports whether it had already been walked.
+func (c *uintChecker) markSeen(v reflect.Value) bool {
+	key := visit{typ: v.Type(), ptr: v.Pointer()}
+	if _, ok := c.seen[key]; ok {
+		return true
+	}
+	c.seen[key] = struct{}{}
+	return false
+}
+
+func (c *uintChecker) check(v reflect.Value, path string) error {
 	switch v.Kind() {
 	case reflect.Uint, reflect.Uint64, reflect.Uintptr:
 		if v.Uint() > math.MaxInt64 {
 			return fmt.Errorf("%w: %s = %d", ErrUintOverflow, path, v.Uint())
 		}
-	case reflect.Interface, reflect.Pointer:
+	case reflect.Interface:
 		if !v.IsNil() {
-			return checkUintRange(v.Elem(), path)
+			return c.check(v.Elem(), path)
+		}
+	case reflect.Pointer:
+		if !v.IsNil() && !c.markSeen(v) {
+			return c.check(v.Elem(), path)
 		}
 	case reflect.Map:
 		// Risor rejects non-string keys itself.
-		if v.Type().Key().Kind() != reflect.String || alwaysFits(v.Type().Elem()) {
+		if v.Type().Key().Kind() != reflect.String || alwaysFits(v.Type().Elem()) ||
+			v.IsNil() || c.markSeen(v) {
 			return nil
 		}
 		iter := v.MapRange()
 		for iter.Next() {
-			if err := checkUintRange(iter.Value(), fmt.Sprintf("%s[%q]", path, iter.Key().String())); err != nil {
+			if err := c.check(iter.Value(), fmt.Sprintf("%s[%q]", path, iter.Key().String())); err != nil {
 				return err
 			}
 		}
@@ -57,7 +89,19 @@ func checkUintRange(v reflect.Value, path string) error {
 			return nil
 		}
 		for i := range v.Len() {
-			if err := checkUintRange(v.Index(i), fmt.Sprintf("%s[%d]", path, i)); err != nil {
+			if err := c.check(v.Index(i), fmt.Sprintf("%s[%d]", path, i)); err != nil {
+				return err
+			}
+		}
+	case reflect.Struct:
+		// Risor only exposes exported fields to scripts.
+		t := v.Type()
+		for i := range t.NumField() {
+			field := t.Field(i)
+			if !field.IsExported() {
+				continue
+			}
+			if err := c.check(v.Field(i), path+"."+field.Name); err != nil {
 				return err
 			}
 		}
