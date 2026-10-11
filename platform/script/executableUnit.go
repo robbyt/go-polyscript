@@ -37,10 +37,25 @@ type ExecutableUnit struct {
 	closerOnce sync.Once
 	closer     *onceCloser
 
-	// stopLifetime unregisters the hook that BindLifetime registers on the
-	// lifetime ctx. Only this func is kept, never the ctx itself.
-	lifetimeMu   sync.Mutex
-	stopLifetime func() bool
+	// lifetime is the current BindLifetime registration. Only funcs and
+	// handles that undo it are kept, never the lifetime ctx itself.
+	lifetimeMu sync.Mutex
+	lifetime   *lifetimeBinding
+}
+
+// lifetimeBinding undoes one BindLifetime registration: stop unregisters the
+// context.AfterFunc hook, and cleanup is the runtime.AddCleanup that would
+// otherwise call stop once the unit's close guard is collected.
+type lifetimeBinding struct {
+	stop    func() bool
+	cleanup runtime.Cleanup
+}
+
+// release unregisters both the hook and its cleanup, so the cleanup no
+// longer keeps the hook, and through it the lifetime ctx, reachable.
+func (b *lifetimeBinding) release() {
+	b.cleanup.Stop()
+	b.stop()
 }
 
 // contentCloser is implemented by compiled content that holds resources.
@@ -213,9 +228,10 @@ func (exe *ExecutableUnit) BindLifetime(lifetime context.Context) error {
 	}
 	// The hook cannot reach a collected guard, so unregister it then, so
 	// that a dropped unit leaves nothing behind in a long-lived lifetime.
-	runtime.AddCleanup(guard, unregisterHook, stop)
-
-	exe.replaceLifetime(stop)
+	exe.replaceLifetime(&lifetimeBinding{
+		stop:    stop,
+		cleanup: runtime.AddCleanup(guard, unregisterHook, stop),
+	})
 	return nil
 }
 
@@ -253,15 +269,15 @@ func unregisterHook(stop func() bool) {
 	stop()
 }
 
-// replaceLifetime installs stop as the unit's lifetime hook, or none for a
-// nil stop, and unregisters the hook it replaces.
-func (exe *ExecutableUnit) replaceLifetime(stop func() bool) {
+// replaceLifetime installs binding as the unit's lifetime registration, or
+// none for a nil binding, and releases the registration it replaces.
+func (exe *ExecutableUnit) replaceLifetime(binding *lifetimeBinding) {
 	exe.lifetimeMu.Lock()
-	previous := exe.stopLifetime
-	exe.stopLifetime = stop
+	previous := exe.lifetime
+	exe.lifetime = binding
 	exe.lifetimeMu.Unlock()
 	if previous != nil {
-		previous()
+		previous.release()
 	}
 }
 

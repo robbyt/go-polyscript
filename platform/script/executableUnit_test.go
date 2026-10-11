@@ -711,6 +711,19 @@ func (c *stopCountingLifetime) AfterFunc(f func()) func() bool {
 	}
 }
 
+// bindCollectableLifetime binds exe to a lifetime ctx carrying a value whose
+// collection closes the returned channel, and keeps no reference to either,
+// so the channel closes only once nothing else keeps the lifetime reachable.
+func bindCollectableLifetime(t *testing.T, exe *ExecutableUnit) <-chan struct{} {
+	t.Helper()
+	type payloadKey struct{}
+	payload := new([64]byte)
+	collected := make(chan struct{})
+	runtime.AddCleanup(payload, func(ch chan struct{}) { close(ch) }, collected)
+	require.NoError(t, exe.BindLifetime(context.WithValue(t.Context(), payloadKey{}, payload)))
+	return collected
+}
+
 func TestExecutableUnit_BindLifetime(t *testing.T) {
 	t.Parallel()
 
@@ -917,6 +930,40 @@ func TestExecutableUnit_BindLifetime(t *testing.T) {
 			assert.Equal(t, int32(1), content.closeCalls.Load(), "the earlier lifetime's hook should be gone")
 			runtime.KeepAlive(exe) // the hook holds the unit only weakly
 		})
+	})
+
+	t.Run("replaced or closed lifetimes are not retained", func(t *testing.T) {
+		tests := []struct {
+			name    string
+			release func(t *testing.T, exe *ExecutableUnit)
+		}{
+			{"rebind", func(t *testing.T, exe *ExecutableUnit) {
+				t.Helper()
+				require.NoError(t, exe.BindLifetime(t.Context()))
+			}},
+			{"Close", func(t *testing.T, exe *ExecutableUnit) {
+				t.Helper()
+				require.NoError(t, exe.Close(t.Context()))
+			}},
+		}
+		for _, tc := range tests {
+			t.Run(tc.name, func(t *testing.T) {
+				exe := newUnitWithContent(t, nil, &countingClosableContent{})
+				collected := bindCollectableLifetime(t, exe)
+				tc.release(t, exe)
+
+				require.Eventually(t, func() bool {
+					runtime.GC()
+					select {
+					case <-collected:
+						return true
+					default:
+						return false
+					}
+				}, 5*time.Second, 10*time.Millisecond, "a released lifetime ctx should not be kept reachable by the unit")
+				runtime.KeepAlive(exe) // the unit stays referenced throughout
+			})
+		}
 	})
 
 	t.Run("nil lifetime", func(t *testing.T) {
