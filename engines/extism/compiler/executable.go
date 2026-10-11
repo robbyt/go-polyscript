@@ -22,18 +22,21 @@ type Executable struct {
 	byteCode    adapters.CompiledPlugin
 	entryPoint  string
 
+	// releaseOnce runs the release exactly once. The plugin is released
+	// once closing is set and inFlight is zero, by whichever of Close or the
+	// last WithPlugin sees that first; a caller that arrives while the
+	// release runs waits in Do until it finishes.
+	releaseOnce sync.Once
+
 	// mu guards the fields below. inFlight counts running WithPlugin calls.
-	// closing is set by the first Close; from then on WithPlugin fails. The
-	// plugin is released once closing is set and inFlight is zero, by
-	// whichever of Close or the last WithPlugin sees that first;
-	// releaseStarted makes sure only one does. released is closed after the
-	// release, and releaseErr, written before that, holds its error.
-	mu             sync.Mutex
-	inFlight       int
-	closing        bool
-	releaseStarted bool
-	released       chan struct{}
-	releaseErr     error
+	// closing is set by the first Close; from then on WithPlugin fails.
+	// released is closed after the release, and releaseErr, written before
+	// that, holds its error.
+	mu         sync.Mutex
+	inFlight   int
+	closing    bool
+	released   chan struct{}
+	releaseErr error
 }
 
 // NewExecutable creates a new Executable instance
@@ -108,22 +111,18 @@ func (e *Executable) WithPlugin(ctx context.Context, fn func(plugin adapters.Com
 func (e *Executable) done(ctx context.Context) {
 	e.mu.Lock()
 	e.inFlight--
-	release := e.claimReleaseLocked()
+	ready := e.readyToReleaseLocked()
 	e.mu.Unlock()
-	if release {
-		e.release(context.WithoutCancel(ctx))
+	if ready {
+		e.releaseOnce.Do(func() { e.release(context.WithoutCancel(ctx)) })
 	}
 }
 
-// claimReleaseLocked reports whether the caller should release the plugin
-// now: Close has been called, nothing is in flight, and no one else has
-// claimed the release. e.mu must be held.
-func (e *Executable) claimReleaseLocked() bool {
-	if !e.closing || e.inFlight > 0 || e.releaseStarted {
-		return false
-	}
-	e.releaseStarted = true
-	return true
+// readyToReleaseLocked reports whether the plugin can be released now:
+// Close has been called and nothing is in flight. releaseOnce makes sure
+// only one caller releases it. e.mu must be held.
+func (e *Executable) readyToReleaseLocked() bool {
+	return e.closing && e.inFlight == 0
 }
 
 // releasedLocked returns the channel closed once the plugin is released,
@@ -191,11 +190,11 @@ func (e *Executable) Close(ctx context.Context) error {
 	e.mu.Lock()
 	released := e.releasedLocked()
 	e.closing = true
-	release := e.claimReleaseLocked()
+	ready := e.readyToReleaseLocked()
 	e.mu.Unlock()
 
-	if release {
-		e.release(context.WithoutCancel(ctx))
+	if ready {
+		e.releaseOnce.Do(func() { e.release(context.WithoutCancel(ctx)) })
 	}
 	select {
 	case <-released:
@@ -203,8 +202,8 @@ func (e *Executable) Close(ctx context.Context) error {
 	case <-ctx.Done():
 	}
 	// ctx is done, but only in-flight calls may make Close give up. With
-	// none left, the release is claimed and runs without cancellation, so
-	// wait for it.
+	// none left, the release is under way without cancellation, so wait for
+	// it.
 	if e.hasInFlight() {
 		return fmt.Errorf("extism: close stopped waiting for in-flight evals: %w", ctx.Err())
 	}

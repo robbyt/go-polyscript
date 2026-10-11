@@ -31,6 +31,11 @@ type ExecutableUnit struct {
 	logHandler slog.Handler
 	logger     *slog.Logger
 
+	// closerOnce builds closer, which wraps the content's Close so it runs
+	// at most once. closer stays nil for content without a Close method.
+	closerOnce sync.Once
+	closer     *onceCloser
+
 	// stopLifetime unregisters the hook that BindLifetime registers on the
 	// lifetime ctx. Only this func is kept, never the ctx itself.
 	lifetimeMu   sync.Mutex
@@ -40,6 +45,22 @@ type ExecutableUnit struct {
 // contentCloser is implemented by compiled content that holds resources.
 type contentCloser interface {
 	Close(context.Context) error
+}
+
+// onceCloser calls a content's Close at most once. The first caller runs it
+// with its own ctx; concurrent callers block in Do until it returns, and
+// every caller, including later ones, gets its result.
+type onceCloser struct {
+	once  sync.Once
+	err   error
+	inner contentCloser
+}
+
+// Close closes the wrapped content on the first call and returns that
+// call's result on every call.
+func (c *onceCloser) Close(ctx context.Context) error {
+	c.once.Do(func() { c.err = c.inner.Close(ctx) })
+	return c.err
 }
 
 // NewExecutableUnit creates a new ExecutableUnit from the provided loader and compiler.
@@ -158,8 +179,8 @@ func (exe *ExecutableUnit) BindLifetime(lifetime context.Context) error {
 	if lifetime == nil {
 		return errors.New("lifetime context is nil")
 	}
-	closer, ok := exe.content.(contentCloser)
-	if !ok {
+	guard := exe.closeGuard()
+	if guard == nil {
 		if lifetime.Err() != nil {
 			return lifetimeEndedError(lifetime, nil)
 		}
@@ -169,35 +190,28 @@ func (exe *ExecutableUnit) BindLifetime(lifetime context.Context) error {
 	release := context.WithoutCancel(lifetime)
 	if lifetime.Err() != nil {
 		exe.replaceLifetime(nil)
-		return lifetimeEndedError(lifetime, closer.Close(release))
+		return lifetimeEndedError(lifetime, guard.Close(release))
 	}
 
 	logger := exe.logger
-	hookDone := make(chan struct{})
-	var hookErr error
 	stop := context.AfterFunc(lifetime, func() {
-		defer close(hookDone)
-		hookErr = closer.Close(release)
-		if hookErr != nil {
-			logger.Warn("failed to close content when its lifetime ended", "error", hookErr)
+		if err := guard.Close(release); err != nil {
+			logger.Warn("failed to close content when its lifetime ended", "error", err)
 		}
 	})
 	// Check again now the hook is registered, so a lifetime that ends at any
 	// point before BindLifetime returns is reported instead of closing the
-	// content behind the caller's back. The content is closed exactly once:
-	// here if stop unregistered the hook, otherwise by the hook, whose result
-	// is waited for.
+	// content behind the caller's back. Whether or not the hook has started,
+	// the guard closes the content once and makes every caller wait for that
+	// close's result.
 	if lifetime.Err() != nil {
 		exe.replaceLifetime(nil)
-		if stop() {
-			return lifetimeEndedError(lifetime, closer.Close(release))
-		}
-		<-hookDone
-		return lifetimeEndedError(lifetime, hookErr)
+		stop()
+		return lifetimeEndedError(lifetime, guard.Close(release))
 	}
 	runtime.AddCleanup(exe, closeUnreachable, unreachableUnit{
 		stop:   stop,
-		closer: closer,
+		closer: guard,
 		logger: logger,
 	})
 
@@ -260,9 +274,13 @@ func lifetimeEndedError(lifetime context.Context, closeErr error) error {
 // Close releases resources held by the compiled content. Content that
 // implements Close(context.Context) error is closed; for other content this
 // is a no-op. It first unregisters the hook from BindLifetime, so ending the
-// lifetime after Close does nothing. ctx bounds how long Close waits for the
-// content, as documented by the content's own Close. Safe to call more than
-// once and on a nil unit.
+// lifetime after Close does nothing.
+//
+// The content is closed at most once, using a [sync.Once]: the first close,
+// whether from Close, the lifetime hook or the garbage collector, calls the
+// content's Close with its own ctx, and every other Close, concurrent or
+// later, waits for that call and returns its result. So only the first
+// close's ctx bounds the wait. Safe on a nil unit.
 func (exe *ExecutableUnit) Close(ctx context.Context) error {
 	if exe == nil {
 		return nil
@@ -271,10 +289,22 @@ func (exe *ExecutableUnit) Close(ctx context.Context) error {
 	return exe.closeContent(ctx)
 }
 
-// closeContent closes the content if it implements Close.
+// closeContent closes the content once, if it implements Close.
 func (exe *ExecutableUnit) closeContent(ctx context.Context) error {
-	if closer, ok := exe.content.(contentCloser); ok {
-		return closer.Close(ctx)
+	if guard := exe.closeGuard(); guard != nil {
+		return guard.Close(ctx)
 	}
 	return nil
+}
+
+// closeGuard returns the wrapper that closes the content at most once, or
+// nil for content without a Close method. It is built on first use, so a
+// unit not made by NewExecutableUnit gets one too.
+func (exe *ExecutableUnit) closeGuard() *onceCloser {
+	exe.closerOnce.Do(func() {
+		if c, ok := exe.content.(contentCloser); ok {
+			exe.closer = &onceCloser{inner: c}
+		}
+	})
+	return exe.closer
 }

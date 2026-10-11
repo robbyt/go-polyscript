@@ -257,14 +257,17 @@ func (be *Evaluator) AddDataToContext(
 // Close implements platform.Evaluator. It releases the compiled plugin and
 // its wazero runtime. As soon as Close is called, new Eval calls return an
 // error wrapping compiler.ErrExecutableClosed without calling the data
-// provider. With no Eval in flight, Close releases the runtime, or waits for
-// a release already under way, and returns the release error, even if ctx
-// is already done. Otherwise it waits for the in-flight Evals, including
-// their data loading, until ctx is done; if ctx ends first, Close returns
-// ctx's error and the runtime is released when the last of those Evals
-// returns. A later Close then returns the release error. Cancelling an
-// Eval's ctx shortens the wait only if the guest stops and the data provider
-// honours cancellation.
+// provider. With no Eval in flight, Close releases the runtime and returns
+// the release error, even if ctx is already done. Otherwise it waits for the
+// in-flight Evals, including their data loading, until ctx is done; if ctx
+// ends first, Close returns ctx's error and the runtime is released when the
+// last of those Evals returns. Cancelling an Eval's ctx shortens the wait
+// only if the guest stops and the data provider honours cancellation.
+//
+// The close runs once: concurrent and later Close calls wait for the first
+// close and return its result, so only the first close's ctx bounds the
+// wait. When the lifetime ctx ends first, that close waits without a
+// deadline.
 //
 // The evaluator also closes itself this way when its lifetime ctx is done:
 // the ctx passed to the constructor, or the one given to WithLifetime. That
@@ -273,8 +276,7 @@ func (be *Evaluator) AddDataToContext(
 //
 // A data provider must not call Close with a ctx that is never done, or Eval,
 // on the same Evaluator, since Close would wait for the Eval that is calling
-// it. It is safe to call more than once, concurrently, and on a nil
-// Evaluator.
+// it. It is safe on a nil Evaluator.
 func (be *Evaluator) Close(ctx context.Context) error {
 	if be == nil {
 		return nil

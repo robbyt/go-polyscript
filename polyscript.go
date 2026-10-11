@@ -45,8 +45,9 @@
 // only after checking err. For an engine that holds resources, Close
 // rejects new Evals at once and waits for in-flight ones only until its ctx
 // is done; if that comes first, it returns the ctx's error and the resources
-// are released when the last in-flight Eval returns. For an engine that
-// holds none, Close changes nothing and Eval keeps working.
+// are released when the last in-flight Eval returns. The close runs once:
+// further Close calls wait for the first and return its result. For an
+// engine that holds none, Close changes nothing and Eval keeps working.
 //
 // # Evaluator lifetime
 //

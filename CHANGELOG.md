@@ -17,9 +17,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   runtime is released when the last in-flight `Eval` returns. With nothing
   in flight it releases the runtime at once, even with a cancelled ctx. A
   data provider must not call `Eval`, or `Close` with a ctx that is never
-  done, on the same evaluator. Every `Close` that returns after the release,
-  including later ones, reports the release error. For Risor and Starlark it
-  is a no-op. Code that implements `platform.Evaluator` itself must add the
+  done, on the same evaluator. The close runs once (a `sync.Once` in
+  `script.ExecutableUnit`): concurrent and later `Close` calls wait for the
+  first and return its result, so only the first close's ctx bounds the
+  wait. For Risor and Starlark it is a no-op. Code that implements `platform.Evaluator` itself must add the
   method.
   ([#162](https://github.com/robbyt/go-polyscript/issues/162))
 - `WithLifetime` option (`polyscript.WithLifetime[E]` and each engine's

@@ -94,7 +94,7 @@ The older `FromRisorString*`, `FromStarlark*`, and `FromExtism*` constructors st
 
 `polyscript.New[E]` is the single entry point. `E` selects the engine, the first argument is a `context.Context` (used while loading and compiling the script, and bounding the evaluator's lifetime), the second is a `Source`, and the remaining arguments are `Option[E]`s.
 
-Release an evaluator you no longer need with `defer evaluator.Close(ctx)`, placed after the error check. For an engine that holds resources, `Close` stops new `Eval` calls at once and frees what the engine holds; for one that holds none, `Close` changes nothing and `Eval` keeps working. See [engines/README.md](engines/README.md) for what each engine does. `Close` waits for in-flight `Eval` calls only until its `ctx` is done: if that comes first, `Close` returns the ctx's error and the resources are released when the last in-flight `Eval` returns. With nothing in flight it releases them at once, even with a cancelled `ctx`.
+Release an evaluator you no longer need with `defer evaluator.Close(ctx)`, placed after the error check. For an engine that holds resources, `Close` stops new `Eval` calls at once and frees what the engine holds; for one that holds none, `Close` changes nothing and `Eval` keeps working. See [engines/README.md](engines/README.md) for what each engine does. `Close` waits for in-flight `Eval` calls only until its `ctx` is done: if that comes first, `Close` returns the ctx's error and the resources are released when the last in-flight `Eval` returns. With nothing in flight it releases them at once, even with a cancelled `ctx`. The close runs once: further `Close` calls wait for the first and return its result.
 
 ### Evaluator lifetime
 

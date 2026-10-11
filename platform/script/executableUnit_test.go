@@ -535,6 +535,59 @@ func TestExecutableUnit_Close(t *testing.T) {
 		content.AssertExpectations(t)
 	})
 
+	t.Run("repeated Close closes the content once", func(t *testing.T) {
+		closeErr := errors.New("close kaboom")
+		content := &countingClosableContent{err: closeErr}
+		exe := &ExecutableUnit{content: content}
+
+		require.ErrorIs(t, exe.Close(t.Context()), closeErr)
+		require.ErrorIs(t, exe.Close(t.Context()), closeErr, "a later Close should return the first close's result")
+		assert.Equal(t, int32(1), content.closeCalls.Load(), "the content should be closed only once")
+	})
+
+	t.Run("concurrent Close calls close the content once", func(t *testing.T) {
+		gate := make(chan struct{})
+		content := &blockingClosableContent{gate: gate}
+		exe := &ExecutableUnit{content: content}
+
+		const closers = 16
+		errs := make(chan error, closers)
+		for range closers {
+			go func() { errs <- exe.Close(t.Context()) }()
+		}
+		// Every Close blocks behind the first until its content close returns.
+		select {
+		case err := <-errs:
+			t.Fatalf("a Close returned before the content close finished: %v", err)
+		case <-time.After(50 * time.Millisecond):
+		}
+		close(gate)
+		for range closers {
+			select {
+			case err := <-errs:
+				require.NoError(t, err)
+			case <-time.After(5 * time.Second):
+				t.Fatal("timed out waiting for Close to return")
+			}
+		}
+		assert.Equal(t, int32(1), content.closeCalls.Load(), "the content should be closed only once")
+	})
+
+	t.Run("Close racing the lifetime hook closes the content once", func(t *testing.T) {
+		synctest.Test(t, func(t *testing.T) {
+			content := &countingClosableContent{}
+			exe := newUnitWithContent(t, nil, content)
+			lifetime, cancel := context.WithCancel(t.Context())
+			require.NoError(t, exe.BindLifetime(lifetime))
+
+			cancel()
+			require.NoError(t, exe.Close(t.Context()))
+			synctest.Wait()
+			assert.Equal(t, int32(1), content.closeCalls.Load(), "the hook and Close should close the content once between them")
+			runtime.KeepAlive(exe) // keep the unit reachable so its GC cleanup cannot run
+		})
+	})
+
 	t.Run("no-op for content without Close", func(t *testing.T) {
 		content := new(MockExecutableContent)
 		exe := &ExecutableUnit{content: content}

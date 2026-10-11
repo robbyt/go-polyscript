@@ -8,6 +8,11 @@ import (
 // It provides access to the script's source code and its compiled bytecode.
 // Implementations like [`risor.Executable`](../../engines/risor/compiler/executable.go)
 // store the script content and the compiled bytecode for execution.
+//
+// Content that holds resources may also implement Close(context.Context)
+// error to release them. Like [io.Closer], its behavior after the first call
+// need not be defined: an [ExecutableUnit] calls it at most once, however
+// many times or ways the unit itself is closed.
 type ExecutableContent interface {
 	// GetSource returns the original script content as a string.
 	// This is the source code before any compilation or execution.

@@ -32,11 +32,14 @@ type Evaluator interface {
 	// waits for in-flight Evals only until ctx is done: if they return first,
 	// it releases the resources and returns the release error; if ctx is done
 	// first, it returns ctx's error and the resources are released when the
-	// last in-flight Eval returns. With nothing in flight it releases them,
-	// or waits for a release already under way, even if ctx is already done.
-	// It is safe to call more than once and concurrently; a Close that
-	// returns after the release reports the release error, so calling Close
-	// again after one that gave up shows whether the release failed.
+	// last in-flight Eval returns. With nothing in flight it releases them
+	// even if ctx is already done.
+	//
+	// The close runs once. It is safe to call Close more than once and
+	// concurrently: other calls, and later ones, wait for the first close
+	// and return its result, so only the first close's ctx bounds the wait.
+	// That first close may also come from the end of the evaluator's
+	// lifetime, which waits without a deadline.
 	//
 	// An evaluator also closes itself this way when its lifetime ctx is done.
 	// That is the ctx passed to its constructor, unless a lifetime option

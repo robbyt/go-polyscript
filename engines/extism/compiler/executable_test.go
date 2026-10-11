@@ -374,6 +374,34 @@ func TestExecutable_WithPlugin(t *testing.T) {
 		mockPlugin.AssertExpectations(t)
 	})
 
+	t.Run("many concurrent Close calls release once", func(t *testing.T) {
+		// ExecutableContent requires a Close that is safe to repeat and to
+		// call concurrently, releasing only once; this pins that for Extism.
+		mockPlugin := new(MockCompiledPlugin)
+		mockPlugin.On("Close", mock.Anything).Return(nil).Once()
+		exe := NewExecutable(wasmBytes, mockPlugin, entryPoint)
+		require.NotNil(t, exe)
+
+		const closers = 32
+		start := make(chan struct{})
+		errs := make(chan error, closers)
+		var wg sync.WaitGroup
+		for range closers {
+			wg.Go(func() {
+				<-start
+				errs <- exe.Close(t.Context())
+			})
+		}
+		close(start)
+		wg.Wait()
+		close(errs)
+		for err := range errs {
+			require.NoError(t, err, "every Close should return the release result")
+		}
+		assert.True(t, exe.IsClosed())
+		mockPlugin.AssertExpectations(t)
+	})
+
 	t.Run("concurrent users do not block each other", func(t *testing.T) {
 		exe := NewExecutable(wasmBytes, new(MockCompiledPlugin), entryPoint)
 		require.NotNil(t, exe)

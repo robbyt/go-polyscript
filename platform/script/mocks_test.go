@@ -68,3 +68,17 @@ func (c *countingClosableContent) Close(context.Context) error {
 	c.closeCalls.Add(1)
 	return c.err
 }
+
+// blockingClosableContent counts Close calls and blocks each one until gate
+// is closed.
+type blockingClosableContent struct {
+	MockExecutableContent
+	gate       chan struct{}
+	closeCalls atomic.Int32
+}
+
+func (c *blockingClosableContent) Close(context.Context) error {
+	c.closeCalls.Add(1)
+	<-c.gate
+	return nil
+}
