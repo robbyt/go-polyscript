@@ -74,8 +74,8 @@ func TestBuildRisorEnv_UintRange(t *testing.T) {
 		hidden uint64 // unexported: Risor cannot read it, so it is not checked
 	}
 	// Risor does not promote fields through embedding: the fields of an
-	// unexported embedded struct are unreachable, while an exported embedded
-	// struct is a field named after its type.
+	// unexported embedded struct are not exposed as attributes, while an
+	// exported embedded struct is a field named after its type.
 	type Shown struct{ Big uint64 }
 	type hidesEmbedded struct{ inner }
 	type hidesEmbeddedPtr struct{ *inner }

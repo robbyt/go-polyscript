@@ -74,8 +74,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `math.MaxInt64` (in maps, slices, pointers or exported struct fields) with
   `ErrUintOverflow`, since Risor would wrap it to a negative `int64`. Values
   Risor converts itself (an `object.RisorValuer` or an `object.Object`) are
-  skipped, along with everything they hold. Checking the input adds about 3%
-  to a small Risor `Eval`.
+  skipped, along with everything they hold, and values returned by Go methods
+  a script calls are not checked. Checking the input adds about 3% to a small
+  Risor `Eval`.
   ([#165](https://github.com/robbyt/go-polyscript/issues/165))
 - **BREAKING:** Converting a Starlark dict whose distinct keys stringify to
   the same map key (e.g. `{1: "a", "1": "b"}`) now fails with

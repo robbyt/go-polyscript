@@ -37,6 +37,9 @@ func BuildRisorEnv(ctxKey string, inputData map[string]any) (map[string]any, err
 // before looking at the kind: a value implementing object.RisorValuer, or one
 // that already is an object.Object, is skipped along with everything it
 // holds, since Risor never reads its fields or its integer value.
+//
+// Values returned by Go methods that a script calls are not checked: Risor
+// converts them only when the method runs, after this check.
 func checkUintRange(v reflect.Value, path string) error {
 	return (&uintChecker{seen: make(map[visit]struct{})}).check(v, path)
 }
@@ -128,9 +131,10 @@ func (c *uintChecker) checkList(v reflect.Value, path string) error {
 // checkStruct checks the direct exported fields of a struct, the only ones
 // Risor exposes to scripts. Risor's GoStruct indexes a struct's own fields
 // (NumField plus IsExported) and does not promote fields through embedding,
-// so an unexported embedded struct or pointer is skipped along with its
-// fields, while an exported embedded struct is an ordinary field that a script
-// reads by its type name, and is checked like any other.
+// so the fields of an unexported embedded struct or pointer are not exposed
+// as attributes and are skipped (its promoted methods are still callable;
+// see checkUintRange), while an exported embedded struct is an ordinary field
+// that a script reads by its type name, and is checked like any other.
 func (c *uintChecker) checkStruct(v reflect.Value, path string) error {
 	t := v.Type()
 	for i := range t.NumField() {
