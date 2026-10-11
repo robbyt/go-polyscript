@@ -7,6 +7,7 @@ import (
 
 	extismSDK "github.com/extism/go-sdk"
 	"github.com/robbyt/go-polyscript/engines/extism/adapters"
+	"github.com/robbyt/go-polyscript/internal/wazerorace"
 	"github.com/tetratelabs/wazero"
 )
 
@@ -59,6 +60,12 @@ func compile(
 	config := extismSDK.PluginConfig{
 		EnableWasi:    opts.EnableWASI,
 		RuntimeConfig: runtimeConfigFor(opts),
+	}
+
+	// Cache wazero's version before creating a runtime, so concurrent
+	// compiles don't race on it under -race (wazero v1.12.0).
+	if err := wazerorace.Prime(); err != nil {
+		return nil, fmt.Errorf("%w: %w", ErrCompileFailed, err)
 	}
 
 	// Create compiled plugin using the SDK

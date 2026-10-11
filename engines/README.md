@@ -151,14 +151,19 @@ harmless in practice, but it fails `go test -race`.
 This is fixed upstream in
 [tetratelabs/wazero#2536](https://github.com/tetratelabs/wazero/pull/2536)
 (commit [`6edbb8c`](https://github.com/tetratelabs/wazero/commit/6edbb8c01a)),
-which is not in a wazero release yet. Until it is, apps that compile Extism
-modules concurrently under `-race` can hit it. Two workarounds:
+which is not in a wazero release yet. Until it is, go-polyscript works around
+it: the Extism compiler caches wazero's version once per process, under a
+`sync.Once`, before it creates its first runtime (`internal/wazerorace`). So
+concurrent Extism compiles through go-polyscript are safe under `-race`.
+
+Your app can still hit the race if it creates its own wazero runtimes (or
+calls the Extism SDK directly) at the same moment as go-polyscript's first
+compile. Two workarounds:
 
 - Create and close one wazero runtime before the parallel work starts, e.g. in
-  `TestMain`. Each test package is its own binary, so every package whose
-  tests create runtimes needs its own warm-up. This is what go-polyscript's
-  own tests do (`internal/wazerorace`, called from `wazerorace_main_test.go`
-  in each such package):
+  `TestMain`. Each test package is its own binary, so every package that
+  needs it must do this. go-polyscript's own tests do this only in
+  `engines/extism/wasmdata`, which calls the Extism SDK directly:
   ```go
   func TestMain(m *testing.M) {
       ctx := context.Background()
