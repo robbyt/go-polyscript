@@ -55,10 +55,11 @@ func (p *ContextProvider) GetData(ctx context.Context) (map[string]any, error) {
 //
 // # Errors
 //
-// Every key is checked, and all the problems found (an empty key at any
-// depth, or a value that cannot be converted) are returned joined with
-// errors.Join, together with the original ctx. None of the data is stored
-// when any of it is invalid, valid keys included.
+// Every top-level key is checked, and the problems found (an empty key at
+// any depth, or a value that cannot be converted) are returned joined with
+// errors.Join, together with the original ctx. Inside a nested map or slice,
+// only the first problem is reported. None of the data is stored when any of
+// it is invalid, valid keys included.
 //
 // Returning the original ctx is not a rollback: values are processed
 // before the error is reported, so an *http.Request body may already have
