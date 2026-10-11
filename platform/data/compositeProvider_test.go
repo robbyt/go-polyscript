@@ -414,7 +414,17 @@ func TestCompositeProvider_AddDataToContext(t *testing.T) {
 
 		newCtx, err := provider.AddDataToContext(ctx, inputData)
 
-		require.NoError(t, err, "Should not return error with empty provider list")
+		require.ErrorIs(t, err, ErrNoProviders, "Data must not vanish silently with no providers")
+		assert.Equal(t, ctx, newCtx, "Context should remain unchanged")
+	})
+
+	t.Run("only nil providers", func(t *testing.T) {
+		provider := NewCompositeProvider(nil, nil)
+
+		ctx := t.Context()
+		newCtx, err := provider.AddDataToContext(ctx, map[string]any{"key": "value"})
+
+		require.ErrorIs(t, err, ErrNoProviders, "nil slots should not count as providers")
 		assert.Equal(t, ctx, newCtx, "Context should remain unchanged")
 	})
 
@@ -467,7 +477,7 @@ func TestCompositeProvider_AddDataToContext(t *testing.T) {
 
 		newCtx, err := provider.AddDataToContext(ctx, inputData)
 
-		require.NoError(t, err, "Should not return error when at least one provider succeeds")
+		require.NoError(t, err, "StaticProvider rejection should not be reported when the ContextProvider succeeds")
 		assert.NotEqual(t, ctx, newCtx, "Context should be modified")
 
 		// Verify both static and context data are available
@@ -948,7 +958,7 @@ func TestCompositeProvider_AddDataToContext_EdgeCases(t *testing.T) {
 			Return(baseCtx, nil)
 
 		_, err := NewCompositeProvider(failing, next).AddDataToContext(baseCtx, map[string]any{"k": "v"})
-		require.NoError(t, err, "a later success hides the earlier failure (see #160)")
+		require.ErrorIs(t, err, assert.AnError, "a later success must not hide the earlier failure")
 		require.NotNil(t, seen)
 		assert.Nil(t, seen.Value(ctxKey{}), "next provider should not see the failing provider's ctx")
 		failing.AssertExpectations(t)
@@ -1003,9 +1013,51 @@ func TestCompositeProvider_AddDataToContext_EdgeCases(t *testing.T) {
 	})
 }
 
+// TestCompositeProvider_AddDataToContext_PartialFailure is the regression
+// test for #160: when some providers fail and others succeed, the error is
+// reported and the returned context still carries the successful
+// providers' data.
+func TestCompositeProvider_AddDataToContext_PartialFailure(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		build func(failing Provider, ctxProvider Provider) *CompositeProvider
+	}{
+		{"failing provider first", func(failing, ctxProvider Provider) *CompositeProvider {
+			return NewCompositeProvider(failing, ctxProvider)
+		}},
+		{"failing provider last", func(failing, ctxProvider Provider) *CompositeProvider {
+			return NewCompositeProvider(ctxProvider, failing)
+		}},
+		{"static provider alongside", func(failing, ctxProvider Provider) *CompositeProvider {
+			return NewCompositeProvider(NewStaticProvider(simpleData), failing, ctxProvider)
+		}},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			failing := new(MockProvider)
+			failing.On("AddDataToContext", mock.Anything, mock.Anything).Return(nil, assert.AnError)
+			ctxProvider := NewContextProvider(constants.EvalData)
+			composite := tc.build(failing, ctxProvider)
+
+			ctx, err := composite.AddDataToContext(t.Context(), map[string]any{"k": "v"})
+
+			require.ErrorIs(t, err, assert.AnError, "partial failure must be reported")
+			require.NotErrorIs(t, err, ErrStaticProviderNoRuntimeUpdates,
+				"static rejections should not be reported when other providers exist")
+			require.NotNil(t, ctx)
+			got, getErr := ctxProvider.GetData(ctx)
+			require.NoError(t, getErr)
+			assert.Equal(t, "v", got["k"], "successful provider's data should be in the returned ctx")
+			failing.AssertExpectations(t)
+		})
+	}
+}
+
 // TestAddDataTally_FinalErr covers the outcome rules of AddDataToContext
-// directly. The "partial failure" row documents current behavior that #160
-// is expected to change.
+// directly.
 func TestAddDataTally_FinalErr(t *testing.T) {
 	t.Parallel()
 
@@ -1017,7 +1069,7 @@ func TestAddDataTally_FinalErr(t *testing.T) {
 		tally   addDataTally
 		wantErr error
 	}{
-		{name: "no providers", tally: addDataTally{}},
+		{name: "no providers", tally: addDataTally{}, wantErr: ErrNoProviders},
 		{
 			name:    "only static providers, all rejected",
 			tally:   addDataTally{staticCount: 1, staticErrs: []error{staticErr}},
@@ -1025,7 +1077,7 @@ func TestAddDataTally_FinalErr(t *testing.T) {
 		},
 		{
 			name:  "static rejected, other provider succeeded",
-			tally: addDataTally{staticCount: 1, totalCount: 1, successCount: 1, staticErrs: []error{staticErr}},
+			tally: addDataTally{staticCount: 1, totalCount: 1, staticErrs: []error{staticErr}},
 		},
 		{
 			name:    "all non-static providers failed",
@@ -1033,8 +1085,13 @@ func TestAddDataTally_FinalErr(t *testing.T) {
 			wantErr: assert.AnError,
 		},
 		{
-			name:  "partial failure is not reported (#160)",
-			tally: addDataTally{totalCount: 2, successCount: 1, errs: []error{otherErr}},
+			name:    "partial failure is reported (#160)",
+			tally:   addDataTally{totalCount: 2, errs: []error{otherErr}},
+			wantErr: assert.AnError,
+		},
+		{
+			name:  "all non-static providers succeeded",
+			tally: addDataTally{totalCount: 2},
 		},
 	}
 

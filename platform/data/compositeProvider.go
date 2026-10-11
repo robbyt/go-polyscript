@@ -7,6 +7,10 @@ import (
 	"maps"
 )
 
+// ErrNoProviders is returned by CompositeProvider.AddDataToContext when the
+// composite holds no non-nil providers, so the data has nowhere to be stored.
+var ErrNoProviders = errors.New("CompositeProvider has no providers to store data")
+
 // CompositeProvider combines multiple providers, with later providers
 // overriding values from earlier ones in the chain.
 type CompositeProvider struct {
@@ -86,9 +90,23 @@ func deepMerge(src, dst map[string]any) map[string]any {
 	return result
 }
 
-// AddDataToContext distributes data to all providers in the chain.
-// Continues through all providers even if some fail.
-// StaticProvider errors are handled specially based on context.
+// AddDataToContext distributes data to all providers in the chain, passing
+// each successful provider's returned context on to the next one. It
+// continues through all providers even if some fail; a failing provider's
+// returned context is discarded.
+//
+// The result is decided once every provider has been tried:
+//   - No non-nil providers: the original ctx and ErrNoProviders.
+//   - Any provider failed (a StaticProvider's expected
+//     ErrStaticProviderNoRuntimeUpdates aside): the most updated context,
+//     carrying the data of every provider that succeeded, and all such
+//     failures joined with errors.Join. Callers that can tolerate partial
+//     storage may keep using the returned context.
+//   - Only StaticProviders: they never accept runtime data, so the original
+//     ctx and their joined ErrStaticProviderNoRuntimeUpdates errors.
+//   - Otherwise: the most updated context and nil. StaticProvider
+//     rejections are expected and not reported when another provider can
+//     store the data.
 //
 // Example:
 //
@@ -122,28 +140,21 @@ func (p *CompositeProvider) AddDataToContext(
 			continue
 		}
 
-		// Success - update the context and count
 		finalCtx = nextCtx
-		tally.recordSuccess()
 	}
 
-	if err := tally.finalErr(); err != nil {
-		return ctx, err
-	}
-
-	// Return the most updated context with no error
-	return finalCtx, nil
+	// finalCtx is still ctx when no provider succeeded.
+	return finalCtx, tally.finalErr()
 }
 
 // addDataTally accumulates the per-provider outcomes of
 // CompositeProvider.AddDataToContext so the final result can be decided
 // after every provider has been tried.
 type addDataTally struct {
-	errs         []error // errors from non-static providers (and any non-sentinel StaticProvider error)
-	staticErrs   []error // ErrStaticProviderNoRuntimeUpdates errors from StaticProviders
-	successCount int     // providers that returned no error
-	totalCount   int     // non-nil providers that are not a *StaticProvider
-	staticCount  int     // providers that are a *StaticProvider
+	errs        []error // errors from non-static providers (and any non-sentinel StaticProvider error)
+	staticErrs  []error // ErrStaticProviderNoRuntimeUpdates errors from StaticProviders
+	totalCount  int     // non-nil providers that are not a *StaticProvider
+	staticCount int     // providers that are a *StaticProvider
 }
 
 // countProvider records that a non-nil provider is about to be tried.
@@ -154,11 +165,6 @@ func (t *addDataTally) countProvider(isStaticProvider bool) {
 		return
 	}
 	t.totalCount++
-}
-
-// recordSuccess records that a provider accepted the data.
-func (t *addDataTally) recordSuccess() {
-	t.successCount++
 }
 
 // recordError wraps err with the provider's index in the providers list
@@ -173,19 +179,21 @@ func (t *addDataTally) recordError(i int, isStaticProvider bool, err error) {
 	t.errs = append(t.errs, wrapped)
 }
 
-// finalErr returns the error AddDataToContext should report, or nil when
-// the accumulated context should be returned.
+// finalErr returns the error AddDataToContext should report alongside the
+// accumulated context, or nil when every provider that can store data did.
 func (t *addDataTally) finalErr() error {
-	// If every non-nil provider is a StaticProvider, they all rejected the
-	// runtime data, so report their errors
-	if t.staticCount > 0 && t.totalCount == 0 && len(t.staticErrs) > 0 {
-		return errors.Join(t.staticErrs...)
-	}
-
-	// If all non-StaticProvider providers failed, return an error
-	if t.totalCount > 0 && t.successCount == 0 && len(t.errs) > 0 {
+	switch {
+	case t.totalCount == 0 && t.staticCount == 0:
+		// Nothing to store the data in; don't let it vanish silently.
+		return ErrNoProviders
+	case len(t.errs) > 0:
+		// Any real failure is reported, even if other providers succeeded.
 		return errors.Join(t.errs...)
+	case t.totalCount == 0:
+		// Every non-nil provider is a StaticProvider, so they all rejected
+		// the runtime data.
+		return errors.Join(t.staticErrs...)
+	default:
+		return nil
 	}
-
-	return nil
 }
