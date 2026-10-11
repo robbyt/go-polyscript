@@ -762,6 +762,12 @@ func TestEval_ResultTypes(t *testing.T) {
 		{"float", `1.5`, data.FLOAT, 1.5},
 		{"bytes", `bytes("abc")`, data.BYTES, []byte("abc")},
 		{"range", `range(3)`, data.LIST, []any{int64(0), int64(1), int64(2)}},
+		{"range nested in list", `[range(2)]`, data.LIST, []any{[]any{int64(0), int64(1)}}},
+		{
+			"range nested in map", `{"a": [range(1)]}`,
+			data.MAP,
+			map[string]any{"a": []any{[]any{int64(0)}}},
+		},
 		{"builtin", `len`, data.FUNCTION, nil},
 		{"module", `math`, data.ERROR, nil},
 	}

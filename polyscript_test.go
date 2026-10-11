@@ -119,27 +119,39 @@ func TestEngineEvaluatorsFromString(t *testing.T) {
 }
 
 // TestResultTypesAcrossEngines checks that the same conceptual result reports
-// the same data.Types from every engine, so callers can switch on Type()
-// without knowing which engine ran. The embedded Extism guest cannot return a
-// bare int or null, so Extism is covered by the decoded-guest-output cases in
-// engines/extism/evaluator.
+// the same data.Types and the same Go value from every engine, so callers can
+// switch on Type() and type-assert Interface() without knowing which engine
+// ran. The embedded Extism guest cannot return a bare int or null, so Extism is
+// covered by the decoded-guest-output cases in engines/extism/evaluator.
 func TestResultTypesAcrossEngines(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name     string
-		risor    string
-		starlark string
-		expected data.Types
+		name          string
+		risor         string
+		starlark      string
+		expectedType  data.Types
+		expectedValue any
 	}{
-		{"int", `42`, `_ = 42`, data.INT},
-		{"nil", `nil`, `_ = None`, data.NONE},
-		{"float", `1.5`, `_ = 1.5`, data.FLOAT},
-		{"string", `"s"`, `_ = "s"`, data.STRING},
-		{"bool", `true`, `_ = True`, data.BOOL},
-		{"bytes", `bytes("abc")`, `_ = b"abc"`, data.BYTES},
-		{"list", `[1, 2]`, `_ = [1, 2]`, data.LIST},
-		{"map", `{"a": 1}`, `_ = {"a": 1}`, data.MAP},
+		{"int", `42`, `_ = 42`, data.INT, int64(42)},
+		{"nil", `nil`, `_ = None`, data.NONE, nil},
+		{"float", `1.5`, `_ = 1.5`, data.FLOAT, 1.5},
+		{"string", `"s"`, `_ = "s"`, data.STRING, "s"},
+		{"bool", `true`, `_ = True`, data.BOOL, true},
+		{"bytes", `bytes("abc")`, `_ = b"abc"`, data.BYTES, []byte("abc")},
+		{"list", `[1, 2]`, `_ = [1, 2]`, data.LIST, []any{int64(1), int64(2)}},
+		{"map", `{"a": 1}`, `_ = {"a": 1}`, data.MAP, map[string]any{"a": int64(1)}},
+		{"range", `range(3)`, `_ = range(3)`, data.LIST, []any{int64(0), int64(1), int64(2)}},
+		{
+			"range nested in list", `[range(2)]`, `_ = [range(2)]`,
+			data.LIST,
+			[]any{[]any{int64(0), int64(1)}},
+		},
+		{
+			"range nested in map", `{"a": range(2)}`, `_ = {"a": range(2)}`,
+			data.MAP,
+			map[string]any{"a": []any{int64(0), int64(1)}},
+		},
 	}
 
 	for _, tc := range tests {
@@ -159,7 +171,8 @@ func TestResultTypesAcrossEngines(t *testing.T) {
 
 				result, err := evaluator.Eval(t.Context())
 				require.NoError(t, err, "%s: eval", eng.name)
-				assert.Equal(t, tc.expected, result.Type(), "%s: Type() for %q", eng.name, eng.content)
+				assert.Equal(t, tc.expectedType, result.Type(), "%s: Type() for %q", eng.name, eng.content)
+				assert.Equal(t, tc.expectedValue, result.Interface(), "%s: Interface() for %q", eng.name, eng.content)
 			}
 		})
 	}

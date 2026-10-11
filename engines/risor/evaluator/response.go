@@ -82,24 +82,45 @@ func (r *execResult) Type() data.Types {
 	}
 }
 
-// Interface returns the Go value Risor converts the result to. A range is
-// expanded to []any (Risor returns []int64) so it matches the []any every
-// other data.LIST result uses.
+// Interface returns the Go value Risor converts the result to, except that
+// ranges are expanded to []any (Risor returns []int64) at every depth, so a
+// range matches the []any every other data.LIST value uses whether it is the
+// result itself or nested in a list or map.
 func (r *execResult) Interface() any {
 	if r.Object == nil {
 		return nil
 	}
+	return toGoValue(r.Object)
+}
 
-	if rng, ok := r.Object.(*risorObject.Range); ok {
-		ints, _ := rng.Interface().([]int64)
+// toGoValue mirrors Risor's Object.Interface(), walking lists and maps itself
+// so ranges nested inside them are expanded to []any as well.
+func toGoValue(obj risorObject.Object) any {
+	switch o := obj.(type) {
+	case *risorObject.Range:
+		ints, _ := o.Interface().([]int64)
 		list := make([]any, len(ints))
 		for i, n := range ints {
 			list[i] = n
 		}
 		return list
+	case *risorObject.List:
+		items := o.Value()
+		list := make([]any, len(items))
+		for i, item := range items {
+			list[i] = toGoValue(item)
+		}
+		return list
+	case *risorObject.Map:
+		items := o.Value()
+		m := make(map[string]any, len(items))
+		for k, v := range items {
+			m[k] = toGoValue(v)
+		}
+		return m
+	default:
+		return obj.Interface()
 	}
-
-	return r.Object.Interface()
 }
 
 func (r *execResult) ScriptExeID() string {

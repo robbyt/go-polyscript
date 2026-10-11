@@ -47,8 +47,9 @@ func (r *execResult) String() string {
 		r.Type(), r.Value, r.ExecTime(), r.ScriptExeID())
 }
 
-// Type maps the Starlark type name to a data.Types constant. Types with no
-// counterpart report data.ERROR.
+// Type maps the Starlark type name to a data.Types constant. A range reports
+// data.LIST because Interface() returns it as []any. Types with no counterpart
+// report data.ERROR.
 func (r *execResult) Type() data.Types {
 	switch r.Value.Type() {
 	case "NoneType":
@@ -63,7 +64,7 @@ func (r *execResult) Type() data.Types {
 		return data.STRING
 	case "bytes":
 		return data.BYTES
-	case "list":
+	case "list", "range":
 		return data.LIST
 	case "tuple":
 		return data.TUPLE

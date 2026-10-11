@@ -11,8 +11,34 @@ import (
 	starlarkLib "go.starlark.net/starlark"
 )
 
+// customSequence is a non-range Indexable used to check that the range
+// conversion does not swallow arbitrary sequence types.
+type customSequence struct{}
+
+func (customSequence) String() string                        { return "customSequence" }
+func (customSequence) Type() string                          { return "customSequence" }
+func (customSequence) Freeze()                               {}
+func (customSequence) Truth() starlarkLib.Bool               { return starlarkLib.True }
+func (customSequence) Hash() (uint32, error)                 { return 0, nil }
+func (customSequence) Len() int                              { return 1 }
+func (customSequence) Index(int) starlarkLib.Value           { return starlarkLib.MakeInt(1) }
+func (customSequence) Iterate() starlarkLib.Iterator         { return nil }
+func (customSequence) Slice(int, int, int) starlarkLib.Value { return starlarkLib.None }
+
 func TestConvertStarlarkValueToInterface(t *testing.T) {
 	t.Parallel()
+
+	// makeRange calls the builtin range(), since the range type is unexported.
+	makeRange := func(args ...int) starlarkLib.Value {
+		t.Helper()
+		tuple := make(starlarkLib.Tuple, len(args))
+		for i, a := range args {
+			tuple[i] = starlarkLib.MakeInt(a)
+		}
+		v, err := starlarkLib.Call(&starlarkLib.Thread{}, starlarkLib.Universe["range"], tuple, nil)
+		require.NoError(t, err)
+		return v
+	}
 
 	tests := []struct {
 		name     string
@@ -155,6 +181,33 @@ func TestConvertStarlarkValueToInterface(t *testing.T) {
 				starlarkLib.Bytes("z"),
 			}),
 			expected: []any{new(big.Int).Lsh(big.NewInt(1), 64), []byte("z")},
+		},
+
+		// Range types
+		{
+			name:     "range",
+			input:    makeRange(3),
+			expected: []any{int64(0), int64(1), int64(2)},
+		},
+		{
+			name:     "stepped range",
+			input:    makeRange(10, 0, -4),
+			expected: []any{int64(10), int64(6), int64(2)},
+		},
+		{
+			name:     "empty range",
+			input:    makeRange(0),
+			expected: []any{},
+		},
+		{
+			name:     "range nested in list",
+			input:    starlarkLib.NewList([]starlarkLib.Value{makeRange(2)}),
+			expected: []any{[]any{int64(0), int64(1)}},
+		},
+		{
+			name:    "non-range indexable",
+			input:   customSequence{},
+			wantErr: true,
 		},
 
 		// Dict types

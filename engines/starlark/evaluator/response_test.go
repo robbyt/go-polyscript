@@ -109,6 +109,7 @@ func TestResponseMethods(t *testing.T) {
 			{"function type", "function", data.FUNCTION},
 			{"builtin type", "builtin_function_or_method", data.FUNCTION},
 			{"bytes type", "bytes", data.BYTES},
+			{"range type", "range", data.LIST},
 		}
 
 		for _, tc := range testCases {

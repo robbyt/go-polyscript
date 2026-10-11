@@ -46,9 +46,10 @@ func ConvertToStarlarkFormat(inputData map[string]any) (starlarkLib.StringDict, 
 
 // ConvertStarlarkValueToInterface converts a Starlark value to a Go any value.
 //
-// Ints become int64 when they fit and *big.Int otherwise. Lists, tuples, and
-// sets all become []any (sets in insertion order), dicts become map[string]any,
-// and bytes become []byte. Nested values are converted recursively.
+// Ints become int64 when they fit and *big.Int otherwise. Lists, tuples,
+// ranges, and sets all become []any (sets in insertion order), dicts become
+// map[string]any, and bytes become []byte. Nested values are converted
+// recursively.
 func ConvertStarlarkValueToInterface(v starlarkLib.Value) (any, error) {
 	if v == nil {
 		return nil, nil
@@ -124,6 +125,22 @@ func ConvertStarlarkValueToInterface(v starlarkLib.Value) (any, error) {
 			dict[string(kStr)] = vv
 		}
 		return dict, nil
+	case starlarkLib.Indexable:
+		// The range type is unexported, so match it by name. Other Indexable
+		// values (lists, tuples, strings, bytes) are handled above, and
+		// unknown sequence types stay unsupported.
+		if v.Type() != "range" {
+			return nil, fmt.Errorf("unsupported Starlark type %T", v)
+		}
+		list := make([]any, 0, v.Len())
+		for i := 0; i < v.Len(); i++ {
+			elem, err := ConvertStarlarkValueToInterface(v.Index(i))
+			if err != nil {
+				return nil, fmt.Errorf("failed to convert range element: %w", err)
+			}
+			list = append(list, elem)
+		}
+		return list, nil
 	// NoneType is already handled in the first case
 	default:
 		return nil, fmt.Errorf("unsupported Starlark type %T", v)

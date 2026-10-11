@@ -580,6 +580,10 @@ func TestEval_ResultTypes(t *testing.T) {
 		{"tuple", `_ = (1, 2, 3)`, data.TUPLE, []any{int64(1), int64(2), int64(3)}},
 		{"set", `_ = set([1, 2])`, data.SET, []any{int64(1), int64(2)}},
 		{"bytes", `_ = b"abc"`, data.BYTES, []byte("abc")},
+		{"range", `_ = range(3)`, data.LIST, []any{int64(0), int64(1), int64(2)}},
+		{"stepped range", `_ = range(10, 0, -4)`, data.LIST, []any{int64(10), int64(6), int64(2)}},
+		{"empty range", `_ = range(0)`, data.LIST, []any{}},
+		{"range nested in list", `_ = [range(2)]`, data.LIST, []any{[]any{int64(0), int64(1)}}},
 	}
 
 	for _, tt := range tests {
