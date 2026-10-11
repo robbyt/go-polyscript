@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `data.BYTES` and `data.UNKNOWN` result types.
+  ([#157](https://github.com/robbyt/go-polyscript/issues/157),
+  [#161](https://github.com/robbyt/go-polyscript/issues/161))
 - Generic top-level constructor `polyscript.New[E]` covering all three engines
   with a unified `Source` and `Option[E]` API, replacing twelve legacy
   `FromXxx` functions. ([#103](https://github.com/robbyt/go-polyscript/pull/103))
@@ -25,6 +28,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ([#115](https://github.com/robbyt/go-polyscript/pull/115))
 
 ### Changed
+- **BREAKING:** `EvaluatorResponse.Type()` now always returns a `data.Types`
+  constant, the same one on every engine for the same kind of value, and
+  `data.UNKNOWN` for values with no counterpart (previously `data.ERROR`, or
+  Risor's raw type name). Risor `nil` now reports `data.NONE` instead of
+  `"null"`, Risor `byte` reports `data.INT`, and Risor builtins and Starlark
+  builtins report `data.FUNCTION`.
+  ([#161](https://github.com/robbyt/go-polyscript/issues/161))
+- **BREAKING:** Result `Interface()` values: Starlark ints too large for
+  `int64` are returned as `*big.Int`; Starlark tuples, sets and ranges, and
+  Risor ranges at any depth, are returned as `[]any`; Starlark bytes are
+  returned as `[]byte`. `Type()` agrees with each of these.
+  ([#157](https://github.com/robbyt/go-polyscript/issues/157))
 - `slog.Handler` is now optional throughout. A nil handler at any layer
   inherits from `slog.Default()` via the canonical `helpers.SetupLogger`
   helper. The new `polyscript.New[E]` constructor takes no handler
@@ -158,6 +173,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   directly can still hit it; see `engines/README.md` for workarounds.
 
 ### Fixed
+- Extism results that decode to a plain Go `int` (any bare JSON integer)
+  reported `data.ERROR`; they now report `data.INT`.
+  ([#161](https://github.com/robbyt/go-polyscript/issues/161))
+- Starlark results lost data: ints beyond `int64` became `0`, and tuple,
+  set and bytes results became `nil` while `Type()` reported success.
+  ([#157](https://github.com/robbyt/go-polyscript/issues/157))
 - Risor `compiler.WithGlobals` with any name other than `ctx` made every
   `Eval` fail with "missing required globals". Declared globals without a
   value are now supplied as `nil` at evaluation time.
