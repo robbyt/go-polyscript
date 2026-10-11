@@ -1,6 +1,8 @@
 package internal
 
 import (
+	"math"
+	"math/big"
 	"net/url"
 	"testing"
 
@@ -44,6 +46,26 @@ func TestConvertStarlarkValueToInterface(t *testing.T) {
 			wantErr:  false,
 		},
 		{
+			name:     "int at int64 max",
+			input:    starlarkLib.MakeInt64(math.MaxInt64),
+			expected: int64(math.MaxInt64),
+		},
+		{
+			name:     "int at int64 min",
+			input:    starlarkLib.MakeInt64(math.MinInt64),
+			expected: int64(math.MinInt64),
+		},
+		{
+			name:     "int above int64 max",
+			input:    starlarkLib.MakeBigInt(new(big.Int).Lsh(big.NewInt(1), 64)),
+			expected: new(big.Int).Lsh(big.NewInt(1), 64),
+		},
+		{
+			name:     "int below int64 min",
+			input:    starlarkLib.MakeBigInt(new(big.Int).Neg(new(big.Int).Lsh(big.NewInt(1), 70))),
+			expected: new(big.Int).Neg(new(big.Int).Lsh(big.NewInt(1), 70)),
+		},
+		{
 			name:     "float",
 			input:    starlarkLib.Float(3.14),
 			expected: float64(3.14),
@@ -85,6 +107,54 @@ func TestConvertStarlarkValueToInterface(t *testing.T) {
 			}(),
 			expected: []any{[]any{int64(1), int64(2)}},
 			wantErr:  false,
+		},
+
+		// Tuple, set, and bytes types
+		{
+			name:     "empty tuple",
+			input:    starlarkLib.Tuple{},
+			expected: []any{},
+		},
+		{
+			name: "nested tuple",
+			input: starlarkLib.Tuple{
+				starlarkLib.MakeInt(1),
+				starlarkLib.Tuple{starlarkLib.String("a"), starlarkLib.None},
+			},
+			expected: []any{int64(1), []any{"a", nil}},
+		},
+		{
+			name: "set keeps insertion order",
+			input: func() *starlarkLib.Set {
+				s := starlarkLib.NewSet(3)
+				for _, v := range []starlarkLib.Value{
+					starlarkLib.MakeInt(3),
+					starlarkLib.String("x"),
+					starlarkLib.Tuple{starlarkLib.MakeInt(1)},
+				} {
+					require.NoError(t, s.Insert(v))
+				}
+				return s
+			}(),
+			expected: []any{int64(3), "x", []any{int64(1)}},
+		},
+		{
+			name:     "empty set",
+			input:    starlarkLib.NewSet(0),
+			expected: []any{},
+		},
+		{
+			name:     "bytes",
+			input:    starlarkLib.Bytes("abc"),
+			expected: []byte("abc"),
+		},
+		{
+			name: "list containing big int and bytes",
+			input: starlarkLib.NewList([]starlarkLib.Value{
+				starlarkLib.MakeBigInt(new(big.Int).Lsh(big.NewInt(1), 64)),
+				starlarkLib.Bytes("z"),
+			}),
+			expected: []any{new(big.Int).Lsh(big.NewInt(1), 64), []byte("z")},
 		},
 
 		// Dict types

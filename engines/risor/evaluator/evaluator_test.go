@@ -744,3 +744,44 @@ func TestEval_DeclaredGlobals(t *testing.T) {
 		})
 	}
 }
+
+// TestEval_ResultTypes runs real scripts and checks that Type() reports a
+// data.Types constant that agrees with the value Interface() returns.
+func TestEval_ResultTypes(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name          string
+		script        string
+		expectedType  data.Types
+		expectedValue any
+	}{
+		{"nil", `nil`, data.NONE, nil},
+		{"int", `42`, data.INT, int64(42)},
+		{"byte", `byte(65)`, data.INT, byte(65)},
+		{"float", `1.5`, data.FLOAT, 1.5},
+		{"bytes", `bytes("abc")`, data.BYTES, []byte("abc")},
+		{"range", `range(3)`, data.LIST, []any{int64(0), int64(1), int64(2)}},
+		{"builtin", `len`, data.FUNCTION, nil},
+		{"module", `math`, data.ERROR, nil},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			handler := slog.NewTextHandler(io.Discard, nil)
+			ld, err := loader.NewFromString(tc.script)
+			require.NoError(t, err)
+			exe, err := createTestExecutable(
+				t.Context(), handler, ld, []string{constants.Ctx},
+				data.NewContextProvider(constants.EvalData),
+			)
+			require.NoError(t, err)
+
+			ctx := context.WithValue(t.Context(), constants.EvalData, map[string]any{})
+			result, err := New(handler, exe).Eval(ctx)
+			require.NoError(t, err)
+			assert.Equal(t, tc.expectedType, result.Type(), "Type() should classify the result")
+			assert.Equal(t, tc.expectedValue, result.Interface(), "Interface() should return the converted result")
+		})
+	}
+}

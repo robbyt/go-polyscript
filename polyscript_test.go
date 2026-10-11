@@ -118,6 +118,53 @@ func TestEngineEvaluatorsFromString(t *testing.T) {
 	}
 }
 
+// TestResultTypesAcrossEngines checks that the same conceptual result reports
+// the same data.Types from every engine, so callers can switch on Type()
+// without knowing which engine ran. The embedded Extism guest cannot return a
+// bare int or null, so Extism is covered by the decoded-guest-output cases in
+// engines/extism/evaluator.
+func TestResultTypesAcrossEngines(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		risor    string
+		starlark string
+		expected data.Types
+	}{
+		{"int", `42`, `_ = 42`, data.INT},
+		{"nil", `nil`, `_ = None`, data.NONE},
+		{"float", `1.5`, `_ = 1.5`, data.FLOAT},
+		{"string", `"s"`, `_ = "s"`, data.STRING},
+		{"bool", `true`, `_ = True`, data.BOOL},
+		{"bytes", `bytes("abc")`, `_ = b"abc"`, data.BYTES},
+		{"list", `[1, 2]`, `_ = [1, 2]`, data.LIST},
+		{"map", `{"a": 1}`, `_ = {"a": 1}`, data.MAP},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			engines := []struct {
+				name    string
+				content string
+				creator stringEngineFn
+			}{
+				{"Risor", tc.risor, risorString},
+				{"Starlark", tc.starlark, starlarkString},
+			}
+
+			for _, eng := range engines {
+				evaluator, err := eng.creator(t.Context(), eng.content, slog.NewTextHandler(io.Discard, nil))
+				require.NoError(t, err, "%s: create evaluator", eng.name)
+
+				result, err := evaluator.Eval(t.Context())
+				require.NoError(t, err, "%s: eval", eng.name)
+				assert.Equal(t, tc.expected, result.Type(), "%s: Type() for %q", eng.name, eng.content)
+			}
+		})
+	}
+}
+
 func TestFromStringValidation(t *testing.T) {
 	t.Parallel()
 

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"math/big"
 	"net/http/httptest"
 	"os"
 	"testing"
@@ -556,4 +557,41 @@ _ = boom
 		var evalErrWrap *Error
 		require.NotErrorAs(t, err, &evalErrWrap)
 	})
+}
+
+// TestEval_ResultTypes runs real scripts and checks that Type() and
+// Interface() agree for every result kind, including the ones that used to
+// convert lossily (big ints, tuples, sets, bytes).
+func TestEval_ResultTypes(t *testing.T) {
+	t.Parallel()
+
+	twoTo64 := new(big.Int).Lsh(big.NewInt(1), 64)
+
+	tests := []struct {
+		name          string
+		script        string
+		expectedType  data.Types
+		expectedValue any
+	}{
+		{"int", `_ = 42`, data.INT, int64(42)},
+		{"none", `_ = None`, data.NONE, nil},
+		{"big int", `_ = 1 << 64`, data.INT, twoTo64},
+		{"negative big int", `_ = -(1 << 64)`, data.INT, new(big.Int).Neg(twoTo64)},
+		{"tuple", `_ = (1, 2, 3)`, data.TUPLE, []any{int64(1), int64(2), int64(3)}},
+		{"set", `_ = set([1, 2])`, data.SET, []any{int64(1), int64(2)}},
+		{"bytes", `_ = b"abc"`, data.BYTES, []byte("abc")},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, evaluator := evalBuilder(t, tt.script)
+
+			ctx := context.WithValue(t.Context(), constants.EvalData, map[string]any{})
+			result, err := evaluator.Eval(ctx)
+			require.NoError(t, err)
+
+			assert.Equal(t, tt.expectedType, result.Type(), "Type() should classify the result")
+			assert.Equal(t, tt.expectedValue, result.Interface(), "Interface() should return the converted result")
+		})
+	}
 }

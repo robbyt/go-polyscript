@@ -130,22 +130,35 @@ func TestResponseMethods(t *testing.T) {
 	t.Run("Type", func(t *testing.T) {
 		tests := []struct {
 			name     string
-			typeStr  string
+			typeStr  rObj.Type
 			expected data.Types
 		}{
-			{"string type", string(data.STRING), data.STRING},
-			{"int type", string(data.INT), data.INT},
-			{"bool type", string(data.BOOL), data.BOOL},
-			{"float type", string(data.FLOAT), data.FLOAT},
-			{"list type", string(data.LIST), data.LIST},
-			{"map type", string(data.MAP), data.MAP},
-			{"none type", string(data.NONE), data.NONE},
+			{"nil type", rObj.NIL, data.NONE},
+			{"bool type", rObj.BOOL, data.BOOL},
+			{"int type", rObj.INT, data.INT},
+			{"byte type", rObj.BYTE, data.INT},
+			{"float type", rObj.FLOAT, data.FLOAT},
+			{"string type", rObj.STRING, data.STRING},
+			{"bytes type", rObj.BYTES, data.BYTES},
+			{"list type", rObj.LIST, data.LIST},
+			{"range type", rObj.RANGE, data.LIST},
+			{"iter type", rObj.ITER, data.LIST},
+			{"map type", rObj.MAP, data.MAP},
+			{"function type", rObj.FUNCTION, data.FUNCTION},
+			{"builtin type", rObj.BUILTIN, data.FUNCTION},
+			{"go_func type", rObj.GOFUNC, data.FUNCTION},
+			{"partial type", rObj.PARTIAL, data.FUNCTION},
+			{"error type", rObj.ERROR, data.ERROR},
+			{"time type falls back to error", rObj.TIME, data.ERROR},
+			{"module type falls back to error", rObj.MODULE, data.ERROR},
+			{"go_struct type falls back to error", rObj.GOSTRUCT, data.ERROR},
+			{"module-defined type falls back to error", rObj.Type("regexp"), data.ERROR},
 		}
 
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
 				mockObj := new(RisorObjectMock)
-				mockObj.On("Type").Return(rObj.Type(tt.typeStr))
+				mockObj.On("Type").Return(tt.typeStr)
 
 				handler := slog.NewTextHandler(os.Stdout, nil)
 				result := newEvalResult(handler, mockObj, time.Second, "version-1")
@@ -155,6 +168,56 @@ func TestResponseMethods(t *testing.T) {
 
 				// Verify mock expectations
 				mockObj.AssertExpectations(t)
+			})
+		}
+
+		t.Run("nil object", func(t *testing.T) {
+			handler := slog.NewTextHandler(os.Stdout, nil)
+			result := newEvalResult(handler, nil, time.Second, "version-1")
+			assert.Equal(t, data.NONE, result.Type())
+			assert.Nil(t, result.Interface())
+		})
+	})
+
+	t.Run("Type and Interface agree", func(t *testing.T) {
+		now := time.Now()
+		tests := []struct {
+			name          string
+			obj           rObj.Object
+			expectedType  data.Types
+			expectedValue any
+		}{
+			{"nil", rObj.Nil, data.NONE, nil},
+			{"int", rObj.NewInt(42), data.INT, int64(42)},
+			{"byte", rObj.NewByte(65), data.INT, byte(65)},
+			{"float", rObj.NewFloat(1.5), data.FLOAT, 1.5},
+			{"string", rObj.NewString("s"), data.STRING, "s"},
+			{"bool", rObj.True, data.BOOL, true},
+			{"bytes", rObj.NewBytes([]byte("abc")), data.BYTES, []byte("abc")},
+			{
+				"list",
+				rObj.NewList([]rObj.Object{rObj.NewInt(1), rObj.Nil}),
+				data.LIST,
+				[]any{int64(1), nil},
+			},
+			{"range", rObj.NewRange(0, 3, 1), data.LIST, []any{int64(0), int64(1), int64(2)}},
+			{"empty range", rObj.NewRange(0, 0, 1), data.LIST, []any{}},
+			{
+				"map",
+				rObj.NewMap(map[string]rObj.Object{"a": rObj.NewInt(1)}),
+				data.MAP,
+				map[string]any{"a": int64(1)},
+			},
+			{"builtin", rObj.NewNoopBuiltin("noop"), data.FUNCTION, nil},
+			{"time falls back to error", rObj.NewTime(now), data.ERROR, now},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				handler := slog.NewTextHandler(os.Stdout, nil)
+				result := newEvalResult(handler, tt.obj, time.Second, "version-1")
+				assert.Equal(t, tt.expectedType, result.Type(), "Type() should classify the object")
+				assert.Equal(t, tt.expectedValue, result.Interface(), "Interface() should return the converted object")
 			})
 		}
 	})
@@ -178,19 +241,27 @@ func TestResponseMethods(t *testing.T) {
 			},
 			{
 				name:       "integer object",
-				mockType:   rObj.Type("integer"),
+				mockType:   rObj.INT,
 				mockString: "42",
 				execTime:   200 * time.Millisecond,
 				versionID:  "v2.0.0",
-				expected:   "ExecResult{Type: integer, Value: 42, ExecTime: 200ms, ScriptExeID: v2.0.0}",
+				expected:   "ExecResult{Type: int, Value: 42, ExecTime: 200ms, ScriptExeID: v2.0.0}",
 			},
 			{
 				name:       "boolean object",
-				mockType:   rObj.Type("boolean"),
+				mockType:   rObj.BOOL,
 				mockString: "true",
 				execTime:   50 * time.Millisecond,
 				versionID:  "v3.0.0",
-				expected:   "ExecResult{Type: boolean, Value: true, ExecTime: 50ms, ScriptExeID: v3.0.0}",
+				expected:   "ExecResult{Type: bool, Value: true, ExecTime: 50ms, ScriptExeID: v3.0.0}",
+			},
+			{
+				name:       "nil object",
+				mockType:   rObj.NIL,
+				mockString: "nil",
+				execTime:   10 * time.Millisecond,
+				versionID:  "v4.0.0",
+				expected:   "ExecResult{Type: none, Value: nil, ExecTime: 10ms, ScriptExeID: v4.0.0}",
 			},
 		}
 

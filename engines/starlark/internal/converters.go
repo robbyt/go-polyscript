@@ -44,7 +44,11 @@ func ConvertToStarlarkFormat(inputData map[string]any) (starlarkLib.StringDict, 
 	return sDict, nil
 }
 
-// ConvertStarlarkValueToInterface converts a Starlark value to a Go any value
+// ConvertStarlarkValueToInterface converts a Starlark value to a Go any value.
+//
+// Ints become int64 when they fit and *big.Int otherwise. Lists, tuples, and
+// sets all become []any (sets in insertion order), dicts become map[string]any,
+// and bytes become []byte. Nested values are converted recursively.
 func ConvertStarlarkValueToInterface(v starlarkLib.Value) (any, error) {
 	if v == nil {
 		return nil, nil
@@ -57,18 +61,42 @@ func ConvertStarlarkValueToInterface(v starlarkLib.Value) (any, error) {
 	case starlarkLib.Bool:
 		return bool(v), nil
 	case starlarkLib.Int:
-		i, _ := v.Int64()
-		return i, nil
+		if i, ok := v.Int64(); ok {
+			return i, nil
+		}
+		return v.BigInt(), nil
 	case starlarkLib.Float:
 		return float64(v), nil
 	case starlarkLib.String:
 		return string(v), nil
+	case starlarkLib.Bytes:
+		return []byte(v), nil
 	case *starlarkLib.List:
 		list := make([]any, 0, v.Len())
 		for i := 0; i < v.Len(); i++ {
 			elem, err := ConvertStarlarkValueToInterface(v.Index(i))
 			if err != nil {
 				return nil, fmt.Errorf("failed to convert list element: %w", err)
+			}
+			list = append(list, elem)
+		}
+		return list, nil
+	case starlarkLib.Tuple:
+		list := make([]any, 0, len(v))
+		for _, item := range v {
+			elem, err := ConvertStarlarkValueToInterface(item)
+			if err != nil {
+				return nil, fmt.Errorf("failed to convert tuple element: %w", err)
+			}
+			list = append(list, elem)
+		}
+		return list, nil
+	case *starlarkLib.Set:
+		list := make([]any, 0, v.Len())
+		for item := range v.Elements() {
+			elem, err := ConvertStarlarkValueToInterface(item)
+			if err != nil {
+				return nil, fmt.Errorf("failed to convert set element: %w", err)
 			}
 			list = append(list, elem)
 		}

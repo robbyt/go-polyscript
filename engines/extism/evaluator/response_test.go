@@ -75,13 +75,20 @@ func TestResponseMethods(t *testing.T) {
 		}{
 			{"nil value", nil, data.NONE},
 			{"bool value", true, data.BOOL},
+			{"int value", 42, data.INT},
+			{"int8 value", int8(42), data.INT},
+			{"int16 value", int16(42), data.INT},
 			{"int32 value", int32(42), data.INT},
 			{"int64 value", int64(42), data.INT},
+			{"uint value", uint(42), data.INT},
+			{"uint8 value", uint8(42), data.INT},
+			{"uint16 value", uint16(42), data.INT},
 			{"uint32 value", uint32(42), data.INT},
 			{"uint64 value", uint64(42), data.INT},
 			{"float32 value", float32(3.14), data.FLOAT},
 			{"float64 value", float64(3.14), data.FLOAT},
 			{"string value", "hello", data.STRING},
+			{"bytes value", []byte("abc"), data.BYTES},
 			{"empty list", []any{}, data.LIST},
 			{"list value", []any{1, 2, 3}, data.LIST},
 			{"empty dict", map[string]any{}, data.MAP},
@@ -116,6 +123,42 @@ func TestResponseMethods(t *testing.T) {
 
 			// Should return ERROR for unknown types
 			assert.Equal(t, data.ERROR, result.Type())
+		})
+
+		t.Run("decoded guest output", func(t *testing.T) {
+			// Run raw guest output through the real decode path (execHelper →
+			// internal.FixJSONNumberTypes) so the Go types Type() sees are the
+			// ones a guest actually produces, not hand-picked ones.
+			tests := []struct {
+				name          string
+				output        string
+				expectedType  data.Types
+				expectedValue any
+			}{
+				{"bare integer", `42`, data.INT, 42},
+				{"negative integer", `-7`, data.INT, -7},
+				{"bare float", `3.5`, data.FLOAT, 3.5},
+				{"null", `null`, data.NONE, nil},
+				{"bool", `true`, data.BOOL, true},
+				{"json string", `"hi"`, data.STRING, "hi"},
+				{"non-json output", `plain text`, data.STRING, "plain text"},
+				{"list", `[1, 2]`, data.LIST, []any{1, 2}},
+				{"map", `{"n": 1}`, data.MAP, map[string]any{"n": 1}},
+			}
+
+			for _, tt := range tests {
+				t.Run(tt.name, func(t *testing.T) {
+					instance := &mockPluginInstance{output: []byte(tt.output)}
+					logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+
+					value, execTime, err := execHelper(t.Context(), logger, instance, "main", []byte(`{}`), 0)
+					require.NoError(t, err)
+
+					result := newEvalResult(logger.Handler(), value, execTime, "test-id")
+					assert.Equal(t, tt.expectedType, result.Type(), "Type() should classify the decoded value")
+					assert.Equal(t, tt.expectedValue, result.Interface(), "Interface() should return the decoded value")
+				})
+			}
 		})
 	})
 

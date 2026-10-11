@@ -2,6 +2,7 @@ package evaluator
 
 import (
 	"log/slog"
+	"math/big"
 	"os"
 	"testing"
 	"time"
@@ -106,6 +107,8 @@ func TestResponseMethods(t *testing.T) {
 			{"dict type", "dict", data.MAP},
 			{"set type", "set", data.SET},
 			{"function type", "function", data.FUNCTION},
+			{"builtin type", "builtin_function_or_method", data.FUNCTION},
+			{"bytes type", "bytes", data.BYTES},
 		}
 
 		for _, tc := range testCases {
@@ -118,6 +121,36 @@ func TestResponseMethods(t *testing.T) {
 				assert.Equal(t, tc.expected, result.Type())
 
 				mockVal.AssertExpectations(t)
+			})
+		}
+	})
+
+	t.Run("Type and Interface agree", func(t *testing.T) {
+		bigInt := new(big.Int).Lsh(big.NewInt(1), 64)
+		set := starlark.NewSet(2)
+		require.NoError(t, set.Insert(starlark.MakeInt(1)))
+		require.NoError(t, set.Insert(starlark.MakeInt(2)))
+
+		testCases := []struct {
+			name          string
+			value         starlark.Value
+			expectedType  data.Types
+			expectedValue any
+		}{
+			{"none", starlark.None, data.NONE, nil},
+			{"small int", starlark.MakeInt(42), data.INT, int64(42)},
+			{"big int", starlark.MakeBigInt(bigInt), data.INT, bigInt},
+			{"tuple", starlark.Tuple{starlark.MakeInt(1), starlark.String("a")}, data.TUPLE, []any{int64(1), "a"}},
+			{"set", set, data.SET, []any{int64(1), int64(2)}},
+			{"bytes", starlark.Bytes("abc"), data.BYTES, []byte("abc")},
+		}
+
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				handler := slog.NewTextHandler(os.Stdout, nil)
+				result := newEvalResult(handler, tc.value, time.Second, "version-1")
+				assert.Equal(t, tc.expectedType, result.Type(), "Type() should classify the value")
+				assert.Equal(t, tc.expectedValue, result.Interface(), "Interface() should convert the value without loss")
 			})
 		}
 	})
