@@ -503,3 +503,45 @@ func TestNewExecutableUnit_NilHandler(t *testing.T) {
 	mockLdr.AssertExpectations(t)
 	comp.AssertExpectations(t)
 }
+
+func TestExecutableUnit_Close(t *testing.T) {
+	t.Parallel()
+
+	t.Run("closes content that implements Close", func(t *testing.T) {
+		ctx := t.Context()
+		content := new(MockClosableExecutableContent)
+		content.On("Close", ctx).Return(nil).Once()
+
+		exe := &ExecutableUnit{content: content}
+		require.NoError(t, exe.Close(ctx))
+		content.AssertExpectations(t)
+	})
+
+	t.Run("propagates content Close error", func(t *testing.T) {
+		ctx := t.Context()
+		closeErr := errors.New("close kaboom")
+		content := new(MockClosableExecutableContent)
+		content.On("Close", ctx).Return(closeErr).Once()
+
+		exe := &ExecutableUnit{content: content}
+		require.ErrorIs(t, exe.Close(ctx), closeErr)
+		content.AssertExpectations(t)
+	})
+
+	t.Run("no-op for content without Close", func(t *testing.T) {
+		content := new(MockExecutableContent)
+		exe := &ExecutableUnit{content: content}
+		require.NoError(t, exe.Close(t.Context()))
+		content.AssertExpectations(t)
+	})
+
+	t.Run("nil content", func(t *testing.T) {
+		exe := &ExecutableUnit{}
+		require.NoError(t, exe.Close(t.Context()))
+	})
+
+	t.Run("nil unit", func(t *testing.T) {
+		var exe *ExecutableUnit
+		require.NoError(t, exe.Close(t.Context()))
+	})
+}

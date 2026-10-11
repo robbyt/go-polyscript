@@ -67,7 +67,10 @@ func evalAndExtractMap(
 func prepareAndEval(
 	t *testing.T,
 	ctx context.Context,
-	evaluator platform.Evaluator,
+	evaluator interface {
+		platform.EvalOnly
+		data.Setter
+	},
 	runtimeData map[string]any,
 ) (platform.EvaluatorResponse, error) {
 	t.Helper()
@@ -174,6 +177,34 @@ func TestResultTypesAcrossEngines(t *testing.T) {
 				assert.Equal(t, tc.expectedType, result.Type(), "%s: Type() for %q", eng.name, eng.content)
 				assert.Equal(t, tc.expectedValue, result.Interface(), "%s: Interface() for %q", eng.name, eng.content)
 			}
+		})
+	}
+}
+
+// TestEvaluatorClose_NoResourceEngines verifies Close is a harmless no-op for
+// engines whose compiled scripts hold no releasable resources.
+func TestEvaluatorClose_NoResourceEngines(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		content string
+		creator stringEngineFn
+	}{
+		{"Starlark", `print("Hello, World!")`, starlarkString},
+		{"Risor", `"Hello, World!"`, risorString},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			eval, err := tc.creator(t.Context(), tc.content, nil)
+			require.NoError(t, err)
+
+			require.NoError(t, eval.Close(t.Context()), "first Close should succeed")
+			require.NoError(t, eval.Close(t.Context()), "second Close should be a no-op")
+
+			_, err = eval.Eval(t.Context())
+			require.NoError(t, err, "Eval should keep working after Close on engines without resources")
 		})
 	}
 }

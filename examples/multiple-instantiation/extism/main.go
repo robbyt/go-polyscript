@@ -46,6 +46,12 @@ func runMultipleTimes(logger *slog.Logger) ([]map[string]any, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Release the compiled module's wazero runtime when done
+	defer func() {
+		if err := evaluator.Close(context.Background()); err != nil {
+			logger.Warn("Failed to close evaluator", "error", err)
+		}
+	}()
 
 	// Inputs to process - we'll run the script once for each input
 	inputs := []string{"World", "Extism", "Go-PolyScript"}

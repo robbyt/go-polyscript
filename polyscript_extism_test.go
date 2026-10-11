@@ -4,10 +4,13 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 
 	"github.com/robbyt/go-polyscript"
+	"github.com/robbyt/go-polyscript/engines/extism/compiler"
 	"github.com/robbyt/go-polyscript/engines/extism/wasmdata"
+	"github.com/robbyt/go-polyscript/platform"
 	"github.com/robbyt/go-polyscript/platform/constants"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -184,4 +187,83 @@ func TestExtismEvalEndToEnd(t *testing.T) {
 	require.NoError(t, err, "Result should be a map")
 	require.Contains(t, resultMap, "greeting")
 	assert.Equal(t, "Hello, Test User!", resultMap["greeting"])
+}
+
+// TestExtismEvaluatorClose verifies Close releases the compiled plugin's
+// wazero runtime: it is idempotent and later Evals fail with
+// compiler.ErrExecutableClosed.
+func TestExtismEvaluatorClose(t *testing.T) {
+	t.Parallel()
+
+	newEval := func(t *testing.T) platform.Evaluator {
+		t.Helper()
+		eval, err := polyscript.New[polyscript.Extism](
+			t.Context(),
+			polyscript.FromBytes(wasmdata.TestModule),
+			polyscript.WithEntryPoint(wasmdata.EntrypointGreet),
+			polyscript.WithStaticData[polyscript.Extism](map[string]any{"input": "Test User"}),
+		)
+		require.NoError(t, err)
+		require.NotNil(t, eval)
+		return eval
+	}
+
+	t.Run("eval after close fails", func(t *testing.T) {
+		eval := newEval(t)
+
+		_, err := eval.Eval(t.Context())
+		require.NoError(t, err, "Eval before Close should succeed")
+
+		require.NoError(t, eval.Close(t.Context()))
+		require.NoError(t, eval.Close(t.Context()), "second Close should be a no-op")
+
+		result, err := eval.Eval(t.Context())
+		require.ErrorIs(t, err, compiler.ErrExecutableClosed)
+		assert.Nil(t, result)
+	})
+
+	t.Run("concurrent eval and close", func(t *testing.T) {
+		eval := newEval(t)
+
+		const workers = 8
+		const evalsPerWorker = 10
+
+		var wg sync.WaitGroup
+		start := make(chan struct{})
+		errs := make(chan error, workers*evalsPerWorker+2)
+		for range workers {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				<-start
+				for range evalsPerWorker {
+					_, err := eval.Eval(t.Context())
+					errs <- err
+				}
+			}()
+		}
+
+		// Two concurrent Closes race the Evals and each other.
+		for range 2 {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				<-start
+				errs <- eval.Close(t.Context())
+			}()
+		}
+
+		close(start)
+		wg.Wait()
+		close(errs)
+
+		for err := range errs {
+			if err != nil {
+				require.ErrorIs(t, err, compiler.ErrExecutableClosed)
+			}
+		}
+
+		_, err := eval.Eval(t.Context())
+		require.ErrorIs(t, err, compiler.ErrExecutableClosed)
+	})
 }

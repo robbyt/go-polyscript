@@ -38,6 +38,11 @@ func (m *mockEvaluator) AddDataToContext(
 	return args.Get(0).(context.Context), args.Error(1)
 }
 
+func (m *mockEvaluator) Close(ctx context.Context) error {
+	args := m.Called(ctx)
+	return args.Error(0)
+}
+
 type mockEvaluatorResponse struct {
 	mock.Mock
 }

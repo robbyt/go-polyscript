@@ -50,6 +50,12 @@ This package contains engine implementations for executing scripts in various la
    - There are several type conversions, and the result is accessible with the `Interface()` method
    - The `platform.EvaluatorResponse` also contains metadata about the execution
 
+7. **Shutdown**
+   - `Evaluator.Close(ctx)` releases resources held by the compiled script by calling `ExecutableUnit.Close`, which closes the `ExecutableContent` if it implements `Close(context.Context) error`
+   - Extism: closes the compiled plugin and its wazero runtime. `Close` waits for in-flight `Eval` calls to return, and later `Eval` calls fail with `compiler.ErrExecutableClosed`
+   - Risor and Starlark hold no releasable resources, so `Close` is a no-op and `Eval` keeps working
+   - `Close` is safe to call more than once; call it (e.g. `defer evaluator.Close(ctx)`) when an evaluator is discarded, especially for evaluators built dynamically at runtime
+
 ## Engine-Specific Data Handling
 
 While all engines receive the same `map[string]any` input data, **each engine processes and exposes this data differently** to the script runtime. Understanding these differences is important for structuring your data correctly.

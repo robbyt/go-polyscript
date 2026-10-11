@@ -362,6 +362,44 @@ func TestCompiler_Compile_Branches(t *testing.T) {
 		plugin := &mockCompiledPlugin{}
 		plugin.On("Instance", mock.Anything, mock.Anything).
 			Return(nil, errors.New("instance kaboom"))
+		// The compiled plugin must be released, even when the compile ctx
+		// is already cancelled.
+		plugin.On("Close", mock.MatchedBy(func(ctx context.Context) bool {
+			return ctx.Err() == nil
+		})).Return(nil).Once()
+
+		comp.compileFn = func(
+			ctx context.Context,
+			wasmBytes []byte,
+			opts *compile.Settings,
+		) (adapters.CompiledPlugin, error) {
+			return plugin, nil
+		}
+
+		reader := newMockScriptReaderCloser([]byte("any-bytes"))
+		reader.On("Close").Return(nil)
+
+		ctx, cancel := context.WithCancel(t.Context())
+		cancel()
+
+		execContent, err := comp.Compile(ctx, reader)
+		require.Error(t, err)
+		require.Nil(t, execContent)
+		require.ErrorIs(t, err, ErrValidationFailed)
+		require.ErrorContains(t, err, "failed to create test instance")
+		require.ErrorContains(t, err, "instance kaboom")
+		plugin.AssertExpectations(t)
+		reader.AssertExpectations(t)
+	})
+
+	t.Run("plugin.Close error on failed compile is logged, not returned", func(t *testing.T) {
+		t.Parallel()
+		comp := createTestCompiler(t, "main")
+
+		plugin := &mockCompiledPlugin{}
+		plugin.On("Instance", mock.Anything, mock.Anything).
+			Return(nil, errors.New("instance kaboom"))
+		plugin.On("Close", mock.Anything).Return(errors.New("plugin close kaboom")).Once()
 
 		comp.compileFn = func(
 			ctx context.Context,
@@ -378,8 +416,8 @@ func TestCompiler_Compile_Branches(t *testing.T) {
 		require.Error(t, err)
 		require.Nil(t, execContent)
 		require.ErrorIs(t, err, ErrValidationFailed)
-		require.ErrorContains(t, err, "failed to create test instance")
 		require.ErrorContains(t, err, "instance kaboom")
+		require.NotContains(t, err.Error(), "plugin close kaboom")
 		plugin.AssertExpectations(t)
 		reader.AssertExpectations(t)
 	})
@@ -409,6 +447,7 @@ func TestCompiler_Compile_Branches(t *testing.T) {
 		execContent, err := comp.Compile(t.Context(), reader)
 		require.NoError(t, err, "instance.Close error must not propagate")
 		require.NotNil(t, execContent)
+		plugin.AssertNotCalled(t, "Close", mock.Anything)
 		plugin.AssertExpectations(t)
 		instance.AssertExpectations(t)
 		reader.AssertExpectations(t)
@@ -424,6 +463,7 @@ func TestCompiler_Compile_Branches(t *testing.T) {
 
 		plugin := &mockCompiledPlugin{}
 		plugin.On("Instance", mock.Anything, mock.Anything).Return(instance, nil)
+		plugin.On("Close", mock.Anything).Return(nil).Once()
 
 		comp.compileFn = func(
 			ctx context.Context,

@@ -184,14 +184,9 @@ func (be *Evaluator) Eval(ctx context.Context) (platform.EvaluatorResponse, erro
 		return nil, fmt.Errorf("executable unit is nil")
 	}
 
-	if be.execUnit.GetContent() == nil {
+	content := be.execUnit.GetContent()
+	if content == nil {
 		return nil, fmt.Errorf("content is nil")
-	}
-
-	// Get bytecode from executable unit
-	bytecode := be.execUnit.GetContent().GetByteCode()
-	if bytecode == nil {
-		return nil, fmt.Errorf("bytecode is nil")
 	}
 
 	// Get execution ID
@@ -201,17 +196,13 @@ func (be *Evaluator) Eval(ctx context.Context) (platform.EvaluatorResponse, erro
 	}
 	logger = logger.With("exeID", exeID)
 
-	// 1. Type assert to WASM module, and get the compiled plugin object
-	wasmExe, ok := be.execUnit.GetContent().(*compiler.Executable)
+	// 1. Type assert to WASM module; the compiled plugin is accessed in step 4
+	wasmExe, ok := content.(*compiler.Executable)
 	if !ok {
 		return nil, fmt.Errorf(
 			"invalid executable type: expected *Executable, got %T",
-			be.execUnit.GetContent(),
+			content,
 		)
-	}
-	plugin := wasmExe.GetExtismByteCode()
-	if plugin == nil {
-		return nil, fmt.Errorf("compiled plugin is nil")
 	}
 
 	// 2. Get the raw input data
@@ -226,13 +217,20 @@ func (be *Evaluator) Eval(ctx context.Context) (platform.EvaluatorResponse, erro
 		return nil, fmt.Errorf("failed to marshal input data: %w", err)
 	}
 
-	// 4. Execute the program
-	result, err := be.exec(
-		ctx, plugin,
-		wasmExe.GetEntryPoint(),
-		adapters.NewPluginInstanceConfig(),
-		runtimeData,
-	)
+	// 4. Execute the program. WithPlugin holds the executable's read lock
+	// while the plugin is in use, so a concurrent Close waits for this Eval;
+	// after Close it returns compiler.ErrExecutableClosed.
+	var result *execResult
+	err = wasmExe.WithPlugin(func(plugin adapters.CompiledPlugin) error {
+		var execErr error
+		result, execErr = be.exec(
+			ctx, plugin,
+			wasmExe.GetEntryPoint(),
+			adapters.NewPluginInstanceConfig(),
+			runtimeData,
+		)
+		return execErr
+	})
 	if err != nil {
 		return nil, fmt.Errorf("exec error: %w", err)
 	}
@@ -250,4 +248,12 @@ func (be *Evaluator) AddDataToContext(
 	d map[string]any,
 ) (context.Context, error) {
 	return data.AddDataToContextFromProvider(ctx, be.logHandler.WithGroup("Evaluator"), be.getDataProvider(), d)
+}
+
+// Close implements platform.Evaluator. It releases the compiled plugin and its
+// wazero runtime, waiting for in-flight Eval calls to finish first. It is safe
+// to call more than once; afterwards Eval returns an error wrapping
+// compiler.ErrExecutableClosed.
+func (be *Evaluator) Close(ctx context.Context) error {
+	return be.execUnit.Close(ctx)
 }

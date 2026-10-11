@@ -31,9 +31,17 @@
 //		polyscript.FromBytes(wasmBytes),
 //		polyscript.WithEntryPoint("greet"),
 //	)
+//	if err != nil {
+//		return err
+//	}
+//	defer eval.Close(ctx)
 //
 // All engine constructors return a [platform.Evaluator]. For direct access to
 // the underlying engine, see the per-engine packages under engines/.
+//
+// Call Close on an evaluator once it is no longer needed. Extism evaluators
+// hold a wazero runtime that Close releases, after which Eval returns an
+// error; for Risor and Starlark, Close is a no-op.
 //
 // # A note on type arguments
 //

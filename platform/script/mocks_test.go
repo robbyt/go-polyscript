@@ -42,3 +42,14 @@ func (m *MockExecutableContent) EngineType() engineTypes.Type {
 	args := m.Called()
 	return args.Get(0).(engineTypes.Type)
 }
+
+// MockClosableExecutableContent is a MockExecutableContent that also
+// implements Close, mirroring engines (Extism) whose content holds resources.
+type MockClosableExecutableContent struct {
+	MockExecutableContent
+}
+
+func (m *MockClosableExecutableContent) Close(ctx context.Context) error {
+	args := m.Called(ctx)
+	return args.Error(0)
+}

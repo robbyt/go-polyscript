@@ -5,8 +5,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
+	"runtime"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -326,24 +330,18 @@ func TestEvaluator_Evaluate(t *testing.T) {
 
 		// Test nil bytecode
 		t.Run("nil bytecode", func(t *testing.T) {
-			mockContent := &mockExecutableContent{
-				engineType: engineTypes.Extism,
-				source:     "invalid wasm",
-				bytecode:   nil, // Nil bytecode will cause error
-			}
-
+			// A zero-value Executable has no compiled plugin.
 			handler := slog.NewTextHandler(os.Stdout, nil)
 			ctxProvider := data.NewContextProvider(constants.EvalData)
 
-			exe := newExe(t, "test-case", mockContent, ctxProvider)
+			exe := newExe(t, "test-case", &compiler.Executable{}, ctxProvider)
 
 			evaluator := New(handler, exe)
 
 			ctx := t.Context()
 			_, err := evaluator.Eval(ctx)
 
-			require.Error(t, err)
-			assert.Contains(t, err.Error(), "bytecode is nil")
+			require.ErrorIs(t, err, compiler.ErrBytecodeNil)
 		})
 
 		// Test invalid content type
@@ -933,5 +931,161 @@ func TestFormatExitOutput(t *testing.T) {
 		// %q renders newlines and tabs as literal \n / \t escape sequences.
 		assert.Contains(t, got, `\n`)
 		assert.Contains(t, got, `\t`)
+	})
+}
+
+// trackingPlugin is a goroutine-safe adapters.CompiledPlugin fake that counts
+// violations of the runtime lifecycle: an instance created or used after the
+// plugin was closed, or the plugin closed while an instance is still live.
+type trackingPlugin struct {
+	closed     atomic.Bool
+	closeCalls atomic.Int32
+	live       atomic.Int32
+	violations atomic.Int32
+}
+
+func (p *trackingPlugin) Instance(
+	_ context.Context,
+	_ extismSDK.PluginInstanceConfig,
+) (adapters.PluginInstance, error) {
+	if p.closed.Load() {
+		p.violations.Add(1)
+	}
+	p.live.Add(1)
+	return &trackingInstance{plugin: p}, nil
+}
+
+func (p *trackingPlugin) Close(_ context.Context) error {
+	if p.live.Load() != 0 {
+		p.violations.Add(1)
+	}
+	p.closed.Store(true)
+	p.closeCalls.Add(1)
+	return nil
+}
+
+type trackingInstance struct {
+	plugin *trackingPlugin
+}
+
+func (i *trackingInstance) CallWithContext(
+	_ context.Context,
+	_ string,
+	_ []byte,
+) (uint32, []byte, error) {
+	if i.plugin.closed.Load() {
+		i.plugin.violations.Add(1)
+	}
+	runtime.Gosched()
+	if i.plugin.closed.Load() {
+		i.plugin.violations.Add(1)
+	}
+	return 0, []byte(`"ok"`), nil
+}
+
+func (i *trackingInstance) Call(name string, data []byte) (uint32, []byte, error) {
+	return i.CallWithContext(context.Background(), name, data)
+}
+
+func (i *trackingInstance) FunctionExists(string) bool { return true }
+
+func (i *trackingInstance) Close(_ context.Context) error {
+	if i.plugin.closed.Load() {
+		i.plugin.violations.Add(1)
+	}
+	i.plugin.live.Add(-1)
+	return nil
+}
+
+func TestEvaluator_Close(t *testing.T) {
+	t.Parallel()
+
+	t.Run("releases the plugin and fails later evals", func(t *testing.T) {
+		mockPlugin := new(MockCompiledPlugin)
+		mockPlugin.On("Close", mock.Anything).Return(nil).Once()
+
+		content := createMockExecutable(mockPlugin, "main")
+		exe := newExe(t, "test-close", content, data.NewContextProvider(constants.EvalData))
+		evaluator := New(nil, exe)
+
+		require.NoError(t, evaluator.Close(t.Context()))
+		assert.True(t, content.IsClosed(), "executable should report closed")
+		require.NoError(t, evaluator.Close(t.Context()), "second Close should be a no-op")
+
+		result, err := evaluator.Eval(t.Context())
+		require.ErrorIs(t, err, compiler.ErrExecutableClosed)
+		assert.Nil(t, result)
+
+		mockPlugin.AssertExpectations(t)
+		mockPlugin.AssertNotCalled(t, "Instance", mock.Anything, mock.Anything)
+	})
+
+	t.Run("propagates plugin close error", func(t *testing.T) {
+		closeErr := errors.New("close kaboom")
+		mockPlugin := new(MockCompiledPlugin)
+		mockPlugin.On("Close", mock.Anything).Return(closeErr).Once()
+
+		content := createMockExecutable(mockPlugin, "main")
+		exe := newExe(t, "test-close-err", content, data.NewContextProvider(constants.EvalData))
+		evaluator := New(nil, exe)
+
+		require.ErrorIs(t, evaluator.Close(t.Context()), closeErr)
+		mockPlugin.AssertExpectations(t)
+	})
+
+	t.Run("nil executable unit", func(t *testing.T) {
+		evaluator := New(nil, nil)
+		require.NoError(t, evaluator.Close(t.Context()))
+	})
+
+	t.Run("concurrent eval and close", func(t *testing.T) {
+		plugin := &trackingPlugin{}
+		content := createMockExecutable(plugin, "main")
+		exe := newExe(t, "test-close-race", content, data.NewContextProvider(constants.EvalData))
+		evaluator := New(slog.NewTextHandler(io.Discard, nil), exe)
+
+		const workers = 8
+		const evalsPerWorker = 50
+
+		var wg sync.WaitGroup
+		start := make(chan struct{})
+		errs := make(chan error, workers*evalsPerWorker+2)
+		for range workers {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				<-start
+				for range evalsPerWorker {
+					_, err := evaluator.Eval(t.Context())
+					errs <- err
+				}
+			}()
+		}
+		// Two concurrent Closes race the Evals and each other.
+		for range 2 {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				<-start
+				runtime.Gosched()
+				errs <- evaluator.Close(t.Context())
+			}()
+		}
+
+		close(start)
+		wg.Wait()
+		close(errs)
+
+		for err := range errs {
+			if err != nil {
+				require.ErrorIs(t, err, compiler.ErrExecutableClosed)
+			}
+		}
+		assert.Equal(t, int32(0), plugin.violations.Load(), "plugin used after, or closed during, use")
+		assert.Equal(t, int32(1), plugin.closeCalls.Load(), "plugin should be closed exactly once")
+		assert.Equal(t, int32(0), plugin.live.Load(), "all instances should be closed")
+
+		_, err := evaluator.Eval(t.Context())
+		require.ErrorIs(t, err, compiler.ErrExecutableClosed)
 	})
 }

@@ -257,3 +257,9 @@ func (be *Evaluator) AddDataToContext(
 ) (context.Context, error) {
 	return data.AddDataToContextFromProvider(ctx, be.logHandler.WithGroup("Evaluator"), be.getDataProvider(), d)
 }
+
+// Close implements platform.Evaluator. A compiled Starlark program holds no
+// releasable resources, so this is effectively a no-op and Eval keeps working.
+func (be *Evaluator) Close(ctx context.Context) error {
+	return be.execUnit.Close(ctx)
+}

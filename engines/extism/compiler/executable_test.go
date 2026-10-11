@@ -2,7 +2,9 @@ package compiler
 
 import (
 	"context"
+	"errors"
 	"testing"
+	"time"
 
 	extismSDK "github.com/extism/go-sdk"
 	"github.com/robbyt/go-polyscript/engines/extism/adapters"
@@ -146,16 +148,16 @@ func TestExecutable(t *testing.T) {
 		entryPoint := "run"
 
 		mockPlugin := new(MockCompiledPlugin)
-		mockPlugin.On("Close", ctx).Return(nil)
+		mockPlugin.On("Close", ctx).Return(nil).Once()
 
 		exe := NewExecutable(wasmBytes, mockPlugin, entryPoint)
 		require.NotNil(t, exe)
-		assert.False(t, exe.closed.Load())
+		assert.False(t, exe.IsClosed())
 
 		t.Run("first close", func(t *testing.T) {
 			err := exe.Close(ctx)
 			require.NoError(t, err)
-			assert.True(t, exe.closed.Load())
+			assert.True(t, exe.IsClosed())
 		})
 
 		t.Run("second close (no-op)", func(t *testing.T) {
@@ -163,6 +165,150 @@ func TestExecutable(t *testing.T) {
 			assert.NoError(t, err)
 		})
 
+		t.Run("getters return nil after close", func(t *testing.T) {
+			assert.Nil(t, exe.GetByteCode())
+			assert.Nil(t, exe.GetExtismByteCode())
+		})
+
+		t.Run("WithPlugin fails after close", func(t *testing.T) {
+			called := false
+			err := exe.WithPlugin(func(adapters.CompiledPlugin) error {
+				called = true
+				return nil
+			})
+			require.ErrorIs(t, err, ErrExecutableClosed)
+			assert.False(t, called, "fn must not run on a closed executable")
+		})
+
 		mockPlugin.AssertExpectations(t)
+	})
+
+	t.Run("Close propagates plugin error once", func(t *testing.T) {
+		ctx := t.Context()
+		closeErr := errors.New("close kaboom")
+		mockPlugin := new(MockCompiledPlugin)
+		mockPlugin.On("Close", ctx).Return(closeErr).Once()
+
+		exe := NewExecutable([]byte("mock wasm bytes"), mockPlugin, "run")
+		require.NotNil(t, exe)
+
+		require.ErrorIs(t, exe.Close(ctx), closeErr)
+		assert.True(t, exe.IsClosed())
+		require.NoError(t, exe.Close(ctx), "second Close must not retry the plugin Close")
+		mockPlugin.AssertExpectations(t)
+	})
+
+	t.Run("Close on nil and zero-value executables", func(t *testing.T) {
+		var nilExe *Executable
+		require.NoError(t, nilExe.Close(t.Context()))
+
+		zeroExe := &Executable{}
+		require.NoError(t, zeroExe.Close(t.Context()))
+		assert.True(t, zeroExe.IsClosed())
+	})
+}
+
+func TestExecutable_WithPlugin(t *testing.T) {
+	t.Parallel()
+
+	wasmBytes := []byte("mock wasm bytes")
+	entryPoint := "run"
+
+	t.Run("passes the compiled plugin to fn", func(t *testing.T) {
+		mockPlugin := new(MockCompiledPlugin)
+		exe := NewExecutable(wasmBytes, mockPlugin, entryPoint)
+		require.NotNil(t, exe)
+
+		var got adapters.CompiledPlugin
+		err := exe.WithPlugin(func(p adapters.CompiledPlugin) error {
+			got = p
+			return nil
+		})
+		require.NoError(t, err)
+		assert.Equal(t, mockPlugin, got)
+		mockPlugin.AssertExpectations(t)
+	})
+
+	t.Run("returns fn error", func(t *testing.T) {
+		fnErr := errors.New("fn kaboom")
+		exe := NewExecutable(wasmBytes, new(MockCompiledPlugin), entryPoint)
+		require.NotNil(t, exe)
+
+		err := exe.WithPlugin(func(adapters.CompiledPlugin) error { return fnErr })
+		require.ErrorIs(t, err, fnErr)
+	})
+
+	t.Run("nil plugin", func(t *testing.T) {
+		exe := &Executable{}
+		err := exe.WithPlugin(func(adapters.CompiledPlugin) error {
+			t.Error("fn must not run without a plugin")
+			return nil
+		})
+		require.ErrorIs(t, err, ErrBytecodeNil)
+	})
+
+	t.Run("Close waits for in-flight users", func(t *testing.T) {
+		pluginClosed := make(chan struct{})
+		mockPlugin := new(MockCompiledPlugin)
+		mockPlugin.On("Close", mock.Anything).Return(nil).Once().
+			Run(func(mock.Arguments) { close(pluginClosed) })
+
+		exe := NewExecutable(wasmBytes, mockPlugin, entryPoint)
+		require.NotNil(t, exe)
+
+		inUse := make(chan struct{})
+		release := make(chan struct{})
+		useDone := make(chan error, 1)
+		go func() {
+			useDone <- exe.WithPlugin(func(adapters.CompiledPlugin) error {
+				close(inUse)
+				<-release
+				return nil
+			})
+		}()
+		<-inUse
+
+		closeDone := make(chan error, 1)
+		go func() { closeDone <- exe.Close(t.Context()) }()
+
+		select {
+		case <-pluginClosed:
+			t.Fatal("plugin closed while still in use")
+		case <-time.After(50 * time.Millisecond):
+		}
+
+		close(release)
+		require.NoError(t, <-useDone)
+		require.NoError(t, <-closeDone)
+		<-pluginClosed
+		mockPlugin.AssertExpectations(t)
+	})
+
+	t.Run("concurrent users do not block each other", func(t *testing.T) {
+		exe := NewExecutable(wasmBytes, new(MockCompiledPlugin), entryPoint)
+		require.NotNil(t, exe)
+
+		firstIn := make(chan struct{})
+		secondIn := make(chan struct{})
+		firstDone := make(chan error, 1)
+		go func() {
+			firstDone <- exe.WithPlugin(func(adapters.CompiledPlugin) error {
+				close(firstIn)
+				select {
+				case <-secondIn:
+					return nil
+				case <-time.After(5 * time.Second):
+					return errors.New("second WithPlugin never ran concurrently")
+				}
+			})
+		}()
+		<-firstIn
+
+		err := exe.WithPlugin(func(adapters.CompiledPlugin) error {
+			close(secondIn)
+			return nil
+		})
+		require.NoError(t, err)
+		require.NoError(t, <-firstDone)
 	})
 }

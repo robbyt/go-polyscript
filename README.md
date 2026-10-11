@@ -94,6 +94,8 @@ The older `FromRisorString*`, `FromStarlark*`, and `FromExtism*` constructors st
 
 `polyscript.New[E]` is the single entry point. `E` selects the engine, the first argument is a `context.Context` (used while loading and compiling the script), the second is a `Source`, and the remaining arguments are `Option[E]`s.
 
+Release an evaluator you no longer need with `defer evaluator.Close(ctx)`. This matters for Extism, whose compiled module holds a wazero runtime; for Risor and Starlark it is a no-op.
+
 ### Engines
 
 | Type                  | Use it for                              |
@@ -389,6 +391,8 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	// release the compiled module's wazero runtime when done
+	defer evaluator.Close(ctx)
 
 	// Execute, and print the result
 	result, err := evaluator.Eval(ctx)

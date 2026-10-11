@@ -118,3 +118,16 @@ func (exe *ExecutableUnit) GetLoader() loader.Loader {
 func (exe *ExecutableUnit) GetDataProvider() data.Provider {
 	return exe.dataProvider
 }
+
+// Close releases resources held by the compiled content. Content that
+// implements Close(context.Context) error (e.g. Extism's compiled plugin) is
+// closed; for other content this is a no-op. Safe to call on a nil unit.
+func (exe *ExecutableUnit) Close(ctx context.Context) error {
+	if exe == nil || exe.content == nil {
+		return nil
+	}
+	if closer, ok := exe.content.(interface{ Close(context.Context) error }); ok {
+		return closer.Close(ctx)
+	}
+	return nil
+}
