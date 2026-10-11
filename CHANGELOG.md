@@ -10,10 +10,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - **BREAKING:** `Close(ctx)` on `platform.Evaluator`, implemented by every
   engine, and on `script.ExecutableUnit`. For Extism it releases the compiled
-  module's wazero runtime: `Close` waits for in-flight `Eval` calls, and any
-  `Eval` started once `Close` has been called fails with
-  `compiler.ErrExecutableClosed`. For Risor and Starlark it is a no-op. Code
-  that implements `platform.Evaluator` itself must add the method.
+  module's wazero runtime: `Close` waits for in-flight `Eval` calls,
+  including their data loading, and any `Eval` started once `Close` has been
+  called fails with `compiler.ErrExecutableClosed` without calling the data
+  provider. `Close`'s ctx cannot interrupt the wait; cancelling an `Eval`'s
+  ctx shortens it only if the data provider honours cancellation, and a data
+  provider must not call `Close` or `Eval` on the same evaluator. For Risor
+  and Starlark it is a no-op. Code that implements `platform.Evaluator`
+  itself must add the method.
   ([#162](https://github.com/robbyt/go-polyscript/issues/162))
 - `data.BYTES` and `data.UNKNOWN` result types.
   ([#157](https://github.com/robbyt/go-polyscript/issues/157),

@@ -997,6 +997,142 @@ func (i *trackingInstance) Close(_ context.Context) error {
 	return nil
 }
 
+// closeTestTimeout bounds every wait in the Close tests, so a regression
+// fails the test instead of hanging the suite.
+const closeTestTimeout = 5 * time.Second
+
+// gatedProvider is a data.Provider that counts GetData calls. When release is
+// set, each call signals entered and then blocks until unblock is called or
+// the Eval ctx is done. A non-nil err is returned instead of data.
+type gatedProvider struct {
+	calls       atomic.Int32
+	entered     chan struct{}
+	release     chan struct{}
+	releaseOnce sync.Once
+	err         error
+}
+
+// newGatedProvider returns a gatedProvider whose GetData blocks until
+// unblock is called. The test's cleanup unblocks it, so a failed assertion
+// can't leave an Eval stuck in the provider.
+func newGatedProvider(t *testing.T) *gatedProvider {
+	t.Helper()
+	p := &gatedProvider{
+		entered: make(chan struct{}, 8),
+		release: make(chan struct{}),
+	}
+	t.Cleanup(p.unblock)
+	return p
+}
+
+func (p *gatedProvider) unblock() {
+	p.releaseOnce.Do(func() { close(p.release) })
+}
+
+func (p *gatedProvider) GetData(ctx context.Context) (map[string]any, error) {
+	p.calls.Add(1)
+	if p.release != nil {
+		select {
+		case p.entered <- struct{}{}:
+		default:
+		}
+		select {
+		case <-p.release:
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+	}
+	if p.err != nil {
+		return nil, p.err
+	}
+	return map[string]any{"key": "value"}, nil
+}
+
+func (p *gatedProvider) AddDataToContext(
+	ctx context.Context,
+	_ map[string]any,
+) (context.Context, error) {
+	return ctx, nil
+}
+
+// recvWithin returns the next value from ch, failing the test if none
+// arrives within closeTestTimeout.
+func recvWithin[T any](t *testing.T, ch <-chan T, what string) T {
+	t.Helper()
+	select {
+	case v := <-ch:
+		return v
+	case <-time.After(closeTestTimeout):
+		require.FailNow(t, "timed out waiting for "+what)
+		var zero T
+		return zero
+	}
+}
+
+// waitForClosing waits until Close has been called on content. Close marks
+// the executable as closing before it waits for the write lock, so a
+// GetExtismByteCode probe then returns nil. A probe that read closing just
+// before Close set it blocks on the read lock behind the pending Close
+// instead, which also means Close has been called; the probe goroutine is
+// released once the in-flight Eval returns.
+func waitForClosing(t *testing.T, content *compiler.Executable) {
+	t.Helper()
+	const probeBlockedAfter = 100 * time.Millisecond
+	deadline := time.After(closeTestTimeout)
+	for {
+		probe := make(chan bool, 1)
+		go func() { probe <- content.GetExtismByteCode() == nil }()
+		select {
+		case closing := <-probe:
+			if closing {
+				return
+			}
+		case <-time.After(probeBlockedAfter):
+			return
+		case <-deadline:
+			require.FailNow(t, "timed out waiting for Close to be called")
+		}
+		runtime.Gosched()
+	}
+}
+
+// startEval runs evaluator.Eval in a goroutine and returns a channel that
+// receives its error.
+func startEval(t *testing.T, evaluator *Evaluator) <-chan error {
+	t.Helper()
+	done := make(chan error, 1)
+	go func() {
+		_, err := evaluator.Eval(t.Context())
+		done <- err
+	}()
+	return done
+}
+
+// startClose runs evaluator.Close in a goroutine and returns a channel that
+// receives its error.
+func startClose(t *testing.T, evaluator *Evaluator) <-chan error {
+	t.Helper()
+	done := make(chan error, 1)
+	go func() {
+		done <- evaluator.Close(t.Context())
+	}()
+	return done
+}
+
+// requireCloseBlocked fails the test if the Close started by startClose
+// returns within a short wait, which means it did not wait for an in-flight
+// Eval.
+func requireCloseBlocked(t *testing.T, closeDone <-chan error) {
+	t.Helper()
+	const closeBlockedWait = 50 * time.Millisecond
+	select {
+	case err := <-closeDone:
+		require.Failf(t, "Close returned while an Eval was still loading data",
+			"Close error: %v", err)
+	case <-time.After(closeBlockedWait):
+	}
+}
+
 func TestEvaluator_Close(t *testing.T) {
 	t.Parallel()
 
@@ -1093,5 +1229,92 @@ func TestEvaluator_Close(t *testing.T) {
 
 		_, err := evaluator.Eval(t.Context())
 		require.ErrorIs(t, err, compiler.ErrExecutableClosed)
+	})
+
+	t.Run("close waits for eval in data loading", func(t *testing.T) {
+		plugin := &trackingPlugin{}
+		content := createMockExecutable(plugin, "main")
+		provider := newGatedProvider(t)
+		exe := newExe(t, "", content, provider)
+		evaluator := New(slog.NewTextHandler(io.Discard, nil), exe)
+
+		evalDone := startEval(t, evaluator)
+		recvWithin(t, provider.entered, "the eval to enter the data provider")
+
+		closeDone := startClose(t, evaluator)
+		waitForClosing(t, content)
+		requireCloseBlocked(t, closeDone)
+
+		provider.unblock()
+		require.NoError(t, recvWithin(t, evalDone, "the eval to finish"),
+			"an Eval that started before Close should complete")
+		require.NoError(t, recvWithin(t, closeDone, "Close to finish"))
+		assert.Equal(t, int32(0), plugin.violations.Load(), "plugin used after, or closed during, use")
+		assert.Equal(t, int32(1), plugin.closeCalls.Load(), "plugin should be closed exactly once")
+		assert.Equal(t, int32(1), provider.calls.Load(), "provider should be called once")
+	})
+
+	t.Run("eval after close does not call the provider", func(t *testing.T) {
+		mockPlugin := new(MockCompiledPlugin)
+		mockPlugin.On("Close", mock.Anything).Return(nil).Once()
+		content := createMockExecutable(mockPlugin, "main")
+		provider := &gatedProvider{}
+		exe := newExe(t, "", content, provider)
+		evaluator := New(slog.NewTextHandler(io.Discard, nil), exe)
+
+		require.NoError(t, evaluator.Close(t.Context()))
+		result, err := evaluator.Eval(t.Context())
+		require.ErrorIs(t, err, compiler.ErrExecutableClosed)
+		assert.Nil(t, result)
+		assert.Equal(t, int32(0), provider.calls.Load(), "a closed evaluator should not load data")
+
+		mockPlugin.AssertExpectations(t)
+		mockPlugin.AssertNotCalled(t, "Instance", mock.Anything, mock.Anything)
+	})
+
+	t.Run("eval while close is waiting is rejected without calling the provider", func(t *testing.T) {
+		plugin := &trackingPlugin{}
+		content := createMockExecutable(plugin, "main")
+		provider := newGatedProvider(t)
+		exe := newExe(t, "", content, provider)
+		evaluator := New(slog.NewTextHandler(io.Discard, nil), exe)
+
+		firstDone := startEval(t, evaluator)
+		recvWithin(t, provider.entered, "the first eval to enter the data provider")
+
+		closeDone := startClose(t, evaluator)
+		waitForClosing(t, content)
+
+		err := recvWithin(t, startEval(t, evaluator), "the second eval to be rejected")
+		require.ErrorIs(t, err, compiler.ErrExecutableClosed)
+		assert.Equal(t, int32(1), provider.calls.Load(), "the rejected eval should not load data")
+		requireCloseBlocked(t, closeDone)
+
+		provider.unblock()
+		require.NoError(t, recvWithin(t, firstDone, "the first eval to finish"))
+		require.NoError(t, recvWithin(t, closeDone, "Close to finish"))
+		assert.Equal(t, int32(0), plugin.violations.Load(), "plugin used after, or closed during, use")
+		assert.Equal(t, int32(1), plugin.closeCalls.Load(), "plugin should be closed exactly once")
+	})
+
+	t.Run("provider error releases the guard", func(t *testing.T) {
+		providerErr := errors.New("provider boom")
+		mockPlugin := new(MockCompiledPlugin)
+		mockPlugin.On("Close", mock.Anything).Return(nil).Once()
+		content := createMockExecutable(mockPlugin, "main")
+		provider := &gatedProvider{err: providerErr}
+		exe := newExe(t, "", content, provider)
+		evaluator := New(slog.NewTextHandler(io.Discard, nil), exe)
+
+		result, err := evaluator.Eval(t.Context())
+		require.ErrorIs(t, err, providerErr)
+		assert.Contains(t, err.Error(), "failed to get input data")
+		assert.Nil(t, result)
+
+		require.NoError(t, recvWithin(t, startClose(t, evaluator), "Close after a failed eval"))
+		assert.True(t, content.IsClosed(), "executable should report closed")
+		assert.Equal(t, int32(1), provider.calls.Load(), "provider should be called once")
+		mockPlugin.AssertExpectations(t)
+		mockPlugin.AssertNotCalled(t, "Instance", mock.Anything, mock.Anything)
 	})
 }
