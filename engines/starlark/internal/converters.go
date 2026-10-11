@@ -104,11 +104,14 @@ func ConvertStarlarkValueToInterface(v starlarkLib.Value) (any, error) {
 		return list, nil
 	case *starlarkLib.Dict:
 		// Create a string-keyed map for JSON compatibility
-		dict := make(map[string]any)
+		dict := make(map[string]any, v.Len())
 		for _, k := range v.Keys() {
 			val, found, err := v.Get(k)
-			if err != nil || !found {
-				continue // Skip invalid entries
+			if err != nil {
+				return nil, fmt.Errorf("failed to get dict value for key %s: %w", k, err)
+			}
+			if !found {
+				return nil, fmt.Errorf("dict key %s vanished during conversion", k)
 			}
 
 			// For JSON compatibility, we need string keys
@@ -116,6 +119,11 @@ func ConvertStarlarkValueToInterface(v starlarkLib.Value) (any, error) {
 			if !ok {
 				// Convert non-string keys to strings for JSON compatibility
 				kStr = starlarkLib.String(k.String())
+			}
+			// Starlark keys are unique, so a repeat here means two distinct
+			// keys (e.g. 1 and "1") stringified to the same map key.
+			if _, dup := dict[string(kStr)]; dup {
+				return nil, fmt.Errorf("%w: key %s maps to %q", ErrDictKeyCollision, k, string(kStr))
 			}
 
 			vv, err := ConvertStarlarkValueToInterface(val)

@@ -114,7 +114,7 @@ func execHelper(
 	execTime := time.Since(startTime)
 	if err != nil {
 		if ctx.Err() != nil {
-			return nil, execTime, fmt.Errorf("execution cancelled: %w (call error: %w)", ctx.Err(), err)
+			return nil, execTime, fmt.Errorf("execution cancelled: %w (%w)", ctx.Err(), err)
 		}
 		return nil, execTime, fmt.Errorf("execution failed: %w", err)
 	}

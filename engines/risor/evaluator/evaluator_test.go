@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"math"
 	"net/http/httptest"
 	"os"
 	"strings"
@@ -824,6 +825,58 @@ func TestEval_ResultTypes(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, tc.expectedType, result.Type(), "Type() should classify the result")
 			assert.Equal(t, tc.expectedValue, result.Interface(), "Interface() should return the converted result")
+		})
+	}
+}
+
+// TestEval_UintRange is the evaluator-level regression for issue #165: an
+// unsigned input above math.MaxInt64 used to wrap silently (MaxUint64 read
+// back as -1); Eval must reject it, while in-range values still round-trip.
+func TestEval_UintRange(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		input    map[string]any
+		expected any
+		wantErr  error
+	}{
+		{
+			name:    "uint64 above max int64 is rejected",
+			input:   map[string]any{"big": uint64(math.MaxUint64)},
+			wantErr: ErrUintOverflow,
+		},
+		{
+			name:    "nested uint64 above max int64 is rejected",
+			input:   map[string]any{"big": []any{uint64(math.MaxInt64) + 1}},
+			wantErr: ErrUintOverflow,
+		},
+		{
+			name:     "uint64 at max int64 passes",
+			input:    map[string]any{"big": uint64(math.MaxInt64)},
+			expected: int64(math.MaxInt64),
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			handler := slog.NewTextHandler(io.Discard, nil)
+			ld, err := loader.NewFromString(`ctx["big"]`)
+			require.NoError(t, err)
+			exe, err := createTestExecutable(
+				t.Context(), handler, ld, []string{constants.Ctx},
+				data.NewStaticProvider(tc.input),
+			)
+			require.NoError(t, err)
+
+			result, err := New(handler, exe).Eval(t.Context())
+			if tc.wantErr != nil {
+				require.ErrorIs(t, err, tc.wantErr)
+				assert.Nil(t, result)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tc.expected, result.Interface())
 		})
 	}
 }

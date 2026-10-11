@@ -20,7 +20,7 @@ func TestConvertToExtismFormat(t *testing.T) {
 		{
 			name:     "empty map",
 			input:    map[string]any{},
-			wantJSON: false,
+			wantJSON: true,
 			wantErr:  false,
 		},
 		{
@@ -39,7 +39,7 @@ func TestConvertToExtismFormat(t *testing.T) {
 		{
 			name:     "nil map",
 			input:    nil,
-			wantJSON: false,
+			wantJSON: true,
 			wantErr:  false,
 		},
 		{
@@ -93,8 +93,10 @@ func TestConvertToExtismFormat(t *testing.T) {
 							}
 						}
 					}
-				} else if len(tt.input) == 0 || tt.input == nil {
-					require.Nil(t, result)
+				}
+				if len(tt.input) == 0 {
+					assert.JSONEq(t, `{}`, string(result),
+						"empty input should be sent to the guest as an empty JSON object")
 				}
 			}
 		})
