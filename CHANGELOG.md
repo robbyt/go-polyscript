@@ -115,7 +115,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the `*WithData` variants and `WithLogHandler` in place of the positional
   log handler. For Extism, pass `WithEntryPoint(name)` in place of the
   positional `entryPoint`; `New[Extism]` requires it and otherwise returns
-  `ErrEntryPointRequired`.
+  an error wrapping `extism.ErrEntryPointRequired` (from `engines/extism`).
   ([#104](https://github.com/robbyt/go-polyscript/issues/104))
 - **BREAKING**: Removed four exported mock types (`loader.MockLoader` with
   `NewMockLoaderWithContent`, `script.MockCompiler`,
