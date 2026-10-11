@@ -206,9 +206,18 @@ type config struct {
 	entryPoint         string
 	exitOutputMaxBytes int
 	noCtxTermination   bool
-	// lifetime is held only while New runs; the engine hands it to the
-	// evaluator, which keeps just a func to stop its hook.
-	lifetime context.Context
+	// lifetime holds each engine's WithLifetime option, built by
+	// [WithLifetime], so that no context.Context is kept in a struct. Only
+	// the one for the engine being built is used.
+	lifetime lifetimeOptions
+}
+
+// lifetimeOptions carries the engine options for [WithLifetime]; a nil
+// option leaves the engine's default, the ctx passed to [New].
+type lifetimeOptions struct {
+	risor    risorMachine.Option
+	starlark starlarkMachine.Option
+	extism   extismMachine.Option
 }
 
 // WithStaticData attaches a fixed map of values that the script will see
@@ -241,7 +250,13 @@ func WithLogHandler[E Engine](h slog.Handler) Option[E] {
 // The type parameter usually needs to be explicit; see "A note on type
 // arguments" in the package doc.
 func WithLifetime[E Engine](ctx context.Context) Option[E] {
-	return func(c *config) { c.lifetime = ctx }
+	return func(c *config) {
+		c.lifetime = lifetimeOptions{
+			risor:    risorMachine.WithLifetime(ctx),
+			starlark: starlarkMachine.WithLifetime(ctx),
+			extism:   extismMachine.WithLifetime(ctx),
+		}
+	}
 }
 
 // WithEntryPoint sets the WASM function name to invoke. It is required for
@@ -350,10 +365,12 @@ func asEvaluator[T platform.Evaluator](ev T, err error) (platform.Evaluator, err
 func newRisor(ctx context.Context, ldr loader.Loader, cfg *config) (platform.Evaluator, error) {
 	opts := []risorMachine.Option{
 		risorMachine.WithLogHandler(cfg.handler),
-		risorMachine.WithLifetime(cfg.lifetime), //nolint:contextcheck // the lifetime ctx is deliberately not derived from the setup ctx
 	}
 	if cfg.staticData != nil {
 		opts = append(opts, risorMachine.WithStaticData(cfg.staticData))
+	}
+	if cfg.lifetime.risor != nil {
+		opts = append(opts, cfg.lifetime.risor)
 	}
 	return asEvaluator(risorMachine.FromRisorLoader(ctx, ldr, opts...))
 }
@@ -361,10 +378,12 @@ func newRisor(ctx context.Context, ldr loader.Loader, cfg *config) (platform.Eva
 func newStarlark(ctx context.Context, ldr loader.Loader, cfg *config) (platform.Evaluator, error) {
 	opts := []starlarkMachine.Option{
 		starlarkMachine.WithLogHandler(cfg.handler),
-		starlarkMachine.WithLifetime(cfg.lifetime), //nolint:contextcheck // the lifetime ctx is deliberately not derived from the setup ctx
 	}
 	if cfg.staticData != nil {
 		opts = append(opts, starlarkMachine.WithStaticData(cfg.staticData))
+	}
+	if cfg.lifetime.starlark != nil {
+		opts = append(opts, cfg.lifetime.starlark)
 	}
 	return asEvaluator(starlarkMachine.FromStarlarkLoader(ctx, ldr, opts...))
 }
@@ -375,10 +394,12 @@ func newExtism(ctx context.Context, ldr loader.Loader, cfg *config) (platform.Ev
 		extismMachine.WithLogHandler(cfg.handler),
 		extismMachine.WithExitOutputMaxBytes(cfg.exitOutputMaxBytes),
 		extismMachine.WithContextTermination(!cfg.noCtxTermination),
-		extismMachine.WithLifetime(cfg.lifetime), //nolint:contextcheck // the lifetime ctx is deliberately not derived from the setup ctx
 	}
 	if cfg.staticData != nil {
 		opts = append(opts, extismMachine.WithStaticData(cfg.staticData))
+	}
+	if cfg.lifetime.extism != nil {
+		opts = append(opts, cfg.lifetime.extism)
 	}
 	return asEvaluator(extismMachine.FromExtismLoader(ctx, ldr, opts...))
 }

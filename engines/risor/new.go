@@ -104,11 +104,11 @@ func FromRisorLoader(ctx context.Context, ldr loader.Loader, opts ...Option) (*e
 		return nil, err
 	}
 
-	lifetime := cfg.lifetime //nolint:contextcheck // the lifetime ctx is deliberately not derived from the setup ctx
-	if lifetime == nil {
-		lifetime = ctx
+	bindLifetime := cfg.bindLifetime
+	if bindLifetime == nil {
+		bindLifetime = func(u *script.ExecutableUnit) error { return u.BindLifetime(ctx) }
 	}
-	if err := execUnit.BindLifetime(lifetime); err != nil {
+	if err := bindLifetime(execUnit); err != nil {
 		return nil, err
 	}
 

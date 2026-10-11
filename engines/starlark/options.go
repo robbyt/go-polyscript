@@ -5,6 +5,7 @@ import (
 	"log/slog"
 
 	"github.com/robbyt/go-polyscript/platform/data"
+	"github.com/robbyt/go-polyscript/platform/script"
 )
 
 // Option configures [FromStarlarkLoader]. Apply in any order; later options
@@ -15,9 +16,10 @@ type config struct {
 	handler      slog.Handler
 	staticData   map[string]any
 	dataProvider data.Provider
-	// lifetime is held only while the constructor runs; it is handed to
-	// the executable unit, which keeps just a func to stop its hook.
-	lifetime context.Context
+	// bindLifetime, set by WithLifetime, binds the executable unit to the
+	// lifetime ctx; nil means the constructor's ctx. It is a func so that no
+	// context.Context is kept in a struct.
+	bindLifetime func(*script.ExecutableUnit) error
 }
 
 // WithLogHandler sets the slog.Handler used for diagnostic logging by the
@@ -54,5 +56,11 @@ func WithDataProvider(p data.Provider) Option {
 // [FromStarlarkLoader] returns an error. A nil ctx means the constructor's
 // ctx.
 func WithLifetime(ctx context.Context) Option {
-	return func(c *config) { c.lifetime = ctx }
+	return func(c *config) {
+		if ctx == nil {
+			c.bindLifetime = nil
+			return
+		}
+		c.bindLifetime = func(u *script.ExecutableUnit) error { return u.BindLifetime(ctx) }
+	}
 }
