@@ -10,16 +10,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - **BREAKING:** `Close(ctx)` on `platform.Evaluator`, implemented by every
   engine, and on `script.ExecutableUnit`. For Extism it releases the compiled
-  module's wazero runtime: `Close` waits for in-flight `Eval` calls,
-  including their data loading, and any `Eval` started once `Close` has been
-  called fails with `compiler.ErrExecutableClosed` without calling the data
-  provider. `Close`'s ctx cannot interrupt the wait; cancelling an `Eval`'s
-  ctx shortens it only if the data provider honours cancellation and the
-  guest stops on cancellation (the default unless ctx termination is
-  disabled), and a data provider must not call `Close` or `Eval` on the same
-  evaluator. For Risor
-  and Starlark it is a no-op. Code that implements `platform.Evaluator`
-  itself must add the method.
+  module's wazero runtime. Once `Close` has been called, any new `Eval` fails
+  with `compiler.ErrExecutableClosed` without calling the data provider.
+  `Close` waits for in-flight `Eval` calls, including their data loading,
+  only until its ctx is done: it then returns the ctx's error, and the
+  runtime is released when the last in-flight `Eval` returns. With nothing
+  in flight it releases the runtime at once, even with a cancelled ctx. A
+  data provider must not call `Eval`, or `Close` with a ctx that is never
+  done, on the same evaluator. Every `Close` that returns after the release,
+  including later ones, reports the release error. For Risor and Starlark it
+  is a no-op. Code that implements `platform.Evaluator` itself must add the
+  method.
+  ([#162](https://github.com/robbyt/go-polyscript/issues/162))
+- `WithLifetime` option (`polyscript.WithLifetime[E]` and each engine's
+  `WithLifetime`) to bound an evaluator's lifetime by a ctx other than the
+  one passed to its constructor, and `script.ExecutableUnit.BindLifetime`,
+  which implements the binding.
   ([#162](https://github.com/robbyt/go-polyscript/issues/162))
 - `data.BYTES` and `data.UNKNOWN` result types.
   ([#157](https://github.com/robbyt/go-polyscript/issues/157),
@@ -41,9 +47,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ([#115](https://github.com/robbyt/go-polyscript/pull/115))
 
 ### Changed
+- **BREAKING:** the ctx passed to `polyscript.New` and the engine
+  constructors (`FromRisorLoader`, `FromStarlarkLoader`, `FromExtismLoader`)
+  now bounds the evaluator's lifetime: when it is done, an evaluator whose
+  engine holds resources (Extism) closes itself as if `Close` had been
+  called. Evaluators reused beyond a request or timeout ctx must be built
+  with a long-lived ctx or given one with `WithLifetime`. A lifetime ctx
+  that is already done when construction finishes makes the constructor
+  close what it built and return an error wrapping the ctx's error, on
+  every engine. The lifetime ctx holds the evaluator only weakly, so one
+  dropped without `Close` is still garbage collected, and its runtime is
+  closed then. ([#162](https://github.com/robbyt/go-polyscript/issues/162))
 - **BREAKING:** Extism `compiler.Executable.ByteCode` is unexported; use
-  `GetExtismByteCode()` or the new `WithPlugin(fn)`, which holds the plugin
-  open while `fn` runs.
+  `GetExtismByteCode()` or the new `WithPlugin(ctx, fn)`, which holds the
+  plugin open while `fn` runs.
   ([#162](https://github.com/robbyt/go-polyscript/issues/162))
 - `polyscript.New` returns an untyped `nil` evaluator on error, instead of a
   non-nil interface wrapping a nil engine pointer.

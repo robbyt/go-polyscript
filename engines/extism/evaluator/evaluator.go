@@ -206,13 +206,13 @@ func (be *Evaluator) Eval(ctx context.Context) (platform.EvaluatorResponse, erro
 	}
 
 	// 2. Load the input data, convert it to JSON and execute the program
-	// inside WithPlugin. It holds the executable's read lock until fn
-	// returns, so a concurrent Close also waits for data loading. Once Close
-	// has been called it returns compiler.ErrExecutableClosed without calling
-	// fn, so the data provider is never called. Its error is returned
+	// inside WithPlugin. It keeps the plugin open until fn returns, so a
+	// concurrent Close does not release it during data loading either. Once
+	// Close has been called it returns compiler.ErrExecutableClosed without
+	// calling fn, so the data provider is never called. Its error is returned
 	// unwrapped; each step inside fn wraps its own.
 	var result *execResult
-	err := wasmExe.WithPlugin(func(plugin adapters.CompiledPlugin) error {
+	err := wasmExe.WithPlugin(ctx, func(plugin adapters.CompiledPlugin) error {
 		rawInputData, loadErr := be.loadInputData(ctx)
 		if loadErr != nil {
 			return fmt.Errorf("failed to get input data: %w", loadErr)
@@ -254,15 +254,27 @@ func (be *Evaluator) AddDataToContext(
 	return data.AddDataToContextFromProvider(ctx, be.logHandler.WithGroup("Evaluator"), be.getDataProvider(), d)
 }
 
-// Close implements platform.Evaluator. It releases the compiled plugin and its
-// wazero runtime, waiting first for in-flight Eval calls to finish, including
-// their data loading. ctx cannot interrupt that wait; cancelling an Eval's ctx
-// shortens it only if the guest stops and the data provider honours
-// cancellation. Eval calls made once Close has been called, including while
-// it waits, return an error wrapping compiler.ErrExecutableClosed without
-// calling the data provider. A data provider must not call Close or Eval on
-// the same Evaluator, since Close would wait for the Eval that is calling it.
-// It is safe to call more than once and on a nil Evaluator.
+// Close implements platform.Evaluator. It releases the compiled plugin and
+// its wazero runtime. As soon as Close is called, new Eval calls return an
+// error wrapping compiler.ErrExecutableClosed without calling the data
+// provider. With no Eval in flight, Close releases the runtime, or waits for
+// a release already under way, and returns the release error, even if ctx
+// is already done. Otherwise it waits for the in-flight Evals, including
+// their data loading, until ctx is done; if ctx ends first, Close returns
+// ctx's error and the runtime is released when the last of those Evals
+// returns. A later Close then returns the release error. Cancelling an
+// Eval's ctx shortens the wait only if the guest stops and the data provider
+// honours cancellation.
+//
+// The evaluator also closes itself this way when its lifetime ctx is done:
+// the ctx passed to the constructor, or the one given to WithLifetime. That
+// ctx holds the evaluator only weakly, so one dropped without Close is
+// closed once it is garbage collected; Close releases the runtime sooner.
+//
+// A data provider must not call Close with a ctx that is never done, or Eval,
+// on the same Evaluator, since Close would wait for the Eval that is calling
+// it. It is safe to call more than once, concurrently, and on a nil
+// Evaluator.
 func (be *Evaluator) Close(ctx context.Context) error {
 	if be == nil {
 		return nil

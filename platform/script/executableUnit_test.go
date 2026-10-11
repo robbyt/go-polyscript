@@ -1,6 +1,7 @@
 package script
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -8,12 +9,17 @@ import (
 	"log/slog"
 	"net/url"
 	"os"
+	"runtime"
+	"strings"
+	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	engineTypes "github.com/robbyt/go-polyscript/engines/types"
 	"github.com/robbyt/go-polyscript/platform/data"
 	"github.com/robbyt/go-polyscript/platform/script/loader"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
@@ -544,4 +550,280 @@ func TestExecutableUnit_Close(t *testing.T) {
 		var exe *ExecutableUnit
 		require.NoError(t, exe.Close(t.Context()))
 	})
+}
+
+// syncBuffer is a bytes.Buffer safe for a log handler that writes from
+// another goroutine, such as a context.AfterFunc callback.
+type syncBuffer struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (b *syncBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.Write(p)
+}
+
+func (b *syncBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.String()
+}
+
+// newUnitWithContent builds an ExecutableUnit around content through
+// NewExecutableUnit, logging to handler.
+func newUnitWithContent(t *testing.T, handler slog.Handler, content ExecutableContent) *ExecutableUnit {
+	t.Helper()
+	ldr := new(mockLoader)
+	ldr.On("GetReader", mock.Anything).Return(io.NopCloser(strings.NewReader("script")), nil)
+	comp := new(MockCompiler)
+	comp.On("Compile", mock.Anything, mock.Anything).Return(content, nil)
+
+	exe, err := NewExecutableUnit(
+		t.Context(), handler, t.Name(), ldr, comp, data.NewStaticProvider(emptyScriptData),
+	)
+	require.NoError(t, err)
+	ldr.AssertExpectations(t)
+	comp.AssertExpectations(t)
+	return exe
+}
+
+// bindUnusedUnit builds a unit around content, binds it to a new live
+// lifetime and drops it, so the only remaining reference to the unit is the
+// lifetime hook. It returns the func that ends the lifetime.
+func bindUnusedUnit(t *testing.T, content ExecutableContent) context.CancelFunc {
+	t.Helper()
+	exe := newUnitWithContent(t, nil, content)
+	lifetime, cancel := context.WithCancel(t.Context())
+	t.Cleanup(cancel)
+	require.NoError(t, exe.BindLifetime(lifetime))
+	return cancel
+}
+
+func TestExecutableUnit_BindLifetime(t *testing.T) {
+	t.Parallel()
+
+	t.Run("lifetime end closes the content once", func(t *testing.T) {
+		synctest.Test(t, func(t *testing.T) {
+			content := &countingClosableContent{}
+			exe := newUnitWithContent(t, nil, content)
+			lifetime, cancel := context.WithCancel(t.Context())
+			defer cancel()
+
+			require.NoError(t, exe.BindLifetime(lifetime))
+			synctest.Wait()
+			assert.Equal(t, int32(0), content.closeCalls.Load(), "content must stay open while the lifetime is live")
+
+			cancel()
+			synctest.Wait()
+			assert.Equal(t, int32(1), content.closeCalls.Load(), "lifetime end should close the content")
+
+			cancel()
+			synctest.Wait()
+			assert.Equal(t, int32(1), content.closeCalls.Load(), "the hook should fire only once")
+			runtime.KeepAlive(exe) // the hook holds the unit only weakly
+		})
+	})
+
+	t.Run("Close stops the lifetime hook", func(t *testing.T) {
+		synctest.Test(t, func(t *testing.T) {
+			content := &countingClosableContent{}
+			exe := newUnitWithContent(t, nil, content)
+			lifetime, cancel := context.WithCancel(t.Context())
+			defer cancel()
+
+			require.NoError(t, exe.BindLifetime(lifetime))
+			require.NoError(t, exe.Close(t.Context()))
+			assert.Equal(t, int32(1), content.closeCalls.Load(), "Close should close the content")
+
+			cancel()
+			synctest.Wait()
+			assert.Equal(t, int32(1), content.closeCalls.Load(),
+				"lifetime end after Close must not close the content again")
+		})
+	})
+
+	t.Run("hook logs a content close error", func(t *testing.T) {
+		synctest.Test(t, func(t *testing.T) {
+			var logs syncBuffer
+			content := &countingClosableContent{err: errors.New("close kaboom")}
+			exe := newUnitWithContent(t, slog.NewTextHandler(&logs, nil), content)
+			lifetime, cancel := context.WithCancel(t.Context())
+			defer cancel()
+
+			require.NoError(t, exe.BindLifetime(lifetime))
+			cancel()
+			synctest.Wait()
+			assert.Equal(t, int32(1), content.closeCalls.Load())
+			assert.Contains(t, logs.String(), "close kaboom", "a close error from the hook should be logged")
+			runtime.KeepAlive(exe)
+		})
+	})
+
+	t.Run("content without Close ignores the lifetime", func(t *testing.T) {
+		synctest.Test(t, func(t *testing.T) {
+			content := new(MockExecutableContent)
+			exe := newUnitWithContent(t, nil, content)
+			lifetime, cancel := context.WithCancel(t.Context())
+
+			require.NoError(t, exe.BindLifetime(lifetime))
+			cancel()
+			synctest.Wait()
+			require.NoError(t, exe.Close(t.Context()))
+			content.AssertExpectations(t)
+		})
+	})
+
+	t.Run("rebinding replaces the earlier lifetime", func(t *testing.T) {
+		synctest.Test(t, func(t *testing.T) {
+			content := &countingClosableContent{}
+			exe := newUnitWithContent(t, nil, content)
+			first, cancelFirst := context.WithCancel(t.Context())
+			defer cancelFirst()
+			second, cancelSecond := context.WithCancel(t.Context())
+			defer cancelSecond()
+
+			require.NoError(t, exe.BindLifetime(first))
+			require.NoError(t, exe.BindLifetime(second))
+			cancelFirst()
+			synctest.Wait()
+			assert.Equal(t, int32(0), content.closeCalls.Load(), "the replaced lifetime must not close the content")
+
+			cancelSecond()
+			synctest.Wait()
+			assert.Equal(t, int32(1), content.closeCalls.Load())
+			runtime.KeepAlive(exe)
+		})
+	})
+
+	t.Run("lifetime does not keep an unused unit in memory", func(t *testing.T) {
+		content := &countingClosableContent{}
+		collected := make(chan struct{})
+		runtime.AddCleanup(content, func(ch chan struct{}) { close(ch) }, collected)
+		bindUnusedUnit(t, content)
+
+		// The unit's cleanup closes the content and lets it go; only then can
+		// the content itself be collected.
+		deadline := time.After(5 * time.Second)
+		for {
+			runtime.GC()
+			select {
+			case <-collected:
+				return
+			case <-deadline:
+				t.Fatal("a unit bound to a live lifetime but no longer used should be garbage collected")
+			case <-time.After(10 * time.Millisecond):
+			}
+		}
+	})
+
+	t.Run("unused unit has its content closed once collected", func(t *testing.T) {
+		content := &countingClosableContent{}
+		cancel := bindUnusedUnit(t, content)
+		require.Eventually(t, func() bool {
+			runtime.GC()
+			return content.closeCalls.Load() == 1
+		}, 5*time.Second, 10*time.Millisecond, "collecting a bound, unclosed unit should close its content")
+
+		cancel()
+		time.Sleep(20 * time.Millisecond) // let a hook that wrongly survived run
+		assert.Equal(t, int32(1), content.closeCalls.Load(), "the lifetime hook must be gone once the unit is collected")
+	})
+
+	t.Run("collecting a closed unit does not close its content again", func(t *testing.T) {
+		content := &countingClosableContent{}
+		func() {
+			exe := newUnitWithContent(t, nil, content)
+			lifetime, cancel := context.WithCancel(t.Context())
+			t.Cleanup(cancel)
+			require.NoError(t, exe.BindLifetime(lifetime))
+			require.NoError(t, exe.Close(lifetime))
+		}()
+		for range 5 {
+			runtime.GC()
+			time.Sleep(10 * time.Millisecond)
+		}
+		assert.Equal(t, int32(1), content.closeCalls.Load(), "only the explicit Close should close the content")
+	})
+
+	t.Run("nil lifetime", func(t *testing.T) {
+		content := &countingClosableContent{}
+		exe := newUnitWithContent(t, nil, content)
+		var lifetime context.Context
+		require.Error(t, exe.BindLifetime(lifetime))
+		assert.Equal(t, int32(0), content.closeCalls.Load())
+	})
+
+	t.Run("nil unit", func(t *testing.T) {
+		var exe *ExecutableUnit
+		require.NoError(t, exe.BindLifetime(t.Context()))
+	})
+}
+
+func TestExecutableUnit_BindLifetime_AlreadyDone(t *testing.T) {
+	t.Parallel()
+
+	errShutdown := errors.New("shutting down")
+	closeErr := errors.New("close kaboom")
+
+	tests := []struct {
+		name     string
+		lifetime func() context.Context
+		closeErr error
+		wantErrs []error
+	}{
+		{
+			name: "cancelled",
+			lifetime: func() context.Context {
+				ctx, cancel := context.WithCancel(t.Context())
+				cancel()
+				return ctx
+			},
+			wantErrs: []error{context.Canceled},
+		},
+		{
+			name: "cancelled with a cause",
+			lifetime: func() context.Context {
+				ctx, cancel := context.WithCancelCause(t.Context())
+				cancel(errShutdown)
+				return ctx
+			},
+			wantErrs: []error{context.Canceled, errShutdown},
+		},
+		{
+			name: "deadline exceeded",
+			lifetime: func() context.Context {
+				ctx, cancel := context.WithDeadline(t.Context(), time.Now().Add(-time.Second))
+				cancel()
+				return ctx
+			},
+			wantErrs: []error{context.DeadlineExceeded},
+		},
+		{
+			name: "content close error is joined",
+			lifetime: func() context.Context {
+				ctx, cancel := context.WithCancel(t.Context())
+				cancel()
+				return ctx
+			},
+			closeErr: closeErr,
+			wantErrs: []error{context.Canceled, closeErr},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			content := &countingClosableContent{err: tc.closeErr}
+			exe := newUnitWithContent(t, nil, content)
+
+			err := exe.BindLifetime(tc.lifetime())
+			require.Error(t, err)
+			for _, want := range tc.wantErrs {
+				require.ErrorIs(t, err, want)
+			}
+			assert.Equal(t, int32(1), content.closeCalls.Load(),
+				"an already-done lifetime should close the content before returning")
+		})
+	}
 }

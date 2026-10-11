@@ -25,7 +25,7 @@ func (m *mockEvaluator) Reload(path string) error {
 	return args.Error(0)
 }
 
-func (m *mockEvaluator) Load(newVersion script.ExecutableUnit) error {
+func (m *mockEvaluator) Load(newVersion *script.ExecutableUnit) error {
 	args := m.Called(newVersion)
 	return args.Error(0)
 }

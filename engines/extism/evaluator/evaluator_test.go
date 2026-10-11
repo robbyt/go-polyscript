@@ -12,6 +12,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	extismSDK "github.com/extism/go-sdk"
@@ -1069,31 +1070,12 @@ func recvWithin[T any](t *testing.T, ch <-chan T, what string) T {
 	}
 }
 
-// waitForClosing waits until Close has been called on content. Close marks
-// the executable as closing before it waits for the write lock, so a
-// GetExtismByteCode probe then returns nil. A probe that read closing just
-// before Close set it blocks on the read lock behind the pending Close
-// instead, which also means Close has been called; the probe goroutine is
-// released once the in-flight Eval returns.
+// waitForClosing waits until Close has been called on content, which makes
+// GetExtismByteCode return nil.
 func waitForClosing(t *testing.T, content *compiler.Executable) {
 	t.Helper()
-	const probeBlockedAfter = 100 * time.Millisecond
-	deadline := time.After(closeTestTimeout)
-	for {
-		probe := make(chan bool, 1)
-		go func() { probe <- content.GetExtismByteCode() == nil }()
-		select {
-		case closing := <-probe:
-			if closing {
-				return
-			}
-		case <-time.After(probeBlockedAfter):
-			return
-		case <-deadline:
-			require.FailNow(t, "timed out waiting for Close to be called")
-		}
-		runtime.Gosched()
-	}
+	require.Eventually(t, func() bool { return content.GetExtismByteCode() == nil },
+		closeTestTimeout, time.Millisecond, "timed out waiting for Close to be called")
 }
 
 // startEval runs evaluator.Eval in a goroutine and returns a channel that
@@ -1316,5 +1298,106 @@ func TestEvaluator_Close(t *testing.T) {
 		assert.Equal(t, int32(1), provider.calls.Load(), "provider should be called once")
 		mockPlugin.AssertExpectations(t)
 		mockPlugin.AssertNotCalled(t, "Instance", mock.Anything, mock.Anything)
+	})
+}
+
+// startCloseWith runs evaluator.Close(ctx) in a goroutine and returns a
+// channel that receives its error.
+func startCloseWith(ctx context.Context, evaluator *Evaluator) <-chan error {
+	done := make(chan error, 1)
+	go func() {
+		done <- evaluator.Close(ctx)
+	}()
+	return done
+}
+
+func TestEvaluator_CloseContext(t *testing.T) {
+	t.Parallel()
+
+	t.Run("returns at its deadline while an eval loads data", func(t *testing.T) {
+		plugin := &trackingPlugin{}
+		content := createMockExecutable(plugin, "main")
+		provider := newGatedProvider(t)
+		exe := newExe(t, "", content, provider)
+		evaluator := New(slog.NewTextHandler(io.Discard, nil), exe)
+
+		evalDone := startEval(t, evaluator)
+		recvWithin(t, provider.entered, "the eval to enter the data provider")
+
+		ctx, cancel := context.WithTimeout(t.Context(), 20*time.Millisecond)
+		defer cancel()
+		start := time.Now()
+		err := recvWithin(t, startCloseWith(ctx, evaluator), "Close to return at its deadline")
+		require.ErrorIs(t, err, context.DeadlineExceeded)
+		assert.Less(t, time.Since(start), time.Second, "Close should return near its deadline")
+
+		err = recvWithin(t, startEval(t, evaluator), "the new eval to be rejected")
+		require.ErrorIs(t, err, compiler.ErrExecutableClosed)
+		assert.Equal(t, int32(1), provider.calls.Load(), "the rejected eval should not load data")
+		assert.False(t, content.IsClosed(), "the plugin must not be released under an in-flight eval")
+		assert.Equal(t, int32(0), plugin.closeCalls.Load())
+
+		provider.unblock()
+		require.NoError(t, recvWithin(t, evalDone, "the in-flight eval to finish"),
+			"an Eval that started before Close should complete")
+		require.Eventually(t, content.IsClosed, closeTestTimeout, time.Millisecond,
+			"the plugin should be released once the last eval returns")
+		assert.Equal(t, int32(1), plugin.closeCalls.Load(), "plugin should be closed exactly once")
+		assert.Equal(t, int32(0), plugin.violations.Load(), "plugin used after, or closed during, use")
+	})
+
+	t.Run("cancelled ctx with nothing in flight releases", func(t *testing.T) {
+		plugin := &trackingPlugin{}
+		content := createMockExecutable(plugin, "main")
+		exe := newExe(t, "", content, data.NewContextProvider(constants.EvalData))
+		evaluator := New(slog.NewTextHandler(io.Discard, nil), exe)
+
+		ctx, cancel := context.WithCancel(t.Context())
+		cancel()
+		require.NoError(t, evaluator.Close(ctx))
+		assert.True(t, content.IsClosed(), "Close should release synchronously")
+		assert.Equal(t, int32(1), plugin.closeCalls.Load())
+	})
+}
+
+func TestEvaluator_Lifetime(t *testing.T) {
+	t.Parallel()
+
+	t.Run("lifetime end closes the evaluator", func(t *testing.T) {
+		plugin := &trackingPlugin{}
+		content := createMockExecutable(plugin, "main")
+		exe := newExe(t, "", content, data.NewContextProvider(constants.EvalData))
+		lifetime, cancel := context.WithCancel(t.Context())
+		defer cancel()
+		require.NoError(t, exe.BindLifetime(lifetime))
+		evaluator := New(slog.NewTextHandler(io.Discard, nil), exe)
+
+		_, err := evaluator.Eval(t.Context())
+		require.NoError(t, err, "Eval should work while the lifetime is live")
+
+		cancel()
+		require.Eventually(t, content.IsClosed, closeTestTimeout, time.Millisecond,
+			"lifetime end should release the plugin")
+		_, err = evaluator.Eval(t.Context())
+		require.ErrorIs(t, err, compiler.ErrExecutableClosed)
+		assert.Equal(t, int32(1), plugin.closeCalls.Load())
+	})
+
+	t.Run("Close before lifetime end closes once", func(t *testing.T) {
+		synctest.Test(t, func(t *testing.T) {
+			plugin := &trackingPlugin{}
+			content := createMockExecutable(plugin, "main")
+			exe := newExe(t, "", content, data.NewContextProvider(constants.EvalData))
+			lifetime, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			require.NoError(t, exe.BindLifetime(lifetime))
+			evaluator := New(slog.NewTextHandler(io.Discard, nil), exe)
+
+			require.NoError(t, evaluator.Close(t.Context()))
+			cancel()
+			synctest.Wait()
+			assert.True(t, content.IsClosed())
+			assert.Equal(t, int32(1), plugin.closeCalls.Load(), "lifetime end after Close must not close again")
+		})
 	})
 }

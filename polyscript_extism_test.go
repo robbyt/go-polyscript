@@ -2,10 +2,12 @@ package polyscript_test
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/robbyt/go-polyscript"
 	"github.com/robbyt/go-polyscript/engines/extism/compiler"
@@ -266,4 +268,84 @@ func TestExtismEvaluatorClose(t *testing.T) {
 		_, err := eval.Eval(t.Context())
 		require.ErrorIs(t, err, compiler.ErrExecutableClosed)
 	})
+}
+
+// TestNew_WithLifetime checks that polyscript.WithLifetime reaches each
+// engine: an evaluator that holds resources closes when its lifetime ends,
+// one that holds none keeps evaluating, and an already-done lifetime fails
+// construction on every engine.
+func TestNew_WithLifetime(t *testing.T) {
+	t.Parallel()
+
+	newExtism := func(setup, lifetime context.Context) (platform.Evaluator, error) {
+		return polyscript.New[polyscript.Extism](
+			setup,
+			polyscript.FromBytes(wasmdata.TestModule),
+			polyscript.WithEntryPoint(wasmdata.EntrypointGreet),
+			polyscript.WithStaticData[polyscript.Extism](map[string]any{"input": "World"}),
+			polyscript.WithLifetime[polyscript.Extism](lifetime),
+		)
+	}
+	newRisor := func(setup, lifetime context.Context) (platform.Evaluator, error) {
+		return polyscript.New[polyscript.Risor](
+			setup, polyscript.FromString(`"ok"`), polyscript.WithLifetime[polyscript.Risor](lifetime),
+		)
+	}
+	newStarlark := func(setup, lifetime context.Context) (platform.Evaluator, error) {
+		return polyscript.New[polyscript.Starlark](
+			setup, polyscript.FromString(`_ = "ok"`), polyscript.WithLifetime[polyscript.Starlark](lifetime),
+		)
+	}
+
+	tests := []struct {
+		name        string
+		create      func(setup, lifetime context.Context) (platform.Evaluator, error)
+		closesOnEnd bool
+	}{
+		{"Extism", newExtism, true},
+		{"Risor", newRisor, false},
+		{"Starlark", newStarlark, false},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name+" lifetime end", func(t *testing.T) {
+			setup, cancelSetup := context.WithCancel(t.Context())
+			lifetime, cancelLifetime := context.WithCancel(t.Context())
+			defer cancelLifetime()
+
+			eval, err := tc.create(setup, lifetime)
+			require.NoError(t, err)
+			cancelSetup()
+			// A hook wrongly bound to the setup ctx runs on its own goroutine,
+			// so give it time to close the evaluator before checking.
+			require.Never(t, func() bool {
+				_, err := eval.Eval(t.Context())
+				return err != nil
+			}, 50*time.Millisecond, 5*time.Millisecond, "the setup ctx must not bound the evaluator's lifetime")
+			_, err = eval.Eval(t.Context())
+			require.NoError(t, err, "the setup ctx must not bound the evaluator's lifetime")
+
+			cancelLifetime()
+			if !tc.closesOnEnd {
+				_, err = eval.Eval(t.Context())
+				require.NoError(t, err, "an engine without resources keeps evaluating")
+				return
+			}
+			require.Eventually(t, func() bool {
+				_, err := eval.Eval(t.Context())
+				return errors.Is(err, compiler.ErrExecutableClosed)
+			}, 5*time.Second, time.Millisecond, "the evaluator should close when its lifetime ends")
+		})
+
+		t.Run(tc.name+" already-done lifetime", func(t *testing.T) {
+			lifetime, cancelLifetime := context.WithCancel(t.Context())
+			cancelLifetime()
+
+			eval, err := tc.create(t.Context(), lifetime)
+			require.ErrorIs(t, err, context.Canceled)
+			if eval != nil {
+				t.Errorf("failed New should return an untyped nil evaluator, got %#v", eval)
+			}
+		})
+	}
 }

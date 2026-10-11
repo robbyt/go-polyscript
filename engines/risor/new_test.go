@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/robbyt/go-polyscript/engines/risor/compiler"
+	"github.com/robbyt/go-polyscript/engines/risor/evaluator"
 	"github.com/robbyt/go-polyscript/platform/data"
 	"github.com/robbyt/go-polyscript/platform/script/loader"
 	"github.com/stretchr/testify/assert"
@@ -210,4 +211,52 @@ func TestFromRisorLoader_CompileCancelled(t *testing.T) {
 	require.Error(t, err, "expected an error when ctx is pre-cancelled")
 	require.Nil(t, eval)
 	require.ErrorIs(t, err, context.Canceled)
+}
+
+// TestLifetime checks that the evaluator holds nothing that a lifetime end
+// releases, so Eval keeps working, while an already-done lifetime still
+// fails construction.
+func TestLifetime(t *testing.T) {
+	t.Parallel()
+
+	const script = `"Hello, " + ctx["name"]`
+	newEval := func(t *testing.T, ctx context.Context, opts ...Option) (*evaluator.Evaluator, error) {
+		t.Helper()
+		ldr, err := loader.NewFromString(script)
+		require.NoError(t, err)
+		opts = append([]Option{WithStaticData(map[string]any{"name": "World"})}, opts...)
+		return FromRisorLoader(ctx, ldr, opts...)
+	}
+	requireEvalWorks := func(t *testing.T, eval *evaluator.Evaluator) {
+		t.Helper()
+		res, err := eval.Eval(t.Context())
+		require.NoError(t, err, "Eval should keep working")
+		assert.Equal(t, "Hello, World", res.Interface())
+	}
+
+	t.Run("cancelling the constructor ctx leaves Eval working", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(t.Context())
+		eval, err := newEval(t, ctx)
+		require.NoError(t, err)
+		cancel()
+		requireEvalWorks(t, eval)
+	})
+
+	t.Run("cancelling WithLifetime leaves Eval working", func(t *testing.T) {
+		lifetime, cancel := context.WithCancel(t.Context())
+		eval, err := newEval(t, t.Context(), WithLifetime(lifetime))
+		require.NoError(t, err)
+		cancel()
+		requireEvalWorks(t, eval)
+		require.NoError(t, eval.Close(t.Context()))
+		requireEvalWorks(t, eval)
+	})
+
+	t.Run("already-cancelled lifetime fails construction", func(t *testing.T) {
+		lifetime, cancel := context.WithCancel(t.Context())
+		cancel()
+		eval, err := newEval(t, t.Context(), WithLifetime(lifetime))
+		require.ErrorIs(t, err, context.Canceled)
+		require.Nil(t, eval)
+	})
 }

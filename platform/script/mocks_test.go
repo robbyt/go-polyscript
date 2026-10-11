@@ -3,6 +3,7 @@ package script
 import (
 	"context"
 	"io"
+	"sync/atomic"
 
 	engineTypes "github.com/robbyt/go-polyscript/engines/types"
 	"github.com/stretchr/testify/mock"
@@ -52,4 +53,18 @@ type MockClosableExecutableContent struct {
 func (m *MockClosableExecutableContent) Close(ctx context.Context) error {
 	args := m.Called(ctx)
 	return args.Error(0)
+}
+
+// countingClosableContent is closable content that counts Close calls and
+// returns err from each. It does not use testify expectations, so a Close
+// that runs from a context.AfterFunc goroutine cannot panic the test.
+type countingClosableContent struct {
+	MockExecutableContent
+	closeCalls atomic.Int32
+	err        error
+}
+
+func (c *countingClosableContent) Close(context.Context) error {
+	c.closeCalls.Add(1)
+	return c.err
 }
