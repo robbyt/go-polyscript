@@ -337,6 +337,27 @@ func TestNew_WithLifetime(t *testing.T) {
 			}, 5*time.Second, time.Millisecond, "the evaluator should close when its lifetime ends")
 		})
 
+		t.Run(tc.name+" nil lifetime means the New ctx", func(t *testing.T) {
+			setup, cancelSetup := context.WithCancel(t.Context())
+			defer cancelSetup()
+
+			eval, err := tc.create(setup, nil)
+			require.NoError(t, err)
+			_, err = eval.Eval(t.Context())
+			require.NoError(t, err)
+
+			cancelSetup()
+			if !tc.closesOnEnd {
+				_, err = eval.Eval(t.Context())
+				require.NoError(t, err, "an engine without resources keeps evaluating")
+				return
+			}
+			require.Eventually(t, func() bool {
+				_, err := eval.Eval(t.Context())
+				return errors.Is(err, compiler.ErrExecutableClosed)
+			}, 5*time.Second, time.Millisecond, "with a nil lifetime, the New ctx should bound the evaluator")
+		})
+
 		t.Run(tc.name+" already-done lifetime", func(t *testing.T) {
 			lifetime, cancelLifetime := context.WithCancel(t.Context())
 			cancelLifetime()

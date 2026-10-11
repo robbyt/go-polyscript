@@ -12,6 +12,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -736,6 +737,9 @@ func TestExecutableUnit_BindLifetime(t *testing.T) {
 		cancel := bindUnusedUnit(t, content)
 		// End the lifetime and collect the unit at once, so the hook and the
 		// unit's GC cleanup race; whichever wins, the content is closed once.
+		// This is a smoke test: the window where the unit is collected after
+		// the hook starts is too narrow to hit on demand. The guarantee itself
+		// is structural: the hook refers to the content, never to the unit.
 		cancel()
 		require.Eventually(t, func() bool {
 			runtime.GC()
@@ -764,6 +768,26 @@ func TestExecutableUnit_BindLifetime(t *testing.T) {
 		assert.Equal(t, int32(1), content.closeCalls.Load(), "only the explicit Close should close the content")
 	})
 
+	t.Run("failed rebind drops the earlier lifetime", func(t *testing.T) {
+		synctest.Test(t, func(t *testing.T) {
+			content := &countingClosableContent{}
+			exe := newUnitWithContent(t, nil, content)
+			first, cancelFirst := context.WithCancel(t.Context())
+			defer cancelFirst()
+			require.NoError(t, exe.BindLifetime(first))
+
+			ended, cancelEnded := context.WithCancel(t.Context())
+			cancelEnded()
+			require.ErrorIs(t, exe.BindLifetime(ended), context.Canceled)
+			assert.Equal(t, int32(1), content.closeCalls.Load(), "a bind to an ended lifetime should close the content")
+
+			cancelFirst()
+			synctest.Wait()
+			assert.Equal(t, int32(1), content.closeCalls.Load(), "the earlier lifetime's hook should be gone")
+			runtime.KeepAlive(exe) // keep the unit reachable so its GC cleanup cannot close the content first
+		})
+	})
+
 	t.Run("nil lifetime", func(t *testing.T) {
 		content := &countingClosableContent{}
 		exe := newUnitWithContent(t, nil, content)
@@ -790,6 +814,31 @@ type endsWhenWatched struct {
 func (c endsWhenWatched) Done() <-chan struct{} {
 	c.cancel()
 	return c.Context.Done()
+}
+
+// endsAfterRegistering is a lifetime that is live at BindLifetime's first
+// check and done at its second, and whose AfterFunc never runs the hook. So
+// BindLifetime's stop always unregisters the hook, and BindLifetime must
+// close the content itself.
+type endsAfterRegistering struct {
+	errCalls *atomic.Int32
+}
+
+func (endsAfterRegistering) Deadline() (time.Time, bool) { return time.Time{}, false }
+func (endsAfterRegistering) Done() <-chan struct{}       { return make(chan struct{}) }
+func (endsAfterRegistering) Value(any) any               { return nil }
+
+func (c endsAfterRegistering) Err() error {
+	if c.errCalls.Add(1) == 1 {
+		return nil
+	}
+	return context.Canceled
+}
+
+// AfterFunc makes context.AfterFunc register through this lifetime, which
+// never calls f, so the hook can only be unregistered.
+func (endsAfterRegistering) AfterFunc(func()) func() bool {
+	return func() bool { return true }
 }
 
 func TestExecutableUnit_BindLifetime_AlreadyDone(t *testing.T) {
@@ -837,6 +886,13 @@ func TestExecutableUnit_BindLifetime_AlreadyDone(t *testing.T) {
 				ctx, cancel := context.WithCancel(t.Context())
 				t.Cleanup(cancel)
 				return endsWhenWatched{Context: ctx, cancel: cancel}
+			},
+			wantErrs: []error{context.Canceled},
+		},
+		{
+			name: "ends after the hook is registered, hook never run",
+			lifetime: func() context.Context {
+				return endsAfterRegistering{errCalls: new(atomic.Int32)}
 			},
 			wantErrs: []error{context.Canceled},
 		},

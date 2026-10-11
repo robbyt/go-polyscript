@@ -148,8 +148,9 @@ func (exe *ExecutableUnit) GetDataProvider() data.Provider {
 // closes the content before returning and returns an error that wraps
 // lifetime's error and its cause, joined with any error from closing the
 // content. The caller should then discard the unit. Binding again replaces
-// the earlier lifetime. It returns an error for a nil lifetime and is a
-// no-op on a nil unit.
+// the earlier lifetime, even when the new bind fails because its lifetime
+// is done, since the content is closed then. It returns an error for a nil
+// lifetime and is a no-op on a nil unit.
 func (exe *ExecutableUnit) BindLifetime(lifetime context.Context) error {
 	if exe == nil {
 		return nil
@@ -167,6 +168,7 @@ func (exe *ExecutableUnit) BindLifetime(lifetime context.Context) error {
 
 	release := context.WithoutCancel(lifetime)
 	if lifetime.Err() != nil {
+		exe.replaceLifetime(nil)
 		return lifetimeEndedError(lifetime, closer.Close(release))
 	}
 
@@ -186,6 +188,7 @@ func (exe *ExecutableUnit) BindLifetime(lifetime context.Context) error {
 	// here if stop unregistered the hook, otherwise by the hook, whose result
 	// is waited for.
 	if lifetime.Err() != nil {
+		exe.replaceLifetime(nil)
 		if stop() {
 			return lifetimeEndedError(lifetime, closer.Close(release))
 		}
@@ -198,6 +201,13 @@ func (exe *ExecutableUnit) BindLifetime(lifetime context.Context) error {
 		logger: logger,
 	})
 
+	exe.replaceLifetime(stop)
+	return nil
+}
+
+// replaceLifetime installs stop as the unit's lifetime hook, or none for a
+// nil stop, and unregisters the hook it replaces.
+func (exe *ExecutableUnit) replaceLifetime(stop func() bool) {
 	exe.lifetimeMu.Lock()
 	previous := exe.stopLifetime
 	exe.stopLifetime = stop
@@ -205,7 +215,6 @@ func (exe *ExecutableUnit) BindLifetime(lifetime context.Context) error {
 	if previous != nil {
 		previous()
 	}
-	return nil
 }
 
 // unreachableUnit is what the cleanup registered by BindLifetime needs to
@@ -258,13 +267,7 @@ func (exe *ExecutableUnit) Close(ctx context.Context) error {
 	if exe == nil {
 		return nil
 	}
-	exe.lifetimeMu.Lock()
-	stop := exe.stopLifetime
-	exe.stopLifetime = nil
-	exe.lifetimeMu.Unlock()
-	if stop != nil {
-		stop()
-	}
+	exe.replaceLifetime(nil)
 	return exe.closeContent(ctx)
 }
 
