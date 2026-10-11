@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **BREAKING:** `Close(ctx)` on `platform.Evaluator`, implemented by every
+  engine, and on `script.ExecutableUnit`. For Extism it releases the compiled
+  module's wazero runtime: `Close` waits for in-flight `Eval` calls, and any
+  `Eval` started once `Close` has been called fails with
+  `compiler.ErrExecutableClosed`. For Risor and Starlark it is a no-op. Code
+  that implements `platform.Evaluator` itself must add the method.
+  ([#162](https://github.com/robbyt/go-polyscript/issues/162))
 - `data.BYTES` and `data.UNKNOWN` result types.
   ([#157](https://github.com/robbyt/go-polyscript/issues/157),
   [#161](https://github.com/robbyt/go-polyscript/issues/161))
@@ -28,6 +35,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ([#115](https://github.com/robbyt/go-polyscript/pull/115))
 
 ### Changed
+- **BREAKING:** Extism `compiler.Executable.ByteCode` is unexported; use
+  `GetExtismByteCode()` or the new `WithPlugin(fn)`, which holds the plugin
+  open while `fn` runs.
+  ([#162](https://github.com/robbyt/go-polyscript/issues/162))
+- `polyscript.New` returns an untyped `nil` evaluator on error, instead of a
+  non-nil interface wrapping a nil engine pointer.
+  ([#162](https://github.com/robbyt/go-polyscript/issues/162))
 - **BREAKING:** `EvaluatorResponse.Type()` now always returns a `data.Types`
   constant, the same one on every engine for the same kind of value, and
   `data.UNKNOWN` for values with no counterpart (previously `data.ERROR`, or
@@ -173,6 +187,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   directly can still hit it; see `engines/README.md` for workarounds.
 
 ### Fixed
+- Extism leaked wazero runtimes: nothing could close a compiled module, and
+  the compiler did not close the plugin when the entry-point check or the
+  test instance failed after a successful compile.
+  ([#162](https://github.com/robbyt/go-polyscript/issues/162))
 - Extism results that decode to a plain Go `int` (any bare JSON integer)
   reported `data.ERROR`; they now report `data.INT`.
   ([#161](https://github.com/robbyt/go-polyscript/issues/161))
