@@ -8,7 +8,9 @@ import (
 
 // EvaluatorResponse is based on the risor object.Object interface, but with some features removed
 type EvaluatorResponse interface {
-	// Type of the object.
+	// Type of the object. Always one of the data.Types constants, and the same
+	// conceptual value reports the same constant on every engine. Values with
+	// no counterpart report data.UNKNOWN.
 	Type() data.Types
 
 	// Inspect returns a string representation of the given object.

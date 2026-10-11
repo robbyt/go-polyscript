@@ -43,8 +43,84 @@ func (r *execResult) String() string {
 		r.Type(), r.Object, r.ExecTime(), r.ScriptExeID())
 }
 
+// Type maps the Risor object type to a data.Types constant. Ranges and
+// iterators report data.LIST because Interface() returns them as []any, and
+// every callable kind (closure, builtin, go_func, partial) reports
+// data.FUNCTION. Risor types with no data.Types counterpart (time, module,
+// go_struct, and types defined by Risor modules) fall back to data.UNKNOWN, the
+// same fallback the other engines use; Interface() still
+// returns Risor's own Go conversion of those values (time.Time for a time).
 func (r *execResult) Type() data.Types {
-	return data.Types(r.Object.Type())
+	if r.Object == nil {
+		return data.NONE
+	}
+
+	switch t := r.Object.Type(); t {
+	case risorObject.NIL:
+		return data.NONE
+	case risorObject.BOOL:
+		return data.BOOL
+	case risorObject.INT, risorObject.BYTE:
+		return data.INT
+	case risorObject.FLOAT:
+		return data.FLOAT
+	case risorObject.STRING:
+		return data.STRING
+	case risorObject.BYTES:
+		return data.BYTES
+	case risorObject.LIST, risorObject.RANGE, risorObject.ITER:
+		return data.LIST
+	case risorObject.MAP:
+		return data.MAP
+	case risorObject.FUNCTION, risorObject.BUILTIN, risorObject.GOFUNC, risorObject.PARTIAL:
+		return data.FUNCTION
+	case risorObject.ERROR:
+		return data.ERROR
+	default:
+		r.logger.Error("Unknown type", "type", string(t))
+		return data.UNKNOWN
+	}
+}
+
+// Interface returns the Go value Risor converts the result to, except that
+// ranges are expanded to []any (Risor returns []int64) at every depth, so a
+// range matches the []any every other data.LIST value uses whether it is the
+// result itself or nested in a list or map.
+func (r *execResult) Interface() any {
+	if r.Object == nil {
+		return nil
+	}
+	return toGoValue(r.Object)
+}
+
+// toGoValue mirrors Risor's Object.Interface(), walking lists and maps itself
+// so ranges nested inside them are expanded to []any as well.
+func toGoValue(obj risorObject.Object) any {
+	switch o := obj.(type) {
+	case *risorObject.Range:
+		ints, _ := o.Interface().([]int64)
+		list := make([]any, len(ints))
+		for i, n := range ints {
+			list[i] = n
+		}
+		return list
+	case *risorObject.List:
+		items := o.Value()
+		list := make([]any, len(items))
+		for i, item := range items {
+			list[i] = toGoValue(item)
+		}
+		return list
+	case *risorObject.Map:
+		items := o.Value()
+		m := make(map[string]any, len(items))
+		for k, v := range items {
+			m[k] = toGoValue(v)
+		}
+		return m
+	default:
+		return obj.Interface()
+	}
 }
 
 func (r *execResult) ScriptExeID() string {

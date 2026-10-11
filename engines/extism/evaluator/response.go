@@ -43,26 +43,30 @@ func (r *execResult) String() string {
 	)
 }
 
+// Type maps the decoded guest output to a data.Types constant. The decode path
+// (internal.FixJSONNumberTypes) produces int for JSON integers and float64 for
+// decimals; the other numeric widths are accepted for values built elsewhere.
 func (r *execResult) Type() data.Types {
-	// Map WASM result types to our internal types
 	switch v := r.value.(type) {
 	case nil:
 		return data.NONE
 	case bool:
 		return data.BOOL
-	case int32, int64, uint32, uint64:
+	case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64:
 		return data.INT
 	case float32, float64:
 		return data.FLOAT
 	case string:
 		return data.STRING
+	case []byte:
+		return data.BYTES
 	case []any:
 		return data.LIST
 	case map[string]any:
 		return data.MAP
 	default:
 		r.logger.Error("Unknown type", "type", fmt.Sprintf("%T", v))
-		return data.ERROR
+		return data.UNKNOWN
 	}
 }
 

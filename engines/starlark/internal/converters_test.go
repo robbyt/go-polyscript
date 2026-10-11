@@ -1,6 +1,8 @@
 package internal
 
 import (
+	"math"
+	"math/big"
 	"net/url"
 	"testing"
 
@@ -9,60 +11,99 @@ import (
 	starlarkLib "go.starlark.net/starlark"
 )
 
-func TestConvertStarlarkValueToInterface(t *testing.T) {
-	t.Parallel()
+// customSequence is a non-range Indexable used to check that the range
+// conversion does not swallow arbitrary sequence types.
+type customSequence struct{}
 
-	tests := []struct {
-		name     string
-		input    starlarkLib.Value
-		expected any
-		wantErr  bool
-	}{
-		// Primitive types
-		{
-			name:     "nil value",
-			input:    nil,
-			expected: nil,
-			wantErr:  false,
-		},
-		{
-			name:     "bool true",
-			input:    starlarkLib.Bool(true),
-			expected: true,
-			wantErr:  false,
-		},
-		{
-			name:     "bool false",
-			input:    starlarkLib.Bool(false),
-			expected: false,
-			wantErr:  false,
-		},
-		{
-			name:     "int",
-			input:    starlarkLib.MakeInt(42),
-			expected: int64(42),
-			wantErr:  false,
-		},
-		{
-			name:     "float",
-			input:    starlarkLib.Float(3.14),
-			expected: float64(3.14),
-			wantErr:  false,
-		},
-		{
-			name:     "string",
-			input:    starlarkLib.String("hello"),
-			expected: "hello",
-			wantErr:  false,
-		},
+func (customSequence) String() string                        { return "customSequence" }
+func (customSequence) Type() string                          { return "customSequence" }
+func (customSequence) Freeze()                               {}
+func (customSequence) Truth() starlarkLib.Bool               { return starlarkLib.True }
+func (customSequence) Hash() (uint32, error)                 { return 0, nil }
+func (customSequence) Len() int                              { return 1 }
+func (customSequence) Index(int) starlarkLib.Value           { return starlarkLib.MakeInt(1) }
+func (customSequence) Iterate() starlarkLib.Iterator         { return nil }
+func (customSequence) Slice(int, int, int) starlarkLib.Value { return starlarkLib.None }
 
-		// List types
+// starlarkToGoCase is one ConvertStarlarkValueToInterface table entry.
+type starlarkToGoCase struct {
+	name     string
+	input    starlarkLib.Value
+	expected any
+	wantErr  bool
+}
+
+// makeRange calls the builtin range(), since the range type is unexported.
+func makeRange(t *testing.T, args ...int) starlarkLib.Value {
+	t.Helper()
+	tuple := make(starlarkLib.Tuple, len(args))
+	for i, a := range args {
+		tuple[i] = starlarkLib.MakeInt(a)
+	}
+	v, err := starlarkLib.Call(&starlarkLib.Thread{}, starlarkLib.Universe["range"], tuple, nil)
+	require.NoError(t, err)
+	return v
+}
+
+// makeSet builds a set holding vals in insertion order.
+func makeSet(t *testing.T, vals ...starlarkLib.Value) *starlarkLib.Set {
+	t.Helper()
+	s := starlarkLib.NewSet(len(vals))
+	for _, v := range vals {
+		require.NoError(t, s.Insert(v), "inserting into set should succeed")
+	}
+	return s
+}
+
+// makeStringDict builds a dict with a single string key.
+func makeStringDict(t *testing.T, key string, value starlarkLib.Value) *starlarkLib.Dict {
+	t.Helper()
+	d := starlarkLib.NewDict(1)
+	require.NoError(t, d.SetKey(starlarkLib.String(key), value), "setting dict key should succeed")
+	return d
+}
+
+// bigPow2 returns 2^n as a *big.Int.
+func bigPow2(n uint) *big.Int {
+	return new(big.Int).Lsh(big.NewInt(1), n)
+}
+
+func starlarkToGoPrimitiveCases() []starlarkToGoCase {
+	return []starlarkToGoCase{
+		{name: "nil value", input: nil, expected: nil},
+		{name: "bool true", input: starlarkLib.Bool(true), expected: true},
+		{name: "bool false", input: starlarkLib.Bool(false), expected: false},
+		{name: "int", input: starlarkLib.MakeInt(42), expected: int64(42)},
 		{
-			name:     "empty list",
-			input:    starlarkLib.NewList(nil),
-			expected: []any{},
-			wantErr:  false,
+			name:     "int at int64 max",
+			input:    starlarkLib.MakeInt64(math.MaxInt64),
+			expected: int64(math.MaxInt64),
 		},
+		{
+			name:     "int at int64 min",
+			input:    starlarkLib.MakeInt64(math.MinInt64),
+			expected: int64(math.MinInt64),
+		},
+		{
+			name:     "int above int64 max",
+			input:    starlarkLib.MakeBigInt(bigPow2(64)),
+			expected: bigPow2(64),
+		},
+		{
+			name:     "int below int64 min",
+			input:    starlarkLib.MakeBigInt(new(big.Int).Neg(bigPow2(70))),
+			expected: new(big.Int).Neg(bigPow2(70)),
+		},
+		{name: "float", input: starlarkLib.Float(3.14), expected: float64(3.14)},
+		{name: "string", input: starlarkLib.String("hello"), expected: "hello"},
+		{name: "bytes", input: starlarkLib.Bytes("abc"), expected: []byte("abc")},
+	}
+}
+
+func starlarkToGoSequenceCases(t *testing.T) []starlarkToGoCase {
+	t.Helper()
+	return []starlarkToGoCase{
+		{name: "empty list", input: starlarkLib.NewList(nil), expected: []any{}},
 		{
 			name: "mixed type list",
 			input: starlarkLib.NewList([]starlarkLib.Value{
@@ -71,93 +112,118 @@ func TestConvertStarlarkValueToInterface(t *testing.T) {
 				starlarkLib.Bool(true),
 			}),
 			expected: []any{int64(1), "two", true},
-			wantErr:  false,
 		},
 		{
 			name: "nested list",
-			input: func() *starlarkLib.List {
-				inner := starlarkLib.NewList([]starlarkLib.Value{
-					starlarkLib.MakeInt(1),
-					starlarkLib.MakeInt(2),
-				})
-				outer := starlarkLib.NewList([]starlarkLib.Value{inner})
-				return outer
-			}(),
+			input: starlarkLib.NewList([]starlarkLib.Value{
+				starlarkLib.NewList([]starlarkLib.Value{starlarkLib.MakeInt(1), starlarkLib.MakeInt(2)}),
+			}),
 			expected: []any{[]any{int64(1), int64(2)}},
-			wantErr:  false,
 		},
-
-		// Dict types
+		{name: "empty tuple", input: starlarkLib.Tuple{}, expected: []any{}},
 		{
-			name:     "empty dict",
-			input:    starlarkLib.NewDict(0),
-			expected: map[string]any{},
-			wantErr:  false,
-		},
-		{
-			name: "string keys dict",
-			input: func() *starlarkLib.Dict {
-				d := starlarkLib.NewDict(1)
-				if err := d.SetKey(starlarkLib.String("key"), starlarkLib.MakeInt(42)); err != nil {
-					t.Fatalf("Failed to set key: %v", err)
-				}
-				return d
-			}(),
-			expected: map[string]any{"key": int64(42)},
-			wantErr:  false,
-		},
-		{
-			name: "nested dict",
-			input: func() *starlarkLib.Dict {
-				inner := starlarkLib.NewDict(1)
-				if err := inner.SetKey(starlarkLib.String("inner"), starlarkLib.MakeInt(1)); err != nil {
-					t.Fatalf("Failed to set key: %v", err)
-				}
-				outer := starlarkLib.NewDict(1)
-				if err := outer.SetKey(starlarkLib.String("outer"), inner); err != nil {
-					t.Fatalf("Failed to set key: %v", err)
-				}
-				return outer
-			}(),
-			expected: map[string]any{
-				"outer": map[string]any{
-					"inner": int64(1),
-				},
+			name: "nested tuple",
+			input: starlarkLib.Tuple{
+				starlarkLib.MakeInt(1),
+				starlarkLib.Tuple{starlarkLib.String("a"), starlarkLib.None},
 			},
-			wantErr: false,
+			expected: []any{int64(1), []any{"a", nil}},
 		},
-
-		// Error cases
 		{
-			name: "dict with invalid entry",
-			input: func() *starlarkLib.Dict {
-				d := starlarkLib.NewDict(1)
-				// Create an invalid entry that will fail Get()
-				err := d.Clear() // This creates an inconsistent state
-				if err != nil {
-					t.Fatalf("Failed to clear dict: %v", err)
-				}
-				return d
-			}(),
-			expected: map[string]any{},
-			wantErr:  false, // Note: Current implementation doesn't return an error for this case
+			name: "set keeps insertion order",
+			input: makeSet(t,
+				starlarkLib.MakeInt(3),
+				starlarkLib.String("x"),
+				starlarkLib.Tuple{starlarkLib.MakeInt(1)},
+			),
+			expected: []any{int64(3), "x", []any{int64(1)}},
+		},
+		{name: "empty set", input: starlarkLib.NewSet(0), expected: []any{}},
+		{
+			name: "list containing big int and bytes",
+			input: starlarkLib.NewList([]starlarkLib.Value{
+				starlarkLib.MakeBigInt(bigPow2(64)),
+				starlarkLib.Bytes("z"),
+			}),
+			expected: []any{bigPow2(64), []byte("z")},
 		},
 	}
+}
 
+func starlarkToGoRangeCases(t *testing.T) []starlarkToGoCase {
+	t.Helper()
+	return []starlarkToGoCase{
+		{name: "range", input: makeRange(t, 3), expected: []any{int64(0), int64(1), int64(2)}},
+		{
+			name:     "stepped range",
+			input:    makeRange(t, 10, 0, -4),
+			expected: []any{int64(10), int64(6), int64(2)},
+		},
+		{name: "empty range", input: makeRange(t, 0), expected: []any{}},
+		{
+			name:     "range nested in list",
+			input:    starlarkLib.NewList([]starlarkLib.Value{makeRange(t, 2)}),
+			expected: []any{[]any{int64(0), int64(1)}},
+		},
+		{name: "non-range indexable", input: customSequence{}, wantErr: true},
+	}
+}
+
+func starlarkToGoDictCases(t *testing.T) []starlarkToGoCase {
+	t.Helper()
+
+	// A cleared dict should convert to an empty map without an error.
+	cleared := makeStringDict(t, "key", starlarkLib.MakeInt(1))
+	require.NoError(t, cleared.Clear(), "clearing dict should succeed")
+
+	return []starlarkToGoCase{
+		{name: "empty dict", input: starlarkLib.NewDict(0), expected: map[string]any{}},
+		{
+			name:     "string keys dict",
+			input:    makeStringDict(t, "key", starlarkLib.MakeInt(42)),
+			expected: map[string]any{"key": int64(42)},
+		},
+		{
+			name:     "nested dict",
+			input:    makeStringDict(t, "outer", makeStringDict(t, "inner", starlarkLib.MakeInt(1))),
+			expected: map[string]any{"outer": map[string]any{"inner": int64(1)}},
+		},
+		{name: "cleared dict", input: cleared, expected: map[string]any{}},
+	}
+}
+
+// runStarlarkToGoCases runs each case through ConvertStarlarkValueToInterface.
+func runStarlarkToGoCases(t *testing.T, tests []starlarkToGoCase) {
+	t.Helper()
 	for _, tt := range tests {
 		tt := tt // Capture range variable
 		t.Run(tt.name, func(t *testing.T) {
 			result, err := ConvertStarlarkValueToInterface(tt.input)
-
 			if tt.wantErr {
-				require.Error(t, err)
+				require.Error(t, err, "conversion should fail")
 				return
 			}
-
-			require.NoError(t, err)
-			require.Equal(t, tt.expected, result)
+			require.NoError(t, err, "conversion should succeed")
+			require.Equal(t, tt.expected, result, "converted value should match")
 		})
 	}
+}
+
+func TestConvertStarlarkValueToInterface(t *testing.T) {
+	t.Parallel()
+
+	t.Run("primitives", func(t *testing.T) {
+		runStarlarkToGoCases(t, starlarkToGoPrimitiveCases())
+	})
+	t.Run("sequences", func(t *testing.T) {
+		runStarlarkToGoCases(t, starlarkToGoSequenceCases(t))
+	})
+	t.Run("ranges", func(t *testing.T) {
+		runStarlarkToGoCases(t, starlarkToGoRangeCases(t))
+	})
+	t.Run("dicts", func(t *testing.T) {
+		runStarlarkToGoCases(t, starlarkToGoDictCases(t))
+	})
 }
 
 func TestConvertToStarlarkFormat(t *testing.T) {

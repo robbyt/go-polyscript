@@ -47,8 +47,10 @@ func (r *execResult) String() string {
 		r.Type(), r.Value, r.ExecTime(), r.ScriptExeID())
 }
 
+// Type maps the Starlark type name to a data.Types constant. A range reports
+// data.LIST because Interface() returns it as []any. Types with no counterpart
+// report data.UNKNOWN.
 func (r *execResult) Type() data.Types {
-	// Map Starlark types to our internal types
 	switch r.Value.Type() {
 	case "NoneType":
 		return data.NONE
@@ -60,7 +62,9 @@ func (r *execResult) Type() data.Types {
 		return data.FLOAT
 	case "string":
 		return data.STRING
-	case "list":
+	case "bytes":
+		return data.BYTES
+	case "list", "range":
 		return data.LIST
 	case "tuple":
 		return data.TUPLE
@@ -68,11 +72,11 @@ func (r *execResult) Type() data.Types {
 		return data.MAP
 	case "set":
 		return data.SET
-	case "function":
+	case "function", "builtin_function_or_method":
 		return data.FUNCTION
 	default:
 		r.logger.Error("Unknown type", "type", r.Value.Type())
-		return data.ERROR
+		return data.UNKNOWN
 	}
 }
 
@@ -97,7 +101,9 @@ func (r *execResult) Inspect() string {
 	return r.Value.String()
 }
 
-// Interface returns the Go native type for the Starlark value
+// Interface returns the Go native type for the Starlark value; see
+// internal.ConvertStarlarkValueToInterface for the mapping. Values that cannot
+// be converted (functions, for example) are logged and returned as nil.
 func (r *execResult) Interface() any {
 	v, err := internal.ConvertStarlarkValueToInterface(r.Value)
 	if err != nil {
