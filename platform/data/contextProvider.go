@@ -65,7 +65,10 @@ func (p *ContextProvider) GetData(ctx context.Context) (map[string]any, error) {
 // that mutate their result never touch the stored data.
 //
 // The deep-copy guarantee covers map[string]any and []any containers
-// (see deepCopyValue). Other reference-typed values stored in the map
+// (see deepCopyValue). The incoming data is copied the same way:
+// processValue rebuilds every map[string]any and []any it is given, so
+// later changes to the caller's maps or slices do not reach the stored
+// data. Other reference-typed values stored in the map
 // (typed slices such as []string, pointers, channels, function values,
 // and maps OTHER than map[string]any) remain shared with the source —
 // ContextProvider never mutates them in place, but callers should avoid
@@ -117,7 +120,9 @@ func (p *ContextProvider) AddDataToContext(
 	return newCtx, errors.Join(errz...)
 }
 
-// processValue converts values to appropriate types for storage
+// processValue converts values to appropriate types for storage. It
+// recurses into map[string]any and []any, returning fresh containers, so
+// nested maps are validated and requests are converted at any depth.
 func (p *ContextProvider) processValue(value any) (any, error) {
 	if value == nil {
 		return nil, nil
@@ -143,6 +148,21 @@ func (p *ContextProvider) processValue(value any) (any, error) {
 				return nil, fmt.Errorf("processing nested value for key '%s': %w", k, err)
 			}
 			result[k] = processedVal
+		}
+		return result, nil
+	case []any:
+		// Rebuild slices too, so the stored data shares no storage with the
+		// caller's input and maps inside slices are validated and converted.
+		if v == nil {
+			return v, nil
+		}
+		result := make([]any, len(v))
+		for i, elem := range v {
+			processedElem, err := p.processValue(elem)
+			if err != nil {
+				return nil, fmt.Errorf("processing element %d: %w", i, err)
+			}
+			result[i] = processedElem
 		}
 		return result, nil
 	default:

@@ -426,6 +426,52 @@ func TestContextProvider_ProcessValue(t *testing.T) {
 		assert.Equal(t, 42, level3["value"])
 	})
 
+	t.Run("slice of any is rebuilt", func(t *testing.T) {
+		provider := NewContextProvider(constants.EvalData)
+		inner := map[string]any{"k": "v"}
+		input := []any{"a", inner}
+
+		result, err := provider.processValue(input)
+		require.NoError(t, err)
+		require.Equal(t, input, result)
+
+		resultSlice, ok := result.([]any)
+		require.True(t, ok, "Result should be a []any")
+		resultSlice[0] = "changed"
+		resultSlice[1].(map[string]any)["k"] = "changed"
+		assert.Equal(t, "a", input[0], "Result should not share the input slice")
+		assert.Equal(t, "v", inner["k"], "Result should not share maps inside the input slice")
+	})
+
+	t.Run("nil slice of any stays nil", func(t *testing.T) {
+		provider := NewContextProvider(constants.EvalData)
+
+		result, err := provider.processValue([]any(nil))
+		require.NoError(t, err)
+		assert.Equal(t, []any(nil), result)
+	})
+
+	t.Run("http request inside a slice", func(t *testing.T) {
+		provider := NewContextProvider(constants.EvalData)
+
+		result, err := provider.processValue([]any{createTestRequestHelper()})
+		require.NoError(t, err)
+		resultSlice, ok := result.([]any)
+		require.True(t, ok, "Result should be a []any")
+		resultMap, ok := resultSlice[0].(map[string]any)
+		require.True(t, ok, "Request inside a slice should be converted to a map")
+		assert.Equal(t, "GET", resultMap["Method"])
+	})
+
+	t.Run("map with empty key inside a slice", func(t *testing.T) {
+		provider := NewContextProvider(constants.EvalData)
+
+		_, err := provider.processValue([]any{"ok", map[string]any{"": "bad"}})
+		require.Error(t, err, "Should reject maps with empty keys inside slices")
+		assert.Contains(t, err.Error(), "processing element 1")
+		assert.Contains(t, err.Error(), "empty keys are not allowed")
+	})
+
 	t.Run("nested map with error in deeper level", func(t *testing.T) {
 		provider := NewContextProvider(constants.EvalData)
 		problematicMap := map[string]any{
@@ -725,5 +771,62 @@ func TestContextProvider_GetData_Isolation(t *testing.T) {
 	t.Run("data stored directly in the context", func(t *testing.T) {
 		ctx := context.WithValue(t.Context(), constants.EvalData, nestedFixtureHelper())
 		assertGetDataIsolatedHelper(t, p, ctx, nestedFixtureHelper())
+	})
+}
+
+// TestContextProvider_AddDataToContext_CopiesInput checks that the stored
+// data shares no map[string]any or []any storage with the caller's input,
+// so changing the input after AddDataToContext cannot change, or race
+// with, what GetData returns.
+func TestContextProvider_AddDataToContext_CopiesInput(t *testing.T) {
+	t.Parallel()
+
+	p := NewContextProvider(constants.EvalData)
+
+	for _, m := range fixtureMutationsHelper {
+		t.Run(m.name, func(t *testing.T) {
+			input := nestedFixtureHelper()
+			ctx, err := p.AddDataToContext(t.Context(), input)
+			require.NoError(t, err)
+
+			m.mutate(input)
+
+			got, err := p.GetData(ctx)
+			require.NoError(t, err)
+			assert.Equal(t, nestedFixtureHelper(), got, "mutating the input must not change stored data")
+		})
+	}
+
+	t.Run("concurrent input mutation and GetData", func(t *testing.T) {
+		input := nestedFixtureHelper()
+		ctx, err := p.AddDataToContext(t.Context(), input)
+		require.NoError(t, err)
+
+		const iterations = 200
+		var wg sync.WaitGroup
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			list := input["list"].([]any)
+			inner := list[1].(map[string]any)
+			for i := range iterations {
+				list[0] = i
+				inner["k"] = i
+			}
+		}()
+		go func() {
+			defer wg.Done()
+			for range iterations {
+				_, err := p.GetData(ctx)
+				if !assert.NoError(t, err) {
+					return
+				}
+			}
+		}()
+		wg.Wait()
+
+		got, err := p.GetData(ctx)
+		require.NoError(t, err)
+		assert.Equal(t, nestedFixtureHelper(), got)
 	})
 }
