@@ -226,7 +226,7 @@ modes we avoided:
   default."
 
 - **No mandatory handler argument on `polyscript.New`.** The host's
-  ergonomic baseline is `polyscript.New[Risor](polyscript.FromString(src))`
+  ergonomic baseline is `polyscript.New[Risor](ctx, polyscript.FromString(src))`
   — nothing else. Adding a required handler argument would force every
   caller to either write `slog.Default()` explicitly (boilerplate) or pass
   nil (which we'd then have to handle anyway).
@@ -243,8 +243,8 @@ If you're reading the source, the chain is:
 
 ```
 host code
-  └─ polyscript.New[E](src, polyscript.WithLogHandler[E](h))
-       └─ engines/<engine>.FromXxxLoader(ldr, <engine>.WithLogHandler(h))
+  └─ polyscript.New[E](ctx, src, polyscript.WithLogHandler[E](h))
+       └─ engines/<engine>.FromXxxLoader(ctx, ldr, <engine>.WithLogHandler(h))
             ├─ engines/<engine>/compiler.New(compiler.WithLogHandler(h))
             │    └─ helpers.SetupLogger(h, "<engine>", "Compiler")
             └─ engines/<engine>/evaluator.New(h, execUnit)

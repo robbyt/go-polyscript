@@ -40,6 +40,10 @@ This pattern separates data preparation from script evaluation:
 
 **Examples:** [Risor](/examples/data-prep/risor), [Starlark](/examples/data-prep/starlark), [Extism](/examples/data-prep/extism)
 
+### Documentation Snippets
+
+[examples/docs](/examples/docs) holds the tested source of every Go code block in the top-level README and in the package docs of `polyscript` and the engine packages. Its Example functions run each snippet and check the output, and `docs_test.go` in the repository root fails if a doc and its source drift apart. See [examples/docs/snippets/doc.go](/examples/docs/snippets/doc.go) for how to update a snippet.
+
 ## Script Engines
 
 ### Starlark

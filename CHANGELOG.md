@@ -127,6 +127,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ([#118](https://github.com/robbyt/go-polyscript/pull/118))
 
 ### Documentation
+- Every Go block in `README.md`, and every code block in the module's Go doc
+  comments (outside `examples/`), now comes from code under `examples/docs/`
+  that `go test` compiles and runs, checking its output. `TestDocSnippets`
+  fails when a doc block and its source differ, when a README Go block has no
+  `<!-- snippet: ... -->` source, when a source region is used by no doc, when
+  a Go file has doc code blocks but no `godocSnippets` entry, or when an entry
+  is stale or duplicated. It replaces `readme_test.go`.
+  ([#164](https://github.com/robbyt/go-polyscript/issues/164))
+- The `platform/data` and `platform/script/loader` doc examples now compile
+  and run. The `NewFromHTTP` and `NewFromHTTPWithOptions` examples shadowed
+  the `loader` package, and the latter declared `options` three times. The
+  non-Go indented blocks in the `FromExtismFile` and `BuildRisorEnv` docs are
+  now prose. ([#164](https://github.com/robbyt/go-polyscript/issues/164))
+- The documented `polyscript.New` and `FromXxxLoader` examples now pass the
+  required leading `context.Context`; copied verbatim, they didn't compile.
+  ([#164](https://github.com/robbyt/go-polyscript/issues/164))
 - Documented the intentional Risor vs Starlark divergence for
   callable-returning scripts: Risor errors, Starlark auto-invokes. New
   "Script Return Value Handling" section in `engines/README.md`.

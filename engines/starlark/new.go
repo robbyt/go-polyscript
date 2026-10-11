@@ -8,13 +8,18 @@
 // # Quick start
 //
 //	ldr, err := loader.NewFromString(`_ = "hello"`)
-//	if err != nil { return err }
+//	if err != nil {
+//		return err
+//	}
 //
 //	eval, err := starlark.FromStarlarkLoader(
-//	    ldr,
-//	    starlark.WithStaticData(map[string]any{"name": "World"}),
+//		ctx,
+//		ldr,
+//		starlark.WithStaticData(map[string]any{"name": "World"}),
 //	)
-//	if err != nil { return err }
+//	if err != nil {
+//		return err
+//	}
 //
 //	result, err := eval.Eval(ctx)
 //
@@ -47,9 +52,10 @@ import (
 // evaluator from this package. Configure it with the With* options:
 //
 //	eval, err := starlark.FromStarlarkLoader(
-//	    ldr,
-//	    starlark.WithLogHandler(slog.Default().Handler()),
-//	    starlark.WithStaticData(map[string]any{"version": "1.0.0"}),
+//		ctx,
+//		ldr,
+//		starlark.WithLogHandler(slog.Default().Handler()),
+//		starlark.WithStaticData(map[string]any{"version": "1.0.0"}),
 //	)
 //
 // All options are optional. With no options the evaluator inherits the
