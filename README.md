@@ -65,12 +65,15 @@ func main() {
 		}
 	`
 
+	ctx := context.Background()
+
 	evaluator, _ := polyscript.New[polyscript.Risor](
+		ctx,
 		polyscript.FromString(script),
 		polyscript.WithStaticData[polyscript.Risor](map[string]any{"name": "World"}),
 	)
 
-	result, _ := evaluator.Eval(context.Background())
+	result, _ := evaluator.Eval(ctx)
 	fmt.Printf("Result: %v\n", result.Interface())
 }
 ```
@@ -79,7 +82,7 @@ The older `FromRisorString*`, `FromStarlark*`, and `FromExtism*` constructors st
 
 ## API at a glance
 
-`polyscript.New[E]` is the single entry point. `E` selects the engine, the first argument is a `Source`, and the remaining arguments are `Option[E]`s.
+`polyscript.New[E]` is the single entry point. `E` selects the engine, the first argument is a `context.Context` (used while loading and compiling the script), the second is a `Source`, and the remaining arguments are `Option[E]`s.
 
 ### Engines
 
@@ -116,7 +119,10 @@ The older `FromRisorString*`, `FromStarlark*`, and `FromExtism*` constructors st
 ### From a file on disk
 
 ```go
+ctx := context.Background()
+
 evaluator, _ := polyscript.New[polyscript.Risor](
+	ctx,
 	polyscript.FromFile("/etc/polyscript/hello.risor"),
 )
 ```
@@ -129,11 +135,14 @@ The path must be absolute. For relative paths, resolve them with `filepath.Abs` 
 
 ```go
 import (
+	"context"
 	"time"
 
 	"github.com/robbyt/go-polyscript"
 	"github.com/robbyt/go-polyscript/platform/script/loader"
 )
+
+ctx := context.Background()
 
 httpOpts := loader.DefaultHTTPOptions().
 	WithTimeout(10 * time.Second).
@@ -147,7 +156,7 @@ if err != nil {
 	return err
 }
 
-evaluator, err := polyscript.New[polyscript.Risor](polyscript.FromLoader(httpLoader))
+evaluator, err := polyscript.New[polyscript.Risor](ctx, polyscript.FromLoader(httpLoader))
 ```
 
 The HTTP loader follows redirects only within the original origin (same scheme, host and port), plus an http-to-https upgrade on the same host. Any other redirect fails with `loader.ErrRedirectNotAllowed`, so custom auth headers are never sent to another host. `WithAllowCrossOriginRedirects(true)` lifts that restriction. When a followed redirect leaves the original origin, the loader strips every header it set (custom `Headers` and anything the authenticator added) plus `Referer`, keeping only `User-Agent` and the names passed to `WithRedirectForwardHeaders(...)` (which can include `Authorization`), and restores them if a later redirect returns to the original origin. Redirects from https to http are always refused.
@@ -156,15 +165,18 @@ The HTTP loader follows redirects only within the original origin (same scheme, 
 
 ```go
 import (
+	"context"
 	"log/slog"
 	"os"
 
 	"github.com/robbyt/go-polyscript"
 )
 
+ctx := context.Background()
 handler := slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelDebug})
 
 evaluator, _ := polyscript.New[polyscript.Risor](
+	ctx,
 	polyscript.FromString(script),
 	polyscript.WithLogHandler[polyscript.Risor](handler),
 	polyscript.WithStaticData[polyscript.Risor](data),
@@ -180,7 +192,10 @@ To send input data to a script, use a "data provider" implementation. There are 
 For example, attaching `WithStaticData` to a Risor evaluator wires up a `StaticProvider` internally to send the static data map into the evaluator during creation.
 
 ```go
+ctx := context.Background()
+
 evaluator, _ := polyscript.New[polyscript.Risor](
+	ctx,
 	polyscript.FromString(script),
 	polyscript.WithStaticData[polyscript.Risor](map[string]any{"name": "cats", "excited": true}),
 )
@@ -191,10 +206,12 @@ evaluator, _ := polyscript.New[polyscript.Risor](
 A constructor created without `WithStaticData` uses a `ContextProvider`, so dynamic per-request data can be threaded in through the context.
 
 ```go
-evaluator, _ := polyscript.New[polyscript.Risor](polyscript.FromString(script))
+ctx := context.Background()
+
+evaluator, _ := polyscript.New[polyscript.Risor](ctx, polyscript.FromString(script))
 
 runtimeData := map[string]any{"name": "Billie Jean", "relationship": false}
-enrichedCtx, _ := evaluator.AddDataToContext(context.Background(), runtimeData)
+enrichedCtx, _ := evaluator.AddDataToContext(ctx, runtimeData)
 
 // Execute with the "enriched" context containing the link to the input data
 result, _ := evaluator.Eval(enrichedCtx)
@@ -220,6 +237,8 @@ For the details of which value kinds are deep-copied versus stored by reference,
 Use the following pattern for fixed configuration values and per-request data. Initial loading, parsing, and instantiating the script is relatively slow, so the example below shows how to set up the script once with static data and then reuse it many times with dynamic runtime data.
 
 ```go
+ctx := context.Background()
+
 staticData := map[string]any{
 	"name": "User",
 	"excited": true,
@@ -227,13 +246,14 @@ staticData := map[string]any{
 
 // Create the evaluator with the static data
 evaluator, _ := polyscript.New[polyscript.Risor](
+	ctx,
 	polyscript.FromString(script),
 	polyscript.WithStaticData[polyscript.Risor](staticData),
 )
 
 // For each request, prepare dynamic data
 requestData := map[string]any{"name": "Robert"}
-enrichedCtx, _ := evaluator.AddDataToContext(context.Background(), requestData)
+enrichedCtx, _ := evaluator.AddDataToContext(ctx, requestData)
 
 // Execute with both static and dynamic data available
 result, _ := evaluator.Eval(enrichedCtx)
@@ -281,13 +301,16 @@ result = {"greeting": message, "length": len(message)}
 _ = result
 `
 
+ctx := context.Background()
+
 evaluator, _ := polyscript.New[polyscript.Starlark](
+	ctx,
 	polyscript.FromString(scriptContent),
 	polyscript.WithStaticData[polyscript.Starlark](map[string]any{"name": "World"}),
 )
 
 // Execute with a context
-result, _ := evaluator.Eval(context.Background())
+result, _ := evaluator.Eval(ctx)
 ```
 
 ### WASM with Extism
@@ -306,7 +329,11 @@ import (
 )
 
 func main() {
+	ctx := context.Background()
+
 	evaluator, _ := polyscript.New[polyscript.Extism](
+		ctx,
+
 		// pre-compiled WASM example module
 		polyscript.FromBytes(wasmdata.TestModule),
 
@@ -319,14 +346,14 @@ func main() {
 	)
 
 	// Execute, and print the result
-	result, _ := evaluator.Eval(context.Background())
+	result, _ := evaluator.Eval(ctx)
 	fmt.Printf("Result: %v\n", result.Interface())
 }
 ```
 
 ## Direct engine subpackage usage
 
-Most callers should use `polyscript.New[E]`. For finer-grained control over a single engine — for example, plugging in a custom `data.Provider` — each engine subpackage exposes the same shape: `FromXxxLoader(ldr, opts...)`, with engine-scoped `WithLogHandler`, `WithStaticData`, `WithDataProvider`, and (Extism only) `WithEntryPoint` options.
+Most callers should use `polyscript.New[E]`. For finer-grained control over a single engine — for example, plugging in a custom `data.Provider` — each engine subpackage exposes the same shape: `FromXxxLoader(ctx, ldr, opts...)`, with engine-scoped `WithLogHandler`, `WithStaticData`, `WithDataProvider`, and (Extism only) `WithEntryPoint` options.
 
 ```go
 import (
@@ -336,14 +363,17 @@ import (
 	"github.com/robbyt/go-polyscript/platform/script/loader"
 )
 
+ctx := context.Background()
+
 ldr, _ := loader.NewFromString(`{"name": ctx["name"]}`)
 
 eval, _ := risor.FromRisorLoader(
+	ctx,
 	ldr,
 	risor.WithStaticData(map[string]any{"name": "World"}),
 )
 
-result, _ := eval.Eval(context.Background())
+result, _ := eval.Eval(ctx)
 ```
 
 Logging is optional: omit `WithLogHandler` and the engine inherits whatever `slog.Default()` has been configured to in the host process. Extism is the same shape but expects a WASM module loader and requires `WithEntryPoint`:
@@ -356,15 +386,18 @@ import (
 	"github.com/robbyt/go-polyscript/platform/script/loader"
 )
 
+ctx := context.Background()
+
 wasmLdr, _ := loader.NewFromBytes(wasmBytes) // wasmBytes is a compiled WASM module
 
 eval, _ := extism.FromExtismLoader(
+	ctx,
 	wasmLdr,
 	extism.WithEntryPoint("greet"),
 	extism.WithStaticData(map[string]any{"input": "World"}),
 )
 
-result, _ := eval.Eval(context.Background())
+result, _ := eval.Eval(ctx)
 ```
 
 ## License

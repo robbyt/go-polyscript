@@ -11,6 +11,7 @@
 //	if err != nil { return err }
 //
 //	eval, err := starlark.FromStarlarkLoader(
+//	    ctx,
 //	    ldr,
 //	    starlark.WithStaticData(map[string]any{"name": "World"}),
 //	)
@@ -47,6 +48,7 @@ import (
 // evaluator from this package. Configure it with the With* options:
 //
 //	eval, err := starlark.FromStarlarkLoader(
+//	    ctx,
 //	    ldr,
 //	    starlark.WithLogHandler(slog.Default().Handler()),
 //	    starlark.WithStaticData(map[string]any{"version": "1.0.0"}),

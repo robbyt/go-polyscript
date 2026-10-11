@@ -11,6 +11,7 @@
 //	if err != nil { return err }
 //
 //	eval, err := risor.FromRisorLoader(
+//	    ctx,
 //	    ldr,
 //	    risor.WithStaticData(map[string]any{"name": "World"}),
 //	)

@@ -8,9 +8,9 @@
 // # Quick start
 //
 // The recommended API is the generic [New] constructor with an engine type
-// argument plus a [Source] and zero or more [Option]s:
+// argument plus a context, a [Source] and zero or more [Option]s:
 //
-//	eval, err := polyscript.New[polyscript.Risor](polyscript.FromString(script))
+//	eval, err := polyscript.New[polyscript.Risor](ctx, polyscript.FromString(script))
 //	if err != nil {
 //	    return err
 //	}
@@ -19,6 +19,7 @@
 // Static data attached at construction:
 //
 //	eval, err := polyscript.New[polyscript.Risor](
+//	    ctx,
 //	    polyscript.FromString(script),
 //	    polyscript.WithStaticData[polyscript.Risor](map[string]any{"name": "World"}),
 //	)
@@ -26,6 +27,7 @@
 // WASM with Extism (entry point is required and bound to Extism at compile time):
 //
 //	eval, err := polyscript.New[polyscript.Extism](
+//	    ctx,
 //	    polyscript.FromBytes(wasmBytes),
 //	    polyscript.WithEntryPoint("greet"),
 //	)

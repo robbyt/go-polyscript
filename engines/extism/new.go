@@ -11,6 +11,7 @@
 //	if err != nil { return err }
 //
 //	eval, err := extism.FromExtismLoader(
+//	    ctx,
 //	    ldr,
 //	    extism.WithEntryPoint("greet"),
 //	    extism.WithStaticData(map[string]any{"input": "World"}),
@@ -54,6 +55,7 @@ var ErrEntryPointRequired = errors.New("extism: entry point is required (use Wit
 // evaluator from this package. Configure it with the With* options:
 //
 //	eval, err := extism.FromExtismLoader(
+//	    ctx,
 //	    ldr,
 //	    extism.WithEntryPoint("greet"),
 //	    extism.WithLogHandler(slog.Default().Handler()),

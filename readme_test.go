@@ -1,6 +1,9 @@
 package polyscript_test
 
 import (
+	"os"
+	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/robbyt/go-polyscript"
@@ -204,4 +207,91 @@ func TestReadmeExtism(t *testing.T) {
 	require.NoError(t, err, "Result should be a map")
 	assert.Contains(t, resultMap, "greeting", "Result should contain greeting field")
 	assert.Equal(t, "Hello, World!", resultMap["greeting"], "Greeting should match")
+}
+
+// constructorCallPattern matches a call to polyscript.New[E] or one of the
+// engine FromXxxLoader constructors, capturing the text of the first argument
+// up to the first comma or closing paren.
+var constructorCallPattern = regexp.MustCompile(
+	`(polyscript\.New\[[^\]]+\]|\bFrom(?:Risor|Starlark|Extism)Loader)\(\s*([^,)]*)`,
+)
+
+// contextArgPattern matches the first-argument forms accepted as a context in
+// documentation snippets.
+var contextArgPattern = regexp.MustCompile(`^(ctx|context\.\w+\(\)|t\.Context\(\))$`)
+
+// markdownGoBlocks returns the contents of every fenced ```go block in a
+// Markdown file.
+func markdownGoBlocks(t *testing.T, path string) []string {
+	t.Helper()
+	raw, err := os.ReadFile(path)
+	require.NoError(t, err, "Should read %s", path)
+
+	var blocks, current []string
+	inBlock := false
+	for line := range strings.SplitSeq(string(raw), "\n") {
+		trimmed := strings.TrimSpace(line)
+		switch {
+		case !inBlock && trimmed == "```go":
+			inBlock = true
+			current = nil
+		case inBlock && trimmed == "```":
+			inBlock = false
+			blocks = append(blocks, strings.Join(current, "\n"))
+		case inBlock:
+			current = append(current, line)
+		}
+	}
+	require.False(t, inBlock, "%s has an unterminated ```go block", path)
+	return blocks
+}
+
+// godocCodeBlocks returns the tab-indented code lines of a Go file's doc
+// comments, joined into a single snippet.
+func godocCodeBlocks(t *testing.T, path string) []string {
+	t.Helper()
+	raw, err := os.ReadFile(path)
+	require.NoError(t, err, "Should read %s", path)
+
+	var lines []string
+	for line := range strings.SplitSeq(string(raw), "\n") {
+		if code, ok := strings.CutPrefix(line, "//\t"); ok {
+			lines = append(lines, code)
+		}
+	}
+	return []string{strings.Join(lines, "\n")}
+}
+
+// TestDocExamplesPassContext guards against documentation drift: every
+// documented constructor call must pass a context as its first argument,
+// matching the real signatures of polyscript.New and the engine
+// FromXxxLoader constructors. The other README tests exercise the snippets'
+// logic but not the exact source shown, so they cannot catch this.
+func TestDocExamplesPassContext(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		path    string
+		extract func(*testing.T, string) []string
+	}{
+		{"README.md", markdownGoBlocks},
+		{"polyscript.go", godocCodeBlocks},
+		{"engines/risor/new.go", godocCodeBlocks},
+		{"engines/starlark/new.go", godocCodeBlocks},
+		{"engines/extism/new.go", godocCodeBlocks},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.path, func(t *testing.T) {
+			calls := 0
+			for _, snippet := range tc.extract(t, tc.path) {
+				for _, m := range constructorCallPattern.FindAllStringSubmatch(snippet, -1) {
+					calls++
+					assert.Regexp(t, contextArgPattern, m[2],
+						"%s: %s(...) must take a context as its first argument", tc.path, m[1])
+				}
+			}
+			assert.Positive(t, calls, "%s should contain at least one constructor example", tc.path)
+		})
+	}
 }
