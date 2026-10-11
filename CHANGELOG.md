@@ -107,6 +107,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ([#103](https://github.com/robbyt/go-polyscript/pull/103))
 
 ### Removed
+- **BREAKING:** The twelve deprecated top-level constructors
+  (`FromRisorFile`, `FromRisorString`, `FromStarlarkFile`,
+  `FromStarlarkString`, `FromExtismFile`, `FromExtismBytes`, and their
+  `*WithData` variants) and `deprecated.go`. Use `polyscript.New[E]` with
+  `FromFile`, `FromString` or `FromBytes` and `WithStaticData`.
+  ([#104](https://github.com/robbyt/go-polyscript/issues/104))
 - **BREAKING**: Removed four exported mock types (`loader.MockLoader` with
   `NewMockLoaderWithContent`, `script.MockCompiler`,
   `script.MockExecutableContent`, and the entire `engines/mocks` package).
