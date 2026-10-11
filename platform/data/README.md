@@ -116,10 +116,11 @@ staticData := map[string]any{
     },
 }
 
-evaluator, err := polyscript.FromRisorStringWithData(
-    scriptContent,
-    staticData,        // Embedded via StaticProvider
-    logger.Handler(),
+evaluator, err := polyscript.New[polyscript.Risor](
+    ctx,
+    polyscript.FromString(scriptContent),
+    polyscript.WithStaticData[polyscript.Risor](staticData), // Embedded via StaticProvider
+    polyscript.WithLogHandler[polyscript.Risor](logger.Handler()),
 )
 
 // STEP 2: Add dynamic data and execute (happens many times)
@@ -170,7 +171,7 @@ Providers control how data is stored and accessed for script execution:
 
 ### How Providers Work in the 2-Step Data Flow Pattern
 
-When you use convenience functions like `FromRisorStringWithData()`, they automatically create:
+When you pass `polyscript.WithStaticData` to `polyscript.New`, the evaluator automatically creates:
 1. A `StaticProvider` with your static data
 2. A `ContextProvider` (initially empty) for dynamic data
 3. A `CompositeProvider` that merges both

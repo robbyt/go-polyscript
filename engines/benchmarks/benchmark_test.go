@@ -61,10 +61,11 @@ func BenchmarkEvaluationPatterns(b *testing.B) {
 			}
 
 			// Create and evaluate in each iteration (simulating one-time use)
-			evaluator, err := polyscript.FromRisorStringWithData(
-				scriptContent,
-				inputData,
-				quietHandler,
+			evaluator, err := polyscript.New[polyscript.Risor](
+				b.Context(),
+				polyscript.FromString(scriptContent),
+				polyscript.WithStaticData[polyscript.Risor](inputData),
+				polyscript.WithLogHandler[polyscript.Risor](quietHandler),
 			)
 			if err != nil {
 				b.Fatalf("Failed to create evaluator: %v", err)
@@ -83,10 +84,11 @@ func BenchmarkEvaluationPatterns(b *testing.B) {
 		inputData := map[string]any{
 			"name": "World",
 		}
-		evaluator, err := polyscript.FromRisorStringWithData(
-			scriptContent,
-			inputData,
-			quietHandler,
+		evaluator, err := polyscript.New[polyscript.Risor](
+			b.Context(),
+			polyscript.FromString(scriptContent),
+			polyscript.WithStaticData[polyscript.Risor](inputData),
+			polyscript.WithLogHandler[polyscript.Risor](quietHandler),
 		)
 		if err != nil {
 			b.Fatalf("Failed to create evaluator: %v", err)
@@ -124,11 +126,12 @@ func BenchmarkDataProviders(b *testing.B) {
 	}
 
 	b.Run("StaticProvider", func(b *testing.B) {
-		// Using the *WithData version of the function which sets up a StaticProvider
-		evaluator, err := polyscript.FromRisorStringWithData(
-			scriptContent,
-			inputData,
-			quietHandler,
+		// WithStaticData sets up a StaticProvider
+		evaluator, err := polyscript.New[polyscript.Risor](
+			b.Context(),
+			polyscript.FromString(scriptContent),
+			polyscript.WithStaticData[polyscript.Risor](inputData),
+			polyscript.WithLogHandler[polyscript.Risor](quietHandler),
 		)
 		if err != nil {
 			b.Fatalf("Failed to create evaluator: %v", err)
@@ -144,10 +147,11 @@ func BenchmarkDataProviders(b *testing.B) {
 	})
 
 	b.Run("ContextProvider", func(b *testing.B) {
-		// Using the standard version which uses a ContextProvider
-		evaluator, err := polyscript.FromRisorString(
-			scriptContent,
-			quietHandler,
+		// Without WithStaticData the evaluator uses a ContextProvider
+		evaluator, err := polyscript.New[polyscript.Risor](
+			b.Context(),
+			polyscript.FromString(scriptContent),
+			polyscript.WithLogHandler[polyscript.Risor](quietHandler),
 		)
 		if err != nil {
 			b.Fatalf("Failed to create evaluator: %v", err)
@@ -176,10 +180,11 @@ func BenchmarkDataProviders(b *testing.B) {
 			}
 		`
 		staticData := map[string]any{"defaultKey": "value"}
-		evaluator, err := polyscript.FromRisorStringWithData(
-			compositeScript,
-			staticData, // Static part
-			quietHandler,
+		evaluator, err := polyscript.New[polyscript.Risor](
+			b.Context(),
+			polyscript.FromString(compositeScript),
+			polyscript.WithStaticData[polyscript.Risor](staticData), // Static part
+			polyscript.WithLogHandler[polyscript.Risor](quietHandler),
 		)
 		if err != nil {
 			b.Fatalf("Failed to create evaluator: %v", err)
@@ -235,10 +240,11 @@ message = "Hello, " + name + "!"
 	// which is more complex to set up in this benchmark template
 
 	b.Run("RisorEngine", func(b *testing.B) {
-		evaluator, err := polyscript.FromRisorStringWithData(
-			risorScript,
-			inputData,
-			quietHandler,
+		evaluator, err := polyscript.New[polyscript.Risor](
+			b.Context(),
+			polyscript.FromString(risorScript),
+			polyscript.WithStaticData[polyscript.Risor](inputData),
+			polyscript.WithLogHandler[polyscript.Risor](quietHandler),
 		)
 		if err != nil {
 			b.Fatalf("Failed to create Risor evaluator: %v", err)
@@ -254,10 +260,11 @@ message = "Hello, " + name + "!"
 	})
 
 	b.Run("StarlarkEngine", func(b *testing.B) {
-		evaluator, err := polyscript.FromStarlarkStringWithData(
-			starlarkScript,
-			inputData,
-			quietHandler,
+		evaluator, err := polyscript.New[polyscript.Starlark](
+			b.Context(),
+			polyscript.FromString(starlarkScript),
+			polyscript.WithStaticData[polyscript.Starlark](inputData),
+			polyscript.WithLogHandler[polyscript.Starlark](quietHandler),
 		)
 		if err != nil {
 			b.Fatalf("Failed to create Starlark evaluator: %v", err)

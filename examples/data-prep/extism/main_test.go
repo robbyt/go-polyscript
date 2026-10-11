@@ -33,11 +33,12 @@ func TestDemonstrateDataPrepAndEval(t *testing.T) {
 	staticData := getTestStaticData()
 
 	// Create evaluator using embedded WASM
-	evaluator, err := polyscript.FromExtismBytesWithData(
-		wasmdata.TestModule,
-		staticData,
-		slog.Default().Handler(),
-		wasmdata.EntrypointGreet,
+	evaluator, err := polyscript.New[polyscript.Extism](
+		t.Context(),
+		polyscript.FromBytes(wasmdata.TestModule),
+		polyscript.WithStaticData[polyscript.Extism](staticData),
+		polyscript.WithLogHandler[polyscript.Extism](slog.Default().Handler()),
+		polyscript.WithEntryPoint(wasmdata.EntrypointGreet),
 	)
 	if err != nil {
 		t.Errorf("Failed to create evaluator: %v", err)
@@ -57,11 +58,12 @@ func TestPrepareRuntimeData(t *testing.T) {
 	logger := slog.Default()
 
 	// Create evaluator using embedded WASM
-	evaluator, err := polyscript.FromExtismBytesWithData(
-		wasmdata.TestModule,
-		staticData,
-		logger.Handler(),
-		wasmdata.EntrypointGreet,
+	evaluator, err := polyscript.New[polyscript.Extism](
+		t.Context(),
+		polyscript.FromBytes(wasmdata.TestModule),
+		polyscript.WithStaticData[polyscript.Extism](staticData),
+		polyscript.WithLogHandler[polyscript.Extism](logger.Handler()),
+		polyscript.WithEntryPoint(wasmdata.EntrypointGreet),
 	)
 	require.NoError(t, err, "Failed to create evaluator")
 	require.NotNil(t, evaluator, "Evaluator should not be nil")
@@ -79,11 +81,12 @@ func TestEvalAndExtractResult(t *testing.T) {
 	logger := slog.Default()
 
 	// Create evaluator using embedded WASM
-	evaluator, err := polyscript.FromExtismBytesWithData(
-		wasmdata.TestModule,
-		staticData,
-		logger.Handler(),
-		wasmdata.EntrypointGreet,
+	evaluator, err := polyscript.New[polyscript.Extism](
+		t.Context(),
+		polyscript.FromBytes(wasmdata.TestModule),
+		polyscript.WithStaticData[polyscript.Extism](staticData),
+		polyscript.WithLogHandler[polyscript.Extism](logger.Handler()),
+		polyscript.WithEntryPoint(wasmdata.EntrypointGreet),
 	)
 	require.NoError(t, err, "Failed to create evaluator")
 	require.NotNil(t, evaluator, "Evaluator should not be nil")
@@ -97,21 +100,6 @@ func TestEvalAndExtractResult(t *testing.T) {
 	result, err := evalAndExtractResult(ctx, logger, evaluator)
 	require.NoError(t, err, "evalAndExtractResult should not return an error")
 	assert.NotNil(t, result, "Result should not be nil")
-}
-
-func TestFromExtismFileWithData(t *testing.T) {
-	// Get static test data
-	staticData := getTestStaticData()
-
-	// Test FromExtismBytesWithData function
-	evaluator, err := polyscript.FromExtismBytesWithData(
-		wasmdata.TestModule,
-		staticData,
-		slog.Default().Handler(),
-		wasmdata.EntrypointGreet,
-	)
-	require.NoError(t, err, "Should create evaluator without error")
-	assert.NotNil(t, evaluator, "Evaluator should not be nil")
 }
 
 func TestEmbeddedWasmModule(t *testing.T) {

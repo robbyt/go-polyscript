@@ -75,8 +75,6 @@ func main() {
 }
 ```
 
-The older `FromRisorString*`, `FromStarlark*`, and `FromExtism*` constructors still work but are deprecated and slated for removal in v1.
-
 ## API at a glance
 
 `polyscript.New[E]` is the single entry point. `E` selects the engine, the first argument is a `Source`, and the remaining arguments are `Option[E]`s.
