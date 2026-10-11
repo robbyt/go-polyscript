@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Starlark `evaluator.ErrDictKeyCollision` and Risor
+  `evaluator.ErrUintOverflow`.
+  ([#165](https://github.com/robbyt/go-polyscript/issues/165))
 - `data.ErrNoProviders`, returned by `CompositeProvider.AddDataToContext`
   when it holds no providers to store the data in.
   ([#160](https://github.com/robbyt/go-polyscript/issues/160))
@@ -64,6 +67,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   every engine. Call `Close` or let the lifetime end: nothing releases an
   evaluator's resources when it is garbage collected.
   ([#162](https://github.com/robbyt/go-polyscript/issues/162))
+- **BREAKING:** Extism sends `{}` to the guest when there is no input data,
+  instead of zero bytes.
+  ([#165](https://github.com/robbyt/go-polyscript/issues/165))
+- **BREAKING:** Risor `Eval` rejects input holding an unsigned integer above
+  `math.MaxInt64` (in maps, slices, pointers or exported struct fields) with
+  `ErrUintOverflow`, since Risor would wrap it to a negative `int64`. Checking
+  the input adds about 3% to a small Risor `Eval`.
+  ([#165](https://github.com/robbyt/go-polyscript/issues/165))
+- **BREAKING:** Converting a Starlark dict whose distinct keys stringify to
+  the same map key (e.g. `{1: "a", "1": "b"}`) now fails with
+  `ErrDictKeyCollision`, reported by `AsMap`, instead of silently keeping one
+  entry.
+  ([#165](https://github.com/robbyt/go-polyscript/issues/165))
 - **BREAKING:** `CompositeProvider.AddDataToContext` now returns the joined
   errors whenever a provider fails, and the original context, instead of
   returning `nil` as long as one provider succeeded. Nested composites and
@@ -180,6 +196,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ([#103](https://github.com/robbyt/go-polyscript/pull/103))
 
 ### Removed
+- The Starlark evaluator's `eval_data` global, which no script could use
+  because it was never declared at compile time.
+  ([#165](https://github.com/robbyt/go-polyscript/issues/165))
 - **BREAKING**: Removed four exported mock types (`loader.MockLoader` with
   `NewMockLoaderWithContent`, `script.MockCompiler`,
   `script.MockExecutableContent`, and the entire `engines/mocks` package).
