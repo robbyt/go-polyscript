@@ -12,24 +12,24 @@
 //
 //	eval, err := polyscript.New[polyscript.Risor](ctx, polyscript.FromString(script))
 //	if err != nil {
-//	    return err
+//		return err
 //	}
 //	result, err := eval.Eval(ctx)
 //
 // Static data attached at construction:
 //
 //	eval, err := polyscript.New[polyscript.Risor](
-//	    ctx,
-//	    polyscript.FromString(script),
-//	    polyscript.WithStaticData[polyscript.Risor](map[string]any{"name": "World"}),
+//		ctx,
+//		polyscript.FromString(script),
+//		polyscript.WithStaticData[polyscript.Risor](map[string]any{"name": "World"}),
 //	)
 //
 // WASM with Extism (entry point is required and bound to Extism at compile time):
 //
 //	eval, err := polyscript.New[polyscript.Extism](
-//	    ctx,
-//	    polyscript.FromBytes(wasmBytes),
-//	    polyscript.WithEntryPoint("greet"),
+//		ctx,
+//		polyscript.FromBytes(wasmBytes),
+//		polyscript.WithEntryPoint("greet"),
 //	)
 //
 // All engine constructors return a [platform.Evaluator]. For direct access to
@@ -42,7 +42,7 @@
 // these helpers when the [Source] sits between them as a non-variadic
 // parameter, so an explicit type argument is usually required:
 //
-//	polyscript.WithStaticData[polyscript.Risor](data)
+//	opt := polyscript.WithStaticData[polyscript.Risor](data)
 //
 // [WithEntryPoint] is bound to [Extism] alone and never needs a type argument.
 // Passing it to [New[Risor]] or [New[Starlark]] is a compile-time error
@@ -240,10 +240,13 @@ func WithContextTermination(enabled bool) Option[Extism] {
 //
 //	eval, err := polyscript.New[polyscript.Risor](ctx, polyscript.FromString(script))
 //
-//	eval, err := polyscript.New[polyscript.Extism](ctx,
-//	    polyscript.FromBytes(wasmBytes),
-//	    polyscript.WithEntryPoint("greet"),
-//	    polyscript.WithStaticData[polyscript.Extism](map[string]any{"input": "World"}),
+// or, for a WASM module:
+//
+//	eval, err := polyscript.New[polyscript.Extism](
+//		ctx,
+//		polyscript.FromBytes(wasmBytes),
+//		polyscript.WithEntryPoint("greet"),
+//		polyscript.WithStaticData[polyscript.Extism](map[string]any{"input": "World"}),
 //	)
 //
 // The supplied ctx flows into the loader's I/O (e.g. HTTP fetch) and the

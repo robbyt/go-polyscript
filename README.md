@@ -1,5 +1,7 @@
 # go-polyscript
 
+<!-- Each Go code block below is a copy of tested code under examples/docs, named by the snippet comment above it. Edit that code first, then copy it here; docs_test.go fails when the two differ. -->
+
 [![Go Reference](https://pkg.go.dev/badge/github.com/robbyt/go-polyscript.svg)](https://pkg.go.dev/github.com/robbyt/go-polyscript)
 [![Go Report Card](https://goreportcard.com/badge/github.com/robbyt/go-polyscript)](https://goreportcard.com/report/github.com/robbyt/go-polyscript)
 [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=robbyt_go-polyscript&metric=coverage)](https://sonarcloud.io/summary/new_code?id=robbyt_go-polyscript)
@@ -36,12 +38,14 @@ go get github.com/robbyt/go-polyscript@latest
 
 Using go-polyscript with the Risor scripting engine:
 
+<!-- snippet: examples/docs/quickstart/main.go -->
 ```go
 package main
 
 import (
 	"context"
 	"fmt"
+	"log"
 
 	"github.com/robbyt/go-polyscript"
 )
@@ -67,13 +71,19 @@ func main() {
 
 	ctx := context.Background()
 
-	evaluator, _ := polyscript.New[polyscript.Risor](
+	evaluator, err := polyscript.New[polyscript.Risor](
 		ctx,
 		polyscript.FromString(script),
 		polyscript.WithStaticData[polyscript.Risor](map[string]any{"name": "World"}),
 	)
+	if err != nil {
+		log.Fatal(err)
+	}
 
-	result, _ := evaluator.Eval(ctx)
+	result, err := evaluator.Eval(ctx)
+	if err != nil {
+		log.Fatal(err)
+	}
 	fmt.Printf("Result: %v\n", result.Interface())
 }
 ```
@@ -118,12 +128,14 @@ The older `FromRisorString*`, `FromStarlark*`, and `FromExtism*` constructors st
 
 ### From a file on disk
 
+<!-- snippet: examples/docs/snippets/loading.go#from-file -->
 ```go
 ctx := context.Background()
 
-evaluator, _ := polyscript.New[polyscript.Risor](
+// scriptPath is an absolute path, such as "/etc/polyscript/hello.risor"
+evaluator, err := polyscript.New[polyscript.Risor](
 	ctx,
-	polyscript.FromFile("/etc/polyscript/hello.risor"),
+	polyscript.FromFile(scriptPath),
 )
 ```
 
@@ -133,6 +145,7 @@ The path must be absolute. For relative paths, resolve them with `filepath.Abs` 
 
 `FromLoader` wraps any `loader.Loader`, including the HTTP loader that ships with go-polyscript:
 
+<!-- snippet: examples/docs/snippets/http.go#http -->
 ```go
 import (
 	"context"
@@ -148,10 +161,8 @@ httpOpts := loader.DefaultHTTPOptions().
 	WithTimeout(10 * time.Second).
 	WithBearerAuth("my-api-token")
 
-httpLoader, err := loader.NewFromHTTPWithOptions(
-	"https://scripts.example.com/greet.risor",
-	httpOpts,
-)
+// scriptURL is the script's location, such as "https://scripts.example.com/greet.risor"
+httpLoader, err := loader.NewFromHTTPWithOptions(scriptURL, httpOpts)
 if err != nil {
 	return err
 }
@@ -163,6 +174,7 @@ The HTTP loader follows redirects only within the original origin (same scheme, 
 
 ### Capturing diagnostic logs
 
+<!-- snippet: examples/docs/snippets/logging.go#logging -->
 ```go
 import (
 	"context"
@@ -175,7 +187,7 @@ import (
 ctx := context.Background()
 handler := slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelDebug})
 
-evaluator, _ := polyscript.New[polyscript.Risor](
+evaluator, err := polyscript.New[polyscript.Risor](
 	ctx,
 	polyscript.FromString(script),
 	polyscript.WithLogHandler[polyscript.Risor](handler),
@@ -191,10 +203,11 @@ To send input data to a script, use a "data provider" implementation. There are 
 
 For example, attaching `WithStaticData` to a Risor evaluator wires up a `StaticProvider` internally to send the static data map into the evaluator during creation.
 
+<!-- snippet: examples/docs/snippets/providers.go#static-provider -->
 ```go
 ctx := context.Background()
 
-evaluator, _ := polyscript.New[polyscript.Risor](
+evaluator, err := polyscript.New[polyscript.Risor](
 	ctx,
 	polyscript.FromString(script),
 	polyscript.WithStaticData[polyscript.Risor](map[string]any{"name": "cats", "excited": true}),
@@ -205,16 +218,23 @@ evaluator, _ := polyscript.New[polyscript.Risor](
 
 A constructor created without `WithStaticData` uses a `ContextProvider`, so dynamic per-request data can be threaded in through the context.
 
+<!-- snippet: examples/docs/snippets/providers.go#context-provider -->
 ```go
 ctx := context.Background()
 
-evaluator, _ := polyscript.New[polyscript.Risor](ctx, polyscript.FromString(script))
+evaluator, err := polyscript.New[polyscript.Risor](ctx, polyscript.FromString(script))
+if err != nil {
+	return err
+}
 
 runtimeData := map[string]any{"name": "Billie Jean", "relationship": false}
-enrichedCtx, _ := evaluator.AddDataToContext(ctx, runtimeData)
+enrichedCtx, err := evaluator.AddDataToContext(ctx, runtimeData)
+if err != nil {
+	return err
+}
 
 // Execute with the "enriched" context containing the link to the input data
-result, _ := evaluator.Eval(enrichedCtx)
+result, err := evaluator.Eval(enrichedCtx)
 ```
 
 #### Concurrency and thread-safety
@@ -225,9 +245,16 @@ Existing data from the parent context is deep-copied when forming the derived co
 
 The typical pattern is one derived-context chain per request, with the returned context threaded forward for any subsequent enrichment:
 
+<!-- snippet: examples/docs/snippets/providers.go#derived-contexts -->
 ```go
-ctx, _ := provider.AddDataToContext(parent, requestData)
-ctx, _ = provider.AddDataToContext(ctx, moreData)  // build on the returned ctx
+ctx, err := provider.AddDataToContext(parent, requestData)
+if err != nil {
+	return err
+}
+ctx, err = provider.AddDataToContext(ctx, moreData) // build on the returned ctx
+if err != nil {
+	return err
+}
 ```
 
 For the details of which value kinds are deep-copied versus stored by reference, see the [`AddDataToContext` godoc](https://pkg.go.dev/github.com/robbyt/go-polyscript/platform/data#ContextProvider.AddDataToContext).
@@ -236,27 +263,34 @@ For the details of which value kinds are deep-copied versus stored by reference,
 
 Use the following pattern for fixed configuration values and per-request data. Initial loading, parsing, and instantiating the script is relatively slow, so the example below shows how to set up the script once with static data and then reuse it many times with dynamic runtime data.
 
+<!-- snippet: examples/docs/snippets/providers.go#static-and-dynamic -->
 ```go
 ctx := context.Background()
 
 staticData := map[string]any{
-	"name": "User",
+	"name":    "User",
 	"excited": true,
 }
 
 // Create the evaluator with the static data
-evaluator, _ := polyscript.New[polyscript.Risor](
+evaluator, err := polyscript.New[polyscript.Risor](
 	ctx,
 	polyscript.FromString(script),
 	polyscript.WithStaticData[polyscript.Risor](staticData),
 )
+if err != nil {
+	return err
+}
 
 // For each request, prepare dynamic data
 requestData := map[string]any{"name": "Robert"}
-enrichedCtx, _ := evaluator.AddDataToContext(ctx, requestData)
+enrichedCtx, err := evaluator.AddDataToContext(ctx, requestData)
+if err != nil {
+	return err
+}
 
 // Execute with both static and dynamic data available
-result, _ := evaluator.Eval(enrichedCtx)
+result, err := evaluator.Eval(enrichedCtx)
 ```
 
 ## Architectural Design
@@ -288,6 +322,7 @@ See the [Data Providers](#working-with-data-providers) section for more details.
 ### Starlark
 Starlark syntax is a deterministic "python-like" language designed for complex configuration, not so much for dynamic scripting. It's high performance, but the capabilities of the language are very limited. Read more about it here: [Starlark-Go](https://github.com/google/starlark-go)
 
+<!-- snippet: examples/docs/snippets/starlark.go#starlark -->
 ```go
 scriptContent := `
 # Starlark has access to ctx variable
@@ -303,14 +338,17 @@ _ = result
 
 ctx := context.Background()
 
-evaluator, _ := polyscript.New[polyscript.Starlark](
+evaluator, err := polyscript.New[polyscript.Starlark](
 	ctx,
 	polyscript.FromString(scriptContent),
 	polyscript.WithStaticData[polyscript.Starlark](map[string]any{"name": "World"}),
 )
+if err != nil {
+	return err
+}
 
 // Execute with a context
-result, _ := evaluator.Eval(ctx)
+result, err := evaluator.Eval(ctx)
 ```
 
 ### WASM with Extism
@@ -319,10 +357,14 @@ Extism uses the Wazero WASM runtime for providing WASI abstractions, and an easy
 
 > **Known issue:** wazero v1.12.0 has a data race that `go test -race` can report when wazero runtimes are created concurrently. go-polyscript's Extism compiler works around it, but apps that also create wazero runtimes directly can still hit it. See [engines/README.md](engines/README.md#known-issue-wazero-data-race-under--race) for the cause and workarounds.
 
+<!-- snippet: examples/docs/extism/main.go -->
 ```go
+package main
+
 import (
 	"context"
 	"fmt"
+	"log"
 
 	"github.com/robbyt/go-polyscript"
 	"github.com/robbyt/go-polyscript/engines/extism/wasmdata"
@@ -331,7 +373,7 @@ import (
 func main() {
 	ctx := context.Background()
 
-	evaluator, _ := polyscript.New[polyscript.Extism](
+	evaluator, err := polyscript.New[polyscript.Extism](
 		ctx,
 
 		// pre-compiled WASM example module
@@ -344,9 +386,15 @@ func main() {
 		// JSON and send it to the WASM application
 		polyscript.WithStaticData[polyscript.Extism](map[string]any{"input": "World"}),
 	)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	// Execute, and print the result
-	result, _ := evaluator.Eval(ctx)
+	result, err := evaluator.Eval(ctx)
+	if err != nil {
+		log.Fatal(err)
+	}
 	fmt.Printf("Result: %v\n", result.Interface())
 }
 ```
@@ -355,6 +403,7 @@ func main() {
 
 Most callers should use `polyscript.New[E]`. For finer-grained control over a single engine — for example, plugging in a custom `data.Provider` — each engine subpackage exposes the same shape: `FromXxxLoader(ctx, ldr, opts...)`, with engine-scoped `WithLogHandler`, `WithStaticData`, `WithDataProvider`, and (Extism only) `WithEntryPoint` options.
 
+<!-- snippet: examples/docs/snippets/direct_risor.go#direct-risor -->
 ```go
 import (
 	"context"
@@ -365,19 +414,26 @@ import (
 
 ctx := context.Background()
 
-ldr, _ := loader.NewFromString(`{"name": ctx["name"]}`)
+ldr, err := loader.NewFromString(`{"name": ctx["name"]}`)
+if err != nil {
+	return err
+}
 
-eval, _ := risor.FromRisorLoader(
+eval, err := risor.FromRisorLoader(
 	ctx,
 	ldr,
 	risor.WithStaticData(map[string]any{"name": "World"}),
 )
+if err != nil {
+	return err
+}
 
-result, _ := eval.Eval(ctx)
+result, err := eval.Eval(ctx)
 ```
 
 Logging is optional: omit `WithLogHandler` and the engine inherits whatever `slog.Default()` has been configured to in the host process. Extism is the same shape but expects a WASM module loader and requires `WithEntryPoint`:
 
+<!-- snippet: examples/docs/snippets/direct_extism.go#direct-extism -->
 ```go
 import (
 	"context"
@@ -388,16 +444,22 @@ import (
 
 ctx := context.Background()
 
-wasmLdr, _ := loader.NewFromBytes(wasmBytes) // wasmBytes is a compiled WASM module
+wasmLdr, err := loader.NewFromBytes(wasmBytes) // wasmBytes is a compiled WASM module
+if err != nil {
+	return err
+}
 
-eval, _ := extism.FromExtismLoader(
+eval, err := extism.FromExtismLoader(
 	ctx,
 	wasmLdr,
 	extism.WithEntryPoint("greet"),
 	extism.WithStaticData(map[string]any{"input": "World"}),
 )
+if err != nil {
+	return err
+}
 
-result, _ := eval.Eval(ctx)
+result, err := eval.Eval(ctx)
 ```
 
 ## License

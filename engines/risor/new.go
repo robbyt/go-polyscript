@@ -8,14 +8,18 @@
 // # Quick start
 //
 //	ldr, err := loader.NewFromString(`"hello"`)
-//	if err != nil { return err }
+//	if err != nil {
+//		return err
+//	}
 //
 //	eval, err := risor.FromRisorLoader(
-//	    ctx,
-//	    ldr,
-//	    risor.WithStaticData(map[string]any{"name": "World"}),
+//		ctx,
+//		ldr,
+//		risor.WithStaticData(map[string]any{"name": "World"}),
 //	)
-//	if err != nil { return err }
+//	if err != nil {
+//		return err
+//	}
 //
 //	result, err := eval.Eval(ctx)
 //
@@ -48,10 +52,10 @@ import (
 // evaluator from this package. Configure it with the With* options:
 //
 //	eval, err := risor.FromRisorLoader(
-//	    ctx,
-//	    ldr,
-//	    risor.WithLogHandler(slog.Default().Handler()),
-//	    risor.WithStaticData(map[string]any{"version": "1.0.0"}),
+//		ctx,
+//		ldr,
+//		risor.WithLogHandler(slog.Default().Handler()),
+//		risor.WithStaticData(map[string]any{"version": "1.0.0"}),
 //	)
 //
 // The supplied ctx flows into the loader's I/O and the Risor parser;

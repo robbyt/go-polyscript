@@ -8,15 +8,19 @@
 // # Quick start
 //
 //	ldr, err := loader.NewFromBytes(wasmBytes)
-//	if err != nil { return err }
+//	if err != nil {
+//		return err
+//	}
 //
 //	eval, err := extism.FromExtismLoader(
-//	    ctx,
-//	    ldr,
-//	    extism.WithEntryPoint("greet"),
-//	    extism.WithStaticData(map[string]any{"input": "World"}),
+//		ctx,
+//		ldr,
+//		extism.WithEntryPoint("greet"),
+//		extism.WithStaticData(map[string]any{"input": "World"}),
 //	)
-//	if err != nil { return err }
+//	if err != nil {
+//		return err
+//	}
 //
 //	result, err := eval.Eval(ctx)
 //
@@ -55,11 +59,11 @@ var ErrEntryPointRequired = errors.New("extism: entry point is required (use Wit
 // evaluator from this package. Configure it with the With* options:
 //
 //	eval, err := extism.FromExtismLoader(
-//	    ctx,
-//	    ldr,
-//	    extism.WithEntryPoint("greet"),
-//	    extism.WithLogHandler(slog.Default().Handler()),
-//	    extism.WithStaticData(map[string]any{"input": "World"}),
+//		ctx,
+//		ldr,
+//		extism.WithEntryPoint("greet"),
+//		extism.WithLogHandler(slog.Default().Handler()),
+//		extism.WithStaticData(map[string]any{"input": "World"}),
 //	)
 //
 // [WithEntryPoint] is required and identifies the exported WASM function
