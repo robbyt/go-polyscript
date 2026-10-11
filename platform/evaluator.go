@@ -26,16 +26,12 @@ type Evaluator interface {
 	EvalOnly
 	data.Setter
 
-	// Close releases resources held by the compiled script, such as the
-	// Extism engine's wazero runtime. It is safe to call more than once.
-	// For engines without releasable resources (Risor, Starlark) Close is a
-	// no-op. On engines that hold resources (Extism), Eval returns an error
-	// once Close is called, without calling the data provider, while Close
-	// itself waits for in-flight Evals, including their data loading. Close's
-	// ctx cannot interrupt that wait; cancelling an Eval's ctx shortens it
-	// only if the Eval honours cancellation, both in its data provider and,
-	// for Extism, in the guest (the default unless ctx termination is
-	// disabled). A data provider must not call Close or Eval on the same
-	// evaluator.
+	// Close releases any resources held by the compiled script. It is safe
+	// to call more than once, and is a no-op for implementations that hold
+	// nothing to release. Once Close has been called, an implementation that
+	// released resources returns an error from Eval. Close may wait for
+	// in-flight Evals to finish, so it must not be called from within an
+	// Eval, such as by a data provider. Each engine documents its own
+	// behaviour.
 	Close(ctx context.Context) error
 }

@@ -44,7 +44,7 @@ func (m *MockExecutableContent) EngineType() engineTypes.Type {
 }
 
 // MockClosableExecutableContent is a MockExecutableContent that also
-// implements Close, mirroring engines (Extism) whose content holds resources.
+// implements Close, standing in for compiled content that holds resources.
 type MockClosableExecutableContent struct {
 	MockExecutableContent
 }

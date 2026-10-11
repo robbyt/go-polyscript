@@ -39,10 +39,10 @@
 // All engine constructors return a [platform.Evaluator]. For direct access to
 // the underlying engine, see the per-engine packages under engines/.
 //
-// Call Close on an evaluator once it is no longer needed. Extism evaluators
-// hold a wazero runtime that Close releases, after which Eval returns an
-// error; for Risor and Starlark, Close is a no-op. On error, New returns a
-// nil evaluator, so defer Close only after checking err.
+// Call Close on an evaluator once it is no longer needed, to release any
+// resources its engine holds; each engine's Evaluator.Close documents what
+// that means for it. On error, New returns a nil evaluator, so defer Close
+// only after checking err.
 //
 // # A note on type arguments
 //

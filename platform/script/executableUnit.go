@@ -120,8 +120,8 @@ func (exe *ExecutableUnit) GetDataProvider() data.Provider {
 }
 
 // Close releases resources held by the compiled content. Content that
-// implements Close(context.Context) error (e.g. Extism's compiled plugin) is
-// closed; for other content this is a no-op. Safe to call on a nil unit.
+// implements Close(context.Context) error is closed; for other content this
+// is a no-op. Safe to call on a nil unit.
 func (exe *ExecutableUnit) Close(ctx context.Context) error {
 	if exe == nil || exe.content == nil {
 		return nil
