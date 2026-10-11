@@ -29,8 +29,8 @@ func BuildRisorEnv(ctxKey string, inputData map[string]any) (map[string]any, err
 }
 
 // checkUintRange walks v the way Risor's TypeRegistry converts Go values
-// (maps, slices, arrays, pointers, interfaces and the exported fields of
-// structs, which Risor wraps as GoStruct and converts when a script reads
+// (maps, slices, arrays, pointers, interfaces and the direct exported fields
+// of structs, which Risor wraps as GoStruct and converts when a script reads
 // them) and rejects any unsigned integer that does not fit in Risor's int64.
 //
 // Like TypeRegistry.FromGo, it checks for values that convert themselves
@@ -125,8 +125,12 @@ func (c *uintChecker) checkList(v reflect.Value, path string) error {
 	return nil
 }
 
-// checkStruct checks the exported fields of a struct, the only ones Risor
-// exposes to scripts.
+// checkStruct checks the direct exported fields of a struct, the only ones
+// Risor exposes to scripts. Risor's GoStruct indexes a struct's own fields
+// (NumField plus IsExported) and does not promote fields through embedding,
+// so an unexported embedded struct or pointer is skipped along with its
+// fields, while an exported embedded struct is an ordinary field that a script
+// reads by its type name, and is checked like any other.
 func (c *uintChecker) checkStruct(v reflect.Value, path string) error {
 	t := v.Type()
 	for i := range t.NumField() {

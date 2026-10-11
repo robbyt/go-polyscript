@@ -73,6 +73,13 @@ func TestBuildRisorEnv_UintRange(t *testing.T) {
 		Nest   map[string]any
 		hidden uint64 // unexported: Risor cannot read it, so it is not checked
 	}
+	// Risor does not promote fields through embedding: the fields of an
+	// unexported embedded struct are unreachable, while an exported embedded
+	// struct is a field named after its type.
+	type Shown struct{ Big uint64 }
+	type hidesEmbedded struct{ inner }
+	type hidesEmbeddedPtr struct{ *inner }
+	type showsEmbedded struct{ Shown }
 	// node forms a pointer cycle, which Risor reads lazily without trouble.
 	type node struct {
 		Val  uint64
@@ -108,6 +115,8 @@ func TestBuildRisorEnv_UintRange(t *testing.T) {
 			{"slice of structs", map[string]any{"l": []inner{{Big: 1}, {Big: big}}}},
 			{"struct in pointer cycle", map[string]any{"n": badCycle}},
 			{"pointer-receiver valuer stored by value", map[string]any{"v": ptrValuer{Big: big}}},
+			{"exported embedded struct", map[string]any{"s": showsEmbedded{Shown{Big: big}}}},
+			{"exported embedded struct by pointer", map[string]any{"s": &showsEmbedded{Shown{Big: big}}}},
 		}
 		for _, tc := range tests {
 			t.Run(tc.name, func(t *testing.T) {
@@ -130,6 +139,12 @@ func TestBuildRisorEnv_UintRange(t *testing.T) {
 		})
 		require.ErrorIs(t, err, ErrUintOverflow)
 		assert.Contains(t, err.Error(), `ctx["s"].Nest["x"]`)
+
+		_, err = BuildRisorEnv(constants.Ctx, map[string]any{
+			"s": showsEmbedded{Shown{Big: big}},
+		})
+		require.ErrorIs(t, err, ErrUintOverflow)
+		assert.Contains(t, err.Error(), `ctx["s"].Shown.Big`)
 	})
 
 	t.Run("in range values pass", func(t *testing.T) {
@@ -153,6 +168,11 @@ func TestBuildRisorEnv_UintRange(t *testing.T) {
 				Name: "x", Inner: inner{Big: inRange}, Nest: map[string]any{"x": inRange},
 			}}},
 			{"unexported struct field is not checked", map[string]any{"s": outer{hidden: big}}},
+			{"unexported embedded struct is not checked", map[string]any{"s": hidesEmbedded{inner{Big: big}}}},
+			{"unexported embedded pointer is not checked", map[string]any{"s": hidesEmbeddedPtr{&inner{Big: big}}}},
+			{"pointer to unexported embedded struct is not checked", map[string]any{
+				"s": &hidesEmbedded{inner{Big: big}},
+			}},
 			{"nil struct pointer", map[string]any{"s": (*outer)(nil)}},
 			{"pointer cycle in range", map[string]any{"n": cycle}},
 		}
@@ -190,6 +210,38 @@ func TestBuildRisorEnv_UintRange(t *testing.T) {
 				assert.Equal(t, tc.input, env[constants.Ctx], "input should be passed through unchanged")
 			})
 		}
+	})
+
+	t.Run("risor does not promote embedded fields", func(t *testing.T) {
+		// Pins the Risor behaviour checkStruct relies on: if Risor ever
+		// promotes embedded fields, the unexported embedded cases above
+		// would let an oversized field through.
+		registry := object.DefaultRegistry()
+		for name, input := range map[string]any{
+			"embedded struct":  hidesEmbedded{inner{Big: big}},
+			"embedded pointer": hidesEmbeddedPtr{&inner{Big: big}},
+		} {
+			obj, err := registry.FromGo(input)
+			require.NoError(t, err, name)
+			goStruct, ok := obj.(*object.GoStruct)
+			require.True(t, ok, "%s should be wrapped as a GoStruct", name)
+			_, ok = goStruct.GetAttr("Big")
+			assert.False(t, ok, "%s should not expose the embedded Big field", name)
+		}
+
+		obj, err := registry.FromGo(showsEmbedded{Shown{Big: inRange}})
+		require.NoError(t, err)
+		goStruct, ok := obj.(*object.GoStruct)
+		require.True(t, ok, "showsEmbedded should be wrapped as a GoStruct")
+		_, ok = goStruct.GetAttr("Big")
+		assert.False(t, ok, "Big should not be promoted from the exported embedded struct")
+		shown, ok := goStruct.GetAttr("Shown")
+		require.True(t, ok, "the exported embedded struct should be a field named Shown")
+		shownStruct, ok := shown.(*object.GoStruct)
+		require.True(t, ok, "Shown should be wrapped as a GoStruct")
+		bigAttr, ok := shownStruct.GetAttr("Big")
+		require.True(t, ok, "Shown.Big should be readable")
+		assert.Equal(t, object.NewInt(math.MaxInt64), bigAttr)
 	})
 
 	t.Run("invalid value is skipped", func(t *testing.T) {
