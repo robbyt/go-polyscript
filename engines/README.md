@@ -193,6 +193,26 @@ compile. Two workarounds:
 changes, as a reminder to remove this note, `internal/wazerorace` and its
 callers once a release with the fix lands.
 
+### Testing: Mock Plugins and the Garbage Collector
+
+A `compiler.Executable` releases its plugin from its own `runtime.AddCleanup` when it is garbage collected without being closed, the way `os.File` closes a file descriptor. So any test that builds an `Executable` around a mock plugin and never closes it will see `Close` called on that mock at some point after the test.
+
+- A testify mock panics on a call it was not told to expect, and a panic inside a cleanup crashes the whole test binary, not just the test that leaked.
+- It only happens when the garbage collector runs at the wrong moment, so it shows up as a random failure, often in a later test or package, sometimes only after a rebase.
+
+**Rules for Extism tests:**
+
+- Give every mock plugin that is not explicitly closed a `Close` expectation that tolerates the cleanup:
+  ```go
+  mockPlugin.On("Close", mock.Anything).Return(nil).Maybe()
+  ```
+  Or close the `Executable` (or its evaluator) in the test, with a matching `Close` expectation.
+- Run new or changed Extism tests once with the garbage collector forced to run constantly, which makes a missing expectation crash every time:
+  ```bash
+  GOGC=1 go test -race -count=3 ./engines/extism/... .
+  ```
+- Never use `recover()` to hide the panic; fix the expectation.
+
 ## Script Return Value Handling
 
 Each engine returns the script's final value to the caller, but they treat
