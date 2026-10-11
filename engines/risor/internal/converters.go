@@ -6,6 +6,7 @@ import (
 	"reflect"
 
 	risor "github.com/deepnoodle-ai/risor/v2"
+	"github.com/deepnoodle-ai/risor/v2/pkg/object"
 )
 
 // BuildRisorEnv builds the full Risor environment map with standard builtins and input data.
@@ -31,6 +32,11 @@ func BuildRisorEnv(ctxKey string, inputData map[string]any) (map[string]any, err
 // (maps, slices, arrays, pointers, interfaces and the exported fields of
 // structs, which Risor wraps as GoStruct and converts when a script reads
 // them) and rejects any unsigned integer that does not fit in Risor's int64.
+//
+// Like TypeRegistry.FromGo, it checks for values that convert themselves
+// before looking at the kind: a value implementing object.RisorValuer, or one
+// that already is an object.Object, is skipped along with everything it
+// holds, since Risor never reads its fields or its integer value.
 func checkUintRange(v reflect.Value, path string) error {
 	return (&uintChecker{seen: make(map[visit]struct{})}).check(v, path)
 }
@@ -58,7 +64,15 @@ func (c *uintChecker) markSeen(v reflect.Value) bool {
 	return false
 }
 
+// check rejects v if it, or any value Risor would convert from it, holds an
+// unsigned integer above math.MaxInt64.
 func (c *uintChecker) check(v reflect.Value, path string) error {
+	if !v.IsValid() {
+		return nil
+	}
+	if convertsItself(v.Type()) {
+		return nil
+	}
 	switch v.Kind() {
 	case reflect.Uint, reflect.Uint64, reflect.Uintptr:
 		if v.Uint() > math.MaxInt64 {
@@ -73,45 +87,78 @@ func (c *uintChecker) check(v reflect.Value, path string) error {
 			return c.check(v.Elem(), path)
 		}
 	case reflect.Map:
-		// Risor rejects non-string keys itself.
-		if v.Type().Key().Kind() != reflect.String || alwaysFits(v.Type().Elem()) ||
-			v.IsNil() || c.markSeen(v) {
-			return nil
-		}
-		iter := v.MapRange()
-		for iter.Next() {
-			if err := c.check(iter.Value(), fmt.Sprintf("%s[%q]", path, iter.Key().String())); err != nil {
-				return err
-			}
-		}
+		return c.checkMap(v, path)
 	case reflect.Slice, reflect.Array:
-		if alwaysFits(v.Type().Elem()) {
-			return nil
-		}
-		for i := range v.Len() {
-			if err := c.check(v.Index(i), fmt.Sprintf("%s[%d]", path, i)); err != nil {
-				return err
-			}
-		}
+		return c.checkList(v, path)
 	case reflect.Struct:
-		// Risor only exposes exported fields to scripts.
-		t := v.Type()
-		for i := range t.NumField() {
-			field := t.Field(i)
-			if !field.IsExported() {
-				continue
-			}
-			if err := c.check(v.Field(i), path+"."+field.Name); err != nil {
-				return err
-			}
+		return c.checkStruct(v, path)
+	}
+	return nil
+}
+
+// checkMap checks the values of a string-keyed map.
+func (c *uintChecker) checkMap(v reflect.Value, path string) error {
+	// Risor rejects non-string keys itself.
+	if v.Type().Key().Kind() != reflect.String || alwaysFits(v.Type().Elem()) ||
+		v.IsNil() || c.markSeen(v) {
+		return nil
+	}
+	iter := v.MapRange()
+	for iter.Next() {
+		if err := c.check(iter.Value(), fmt.Sprintf("%s[%q]", path, iter.Key().String())); err != nil {
+			return err
 		}
 	}
 	return nil
 }
 
+// checkList checks the elements of a slice or array.
+func (c *uintChecker) checkList(v reflect.Value, path string) error {
+	if alwaysFits(v.Type().Elem()) {
+		return nil
+	}
+	for i := range v.Len() {
+		if err := c.check(v.Index(i), fmt.Sprintf("%s[%d]", path, i)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// checkStruct checks the exported fields of a struct, the only ones Risor
+// exposes to scripts.
+func (c *uintChecker) checkStruct(v reflect.Value, path string) error {
+	t := v.Type()
+	for i := range t.NumField() {
+		field := t.Field(i)
+		if !field.IsExported() {
+			continue
+		}
+		if err := c.check(v.Field(i), path+"."+field.Name); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+var (
+	risorValuerType = reflect.TypeFor[object.RisorValuer]()
+	risorObjectType = reflect.TypeFor[object.Object]()
+)
+
+// convertsItself reports whether Risor converts values of type t without
+// looking at their kind: TypeRegistry.FromGo returns RisorValue() for an
+// object.RisorValuer and passes an object.Object through unchanged.
+func convertsItself(t reflect.Type) bool {
+	return t.Implements(risorValuerType) || t.Implements(risorObjectType)
+}
+
 // alwaysFits reports whether every value of type t converts to Risor without
 // overflow, so checkUintRange can skip walking a container of them.
 func alwaysFits(t reflect.Type) bool {
+	if convertsItself(t) {
+		return true
+	}
 	switch t.Kind() {
 	case reflect.Uint8, reflect.Uint16, reflect.Uint32,
 		reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,

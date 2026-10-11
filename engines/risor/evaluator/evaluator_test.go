@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	rObj "github.com/deepnoodle-ai/risor/v2/pkg/object"
 	"github.com/robbyt/go-polyscript/engines/risor/compiler"
 	"github.com/robbyt/go-polyscript/engines/types"
 	"github.com/robbyt/go-polyscript/internal/helpers"
@@ -829,6 +830,18 @@ func TestEval_ResultTypes(t *testing.T) {
 	}
 }
 
+// safeValuer converts itself to the Risor string "safe", so Risor never
+// reads its oversized field.
+type safeValuer struct{ Big uint64 }
+
+func (safeValuer) RisorValue() rObj.Object { return rObj.NewString("safe") }
+
+// safeUint is an unsigned type that converts itself to the Risor string
+// "safe" instead of being read as an integer.
+type safeUint uint64
+
+func (safeUint) RisorValue() rObj.Object { return rObj.NewString("safe") }
+
 // TestEval_UintRange is the evaluator-level regression for issue #165: an
 // unsigned input above math.MaxInt64 used to wrap silently (MaxUint64 read
 // back as -1); Eval must reject it, while in-range values still round-trip.
@@ -889,6 +902,38 @@ func TestEval_UintRange(t *testing.T) {
 			script:   `ctx["big"].Big`,
 			input:    map[string]any{"big": &holder{Big: math.MaxInt64}},
 			expected: int64(math.MaxInt64),
+		},
+		{
+			name:     "valuer struct with big field uses its own conversion",
+			input:    map[string]any{"big": safeValuer{Big: math.MaxUint64}},
+			expected: "safe",
+		},
+		{
+			name:     "valuer struct pointer with big field uses its own conversion",
+			input:    map[string]any{"big": &safeValuer{Big: math.MaxUint64}},
+			expected: "safe",
+		},
+		{
+			name:     "named uint valuer uses its own conversion",
+			input:    map[string]any{"big": safeUint(math.MaxUint64)},
+			expected: "safe",
+		},
+		{
+			name:     "map of named uint valuers uses their own conversion",
+			script:   `ctx["big"]["x"]`,
+			input:    map[string]any{"big": map[string]safeUint{"x": safeUint(math.MaxUint64)}},
+			expected: "safe",
+		},
+		{
+			name:     "slice of named uint valuers uses their own conversion",
+			script:   `ctx["big"][0]`,
+			input:    map[string]any{"big": []safeUint{safeUint(math.MaxUint64)}},
+			expected: "safe",
+		},
+		{
+			name:     "risor object passes through",
+			input:    map[string]any{"big": rObj.NewInt(7)},
+			expected: int64(7),
 		},
 	}
 

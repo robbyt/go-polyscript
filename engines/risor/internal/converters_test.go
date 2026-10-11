@@ -2,8 +2,10 @@ package internal
 
 import (
 	"math"
+	"reflect"
 	"testing"
 
+	"github.com/deepnoodle-ai/risor/v2/pkg/object"
 	"github.com/robbyt/go-polyscript/platform/constants"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -34,6 +36,24 @@ func TestBuildRisorEnv(t *testing.T) {
 		assert.Equal(t, "bar", ctxData["foo"])
 	})
 }
+
+// safeValuer converts itself to a Risor string, so Risor never reads its
+// oversized field.
+type safeValuer struct{ Big uint64 }
+
+func (safeValuer) RisorValue() object.Object { return object.NewString("safe") }
+
+// safeUint is an unsigned type that converts itself instead of being read as
+// an integer.
+type safeUint uint64
+
+func (safeUint) RisorValue() object.Object { return object.NewString("safe") }
+
+// ptrValuer converts itself only through its pointer, so a ptrValuer stored
+// by value is wrapped as a GoStruct and its fields are read.
+type ptrValuer struct{ Big uint64 }
+
+func (*ptrValuer) RisorValue() object.Object { return object.NewString("safe") }
 
 // TestBuildRisorEnv_UintRange is a regression for issue #165: Risor converts
 // unsigned integers with int64(rv.Uint()), so values above math.MaxInt64
@@ -87,6 +107,7 @@ func TestBuildRisorEnv_UintRange(t *testing.T) {
 			{"map in struct field", map[string]any{"s": outer{Nest: map[string]any{"x": big}}}},
 			{"slice of structs", map[string]any{"l": []inner{{Big: 1}, {Big: big}}}},
 			{"struct in pointer cycle", map[string]any{"n": badCycle}},
+			{"pointer-receiver valuer stored by value", map[string]any{"v": ptrValuer{Big: big}}},
 		}
 		for _, tc := range tests {
 			t.Run(tc.name, func(t *testing.T) {
@@ -142,5 +163,38 @@ func TestBuildRisorEnv_UintRange(t *testing.T) {
 				assert.Equal(t, tc.input, env[constants.Ctx], "input should be passed through unchanged")
 			})
 		}
+	})
+
+	t.Run("values risor converts itself are skipped", func(t *testing.T) {
+		tests := []struct {
+			name  string
+			input map[string]any
+		}{
+			{"valuer struct with big field", map[string]any{"v": safeValuer{Big: big}}},
+			{"valuer struct pointer with big field", map[string]any{"v": &safeValuer{Big: big}}},
+			{"pointer-receiver valuer by pointer", map[string]any{"v": &ptrValuer{Big: big}}},
+			{"named uint valuer", map[string]any{"v": safeUint(big)}},
+			{"map of named uint valuers", map[string]any{"m": map[string]safeUint{"x": safeUint(big)}}},
+			{"slice of named uint valuers", map[string]any{"l": []safeUint{safeUint(big)}}},
+			{"valuer in struct field", map[string]any{"s": struct{ V safeValuer }{safeValuer{Big: big}}}},
+			{"risor object", map[string]any{"o": object.NewInt(1)}},
+			{"map of risor objects", map[string]any{"m": map[string]object.Object{"x": object.NewInt(1)}}},
+			{"nil risor object in struct field", map[string]any{"s": struct{ O object.Object }{}}},
+			{"typed-nil valuer pointer", map[string]any{"v": (*safeValuer)(nil)}},
+			{"typed-nil pointer-receiver valuer", map[string]any{"v": (*ptrValuer)(nil)}},
+		}
+		for _, tc := range tests {
+			t.Run(tc.name, func(t *testing.T) {
+				env, err := BuildRisorEnv(constants.Ctx, tc.input)
+				require.NoError(t, err)
+				assert.Equal(t, tc.input, env[constants.Ctx], "input should be passed through unchanged")
+			})
+		}
+	})
+
+	t.Run("invalid value is skipped", func(t *testing.T) {
+		assert.NotPanics(t, func() {
+			assert.NoError(t, checkUintRange(reflect.Value{}, constants.Ctx))
+		})
 	})
 }
