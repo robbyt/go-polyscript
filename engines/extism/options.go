@@ -89,8 +89,8 @@ func WithContextTermination(enabled bool) Option {
 // such as a timeout for loading the module, and pass a long-lived ctx, or
 // context.Background() for no limit. If the ctx is already done when
 // construction finishes, [FromExtismLoader] closes what it built and
-// returns an error. A nil ctx means the constructor's ctx. The ctx holds
-// the evaluator only weakly: an evaluator dropped without Close is closed
+// returns an error. A nil ctx means the constructor's ctx. The ctx does not
+// keep the evaluator in memory: an evaluator dropped without Close is closed
 // once it is garbage collected, but Close releases the runtime sooner.
 func WithLifetime(ctx context.Context) Option {
 	return func(c *config) {

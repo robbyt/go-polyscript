@@ -622,7 +622,7 @@ func TestExecutableUnit_BindLifetime(t *testing.T) {
 			cancel()
 			synctest.Wait()
 			assert.Equal(t, int32(1), content.closeCalls.Load(), "the hook should fire only once")
-			runtime.KeepAlive(exe) // the hook holds the unit only weakly
+			runtime.KeepAlive(exe) // keep the unit reachable so its GC cleanup cannot close the content first
 		})
 	})
 
@@ -731,6 +731,23 @@ func TestExecutableUnit_BindLifetime(t *testing.T) {
 		assert.Equal(t, int32(1), content.closeCalls.Load(), "the lifetime hook must be gone once the unit is collected")
 	})
 
+	t.Run("unit dropped as its lifetime ends still has its content closed", func(t *testing.T) {
+		content := &countingClosableContent{}
+		cancel := bindUnusedUnit(t, content)
+		// End the lifetime and collect the unit at once, so the hook and the
+		// unit's GC cleanup race; whichever wins, the content is closed once.
+		cancel()
+		require.Eventually(t, func() bool {
+			runtime.GC()
+			return content.closeCalls.Load() == 1
+		}, 5*time.Second, 10*time.Millisecond, "the content of a unit dropped as its lifetime ends should be closed")
+		for range 5 {
+			runtime.GC()
+			time.Sleep(10 * time.Millisecond)
+		}
+		assert.Equal(t, int32(1), content.closeCalls.Load(), "the content should be closed exactly once")
+	})
+
 	t.Run("collecting a closed unit does not close its content again", func(t *testing.T) {
 		content := &countingClosableContent{}
 		func() {
@@ -759,6 +776,20 @@ func TestExecutableUnit_BindLifetime(t *testing.T) {
 		var exe *ExecutableUnit
 		require.NoError(t, exe.BindLifetime(t.Context()))
 	})
+}
+
+// endsWhenWatched is a lifetime that is still live when first checked but
+// ends as soon as something watches its Done channel, as context.AfterFunc
+// does while registering a hook. It models a lifetime that ends during
+// BindLifetime, between its check and the hook's registration.
+type endsWhenWatched struct {
+	context.Context
+	cancel context.CancelFunc
+}
+
+func (c endsWhenWatched) Done() <-chan struct{} {
+	c.cancel()
+	return c.Context.Done()
 }
 
 func TestExecutableUnit_BindLifetime_AlreadyDone(t *testing.T) {
@@ -799,6 +830,15 @@ func TestExecutableUnit_BindLifetime_AlreadyDone(t *testing.T) {
 				return ctx
 			},
 			wantErrs: []error{context.DeadlineExceeded},
+		},
+		{
+			name: "ends while the hook is registered",
+			lifetime: func() context.Context {
+				ctx, cancel := context.WithCancel(t.Context())
+				t.Cleanup(cancel)
+				return endsWhenWatched{Context: ctx, cancel: cancel}
+			},
+			wantErrs: []error{context.Canceled},
 		},
 		{
 			name: "content close error is joined",

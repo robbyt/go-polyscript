@@ -55,8 +55,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with a long-lived ctx or given one with `WithLifetime`. A lifetime ctx
   that is already done when construction finishes makes the constructor
   close what it built and return an error wrapping the ctx's error, on
-  every engine. The lifetime ctx holds the evaluator only weakly, so one
-  dropped without `Close` is still garbage collected, and its runtime is
+  every engine. The lifetime ctx does not keep the evaluator in memory, so
+  one dropped without `Close` is still garbage collected, and its runtime is
   closed then. ([#162](https://github.com/robbyt/go-polyscript/issues/162))
 - **BREAKING:** Extism `compiler.Executable.ByteCode` is unexported; use
   `GetExtismByteCode()` or the new `WithPlugin(ctx, fn)`, which holds the

@@ -268,7 +268,7 @@ func (be *Evaluator) AddDataToContext(
 //
 // The evaluator also closes itself this way when its lifetime ctx is done:
 // the ctx passed to the constructor, or the one given to WithLifetime. That
-// ctx holds the evaluator only weakly, so one dropped without Close is
+// ctx does not keep the evaluator in memory, so one dropped without Close is
 // closed once it is garbage collected; Close releases the runtime sooner.
 //
 // A data provider must not call Close with a ctx that is never done, or Eval,

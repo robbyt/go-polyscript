@@ -8,7 +8,6 @@ import (
 	"runtime"
 	"sync"
 	"time"
-	"weak"
 
 	engineTypes "github.com/robbyt/go-polyscript/engines/types"
 	"github.com/robbyt/go-polyscript/internal/helpers"
@@ -139,17 +138,18 @@ func (exe *ExecutableUnit) GetDataProvider() data.Provider {
 // not stored. Content without a Close method holds nothing to release, so
 // for it no hook is registered.
 //
-// The hook refers to the unit only weakly, so a long-lived lifetime does
-// not keep a unit that is no longer used in memory. If such a unit is
+// The hook refers to the content, not the unit, so a long-lived lifetime
+// does not keep a unit that is no longer used in memory. If such a unit is
 // garbage collected while still bound and not closed, its hook is
 // unregistered and its content is closed then. Call Close to release the
 // content promptly instead of waiting for the garbage collector.
 //
-// If lifetime is already done, BindLifetime closes the content right away
-// and returns an error that wraps lifetime's error and its cause, joined
-// with any error from closing the content. The caller should then discard
-// the unit. Binding again replaces the earlier lifetime. It returns an error
-// for a nil lifetime and is a no-op on a nil unit.
+// If lifetime is done by the time the hook is registered, BindLifetime
+// closes the content before returning and returns an error that wraps
+// lifetime's error and its cause, joined with any error from closing the
+// content. The caller should then discard the unit. Binding again replaces
+// the earlier lifetime. It returns an error for a nil lifetime and is a
+// no-op on a nil unit.
 func (exe *ExecutableUnit) BindLifetime(lifetime context.Context) error {
 	if exe == nil {
 		return nil
@@ -157,32 +157,45 @@ func (exe *ExecutableUnit) BindLifetime(lifetime context.Context) error {
 	if lifetime == nil {
 		return errors.New("lifetime context is nil")
 	}
-	if lifetime.Err() != nil {
-		err := lifetimeEndedError(lifetime)
-		if closeErr := exe.closeContent(context.WithoutCancel(lifetime)); closeErr != nil {
-			err = errors.Join(err, fmt.Errorf("failed to close content: %w", closeErr))
-		}
-		return err
-	}
 	closer, ok := exe.content.(contentCloser)
 	if !ok {
+		if lifetime.Err() != nil {
+			return lifetimeEndedError(lifetime, nil)
+		}
 		return nil
 	}
 
-	unit := weak.Make(exe)
+	release := context.WithoutCancel(lifetime)
+	if lifetime.Err() != nil {
+		return lifetimeEndedError(lifetime, closer.Close(release))
+	}
+
+	logger := exe.logger
+	hookDone := make(chan struct{})
+	var hookErr error
 	stop := context.AfterFunc(lifetime, func() {
-		u := unit.Value()
-		if u == nil {
-			return
-		}
-		if err := u.closeContent(context.WithoutCancel(lifetime)); err != nil {
-			u.logger.Warn("failed to close content when its lifetime ended", "error", err)
+		defer close(hookDone)
+		hookErr = closer.Close(release)
+		if hookErr != nil {
+			logger.Warn("failed to close content when its lifetime ended", "error", hookErr)
 		}
 	})
+	// Check again now the hook is registered, so a lifetime that ends at any
+	// point before BindLifetime returns is reported instead of closing the
+	// content behind the caller's back. The content is closed exactly once:
+	// here if stop unregistered the hook, otherwise by the hook, whose result
+	// is waited for.
+	if lifetime.Err() != nil {
+		if stop() {
+			return lifetimeEndedError(lifetime, closer.Close(release))
+		}
+		<-hookDone
+		return lifetimeEndedError(lifetime, hookErr)
+	}
 	runtime.AddCleanup(exe, closeUnreachable, unreachableUnit{
 		stop:   stop,
 		closer: closer,
-		logger: exe.logger,
+		logger: logger,
 	})
 
 	exe.lifetimeMu.Lock()
@@ -221,13 +234,18 @@ func closeUnreachable(u unreachableUnit) {
 
 // lifetimeEndedError reports that lifetime was done before the unit could be
 // bound to it. It wraps both ctx.Err() and, when it differs, the cause, so
-// errors.Is matches either.
-func lifetimeEndedError(lifetime context.Context) error {
+// errors.Is matches either, joined with closeErr from closing the content.
+func lifetimeEndedError(lifetime context.Context, closeErr error) error {
 	err := lifetime.Err()
 	if cause := context.Cause(lifetime); cause != nil && !errors.Is(err, cause) {
-		return fmt.Errorf("lifetime context ended before construction finished: %w (cause: %w)", err, cause)
+		err = fmt.Errorf("lifetime context ended before construction finished: %w (cause: %w)", err, cause)
+	} else {
+		err = fmt.Errorf("lifetime context ended before construction finished: %w", err)
 	}
-	return fmt.Errorf("lifetime context ended before construction finished: %w", err)
+	if closeErr != nil {
+		err = errors.Join(err, fmt.Errorf("failed to close content: %w", closeErr))
+	}
+	return err
 }
 
 // Close releases resources held by the compiled content. Content that
