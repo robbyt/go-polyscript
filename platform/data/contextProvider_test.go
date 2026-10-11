@@ -188,12 +188,12 @@ func TestContextProvider_AddDataToContext(t *testing.T) {
 
 	t.Run("empty context key", func(t *testing.T) {
 		provider := NewContextProvider("")
-		ctx := t.Context()
+		ctx := newBaseCtxHelper(t)
 
 		newCtx, err := provider.AddDataToContext(ctx, map[string]any{"key": "value"})
 
 		require.Error(t, err, "Should return error for empty context key")
-		assert.Equal(t, ctx, newCtx, "Context should remain unchanged")
+		assert.Same(t, ctx, newCtx, "Context should remain unchanged")
 	})
 
 	t.Run("nil input data", func(t *testing.T) {
@@ -266,20 +266,41 @@ func TestContextProvider_AddDataToContext(t *testing.T) {
 		assert.Equal(t, "/test", requestData["URL_Path"], "Should contain request path")
 	})
 
-	t.Run("empty string keys are rejected", func(t *testing.T) {
-		provider := NewContextProvider(constants.EvalData)
-		ctx := t.Context()
+	t.Run("invalid keys return the original ctx", func(t *testing.T) {
+		tests := []struct {
+			name    string
+			input   map[string]any
+			wantErr string
+		}{
+			{
+				name:    "empty top-level key",
+				input:   map[string]any{"valid": "data", "": "value"},
+				wantErr: "empty keys are not allowed",
+			},
+			{
+				name:    "empty nested key",
+				input:   map[string]any{"valid": "data", "nested": map[string]any{"": 1}},
+				wantErr: "empty keys are not allowed in nested maps",
+			},
+		}
+		for _, tc := range tests {
+			t.Run(tc.name, func(t *testing.T) {
+				provider := NewContextProvider(constants.EvalData)
+				parentCtx, err := provider.AddDataToContext(
+					newBaseCtxHelper(t), map[string]any{"existing": "kept"})
+				require.NoError(t, err)
 
-		// Try to add data with an empty key
-		newCtx, err := provider.AddDataToContext(ctx, map[string]any{"": "value"})
+				newCtx, err := provider.AddDataToContext(parentCtx, tc.input)
 
-		require.Error(t, err, "Should error with empty key")
-		assert.Contains(t, err.Error(), "empty keys are not allowed")
-
-		// Context should be modified but the empty key should not be added
-		data, getErr := provider.GetData(newCtx)
-		require.NoError(t, getErr)
-		assert.NotContains(t, data, "", "Empty key should not be added")
+				require.Error(t, err, "an invalid key should be reported")
+				assert.Contains(t, err.Error(), tc.wantErr)
+				assert.Same(t, parentCtx, newCtx, "the original ctx should be returned on error")
+				data, getErr := provider.GetData(newCtx)
+				require.NoError(t, getErr)
+				assert.Equal(t, map[string]any{"existing": "kept"}, data,
+					"none of the new data, valid keys included, should be stored")
+			})
+		}
 	})
 
 	t.Run("nested maps are processed recursively", func(t *testing.T) {

@@ -190,9 +190,16 @@ a copy of the data you pass in.
 `data.ErrStaticProviderNoRuntimeUpdates` rejection (from a `StaticProvider`, or a
 nested `CompositeProvider` holding only static providers) is ignored when another
 provider stores the data. Any other failure is returned (joined with `errors.Join`)
-together with the most updated context, which still carries the data from the
-providers that succeeded. A composite with nothing to store into (no non-nil
-providers, or only empty nested composites) returns `data.ErrNoProviders`.
+together with the original context; the data stored by the providers that
+succeeded is discarded with their contexts. A composite with nothing to store into
+(no non-nil providers, or only empty nested composites) returns `data.ErrNoProviders`.
+
+Every provider follows the same rule: on any error, `AddDataToContext()` returns
+the context it was given, never one carrying part of the data. `ContextProvider`
+stores none of the data when any entry is invalid (an empty key, or a request
+it cannot convert). This is not a rollback: the composite still calls every
+provider, and side effects such as `ContextProvider` reading an HTTP request body
+are not undone.
 
 Example of the provider chain:
 

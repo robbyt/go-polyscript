@@ -65,10 +65,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   evaluator's resources when it is garbage collected.
   ([#162](https://github.com/robbyt/go-polyscript/issues/162))
 - **BREAKING:** `CompositeProvider.AddDataToContext` now returns the joined
-  errors whenever a provider fails, together with the context carrying
-  every successful provider's data, instead of returning `nil` as long as
-  one provider succeeded. Nested composites and wrapped static providers
-  are judged by the error they return, not by their type.
+  errors whenever a provider fails, and the original context, instead of
+  returning `nil` as long as one provider succeeded. Nested composites and
+  wrapped static providers are judged by the error they return, not by
+  their type. `ContextProvider.AddDataToContext` likewise returns the
+  original context, storing none of the data, when any entry is invalid.
+  The original context is not a rollback: side effects such as reading an
+  HTTP request body are not undone.
   ([#160](https://github.com/robbyt/go-polyscript/issues/160))
 - `StaticProvider` and `ContextProvider` copy data on the way in and out:
   `NewStaticProvider` stores a deep copy of the caller's map,

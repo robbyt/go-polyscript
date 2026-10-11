@@ -109,10 +109,10 @@ func deepMerge(src, dst map[string]any) map[string]any {
 // a real failure is a real failure.
 //
 // The result is decided once every provider has been tried:
-//   - Any provider failed: the most updated context, carrying the data of
-//     every provider that succeeded, and all the failures joined with
-//     errors.Join. Expected rejections are not included. Callers that can
-//     tolerate partial storage may keep using the returned context.
+//   - Any provider failed: the original ctx and all the failures joined
+//     with errors.Join. Expected rejections are not included. The contexts
+//     built by the providers that succeeded are discarded, so a nested
+//     composite never hands partial data to its parent.
 //   - Otherwise, if at least one provider stored the data: the most
 //     updated context and nil.
 //   - Otherwise, if some provider rejected the data as static: the
@@ -120,6 +120,11 @@ func deepMerge(src, dst map[string]any) map[string]any {
 //   - Otherwise there was nothing to store into (no providers, only nil
 //     slots, or only empty nested composites): the original ctx and
 //     ErrNoProviders.
+//
+// Returning the original ctx is not a rollback. Every provider is still
+// called after a failure, and anything a provider did besides building a
+// context is not undone: a ContextProvider may already have read an HTTP
+// request body, for example. Only the derived contexts are thrown away.
 //
 // Example:
 //
@@ -153,8 +158,11 @@ func (p *CompositeProvider) AddDataToContext(
 		finalCtx = nextCtx
 	}
 
-	// finalCtx is still ctx when no provider succeeded.
-	return finalCtx, tally.finalErr()
+	if err := tally.finalErr(); err != nil {
+		// Discard every derived context, so callers never see partial data.
+		return ctx, err
+	}
+	return finalCtx, nil
 }
 
 // addDataTally accumulates the per-provider outcomes of
@@ -181,7 +189,7 @@ func (t *addDataTally) recordError(i int, err error) {
 }
 
 // finalErr returns the error AddDataToContext should report alongside the
-// accumulated context, or nil when every provider that can store data did.
+// original ctx, or nil when every provider that can store data did.
 func (t *addDataTally) finalErr() error {
 	switch {
 	case len(t.errs) > 0:

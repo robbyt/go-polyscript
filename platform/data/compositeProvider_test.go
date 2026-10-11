@@ -1018,9 +1018,9 @@ func TestCompositeProvider_AddDataToContext_EdgeCases(t *testing.T) {
 }
 
 // TestCompositeProvider_AddDataToContext_PartialFailure is the regression
-// test for #160: when some providers fail and others succeed, the error is
-// reported and the returned context still carries the successful
-// providers' data.
+// test for #160: when some providers fail and others succeed, every
+// provider is still called and every failure is reported, together with
+// the original ctx. The successful providers' data is not returned.
 func TestCompositeProvider_AddDataToContext_PartialFailure(t *testing.T) {
 	t.Parallel()
 
@@ -1043,21 +1043,43 @@ func TestCompositeProvider_AddDataToContext_PartialFailure(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			failing := new(MockProvider)
 			failing.On("AddDataToContext", mock.Anything, mock.Anything).Return(nil, assert.AnError)
-			ctxProvider := NewContextProvider(constants.EvalData)
+			ctxProvider := &countingProvider{Provider: NewContextProvider(constants.EvalData)}
 			composite := tc.build(failing, ctxProvider)
 
-			ctx, err := composite.AddDataToContext(t.Context(), map[string]any{"k": "v"})
+			baseCtx := newBaseCtxHelper(t)
+			ctx, err := composite.AddDataToContext(baseCtx, map[string]any{"k": "v"})
 
 			require.ErrorIs(t, err, assert.AnError, "partial failure must be reported")
 			require.NotErrorIs(t, err, ErrStaticProviderNoRuntimeUpdates,
 				"static rejections should not be reported when other providers exist")
-			require.NotNil(t, ctx)
-			got, getErr := ctxProvider.GetData(ctx)
-			require.NoError(t, getErr)
-			assert.Equal(t, "v", got["k"], "successful provider's data should be in the returned ctx")
+			assert.Same(t, baseCtx, ctx, "the original ctx should be returned on any failure")
+			assert.Nil(t, ctx.Value(constants.EvalData), "no provider's data should be in the returned ctx")
+			assert.Equal(t, int32(1), ctxProvider.calls.Load(), "the succeeding provider should still be called")
 			failing.AssertExpectations(t)
 		})
 	}
+
+	t.Run("every failure around a success is joined", func(t *testing.T) {
+		errA := errors.New("first failure")
+		errB := errors.New("second failure")
+		first := new(MockProvider)
+		first.On("AddDataToContext", mock.Anything, mock.Anything).Return(nil, errA)
+		last := new(MockProvider)
+		last.On("AddDataToContext", mock.Anything, mock.Anything).Return(nil, errB)
+		ctxProvider := &countingProvider{Provider: NewContextProvider(constants.EvalData)}
+
+		baseCtx := newBaseCtxHelper(t)
+		ctx, err := NewCompositeProvider(first, ctxProvider, last).
+			AddDataToContext(baseCtx, map[string]any{"k": "v"})
+
+		require.ErrorIs(t, err, errA, "the first failure should be kept")
+		require.ErrorIs(t, err, errB, "the last failure should be kept")
+		assert.Same(t, baseCtx, ctx, "the original ctx should be returned on any failure")
+		assert.Nil(t, ctx.Value(constants.EvalData), "no provider's data should be in the returned ctx")
+		assert.Equal(t, int32(1), ctxProvider.calls.Load(), "the succeeding provider should still be called")
+		first.AssertExpectations(t)
+		last.AssertExpectations(t)
+	})
 }
 
 // TestCompositeProvider_AddDataToContext_Nested checks that a
@@ -1143,14 +1165,44 @@ func TestCompositeProvider_AddDataToContext_Nested(t *testing.T) {
 	t.Run("inner failure is still reported", func(t *testing.T) {
 		failing := new(MockProvider)
 		failing.On("AddDataToContext", mock.Anything, mock.Anything).Return(nil, assert.AnError)
-		ctxProvider := NewContextProvider(constants.EvalData)
+		ctxProvider := &countingProvider{Provider: NewContextProvider(constants.EvalData)}
 		outer := NewCompositeProvider(NewCompositeProvider(failing), ctxProvider)
 
-		ctx, err := outer.AddDataToContext(t.Context(), map[string]any{"k": "v"})
+		baseCtx := newBaseCtxHelper(t)
+		ctx, err := outer.AddDataToContext(baseCtx, map[string]any{"k": "v"})
 		require.ErrorIs(t, err, assert.AnError)
-		got, getErr := ctxProvider.GetData(ctx)
-		require.NoError(t, getErr)
-		assert.Equal(t, "v", got["k"], "the outer context provider's data should still be stored")
+		assert.Same(t, baseCtx, ctx, "the original ctx should be returned on any failure")
+		assert.Nil(t, ctx.Value(constants.EvalData), "the outer context provider's data should not be returned")
+		assert.Equal(t, int32(1), ctxProvider.calls.Load(), "the outer context provider should still be called")
+		failing.AssertExpectations(t)
+	})
+
+	t.Run("outer failure discards a successful inner composite", func(t *testing.T) {
+		failing := new(MockProvider)
+		failing.On("AddDataToContext", mock.Anything, mock.Anything).Return(nil, assert.AnError)
+		ctxProvider := &countingProvider{Provider: NewContextProvider(constants.EvalData)}
+		outer := NewCompositeProvider(NewCompositeProvider(ctxProvider), failing)
+
+		baseCtx := newBaseCtxHelper(t)
+		ctx, err := outer.AddDataToContext(baseCtx, map[string]any{"k": "v"})
+		require.ErrorIs(t, err, assert.AnError)
+		assert.Same(t, baseCtx, ctx, "the original ctx should be returned on any failure")
+		assert.Nil(t, ctx.Value(constants.EvalData), "the inner composite's data should not be returned")
+		assert.Equal(t, int32(1), ctxProvider.calls.Load(), "the inner composite should still be called")
+		failing.AssertExpectations(t)
+	})
+
+	t.Run("inner partial failure returns the original ctx", func(t *testing.T) {
+		failing := new(MockProvider)
+		failing.On("AddDataToContext", mock.Anything, mock.Anything).Return(nil, assert.AnError)
+		innerCtxProvider := &countingProvider{Provider: NewContextProvider(constants.EvalData)}
+		inner := NewCompositeProvider(innerCtxProvider, failing)
+
+		baseCtx := newBaseCtxHelper(t)
+		ctx, err := inner.AddDataToContext(baseCtx, map[string]any{"k": "v"})
+		require.ErrorIs(t, err, assert.AnError)
+		assert.Same(t, baseCtx, ctx, "a nested composite must not hand partial data to its parent")
+		assert.Equal(t, int32(1), innerCtxProvider.calls.Load())
 		failing.AssertExpectations(t)
 	})
 

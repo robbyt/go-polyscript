@@ -53,6 +53,18 @@ func (p *ContextProvider) GetData(ctx context.Context) (map[string]any, error) {
 //
 // See README.md for detailed usage examples.
 //
+// # Errors
+//
+// Every key is checked, and all the problems found (an empty key at any
+// depth, or a value that cannot be converted) are returned joined with
+// errors.Join, together with the original ctx. None of the data is stored
+// when any of it is invalid, valid keys included.
+//
+// Returning the original ctx is not a rollback: values are processed
+// before the error is reported, so an *http.Request body may already have
+// been read by helpers.RequestToMap. Only the derived context is thrown
+// away.
+//
 // # Concurrency
 //
 // AddDataToContext is safe for concurrent use. Each call returns a
@@ -116,8 +128,11 @@ func (p *ContextProvider) AddDataToContext(
 		p.mergeIntoMap(toStore, key, processedValue, &errz)
 	}
 
-	newCtx := context.WithValue(ctx, p.contextKey, toStore)
-	return newCtx, errors.Join(errz...)
+	if len(errz) > 0 {
+		// Discard the partly built map, so callers never see partial data.
+		return ctx, errors.Join(errz...)
+	}
+	return context.WithValue(ctx, p.contextKey, toStore), nil
 }
 
 // processValue converts values to appropriate types for storage. It

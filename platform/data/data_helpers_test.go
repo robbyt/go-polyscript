@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/url"
+	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -60,6 +61,32 @@ func (m *MockProvider) AddDataToContext(
 	args := m.Called(ctx, data)
 	newCtx, _ := args.Get(0).(context.Context)
 	return newCtx, args.Error(1)
+}
+
+// baseCtxKey keys the marker value stored by newBaseCtxHelper.
+type baseCtxKey struct{}
+
+// newBaseCtxHelper returns a pointer-backed context carrying a marker
+// value, so error-path tests can check with assert.Same that a provider
+// returned exactly the ctx it was given rather than one derived from it.
+func newBaseCtxHelper(t *testing.T) context.Context {
+	t.Helper()
+	return context.WithValue(t.Context(), baseCtxKey{}, "base")
+}
+
+// countingProvider wraps a Provider and counts its AddDataToContext calls,
+// so tests can check that a CompositeProvider still called every provider.
+type countingProvider struct {
+	Provider
+	calls atomic.Int32
+}
+
+func (p *countingProvider) AddDataToContext(
+	ctx context.Context,
+	data map[string]any,
+) (context.Context, error) {
+	p.calls.Add(1)
+	return p.Provider.AddDataToContext(ctx, data)
 }
 
 // newMockErrorProvider creates a mock provider that returns errors

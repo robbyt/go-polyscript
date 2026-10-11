@@ -6,6 +6,7 @@ import (
 
 	"github.com/robbyt/go-polyscript/platform/constants"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -230,5 +231,28 @@ func TestAddDataToContextWithErrorHandling(t *testing.T) {
 		// No data should be added to context
 		data := enrichedCtx.Value(constants.EvalData)
 		assert.Nil(t, data, "Context should not have data added when there's an error")
+	})
+
+	t.Run("composite partial failure matches a direct call", func(t *testing.T) {
+		failing := new(MockProvider)
+		failing.On("AddDataToContext", mock.Anything, mock.Anything).Return(nil, assert.AnError)
+		ctxProvider := NewContextProvider(constants.EvalData)
+		composite := NewCompositeProvider(ctxProvider, failing)
+		input := map[string]any{"k": "v"}
+		baseCtx := newBaseCtxHelper(t)
+
+		directCtx, directErr := composite.AddDataToContext(baseCtx, input)
+		helperCtx, helperErr := AddDataToContextHelper(baseCtx, handler, composite, input)
+
+		require.ErrorIs(t, directErr, assert.AnError)
+		require.ErrorIs(t, helperErr, assert.AnError)
+		directData, err := ctxProvider.GetData(directCtx)
+		require.NoError(t, err)
+		helperData, err := ctxProvider.GetData(helperCtx)
+		require.NoError(t, err)
+		assert.Equal(t, helperData, directData, "a direct call and the helper should return the same data")
+		assert.Same(t, baseCtx, directCtx, "a direct call should return the original ctx on error")
+		assert.Same(t, baseCtx, helperCtx, "the helper should return the original ctx on error")
+		failing.AssertExpectations(t)
 	})
 }
