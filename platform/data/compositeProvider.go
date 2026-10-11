@@ -87,9 +87,9 @@ func deepMerge(src, dst map[string]any) map[string]any {
 // Example:
 //
 //	ctx := context.Background()
-//	staticProvider := NewStaticProvider(map[string]any{"config": configData})
-//	contextProvider := NewContextProvider(constants.EvalData)
-//	composite := NewCompositeProvider(staticProvider, contextProvider)
+//	staticProvider := data.NewStaticProvider(map[string]any{"config": configData})
+//	contextProvider := data.NewContextProvider(constants.EvalData)
+//	composite := data.NewCompositeProvider(staticProvider, contextProvider)
 //	ctx, err := composite.AddDataToContext(ctx, userData)
 func (p *CompositeProvider) AddDataToContext(
 	ctx context.Context,

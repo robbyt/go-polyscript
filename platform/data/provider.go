@@ -22,12 +22,13 @@ type Setter interface {
 	// map; merge ahead of time when you have multiple sources.
 	//
 	// Example:
-	//  scriptData := map[string]any{"greeting": "Hello, World!", "request": request}
-	//  enrichedCtx, err := evaluator.AddDataToContext(ctx, scriptData)
-	//  if err != nil {
-	//      return err
-	//  }
-	//  result, err := evaluator.Eval(enrichedCtx)
+	//
+	//	scriptData := map[string]any{"greeting": "Hello, World!", "request": request}
+	//	enrichedCtx, err := evaluator.AddDataToContext(ctx, scriptData)
+	//	if err != nil {
+	//		return err
+	//	}
+	//	result, err := evaluator.Eval(enrichedCtx)
 	AddDataToContext(ctx context.Context, data map[string]any) (context.Context, error)
 }
 

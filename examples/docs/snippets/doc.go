@@ -1,6 +1,7 @@
 // Package snippets holds the source of the Go code fragments shown in
-// README.md and in the package documentation of polyscript.go and
-// engines/{risor,starlark,extism}/new.go. Complete programs shown in
+// README.md and in the doc comments of the module's Go files, such as
+// polyscript.go, engines/{risor,starlark,extism}/new.go, and the platform
+// packages (godoc_platform.go). Complete programs shown in
 // README.md live beside this package, in examples/docs/quickstart and
 // examples/docs/extism.
 //

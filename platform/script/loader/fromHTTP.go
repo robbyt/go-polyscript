@@ -204,9 +204,9 @@ type FromHTTP struct {
 //
 // Example:
 //
-//	loader, err := loader.NewFromHTTP("https://localhost:8080/script.js")
+//	httpLoader, err := loader.NewFromHTTP(scriptURL)
 //	if err != nil {
-//	    return err
+//		return err
 //	}
 //
 // See also NewFromHTTPWithOptions for more customization options.
@@ -217,19 +217,15 @@ func NewFromHTTP(rawURL string) (*FromHTTP, error) {
 // NewFromHTTPWithOptions creates a new HTTP loader with the given URL and custom options.
 // Use this when you need authentication, custom timeouts, or other HTTP configuration.
 //
-// Examples:
+// Example:
 //
-//	// With basic auth
-//	options := loader.DefaultHTTPOptions().WithBasicAuth("user", "pass")
-//	loader, err := loader.NewFromHTTPWithOptions("https://localhost:8080/script.js", options)
-//
-//	// With bearer token
-//	options := loader.DefaultHTTPOptions().WithBearerAuth("token123")
-//	loader, err := loader.NewFromHTTPWithOptions("https://localhost:8080/script.js", options)
-//
-//	// With custom timeout
-//	options := loader.DefaultHTTPOptions().WithTimeout(10 * time.Second)
-//	loader, err := loader.NewFromHTTPWithOptions("https://localhost:8080/script.js", options)
+//	opts := loader.DefaultHTTPOptions().
+//		WithBasicAuth("user", "pass"). // or WithBearerAuth("token123")
+//		WithTimeout(10 * time.Second)
+//	httpLoader, err := loader.NewFromHTTPWithOptions(scriptURL, opts)
+//	if err != nil {
+//		return err
+//	}
 //
 // A nil options is treated as DefaultHTTPOptions().
 func NewFromHTTPWithOptions(rawURL string, options *HTTPOptions) (*FromHTTP, error) {

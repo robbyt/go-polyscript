@@ -19,13 +19,8 @@ import (
 
 // FromExtismFile creates an Extism evaluator from a WASM file.
 //
-// Deprecated: use [New] with [Extism], [FromFile], and [WithEntryPoint] instead:
-//
-//	eval, err := polyscript.New[polyscript.Extism](
-//	    polyscript.FromFile(filePath),
-//	    polyscript.WithLogHandler[polyscript.Extism](logHandler),
-//	    polyscript.WithEntryPoint(entryPoint),
-//	)
+// Deprecated: use [New] with [Extism], [FromFile], [WithLogHandler], and
+// [WithEntryPoint] instead.
 func FromExtismFile(
 	filePath string,
 	logHandler slog.Handler,

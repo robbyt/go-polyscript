@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"path/filepath"
 
+	"github.com/robbyt/go-polyscript"
 	"github.com/robbyt/go-polyscript/engines/extism/wasmdata"
 	"github.com/robbyt/go-polyscript/platform/constants"
 	"github.com/robbyt/go-polyscript/platform/data"
@@ -197,4 +198,63 @@ func Example_godocExtismOptions() {
 	check(godocExtismOptions(context.Background(), ldr))
 	// Output:
 	// map[greeting:Hello, World!]
+}
+
+// basicAuthServer returns a test server that serves body to requests with
+// the user and pass Basic credentials the platform fragments use.
+func basicAuthServer(body string) *httptest.Server {
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if user, pass, ok := r.BasicAuth(); !ok || user != "user" || pass != "pass" {
+			http.Error(w, "missing basic auth", http.StatusUnauthorized)
+			return
+		}
+		_, err := fmt.Fprint(w, body)
+		check(err)
+	}))
+}
+
+func Example_godocCompositeAddData() {
+	check(godocCompositeAddData(map[string]any{"debug": true}, map[string]any{"name": "World"}))
+	// Output:
+	// map[config:map[debug:true] name:World]
+}
+
+func Example_godocSetterAddData() {
+	ctx := context.Background()
+	evaluator, err := polyscript.New[polyscript.Risor](ctx, polyscript.FromString(`ctx["greeting"]`))
+	check(err)
+	request := httptest.NewRequest(http.MethodGet, "/greet", nil)
+	check(godocSetterAddData(ctx, evaluator, request))
+	// Output:
+	// Hello, World!
+}
+
+func Example_godocHTTPOptions() {
+	srv := basicAuthServer(`"Hello from HTTPOptions"`)
+	defer srv.Close()
+
+	check(godocHTTPOptions(context.Background(), srv.URL+"/script.risor"))
+	// Output:
+	// "Hello from HTTPOptions"
+}
+
+func Example_godocNewFromHTTP() {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, err := fmt.Fprint(w, `"Hello from NewFromHTTP"`)
+		check(err)
+	}))
+	defer srv.Close()
+
+	check(godocNewFromHTTP(context.Background(), srv.URL+"/script.risor"))
+	// Output:
+	// "Hello from NewFromHTTP"
+}
+
+func Example_godocNewFromHTTPWithOptions() {
+	srv := basicAuthServer(`"Hello from NewFromHTTPWithOptions"`)
+	defer srv.Close()
+
+	check(godocNewFromHTTPWithOptions(context.Background(), srv.URL+"/script.risor"))
+	// Output:
+	// "Hello from NewFromHTTPWithOptions"
 }
