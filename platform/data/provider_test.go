@@ -411,11 +411,7 @@ func TestProvider_GetData_ConcurrentMutation(t *testing.T) {
 
 	wantComposite := nestedFixtureHelper()
 	wantComposite["static"] = nestedFixtureHelper()
-	readers := []struct {
-		name   string
-		getter Getter
-		want   map[string]any
-	}{
+	readers := []concurrentReader{
 		{"static", static, map[string]any{"static": nestedFixtureHelper()}},
 		{"context", ctxProvider, nestedFixtureHelper()},
 		{"composite", composite, wantComposite},
@@ -427,52 +423,11 @@ func TestProvider_GetData_ConcurrentMutation(t *testing.T) {
 	var wg sync.WaitGroup
 	for _, r := range readers {
 		for range goroutinesPerRole {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				for range iterations {
-					got, err := r.getter.GetData(parent)
-					if !assert.NoErrorf(t, err, "%s GetData", r.name) {
-						return
-					}
-					targets := []map[string]any{got}
-					if nested, ok := got["static"].(map[string]any); ok {
-						targets = append(targets, nested)
-					}
-					for _, target := range targets {
-						if _, ok := target["cfg"]; !ok {
-							continue
-						}
-						for _, m := range fixtureMutationsHelper {
-							m.mutate(target)
-						}
-					}
-				}
-			}()
+			wg.Go(func() { mutateGetDataHelper(t, parent, r, iterations) })
 		}
 	}
 	for range goroutinesPerRole {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for j := range iterations {
-				next, err := composite.AddDataToContext(parent, map[string]any{
-					"cfg": map[string]any{"x": j},
-				})
-				if !assert.NoErrorf(t, err, "AddDataToContext iter %d", j) {
-					return
-				}
-				got, err := composite.GetData(next)
-				if !assert.NoErrorf(t, err, "GetData iter %d", j) {
-					return
-				}
-				cfg, ok := got["cfg"].(map[string]any)
-				if !assert.True(t, ok, "cfg should be a map") {
-					return
-				}
-				assert.Equal(t, j, cfg["x"])
-			}
-		}()
+		wg.Go(func() { addAndVerifyHelper(t, parent, composite, iterations) })
 	}
 	wg.Wait()
 
@@ -480,5 +435,74 @@ func TestProvider_GetData_ConcurrentMutation(t *testing.T) {
 		got, err := r.getter.GetData(parent)
 		require.NoError(t, err)
 		assert.Equal(t, r.want, got, "%s provider state must be unchanged", r.name)
+	}
+}
+
+// concurrentReader is a provider that TestProvider_GetData_ConcurrentMutation
+// reads from concurrently, with the data it must still return afterwards.
+type concurrentReader struct {
+	name   string
+	getter Getter
+	want   map[string]any
+}
+
+// mutateGetDataHelper calls GetData on parent iterations times and applies
+// every fixtureMutationsHelper mutation to each fixture-shaped map in the result.
+// It runs on a non-test goroutine, so failures use t.Errorf, never FailNow.
+func mutateGetDataHelper(t *testing.T, parent context.Context, r concurrentReader, iterations int) {
+	t.Helper()
+	for range iterations {
+		got, err := r.getter.GetData(parent)
+		if err != nil {
+			t.Errorf("%s GetData: %v", r.name, err)
+			return
+		}
+		for _, target := range fixtureTargetsHelper(got) {
+			for _, m := range fixtureMutationsHelper {
+				m.mutate(target)
+			}
+		}
+	}
+}
+
+// fixtureTargetsHelper returns got and its "static" sub-map, keeping only the
+// maps shaped like nestedFixtureHelper (those with a "cfg" key).
+func fixtureTargetsHelper(got map[string]any) []map[string]any {
+	candidates := []map[string]any{got}
+	if nested, ok := got["static"].(map[string]any); ok {
+		candidates = append(candidates, nested)
+	}
+	var targets []map[string]any
+	for _, c := range candidates {
+		if _, ok := c["cfg"]; ok {
+			targets = append(targets, c)
+		}
+	}
+	return targets
+}
+
+// addAndVerifyHelper derives a new context from parent iterations times with
+// AddDataToContext and checks that GetData on it returns the value just added.
+// It runs on a non-test goroutine, so failures use t.Errorf, never FailNow.
+func addAndVerifyHelper(t *testing.T, parent context.Context, composite *CompositeProvider, iterations int) {
+	t.Helper()
+	for j := range iterations {
+		next, err := composite.AddDataToContext(parent, map[string]any{
+			"cfg": map[string]any{"x": j},
+		})
+		if err != nil {
+			t.Errorf("AddDataToContext iter %d: %v", j, err)
+			return
+		}
+		got, err := composite.GetData(next)
+		if err != nil {
+			t.Errorf("GetData iter %d: %v", j, err)
+			return
+		}
+		cfg, ok := got["cfg"].(map[string]any)
+		if !assert.True(t, ok, "cfg should be a map") {
+			return
+		}
+		assert.Equal(t, j, cfg["x"])
 	}
 }
