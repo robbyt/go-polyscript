@@ -125,6 +125,12 @@ func TestEvaluator_Close(t *testing.T) {
 		evaluator := New(nil, nil)
 		require.NoError(t, evaluator.Close(t.Context()))
 	})
+
+	t.Run("nil evaluator", func(t *testing.T) {
+		var evaluator *Evaluator
+		require.NoError(t, evaluator.Close(t.Context()),
+			"Close on a nil evaluator (e.g. from a failed constructor) must not panic")
+	})
 }
 
 // TestEvaluator_Evaluate tests evaluating Risor scripts

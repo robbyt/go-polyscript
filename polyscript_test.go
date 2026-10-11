@@ -209,6 +209,45 @@ func TestEvaluatorClose_NoResourceEngines(t *testing.T) {
 	}
 }
 
+// TestNew_FailureReturnsNilEvaluator verifies a failed New returns an untyped
+// nil platform.Evaluator rather than an interface wrapping a nil engine
+// pointer, so the usual `if err != nil` / `eval != nil` checks hold and no
+// caller ends up calling Close on a typed nil.
+func TestNew_FailureReturnsNilEvaluator(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		create func(ctx context.Context) (platform.Evaluator, error)
+	}{
+		{"Risor compile error", func(ctx context.Context) (platform.Evaluator, error) {
+			return polyscript.New[polyscript.Risor](ctx, polyscript.FromString("func ("))
+		}},
+		{"Starlark compile error", func(ctx context.Context) (platform.Evaluator, error) {
+			return polyscript.New[polyscript.Starlark](ctx, polyscript.FromString("def ("))
+		}},
+		{"Extism compile error", func(ctx context.Context) (platform.Evaluator, error) {
+			return polyscript.New[polyscript.Extism](
+				ctx, polyscript.FromBytes([]byte("not wasm")), polyscript.WithEntryPoint("greet"),
+			)
+		}},
+		{"Extism missing entry point", func(ctx context.Context) (platform.Evaluator, error) {
+			return polyscript.New[polyscript.Extism](ctx, polyscript.FromBytes([]byte("not wasm")))
+		}},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			eval, err := tc.create(t.Context())
+			require.Error(t, err)
+			// assert.Nil treats a typed nil as nil, so compare the interface directly.
+			if eval != nil {
+				t.Errorf("failed New should return an untyped nil evaluator, got %#v", eval)
+			}
+		})
+	}
+}
+
 func TestFromStringValidation(t *testing.T) {
 	t.Parallel()
 

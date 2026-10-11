@@ -41,7 +41,8 @@
 //
 // Call Close on an evaluator once it is no longer needed. Extism evaluators
 // hold a wazero runtime that Close releases, after which Eval returns an
-// error; for Risor and Starlark, Close is a no-op.
+// error; for Risor and Starlark, Close is a no-op. On error, New returns a
+// nil evaluator, so defer Close only after checking err.
 //
 // # A note on type arguments
 //
@@ -264,6 +265,9 @@ func WithContextTermination(enabled bool) Option[Extism] {
 // usually need an explicit type argument; see "A note on type arguments" in
 // the package doc. [WithEntryPoint] is bound to [Extism]; passing it to
 // [Risor] or [Starlark] is a compile error.
+//
+// On error the returned evaluator is nil. Otherwise the caller owns it and
+// should Close it when done.
 func New[E Engine](ctx context.Context, src Source, opts ...Option[E]) (platform.Evaluator, error) {
 	cfg := &config{}
 	for _, o := range opts {
@@ -293,12 +297,22 @@ func New[E Engine](ctx context.Context, src Source, opts ...Option[E]) (platform
 	}
 }
 
+// asEvaluator converts an engine constructor's result to a
+// platform.Evaluator, returning an untyped nil on error so callers never get
+// an interface wrapping a nil engine pointer.
+func asEvaluator[T platform.Evaluator](ev T, err error) (platform.Evaluator, error) {
+	if err != nil {
+		return nil, err
+	}
+	return ev, nil
+}
+
 func newRisor(ctx context.Context, ldr loader.Loader, cfg *config) (platform.Evaluator, error) {
 	opts := []risorMachine.Option{risorMachine.WithLogHandler(cfg.handler)}
 	if cfg.staticData != nil {
 		opts = append(opts, risorMachine.WithStaticData(cfg.staticData))
 	}
-	return risorMachine.FromRisorLoader(ctx, ldr, opts...)
+	return asEvaluator(risorMachine.FromRisorLoader(ctx, ldr, opts...))
 }
 
 func newStarlark(ctx context.Context, ldr loader.Loader, cfg *config) (platform.Evaluator, error) {
@@ -306,7 +320,7 @@ func newStarlark(ctx context.Context, ldr loader.Loader, cfg *config) (platform.
 	if cfg.staticData != nil {
 		opts = append(opts, starlarkMachine.WithStaticData(cfg.staticData))
 	}
-	return starlarkMachine.FromStarlarkLoader(ctx, ldr, opts...)
+	return asEvaluator(starlarkMachine.FromStarlarkLoader(ctx, ldr, opts...))
 }
 
 func newExtism(ctx context.Context, ldr loader.Loader, cfg *config) (platform.Evaluator, error) {
@@ -319,5 +333,5 @@ func newExtism(ctx context.Context, ldr loader.Loader, cfg *config) (platform.Ev
 	if cfg.staticData != nil {
 		opts = append(opts, extismMachine.WithStaticData(cfg.staticData))
 	}
-	return extismMachine.FromExtismLoader(ctx, ldr, opts...)
+	return asEvaluator(extismMachine.FromExtismLoader(ctx, ldr, opts...))
 }

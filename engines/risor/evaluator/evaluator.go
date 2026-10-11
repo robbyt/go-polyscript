@@ -188,6 +188,10 @@ func (be *Evaluator) AddDataToContext(
 
 // Close implements platform.Evaluator. Compiled Risor bytecode holds no
 // releasable resources, so this is effectively a no-op and Eval keeps working.
+// Safe on a nil Evaluator.
 func (be *Evaluator) Close(ctx context.Context) error {
+	if be == nil {
+		return nil
+	}
 	return be.execUnit.Close(ctx)
 }

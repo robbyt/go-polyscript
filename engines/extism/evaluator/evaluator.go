@@ -251,9 +251,13 @@ func (be *Evaluator) AddDataToContext(
 }
 
 // Close implements platform.Evaluator. It releases the compiled plugin and its
-// wazero runtime, waiting for in-flight Eval calls to finish first. It is safe
-// to call more than once; afterwards Eval returns an error wrapping
-// compiler.ErrExecutableClosed.
+// wazero runtime, waiting for in-flight Eval calls to finish first. Eval calls
+// made once Close has been called, including while it waits, return an error
+// wrapping compiler.ErrExecutableClosed. It is safe to call more than once and
+// on a nil Evaluator.
 func (be *Evaluator) Close(ctx context.Context) error {
+	if be == nil {
+		return nil
+	}
 	return be.execUnit.Close(ctx)
 }

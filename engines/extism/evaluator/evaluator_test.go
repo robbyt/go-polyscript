@@ -1038,6 +1038,12 @@ func TestEvaluator_Close(t *testing.T) {
 		require.NoError(t, evaluator.Close(t.Context()))
 	})
 
+	t.Run("nil evaluator", func(t *testing.T) {
+		var evaluator *Evaluator
+		require.NoError(t, evaluator.Close(t.Context()),
+			"Close on a nil evaluator (e.g. from a failed constructor) must not panic")
+	})
+
 	t.Run("concurrent eval and close", func(t *testing.T) {
 		plugin := &trackingPlugin{}
 		content := createMockExecutable(plugin, "main")
