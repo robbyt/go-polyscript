@@ -31,10 +31,9 @@ func lifetime(appCtx context.Context, wasmBytes []byte) error {
 	}
 	defer evaluator.Close(appCtx)
 	// snippet:end
+	// Eval checks the lifetime synchronously, so it fails at once if the
+	// evaluator was wrongly bound to loadCtx.
 	cancel()
-	// Give a lifetime hook wrongly bound to loadCtx time to close the
-	// evaluator before it is used.
-	time.Sleep(20 * time.Millisecond)
 	enrichedCtx, err := evaluator.AddDataToContext(appCtx, map[string]any{"input": "World"})
 	return evalAndPrint(enrichedCtx, evaluator, err)
 }

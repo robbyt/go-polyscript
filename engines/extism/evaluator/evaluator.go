@@ -255,27 +255,23 @@ func (be *Evaluator) AddDataToContext(
 }
 
 // Close implements platform.Evaluator. It releases the compiled plugin and
-// its wazero runtime. As soon as Close is called, new Eval calls return an
-// error wrapping compiler.ErrExecutableClosed without calling the data
-// provider. With no Eval in flight, Close releases the runtime and returns
-// the release error, even if ctx is already done. Otherwise it waits for the
-// in-flight Evals, including their data loading, until ctx is done; if ctx
-// ends first, Close returns ctx's error and the runtime is released when the
-// last of those Evals returns. Cancelling an Eval's ctx shortens the wait
-// only if the guest stops and the data provider honours cancellation.
-//
-// The close runs once: concurrent and later Close calls wait for the first
-// close and return its result, so only the first close's ctx bounds the
-// wait. When the lifetime ctx ends first, that close waits without a
-// deadline.
+// its wazero runtime, like [net/http.Server.Shutdown]: as soon as Close is
+// called, new Eval calls return an error wrapping
+// compiler.ErrExecutableClosed without calling the data provider. Close then
+// waits for in-flight Evals, including their data loading, until ctx is
+// done; if ctx ends first, Close returns an error wrapping ctx's error and
+// the runtime is released when the last of those Evals returns. With no Eval
+// in flight, Close releases the runtime and returns the release error, even
+// if ctx is already done. Cancelling an Eval's ctx shortens the wait only if
+// the guest stops and the data provider honours cancellation. Close is safe
+// to call more than once and concurrently: the runtime is released once,
+// and each call waits on its own ctx.
 //
 // The evaluator also closes itself this way when its lifetime ctx is done:
-// the ctx passed to the constructor, or the one given to WithLifetime. That
-// ctx does not keep the evaluator in memory. Once an evaluator dropped
-// without Close is garbage collected, the end of the lifetime no longer
-// closes it; its compiler.Executable releases the runtime when that is
-// garbage collected too, unless a caller retained it, in which case the
-// caller owns its release. Close releases the runtime sooner.
+// the ctx passed to the constructor, or the one given to WithLifetime. Only
+// that ctx's Done channel is kept. Call Close or let the lifetime end: an
+// evaluator that is neither closed nor bound to a lifetime that ends keeps
+// its runtime, since nothing releases it when it is garbage collected.
 //
 // A data provider must not call Close with a ctx that is never done, or Eval,
 // on the same Evaluator, since Close would wait for the Eval that is calling

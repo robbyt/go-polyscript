@@ -314,9 +314,9 @@ func TestFromExtismLoader_Lifetime(t *testing.T) {
 
 		eval, err := newGreetEvaluator(t, setupCtx, WithLifetime(lifetime))
 		require.NoError(t, err)
+		// Eval checks the lifetime synchronously, so a watcher bound to the
+		// wrong ctx would make it fail at once.
 		cancelSetup()
-		// Give a wrongly bound hook time to fire before checking Eval.
-		time.Sleep(20 * time.Millisecond)
 		requireEvalWorks(t, eval)
 
 		cancelLifetime()
@@ -337,9 +337,9 @@ func TestFromExtismLoader_Lifetime(t *testing.T) {
 		require.NoError(t, eval.Close(t.Context()))
 	})
 
-	t.Run("Close racing the lifetime hook waits for its release", func(t *testing.T) {
+	t.Run("Close racing the lifetime watcher waits for its release", func(t *testing.T) {
 		// The common shutdown pattern: the same ctx is the lifetime and the
-		// Close ctx. The hook and Close race to release the runtime; Close
+		// Close ctx. The watcher and Close race to release the runtime; Close
 		// must not give up just because its ctx is done.
 		for range 25 {
 			ctx, cancel := context.WithCancel(t.Context())

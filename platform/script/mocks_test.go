@@ -56,8 +56,7 @@ func (m *MockClosableExecutableContent) Close(ctx context.Context) error {
 }
 
 // countingClosableContent is closable content that counts Close calls and
-// returns err from each. It does not use testify expectations, so a Close
-// that runs from a context.AfterFunc goroutine cannot panic the test.
+// returns err from each.
 type countingClosableContent struct {
 	MockExecutableContent
 	closeCalls atomic.Int32
@@ -69,16 +68,13 @@ func (c *countingClosableContent) Close(context.Context) error {
 	return c.err
 }
 
-// blockingClosableContent counts Close calls and blocks each one until gate
-// is closed.
-type blockingClosableContent struct {
-	MockExecutableContent
-	gate       chan struct{}
-	closeCalls atomic.Int32
+// watchingContent is closable content that also watches its lifetime,
+// recording each channel passed to WatchLifetime.
+type watchingContent struct {
+	countingClosableContent
+	watched []<-chan struct{}
 }
 
-func (c *blockingClosableContent) Close(context.Context) error {
-	c.closeCalls.Add(1)
-	<-c.gate
-	return nil
+func (c *watchingContent) WatchLifetime(done <-chan struct{}) {
+	c.watched = append(c.watched, done)
 }

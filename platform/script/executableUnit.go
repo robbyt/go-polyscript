@@ -5,10 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"runtime"
-	"sync"
 	"time"
-	"weak"
 
 	engineTypes "github.com/robbyt/go-polyscript/engines/types"
 	"github.com/robbyt/go-polyscript/internal/helpers"
@@ -31,52 +28,18 @@ type ExecutableUnit struct {
 
 	logHandler slog.Handler
 	logger     *slog.Logger
-
-	// closerOnce builds closer, which wraps the content's Close so it runs
-	// at most once. closer stays nil for content without a Close method.
-	closerOnce sync.Once
-	closer     *onceCloser
-
-	// lifetime is the current BindLifetime registration. Only funcs and
-	// handles that undo it are kept, never the lifetime ctx itself.
-	lifetimeMu sync.Mutex
-	lifetime   *lifetimeBinding
 }
 
-// lifetimeBinding undoes one BindLifetime registration: stop unregisters the
-// context.AfterFunc hook, and cleanup is the runtime.AddCleanup that would
-// otherwise call stop once the unit's close guard is collected.
-type lifetimeBinding struct {
-	stop    func() bool
-	cleanup runtime.Cleanup
-}
-
-// release unregisters both the hook and its cleanup, so the cleanup no
-// longer keeps the hook, and through it the lifetime ctx, reachable.
-func (b *lifetimeBinding) release() {
-	b.cleanup.Stop()
-	b.stop()
-}
-
-// contentCloser is implemented by compiled content that holds resources.
+// contentCloser is implemented by content that holds resources.
 type contentCloser interface {
 	Close(context.Context) error
 }
 
-// onceCloser calls a content's Close at most once. The first caller runs it
-// with its own ctx; concurrent callers block in Do until it returns, and
-// every caller, including later ones, gets its result.
-type onceCloser struct {
-	once  sync.Once
-	err   error
-	inner contentCloser
-}
-
-// Close closes the wrapped content on the first call and returns that
-// call's result on every call.
-func (c *onceCloser) Close(ctx context.Context) error {
-	c.once.Do(func() { c.err = c.inner.Close(ctx) })
-	return c.err
+// lifetimeWatcher is implemented by content that releases its resources
+// when a lifetime ends. Like [io.WriterTo], it is optional: BindLifetime
+// passes the lifetime's Done channel to content that implements it.
+type lifetimeWatcher interface {
+	WatchLifetime(done <-chan struct{})
 }
 
 // NewExecutableUnit creates a new ExecutableUnit from the provided loader and compiler.
@@ -168,34 +131,22 @@ func (exe *ExecutableUnit) GetDataProvider() data.Provider {
 	return exe.dataProvider
 }
 
-// BindLifetime ties the unit to lifetime: when lifetime is done, the unit
-// closes its content as if Close had been called. Engine constructors call
-// it with the ctx passed to them, or the one given to their WithLifetime
-// option. Only a func that unregisters the hook is kept; lifetime itself is
-// not stored. Content without a Close method holds nothing to release, so
-// for it no hook is registered.
+// BindLifetime ties the content's resources to lifetime. Content that
+// implements WatchLifetime(done <-chan struct{}) is given lifetime.Done(),
+// and closes itself once that channel is closed. Only the channel is passed
+// on; lifetime itself is not stored. Engine constructors call BindLifetime
+// once, with the ctx passed to them or the one given to their WithLifetime
+// option. It must not be called again.
 //
-// The hook holds the unit only weakly, so lifetime keeps neither the unit
-// nor its content in memory. A dropped unit is only known to be gone once
-// it has been garbage collected: until then, the end of lifetime still
-// closes the content, even if the unit is no longer reachable and a caller
-// retained the content. Once the unit is collected its hook is unregistered
-// and the end of lifetime no longer closes the content: a caller that
-// retained the content from GetContent can keep using it and owns its
-// release from then on. A caller that needs the content to outlive the unit
-// should therefore not bind the unit to a lifetime that may end first. Only
-// the content itself is covered: the bytecode from its GetByteCode need not
-// keep the content alive, so retain the content, not just its bytecode.
-// Content that holds resources should release them from its own cleanup
-// when it becomes unreachable, as [os.File] does; Close releases it sooner.
-//
-// If lifetime is done by the time the hook is registered, BindLifetime
-// closes the content before returning and returns an error that wraps
-// lifetime's error and its cause, joined with any error from closing the
-// content. The caller should then discard the unit. Binding again replaces
-// the earlier lifetime, even when the new bind fails because its lifetime
-// is done, since the content is closed then. It returns an error for a nil
-// lifetime and is a no-op on a nil unit.
+// After handing over the channel, BindLifetime checks lifetime once more. If
+// lifetime is already done, it closes the content and returns an error that
+// wraps lifetime's error and, when it differs, its cause, joined with any
+// error from closing the content; the caller should then discard the unit.
+// Content that does not watch its lifetime gets the same error. A lifetime
+// that ends after that check, even before the constructor returns, closes
+// the content just as if it ended later; only a lifetime already over at the
+// check fails construction. It returns an error for a nil lifetime and is a
+// no-op on a nil unit.
 func (exe *ExecutableUnit) BindLifetime(lifetime context.Context) error {
 	if exe == nil {
 		return nil
@@ -203,82 +154,15 @@ func (exe *ExecutableUnit) BindLifetime(lifetime context.Context) error {
 	if lifetime == nil {
 		return errors.New("lifetime context is nil")
 	}
-	guard := exe.closeGuard()
-	if guard == nil {
-		if lifetime.Err() != nil {
-			return lifetimeEndedError(lifetime, nil)
+	if w, ok := exe.content.(lifetimeWatcher); ok {
+		if done := lifetime.Done(); done != nil {
+			w.WatchLifetime(done)
 		}
+	}
+	if lifetime.Err() == nil {
 		return nil
 	}
-
-	release := context.WithoutCancel(lifetime)
-	if lifetime.Err() != nil {
-		return exe.closeForEndedLifetime(lifetime, guard, release)
-	}
-
-	stop := context.AfterFunc(lifetime, closeOnLifetimeEnd(weak.Make(guard), release, exe.logger))
-	// Check again now the hook is registered, so a lifetime that ends at any
-	// point before BindLifetime returns is reported instead of closing the
-	// content behind the caller's back. Whether or not the hook has started,
-	// the guard closes the content once and makes every caller wait for that
-	// close's result.
-	if lifetime.Err() != nil {
-		stop()
-		return exe.closeForEndedLifetime(lifetime, guard, release)
-	}
-	// The hook cannot reach a collected guard, so unregister it then, so
-	// that a dropped unit leaves nothing behind in a long-lived lifetime.
-	exe.replaceLifetime(&lifetimeBinding{
-		stop:    stop,
-		cleanup: runtime.AddCleanup(guard, unregisterHook, stop),
-	})
-	return nil
-}
-
-// closeForEndedLifetime handles a lifetime that ended before BindLifetime
-// could finish: it drops any earlier lifetime, closes the content through
-// guard and reports both.
-func (exe *ExecutableUnit) closeForEndedLifetime(
-	lifetime context.Context,
-	guard *onceCloser,
-	release context.Context,
-) error {
-	exe.replaceLifetime(nil)
-	return lifetimeEndedError(lifetime, guard.Close(release))
-}
-
-// closeOnLifetimeEnd returns the hook BindLifetime registers on a lifetime.
-// It closes the content through guard if the unit that owns guard is still
-// alive, and does nothing once it has been garbage collected.
-func closeOnLifetimeEnd(guard weak.Pointer[onceCloser], release context.Context, logger *slog.Logger) func() {
-	return func() {
-		g := guard.Value()
-		if g == nil {
-			return
-		}
-		if err := g.Close(release); err != nil {
-			logger.Warn("failed to close content when its lifetime ended", "error", err)
-		}
-	}
-}
-
-// unregisterHook is the cleanup BindLifetime attaches to a unit's close
-// guard. It unregisters the lifetime hook, which refers to the guard only
-// weakly and so cannot keep it alive.
-func unregisterHook(stop func() bool) {
-	stop()
-}
-
-// replaceLifetime installs binding as the unit's lifetime registration, or
-// none for a nil binding, and releases the registration it replaces.
-func (exe *ExecutableUnit) replaceLifetime(binding *lifetimeBinding) {
-	exe.lifetimeMu.Lock()
-	previous := exe.lifetime
-	exe.lifetime = binding
-	exe.lifetimeMu.Unlock()
-	if previous != nil {
-		previous.release()
-	}
+	return lifetimeEndedError(lifetime, exe.Close(context.WithoutCancel(lifetime)))
 }
 
 // lifetimeEndedError reports that lifetime was done before the unit could be
@@ -297,40 +181,17 @@ func lifetimeEndedError(lifetime context.Context, closeErr error) error {
 	return err
 }
 
-// Close releases resources held by the compiled content. Content that
-// implements Close(context.Context) error is closed; for other content this
-// is a no-op. It first unregisters the hook from BindLifetime, so ending the
-// lifetime after Close does nothing.
-//
-// The content is closed at most once, using a [sync.Once]: the first close,
-// whether from Close, the lifetime hook or BindLifetime, calls the content's
-// Close with its own ctx, and every other Close, concurrent or later, waits
-// for that call and returns its result. So only the first close's ctx bounds
-// the wait. Safe on a nil unit.
+// Close releases resources held by the compiled content by calling its
+// Close, for content that implements Close(context.Context) error; for other
+// content it is a no-op. The content makes repeated and concurrent calls
+// safe, and ctx bounds only this caller's wait (see [ExecutableContent]).
+// Safe on a nil unit.
 func (exe *ExecutableUnit) Close(ctx context.Context) error {
 	if exe == nil {
 		return nil
 	}
-	exe.replaceLifetime(nil)
-	return exe.closeContent(ctx)
-}
-
-// closeContent closes the content once, if it implements Close.
-func (exe *ExecutableUnit) closeContent(ctx context.Context) error {
-	if guard := exe.closeGuard(); guard != nil {
-		return guard.Close(ctx)
+	if c, ok := exe.content.(contentCloser); ok {
+		return c.Close(ctx)
 	}
 	return nil
-}
-
-// closeGuard returns the wrapper that closes the content at most once, or
-// nil for content without a Close method. It is built on first use, so a
-// unit not made by NewExecutableUnit gets one too.
-func (exe *ExecutableUnit) closeGuard() *onceCloser {
-	exe.closerOnce.Do(func() {
-		if c, ok := exe.content.(contentCloser); ok {
-			exe.closer = &onceCloser{inner: c}
-		}
-	})
-	return exe.closer
 }

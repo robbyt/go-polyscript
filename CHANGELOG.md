@@ -13,20 +13,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   module's wazero runtime. Once `Close` has been called, any new `Eval` fails
   with `compiler.ErrExecutableClosed` without calling the data provider.
   `Close` waits for in-flight `Eval` calls, including their data loading,
-  only until its ctx is done: it then returns the ctx's error, and the
-  runtime is released when the last in-flight `Eval` returns. With nothing
-  in flight it releases the runtime at once, even with a cancelled ctx. A
-  data provider must not call `Eval`, or `Close` with a ctx that is never
-  done, on the same evaluator. The close runs once (a `sync.Once` in
-  `script.ExecutableUnit`): concurrent and later `Close` calls wait for the
-  first and return its result, so only the first close's ctx bounds the
-  wait. For Risor and Starlark it is a no-op. Code that implements `platform.Evaluator` itself must add the
-  method.
+  only until its ctx is done: it then returns an error wrapping the ctx's
+  error, and the runtime is released when the last in-flight `Eval` returns.
+  With nothing in flight it releases the runtime at once, even with a
+  cancelled ctx. A data provider must not call `Eval`, or `Close` with a ctx
+  that is never done, on the same evaluator. Like `http.Server.Shutdown`,
+  `Close` is safe to call more than once and concurrently: the runtime is
+  released once, and each call waits on its own ctx. For Risor and Starlark
+  it is a no-op. Code that implements `platform.Evaluator` itself must add
+  the method.
   ([#162](https://github.com/robbyt/go-polyscript/issues/162))
 - `WithLifetime` option (`polyscript.WithLifetime[E]` and each engine's
   `WithLifetime`) to bound an evaluator's lifetime by a ctx other than the
   one passed to its constructor, and `script.ExecutableUnit.BindLifetime`,
-  which implements the binding.
+  which implements the binding by passing the ctx's `Done()` channel to
+  content that implements `WatchLifetime`.
   ([#162](https://github.com/robbyt/go-polyscript/issues/162))
 - `data.BYTES` and `data.UNKNOWN` result types.
   ([#157](https://github.com/robbyt/go-polyscript/issues/157),
@@ -56,18 +57,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with a long-lived ctx or given one with `WithLifetime`. A lifetime ctx
   that is already done when construction finishes makes the constructor
   close what it built and return an error wrapping the ctx's error, on
-  every engine. The lifetime ctx does not keep the evaluator in memory, and
-  does not close one that has been garbage collected.
+  every engine. Call `Close` or let the lifetime end: nothing releases an
+  evaluator's resources when it is garbage collected.
   ([#162](https://github.com/robbyt/go-polyscript/issues/162))
-- Extism `compiler.Executable` releases its compiled plugin and wazero
-  runtime when it is garbage collected without having been closed, like
-  `os.File`; `Close` releases it sooner. Content retained from
-  `ExecutableUnit.GetContent` is no longer closed when the unit or evaluator
-  is garbage collected. The end of the lifetime ctx still closes it until the
-  dropped unit has been collected; after that, whoever retains it owns its
-  release. Retain the content itself: a plugin from `GetExtismByteCode` does
-  not keep the `Executable` alive, and is released when the `Executable` is
-  collected. ([#162](https://github.com/robbyt/go-polyscript/issues/162))
 - **BREAKING:** Extism `compiler.Executable.ByteCode` is unexported; use
   `GetExtismByteCode()` or the new `WithPlugin(ctx, fn)`, which holds the
   plugin open while `fn` runs.

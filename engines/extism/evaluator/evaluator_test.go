@@ -497,8 +497,6 @@ func TestEvaluator_Evaluate(t *testing.T) {
 		t.Run("load input data error", func(t *testing.T) {
 			handler := slog.NewTextHandler(os.Stdout, nil)
 			mockPlugin := new(MockCompiledPlugin)
-			// The executable is never closed; the garbage collector releases it.
-			mockPlugin.On("Close", mock.Anything).Return(nil).Maybe()
 			content := createMockExecutable(mockPlugin, "main")
 
 			exe := newExe(t, "test-load-input-error", content, &mockErrProvider{err: errors.New("provider boom")})
@@ -517,8 +515,6 @@ func TestEvaluator_Evaluate(t *testing.T) {
 		t.Run("convert to extism format error", func(t *testing.T) {
 			handler := slog.NewTextHandler(os.Stdout, nil)
 			mockPlugin := new(MockCompiledPlugin)
-			// The executable is never closed; the garbage collector releases it.
-			mockPlugin.On("Close", mock.Anything).Return(nil).Maybe()
 			content := createMockExecutable(mockPlugin, "main")
 
 			exe := newExe(t, "test-convert-format-error", content, &mockMapProvider{data: map[string]any{
@@ -1387,29 +1383,23 @@ func TestEvaluator_Lifetime(t *testing.T) {
 		assert.Equal(t, int32(1), plugin.closeCalls.Load())
 	})
 
-	t.Run("retained executable outlives a dropped unit and its lifetime", func(t *testing.T) {
-		plugin := &trackingPlugin{}
-		content := createMockExecutable(plugin, "main")
-		lifetime, cancel := context.WithCancel(t.Context())
-		defer cancel()
+	t.Run("already-done lifetime closes the executable once", func(t *testing.T) {
+		synctest.Test(t, func(t *testing.T) {
+			plugin := &trackingPlugin{}
+			content := createMockExecutable(plugin, "main")
+			exe := newExe(t, "", content, data.NewContextProvider(constants.EvalData))
+			lifetime, cancel := context.WithCancel(t.Context())
+			cancel()
 
-		unitCollected := bindAndDropUnit(t, content, func(u *script.ExecutableUnit) error {
-			return u.BindLifetime(lifetime)
+			require.ErrorIs(t, exe.BindLifetime(lifetime), context.Canceled)
+			synctest.Wait()
+			assert.True(t, content.IsClosed(), "an already-done lifetime should release the plugin")
+			assert.Equal(t, int32(1), plugin.closeCalls.Load(),
+				"the watcher and BindLifetime should release the plugin once between them")
 		})
-		waitCollected(t, unitCollected)
-		cancel()
-		settleGC()
-
-		assert.False(t, content.IsClosed(), "a retained executable must stay open once its unit is gone")
-		require.NoError(t, content.WithPlugin(t.Context(), func(adapters.CompiledPlugin) error { return nil }),
-			"a retained executable should stay usable")
-		assert.Equal(t, int32(0), plugin.closeCalls.Load())
-
-		require.NoError(t, content.Close(t.Context()), "whoever retains the executable owns its release")
-		assert.Equal(t, int32(1), plugin.closeCalls.Load())
 	})
 
-	t.Run("Close before lifetime end closes once", func(t *testing.T) {
+	t.Run("Close before lifetime end closes once and stops the watcher", func(t *testing.T) {
 		synctest.Test(t, func(t *testing.T) {
 			plugin := &trackingPlugin{}
 			content := createMockExecutable(plugin, "main")
@@ -1426,42 +1416,4 @@ func TestEvaluator_Lifetime(t *testing.T) {
 			assert.Equal(t, int32(1), plugin.closeCalls.Load(), "lifetime end after Close must not close again")
 		})
 	})
-}
-
-// bindAndDropUnit builds a unit around content, binds it to a lifetime with
-// bind and drops it, so only content is retained. It returns a channel that
-// is closed once the unit is garbage collected.
-func bindAndDropUnit(t *testing.T, content script.ExecutableContent, bind func(*script.ExecutableUnit) error) <-chan struct{} {
-	t.Helper()
-	exe := newExe(t, "", content, data.NewContextProvider(constants.EvalData))
-	require.NoError(t, bind(exe))
-	collected := make(chan struct{})
-	runtime.AddCleanup(exe, func(ch chan struct{}) { close(ch) }, collected)
-	return collected
-}
-
-// waitCollected runs the garbage collector until collected is closed,
-// failing the test if that takes longer than closeTestTimeout.
-func waitCollected(t *testing.T, collected <-chan struct{}) {
-	t.Helper()
-	deadline := time.After(closeTestTimeout)
-	for {
-		runtime.GC()
-		select {
-		case <-collected:
-			return
-		case <-deadline:
-			require.FailNow(t, "the dropped unit should be garbage collected")
-		case <-time.After(10 * time.Millisecond):
-		}
-	}
-}
-
-// settleGC runs the garbage collector a few times and gives cleanups and
-// lifetime hooks time to run, so one that should not run gets the chance to.
-func settleGC() {
-	for range 5 {
-		runtime.GC()
-		time.Sleep(10 * time.Millisecond)
-	}
 }

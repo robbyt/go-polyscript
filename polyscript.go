@@ -45,9 +45,10 @@
 // only after checking err. For an engine that holds resources, Close
 // rejects new Evals at once and waits for in-flight ones only until its ctx
 // is done; if that comes first, it returns the ctx's error and the resources
-// are released when the last in-flight Eval returns. The close runs once:
-// further Close calls wait for the first and return its result. For an
-// engine that holds none, Close changes nothing and Eval keeps working.
+// are released when the last in-flight Eval returns. Close is safe to call
+// more than once and concurrently; the resources are released once, and
+// each call waits on its own ctx. For an engine that holds none, Close
+// changes nothing and Eval keeps working.
 //
 // # Evaluator lifetime
 //
@@ -57,13 +58,13 @@
 // timeout ctx is therefore closed when that ctx ends; for one that holds
 // none, the end of the lifetime changes nothing. To compile once and run
 // many times, pass a long-lived ctx, or keep a short ctx for loading and
-// compiling and pass the long-lived one with [WithLifetime]. The lifetime
-// ctx does not keep the evaluator in memory: once a dropped evaluator is
-// garbage collected, the end of the lifetime no longer closes it, and
-// whatever its engine held is released by that resource's own cleanup, if
-// it has one. Close releases it sooner. If the lifetime ctx is already done
-// when construction finishes, New closes what it built and returns an
-// error.
+// compiling and pass the long-lived one with [WithLifetime]. Call Close or
+// let the lifetime end: an evaluator that is neither closed nor bound to a
+// lifetime that ends keeps what its engine holds, since nothing releases it
+// when the evaluator is garbage collected. If the lifetime ctx is already
+// done when construction finishes, New closes what it built and returns an
+// error; a lifetime that ends later, even before New returns, closes the
+// evaluator as described above.
 //
 // # A note on type arguments
 //
@@ -246,10 +247,8 @@ func WithLogHandler[E Engine](h slog.Handler) Option[E] {
 // ctx passed to New is short-lived, such as a timeout for loading the script,
 // and pass a long-lived ctx, or context.Background() for no limit. If the ctx
 // is already done when construction finishes, New closes what it built and
-// returns an error. A nil ctx means the ctx passed to New. The ctx does not
-// keep the evaluator in memory, and does not close one that has been garbage
-// collected; Close it when done rather than relying on the garbage
-// collector.
+// returns an error. A nil ctx means the ctx passed to New. With a ctx that
+// is never done, only Close releases what the engine holds.
 //
 // The type parameter usually needs to be explicit; see "A note on type
 // arguments" in the package doc.

@@ -23,12 +23,11 @@ entrypoint := wasmdata.EntrypointGreet
 
 ---
 
-## Mock Plugins and the GC Cleanup
+## Mock Plugins and Lifetimes
 
-- `compiler.Executable` closes its plugin from a `runtime.AddCleanup` when garbage collected unclosed. A testify mock without a `Close` expectation then panics inside the cleanup and crashes the whole test binary, at random, often far from the leaking test.
-- **Every mock plugin that is not explicitly closed needs** `mockPlugin.On("Close", mock.Anything).Return(nil).Maybe()`.
-- **Verify with** `GOGC=1 go test -race -count=3 ./engines/extism/... .` after adding or changing Extism tests.
-- See "Testing: Mock Plugins and the Garbage Collector" in `engines/README.md`.
+- Nothing closes a `compiler.Executable` on garbage collection, but one bound to a lifetime (`WatchLifetime`, or an evaluator constructor's ctx) calls `Close` on its plugin when that ctx ends, e.g. `t.Context()` at test end. A testify mock without a `Close` expectation then panics in the watcher goroutine and crashes the test binary.
+- **Every mock plugin on an executable whose lifetime may end during the test needs** `mockPlugin.On("Close", mock.Anything).Return(nil).Maybe()`, unless the test closes it explicitly with a matching expectation.
+- See "Testing: Mock Plugins and Lifetimes" in `engines/README.md`.
 
 ---
 

@@ -87,13 +87,10 @@ func WithContextTermination(enabled bool) Option {
 // compiler.ErrExecutableClosed, and the wazero runtime is released once
 // in-flight Evals return. Use it when the constructor's ctx is short-lived,
 // such as a timeout for loading the module, and pass a long-lived ctx, or
-// context.Background() for no limit. If the ctx is already done when
-// construction finishes, [FromExtismLoader] closes what it built and
-// returns an error. A nil ctx means the constructor's ctx. The ctx does not
-// keep the evaluator in memory: once an evaluator dropped without Close is
-// garbage collected, the end of the lifetime no longer closes it, and its
-// compiler.Executable releases the runtime when that is garbage collected
-// too, unless a caller retained it. Close releases the runtime sooner.
+// context.Background() for no limit, in which case only Close releases the
+// runtime. If the ctx is already done when construction finishes,
+// [FromExtismLoader] closes what it built and returns an error. A nil ctx
+// means the constructor's ctx.
 func WithLifetime(ctx context.Context) Option {
 	return func(c *config) {
 		if ctx == nil {

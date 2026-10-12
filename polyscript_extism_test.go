@@ -315,13 +315,9 @@ func TestNew_WithLifetime(t *testing.T) {
 
 			eval, err := tc.create(setup, lifetime)
 			require.NoError(t, err)
+			// Eval checks the lifetime synchronously, so a watcher bound to the
+			// setup ctx would make it fail at once.
 			cancelSetup()
-			// A hook wrongly bound to the setup ctx runs on its own goroutine,
-			// so give it time to close the evaluator before checking.
-			require.Never(t, func() bool {
-				_, err := eval.Eval(t.Context())
-				return err != nil
-			}, 50*time.Millisecond, 5*time.Millisecond, "the setup ctx must not bound the evaluator's lifetime")
 			_, err = eval.Eval(t.Context())
 			require.NoError(t, err, "the setup ctx must not bound the evaluator's lifetime")
 

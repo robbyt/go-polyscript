@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"runtime"
 	"sync"
 
 	"github.com/robbyt/go-polyscript/engines/extism/adapters"
@@ -16,24 +15,18 @@ import (
 var ErrExecutableClosed = errors.New("executable is closed")
 
 // Executable implements script.ExecutableContent for Extism WASM modules.
-// It owns the compiled plugin (and its wazero runtime) until it is released
-// by Close. Like an [os.File], an Executable from NewExecutable that becomes
-// unreachable without being closed releases its plugin when it is garbage
-// collected; Close releases it sooner. Retaining an Executable, for example
-// from an ExecutableUnit's GetContent, keeps the garbage collector from
-// releasing it, and whoever retains it owns its release; the unit can still
-// close it through its own Close or the end of its lifetime until the unit
-// has been garbage collected. Retaining only the plugin from
-// GetExtismByteCode does not keep the Executable, or the plugin, open.
+// It owns the compiled plugin (and its wazero runtime) until Close, or the
+// end of the lifetime given to WatchLifetime, releases it. Nothing releases
+// it when it is garbage collected: like an [os/exec.Cmd] that needs Wait,
+// an Executable that is neither closed nor watching a lifetime that ends
+// keeps its runtime.
 type Executable struct {
 	scriptBytes []byte
 	byteCode    adapters.CompiledPlugin
 	entryPoint  string
 
-	// rel releases the plugin at most once, for both Close and the cleanup
-	// NewExecutable registers. It is built on first use for an Executable
-	// not made by NewExecutable.
-	rel *pluginRelease
+	// watchOnce makes WatchLifetime start at most one watcher.
+	watchOnce sync.Once
 
 	// releaseOnce runs the release exactly once. The plugin is released
 	// once closing is set and inFlight is zero, by whichever of Close or the
@@ -42,53 +35,19 @@ type Executable struct {
 	releaseOnce sync.Once
 
 	// mu guards the fields below. inFlight counts running WithPlugin calls.
-	// closing is set by the first Close; from then on WithPlugin fails.
-	// released is closed after the release, and releaseErr, written before
-	// that, holds its error.
-	mu         sync.Mutex
-	inFlight   int
-	closing    bool
-	released   chan struct{}
-	releaseErr error
-}
-
-// pluginRelease closes a compiled plugin at most once. It does not refer to
-// the Executable, so the cleanup that releases an unreachable Executable can
-// hold it without keeping that Executable alive.
-type pluginRelease struct {
-	once   sync.Once
-	plugin adapters.CompiledPlugin
-	err    error
-}
-
-// release closes the plugin on the first call and returns that close's
-// error on every call. Concurrent callers wait for the first to finish.
-func (r *pluginRelease) release(ctx context.Context) error {
-	r.closeOnce(ctx)
-	return r.err
-}
-
-// closeOnce closes the plugin on the first call and stores its error.
-func (r *pluginRelease) closeOnce(ctx context.Context) {
-	r.once.Do(func() {
-		if r.plugin != nil {
-			r.err = r.plugin.Close(ctx)
-		}
-	})
-}
-
-// releaseUnreachable is the cleanup NewExecutable registers. It releases
-// the plugin of an Executable that was garbage collected without being
-// released; for one that was, it does nothing. Nothing is left to report a
-// release error to, so it is kept only in r.
-func releaseUnreachable(r *pluginRelease) {
-	r.closeOnce(context.Background())
+	// closing is set by the first Close; from then on WithPlugin fails, as
+	// it does once lifetimeDone is closed. released is closed after the
+	// release, and releaseErr, written before that, holds its error.
+	mu           sync.Mutex
+	inFlight     int
+	closing      bool
+	lifetimeDone <-chan struct{}
+	released     chan struct{}
+	releaseErr   error
 }
 
 // NewExecutable creates a new Executable instance. It returns nil if
-// scriptBytes is empty, byteCode is nil or entryPoint is empty. If the
-// Executable becomes unreachable without being closed, its plugin is
-// released when it is garbage collected.
+// scriptBytes is empty, byteCode is nil or entryPoint is empty.
 func NewExecutable(
 	scriptBytes []byte,
 	byteCode adapters.CompiledPlugin,
@@ -97,15 +56,12 @@ func NewExecutable(
 	if len(scriptBytes) == 0 || byteCode == nil || entryPoint == "" {
 		return nil
 	}
-	e := &Executable{
+	return &Executable{
 		scriptBytes: scriptBytes,
 		byteCode:    byteCode,
 		entryPoint:  entryPoint,
-		rel:         &pluginRelease{plugin: byteCode},
 		released:    make(chan struct{}),
 	}
-	runtime.AddCleanup(e, releaseUnreachable, e.rel)
-	return e
 }
 
 // GetSource returns the original script content
@@ -121,8 +77,7 @@ func (e *Executable) GetByteCode() any {
 
 // GetExtismByteCode returns the compiled plugin with its proper type, or nil
 // once Close has been called. The returned plugin is not protected against a
-// concurrent Close, and does not keep the Executable from being garbage
-// collected and releasing it; use WithPlugin to run code against it safely.
+// concurrent Close; use WithPlugin to run code against it safely.
 func (e *Executable) GetExtismByteCode() adapters.CompiledPlugin {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -132,18 +87,46 @@ func (e *Executable) GetExtismByteCode() adapters.CompiledPlugin {
 	return e.byteCode
 }
 
+// WatchLifetime makes the Executable close itself once done is closed, as
+// Close does but without waiting: the plugin is released then, or when the
+// last in-flight WithPlugin call returns. WithPlugin fails with
+// ErrExecutableClosed as soon as done is closed, even before that close
+// starts. It keeps only the channel, never a ctx, and starts one goroutine,
+// which exits once done is closed or the plugin is released. It is meant to
+// be called once, during construction: later calls, and a nil done, are
+// no-ops.
+func (e *Executable) WatchLifetime(done <-chan struct{}) {
+	if done == nil {
+		return
+	}
+	e.watchOnce.Do(func() {
+		e.mu.Lock()
+		e.lifetimeDone = done
+		released := e.releasedLocked()
+		e.mu.Unlock()
+		go func() {
+			select {
+			case <-done:
+				e.shutdown(context.Background())
+			case <-released:
+			}
+		}()
+	})
+}
+
 // WithPlugin calls fn with the compiled plugin and keeps the plugin open
 // until fn returns: a concurrent Close does not release it before then.
 // Concurrent WithPlugin calls do not block each other. It returns
 // ErrExecutableClosed without calling fn once Close has been called, even
-// while that Close is still waiting, ErrBytecodeNil if there is no plugin,
-// and otherwise fn's error. If Close is waiting, or gave up waiting, when
-// the last WithPlugin call returns, that call releases the plugin with ctx's
-// values but not its cancellation. fn must not call Close on e with a ctx
-// that is never done, since Close would wait for fn.
+// while that Close is still waiting, or once the watched lifetime is done,
+// ErrBytecodeNil if there is no plugin, and otherwise fn's error. If Close
+// is waiting, or gave up waiting, when the last WithPlugin call returns,
+// that call releases the plugin with ctx's values but not its cancellation.
+// fn must not call Close on e with a ctx that is never done, since Close
+// would wait for fn.
 func (e *Executable) WithPlugin(ctx context.Context, fn func(plugin adapters.CompiledPlugin) error) error {
 	e.mu.Lock()
-	if e.closing {
+	if e.closing || isClosed(e.lifetimeDone) {
 		e.mu.Unlock()
 		return ErrExecutableClosed
 	}
@@ -160,14 +143,14 @@ func (e *Executable) WithPlugin(ctx context.Context, fn func(plugin adapters.Com
 }
 
 // done ends a WithPlugin call. The last call to end after Close has been
-// called releases the plugin, without ctx's cancellation.
+// called releases the plugin.
 func (e *Executable) done(ctx context.Context) {
 	e.mu.Lock()
 	e.inFlight--
 	ready := e.readyToReleaseLocked()
 	e.mu.Unlock()
 	if ready {
-		e.releaseOnce.Do(func() { e.release(context.WithoutCancel(ctx)) })
+		e.release(ctx)
 	}
 }
 
@@ -188,27 +171,21 @@ func (e *Executable) releasedLocked() chan struct{} {
 	return e.released
 }
 
-// release closes the plugin and then the released channel. Callers pass a
-// ctx without cancellation, so the release is never cut short.
+// release closes the plugin with ctx's values but not its cancellation, and
+// then the released channel. It runs once; a caller that arrives while it
+// runs waits for it to finish.
 func (e *Executable) release(ctx context.Context) {
-	e.mu.Lock()
-	rel := e.relLocked()
-	e.mu.Unlock()
-	err := rel.release(ctx)
-	e.mu.Lock()
-	e.releaseErr = err
-	ch := e.releasedLocked()
-	e.mu.Unlock()
-	close(ch)
-}
-
-// relLocked returns the plugin's release, creating it for an Executable not
-// built by NewExecutable. e.mu must be held.
-func (e *Executable) relLocked() *pluginRelease {
-	if e.rel == nil {
-		e.rel = &pluginRelease{plugin: e.byteCode}
-	}
-	return e.rel
+	e.releaseOnce.Do(func() {
+		var err error
+		if e.byteCode != nil {
+			err = e.byteCode.Close(context.WithoutCancel(ctx))
+		}
+		e.mu.Lock()
+		e.releaseErr = err
+		ch := e.releasedLocked()
+		e.mu.Unlock()
+		close(ch)
+	})
 }
 
 // IsClosed reports whether the plugin has been released, not merely that
@@ -232,34 +209,25 @@ func (e *Executable) GetEntryPoint() string {
 	return e.entryPoint
 }
 
-// Close releases the compiled plugin and its wazero runtime. As soon as it
-// is called, new WithPlugin calls fail with ErrExecutableClosed. With
-// nothing in flight it releases the plugin, or waits for a release already
-// under way, and returns the release error, even if ctx is already done.
-// Otherwise it waits for the in-flight WithPlugin calls (i.e. running Evals)
-// until ctx is done: if they finish first, the last one releases the plugin
-// and Close returns the release error; if ctx is done first, Close returns
-// ctx's error and the plugin is released when the last of them returns. The
-// release never uses ctx's cancellation. Close is safe to call more than
-// once and concurrently: the plugin is released once, and every Close that
-// sees the release finish, including one called after it, returns its
-// error. Call Close again after one that gave up waiting to learn whether
-// the release failed. Close releases the plugin sooner than the garbage
-// collector, which releases an unclosed Executable once it is unreachable.
-// Safe on a nil Executable.
+// Close releases the compiled plugin and its wazero runtime. Like
+// [net/http.Server.Shutdown], it stops new work at once: from then on
+// WithPlugin fails with ErrExecutableClosed. It then waits for in-flight
+// WithPlugin calls (i.e. running Evals) until ctx is done: if they finish
+// first, the last one releases the plugin and Close returns the release
+// error; if ctx is done first, Close returns an error wrapping ctx's error
+// and the plugin is released when the last of them returns. With nothing in
+// flight the release is under way, so Close waits for it and returns its
+// error, even if ctx is already done. The release never uses ctx's
+// cancellation. Close is safe to call more than once and concurrently: the
+// plugin is released once, every call waits on its own ctx, and every call
+// that sees the release finish returns its error. Call Close again after
+// one that gave up waiting to learn whether the release failed. Safe on a
+// nil Executable.
 func (e *Executable) Close(ctx context.Context) error {
 	if e == nil {
 		return nil
 	}
-	e.mu.Lock()
-	released := e.releasedLocked()
-	e.closing = true
-	ready := e.readyToReleaseLocked()
-	e.mu.Unlock()
-
-	if ready {
-		e.releaseOnce.Do(func() { e.release(context.WithoutCancel(ctx)) })
-	}
+	released := e.shutdown(ctx)
 	select {
 	case <-released:
 		return e.loadReleaseErr()
@@ -273,6 +241,21 @@ func (e *Executable) Close(ctx context.Context) error {
 	}
 	<-released
 	return e.loadReleaseErr()
+}
+
+// shutdown marks e as closing and, with nothing in flight, releases the
+// plugin; otherwise the last in-flight WithPlugin call releases it. It does
+// not wait for that, and returns the channel closed once it is done.
+func (e *Executable) shutdown(ctx context.Context) <-chan struct{} {
+	e.mu.Lock()
+	released := e.releasedLocked()
+	e.closing = true
+	ready := e.readyToReleaseLocked()
+	e.mu.Unlock()
+	if ready {
+		e.release(ctx)
+	}
+	return released
 }
 
 // hasInFlight reports whether any WithPlugin call is still running.
