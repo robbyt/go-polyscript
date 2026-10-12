@@ -208,6 +208,11 @@ func TestExecutable(t *testing.T) {
 		zeroExe := &Executable{}
 		require.NoError(t, zeroExe.Close(t.Context()))
 		assert.True(t, zeroExe.IsClosed())
+
+		cancelled, cancel := context.WithCancel(t.Context())
+		cancel()
+		require.NoError(t, (&Executable{}).Close(cancelled),
+			"a zero-value Executable has nothing to release, so a cancelled ctx does not matter")
 	})
 }
 
@@ -640,6 +645,78 @@ func TestExecutable_CloseContext(t *testing.T) {
 		require.NoError(t, recvWithin(t, useDone, "the in-flight user to finish"))
 		require.NoError(t, recvWithin(t, secondClose, "the second Close to return"))
 		assert.True(t, exe.IsClosed())
+		mockPlugin.AssertExpectations(t)
+	})
+
+	// gatedPlugin returns a plugin whose Close signals releasing, then blocks
+	// until openGate is called and returns releaseErr.
+	gatedPlugin := func(t *testing.T, releaseErr error) (*MockCompiledPlugin, <-chan struct{}, func()) {
+		t.Helper()
+		releasing := make(chan struct{})
+		gate := make(chan struct{})
+		openGate := sync.OnceFunc(func() { close(gate) })
+		t.Cleanup(openGate)
+		mockPlugin := new(MockCompiledPlugin)
+		mockPlugin.On("Close", liveCtx()).Return(releaseErr).Once().
+			Run(func(mock.Arguments) {
+				close(releasing)
+				<-gate
+			})
+		return mockPlugin, releasing, openGate
+	}
+
+	t.Run("cancellation is honoured while the last in-flight call releases", func(t *testing.T) {
+		releaseErr := errors.New("release kaboom")
+		mockPlugin, releasing, openGate := gatedPlugin(t, releaseErr)
+		exe := NewExecutable(wasmBytes, mockPlugin, entryPoint)
+		require.NotNil(t, exe)
+		release, useDone := startUser(t, exe)
+
+		ctx, cancel := context.WithCancel(t.Context())
+		defer cancel()
+		closeDone := make(chan error, 1)
+		go func() { closeDone <- exe.Close(ctx) }()
+		require.Eventually(t, func() bool { return isClosing(exe) },
+			closeTestTimeout, time.Millisecond, "Close should mark the executable as closing")
+
+		release()
+		recvWithin(t, releasing, "the last user to start the release")
+		cancel()
+		require.ErrorIs(t, recvWithin(t, closeDone, "Close to return once its ctx is cancelled"),
+			context.Canceled, "the last user is in flight until its release finishes")
+		assert.False(t, exe.IsClosed(), "the release is still running")
+
+		openGate()
+		require.NoError(t, recvWithin(t, useDone, "the last user to finish its release"))
+		assert.True(t, exe.IsClosed())
+		require.ErrorIs(t, exe.Close(t.Context()), releaseErr, "a later Close returns the release error")
+		mockPlugin.AssertExpectations(t)
+	})
+
+	t.Run("a Close arriving during the last call's release honours its ctx", func(t *testing.T) {
+		releaseErr := errors.New("release kaboom")
+		mockPlugin, releasing, openGate := gatedPlugin(t, releaseErr)
+		exe := NewExecutable(wasmBytes, mockPlugin, entryPoint)
+		require.NotNil(t, exe)
+		release, useDone := startUser(t, exe)
+
+		firstClose := make(chan error, 1)
+		go func() { firstClose <- exe.Close(t.Context()) }()
+		require.Eventually(t, func() bool { return isClosing(exe) },
+			closeTestTimeout, time.Millisecond, "Close should mark the executable as closing")
+		release()
+		recvWithin(t, releasing, "the last user to start the release")
+
+		ctx, cancel := context.WithCancel(t.Context())
+		cancel()
+		secondClose := make(chan error, 1)
+		go func() { secondClose <- exe.Close(ctx) }()
+		require.ErrorIs(t, recvWithin(t, secondClose, "the second Close to return"),
+			context.Canceled, "a Close must not wait past its ctx for the last user's release")
+
+		openGate()
+		require.NoError(t, recvWithin(t, useDone, "the last user to finish its release"))
+		require.ErrorIs(t, recvWithin(t, firstClose, "the first Close to return"), releaseErr)
 		mockPlugin.AssertExpectations(t)
 	})
 }

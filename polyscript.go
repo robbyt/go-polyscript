@@ -47,7 +47,8 @@
 // is done; if that comes first, it returns the ctx's error and the resources
 // are released when the last in-flight Eval returns. Close is safe to call
 // more than once and concurrently; the resources are released once, and
-// each call waits on its own ctx. For an engine that holds none, Close
+// each call's ctx bounds only its wait for in-flight Evals, not the release
+// itself. For an engine that holds none, Close
 // changes nothing and Eval keeps working.
 //
 // # Evaluator lifetime

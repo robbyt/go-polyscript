@@ -37,7 +37,8 @@ type Evaluator interface {
 	//
 	// Like [net/http.Server.Shutdown], Close is safe to call more than once
 	// and concurrently: the resources are released once, and each call's ctx
-	// bounds only that call's wait.
+	// bounds only that call's wait for in-flight Evals, not the release
+	// itself.
 	//
 	// An evaluator also closes itself this way when its lifetime ctx is done.
 	// That is the ctx passed to its constructor, unless a lifetime option

@@ -19,7 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   cancelled ctx. A data provider must not call `Eval`, or `Close` with a ctx
   that is never done, on the same evaluator. Like `http.Server.Shutdown`,
   `Close` is safe to call more than once and concurrently: the runtime is
-  released once, and each call waits on its own ctx. For Risor and Starlark
+  released once, and each call's ctx bounds only its wait for in-flight
+  `Eval` calls, not the release itself. For Risor and Starlark
   it is a no-op. Code that implements `platform.Evaluator` itself must add
   the method.
   ([#162](https://github.com/robbyt/go-polyscript/issues/162))

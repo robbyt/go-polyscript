@@ -13,7 +13,7 @@ import (
 // error to release them. Close must be safe to call more than once and
 // concurrently and must release the resources once. Like
 // [net/http.Server.Shutdown], each call's ctx bounds only that caller's wait
-// for the release.
+// for in-flight work, not the release itself.
 //
 // Such content may also implement WatchLifetime(done <-chan struct{}) to
 // close itself once done is closed; see [ExecutableUnit.BindLifetime].

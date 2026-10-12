@@ -265,7 +265,10 @@ func (be *Evaluator) AddDataToContext(
 // if ctx is already done. Cancelling an Eval's ctx shortens the wait only if
 // the guest stops and the data provider honours cancellation. Close is safe
 // to call more than once and concurrently: the runtime is released once,
-// and each call waits on its own ctx.
+// and each call's ctx bounds only its wait for in-flight Evals. The last
+// Eval counts as in flight until it has released the runtime. A Close that
+// finds no Eval in flight runs the release, or waits for one already under
+// way, regardless of ctx, so a plugin close that hangs blocks it.
 //
 // The evaluator also closes itself this way when its lifetime ctx is done:
 // the ctx passed to the constructor, or the one given to WithLifetime. Only
