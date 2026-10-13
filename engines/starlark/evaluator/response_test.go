@@ -361,4 +361,19 @@ func TestExecResultAsMap(t *testing.T) {
 		// starlark int converts to int64; the AsMap error message reflects the Go type.
 		assert.Contains(t, err.Error(), "got int64")
 	})
+
+	t.Run("error on dict key collision", func(t *testing.T) {
+		dict := starlark.NewDict(2)
+		require.NoError(t, dict.SetKey(starlark.MakeInt(1), starlark.String("a")))
+		require.NoError(t, dict.SetKey(starlark.String("1"), starlark.String("b")))
+
+		result := newEvalResult(handler, dict, time.Millisecond, "id-collide")
+		assert.Equal(t, data.MAP, result.Type())
+		got, err := result.AsMap()
+		assert.Nil(t, got)
+		require.ErrorIs(t, err, ErrDictKeyCollision,
+			"the conversion error should reach the caller")
+		assert.NotErrorIs(t, err, ErrAsMapTypeMismatch,
+			"a dict result is a map; the failure is in converting it")
+	})
 }

@@ -6,12 +6,14 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"math"
 	"net/http/httptest"
 	"os"
 	"strings"
 	"testing"
 	"time"
 
+	rObj "github.com/deepnoodle-ai/risor/v2/pkg/object"
 	"github.com/robbyt/go-polyscript/engines/risor/compiler"
 	"github.com/robbyt/go-polyscript/engines/types"
 	"github.com/robbyt/go-polyscript/internal/helpers"
@@ -824,6 +826,140 @@ func TestEval_ResultTypes(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, tc.expectedType, result.Type(), "Type() should classify the result")
 			assert.Equal(t, tc.expectedValue, result.Interface(), "Interface() should return the converted result")
+		})
+	}
+}
+
+// safeValuer converts itself to the Risor string "safe", so Risor never
+// reads its oversized field.
+type safeValuer struct{ Big uint64 }
+
+func (safeValuer) RisorValue() rObj.Object { return rObj.NewString("safe") }
+
+// safeUint is an unsigned type that converts itself to the Risor string
+// "safe" instead of being read as an integer.
+type safeUint uint64
+
+func (safeUint) RisorValue() rObj.Object { return rObj.NewString("safe") }
+
+// TestEval_UintRange is the evaluator-level regression for issue #165: an
+// unsigned input above math.MaxInt64 used to wrap silently (MaxUint64 read
+// back as -1); Eval must reject it, while in-range values still round-trip.
+func TestEval_UintRange(t *testing.T) {
+	t.Parallel()
+
+	// Risor wraps structs as GoStruct and converts fields when a script reads
+	// them, so out-of-range fields must be caught up front as well.
+	type holder struct {
+		Big  uint64
+		Nest map[string]any
+	}
+
+	tests := []struct {
+		name     string
+		script   string
+		input    map[string]any
+		expected any
+		wantErr  error
+	}{
+		{
+			name:    "uint64 above max int64 is rejected",
+			input:   map[string]any{"big": uint64(math.MaxUint64)},
+			wantErr: ErrUintOverflow,
+		},
+		{
+			name:    "nested uint64 above max int64 is rejected",
+			input:   map[string]any{"big": []any{uint64(math.MaxInt64) + 1}},
+			wantErr: ErrUintOverflow,
+		},
+		{
+			name:    "struct field above max int64 is rejected",
+			script:  `ctx["big"].Big`,
+			input:   map[string]any{"big": holder{Big: math.MaxUint64}},
+			wantErr: ErrUintOverflow,
+		},
+		{
+			name:    "struct pointer field above max int64 is rejected",
+			script:  `ctx["big"].Big`,
+			input:   map[string]any{"big": &holder{Big: math.MaxUint64}},
+			wantErr: ErrUintOverflow,
+		},
+		{
+			name:   "map in struct field above max int64 is rejected",
+			script: `ctx["big"].Nest["x"]`,
+			input: map[string]any{"big": holder{
+				Nest: map[string]any{"x": uint64(math.MaxUint64)},
+			}},
+			wantErr: ErrUintOverflow,
+		},
+		{
+			name:     "uint64 at max int64 passes",
+			input:    map[string]any{"big": uint64(math.MaxInt64)},
+			expected: int64(math.MaxInt64),
+		},
+		{
+			name:     "struct field at max int64 passes",
+			script:   `ctx["big"].Big`,
+			input:    map[string]any{"big": &holder{Big: math.MaxInt64}},
+			expected: int64(math.MaxInt64),
+		},
+		{
+			name:     "valuer struct with big field uses its own conversion",
+			input:    map[string]any{"big": safeValuer{Big: math.MaxUint64}},
+			expected: "safe",
+		},
+		{
+			name:     "valuer struct pointer with big field uses its own conversion",
+			input:    map[string]any{"big": &safeValuer{Big: math.MaxUint64}},
+			expected: "safe",
+		},
+		{
+			name:     "named uint valuer uses its own conversion",
+			input:    map[string]any{"big": safeUint(math.MaxUint64)},
+			expected: "safe",
+		},
+		{
+			name:     "map of named uint valuers uses their own conversion",
+			script:   `ctx["big"]["x"]`,
+			input:    map[string]any{"big": map[string]safeUint{"x": safeUint(math.MaxUint64)}},
+			expected: "safe",
+		},
+		{
+			name:     "slice of named uint valuers uses their own conversion",
+			script:   `ctx["big"][0]`,
+			input:    map[string]any{"big": []safeUint{safeUint(math.MaxUint64)}},
+			expected: "safe",
+		},
+		{
+			name:     "risor object passes through",
+			input:    map[string]any{"big": rObj.NewInt(7)},
+			expected: int64(7),
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			handler := slog.NewTextHandler(io.Discard, nil)
+			script := tc.script
+			if script == "" {
+				script = `ctx["big"]`
+			}
+			ld, err := loader.NewFromString(script)
+			require.NoError(t, err)
+			exe, err := createTestExecutable(
+				t.Context(), handler, ld, []string{constants.Ctx},
+				data.NewStaticProvider(tc.input),
+			)
+			require.NoError(t, err)
+
+			result, err := New(handler, exe).Eval(t.Context())
+			if tc.wantErr != nil {
+				require.ErrorIs(t, err, tc.wantErr)
+				assert.Nil(t, result)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tc.expected, result.Interface())
 		})
 	}
 }

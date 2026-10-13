@@ -89,7 +89,12 @@ func (r *execResult) ExecTime() time.Duration {
 }
 
 func (r *execResult) AsMap() (map[string]any, error) {
-	v := r.Interface()
+	// Convert directly rather than via Interface(), which logs and drops the
+	// error (e.g. ErrDictKeyCollision) and would misreport it as a type mismatch.
+	v, err := internal.ConvertStarlarkValueToInterface(r.Value)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert result: %w", err)
+	}
 	m, ok := v.(map[string]any)
 	if !ok {
 		return nil, fmt.Errorf("%w, got %T", ErrAsMapTypeMismatch, v)

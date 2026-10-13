@@ -100,6 +100,7 @@ type mockPluginInstance struct {
 	wasCalled  bool
 	wasClosed  bool
 	cancelFunc func()
+	gotInput   []byte
 }
 
 func (m *mockPluginInstance) CallWithContext(
@@ -108,6 +109,7 @@ func (m *mockPluginInstance) CallWithContext(
 	input []byte,
 ) (uint32, []byte, error) {
 	m.wasCalled = true
+	m.gotInput = input
 	// Execute the cancel function if provided (to simulate context cancellation)
 	if m.cancelFunc != nil {
 		m.cancelFunc()
@@ -313,6 +315,36 @@ func TestEvaluator_Evaluate(t *testing.T) {
 			// Verify current behavior
 			expected := `{"initial":"top-level-value","input_data":{"input":"API User","request":{}}}`
 			assert.JSONEq(t, expected, string(jsonBytes))
+		})
+
+		// Regression for issue #165: with no input data, the guest must
+		// receive an empty JSON object rather than zero bytes, which a guest
+		// parsing JSON input rejects as "unexpected end of JSON input".
+		t.Run("empty input sends empty JSON object", func(t *testing.T) {
+			tests := []struct {
+				name string
+				data map[string]any
+			}{
+				{name: "empty map", data: map[string]any{}},
+				{name: "nil map", data: nil},
+			}
+			for _, tt := range tests {
+				t.Run(tt.name, func(t *testing.T) {
+					handler := slog.NewTextHandler(os.Stdout, nil)
+					mockPlugin := new(MockCompiledPlugin)
+					mockInstance := &mockPluginInstance{output: []byte(`{}`)}
+					mockPlugin.On("Instance", mock.Anything, mock.Anything).Return(mockInstance, nil)
+					content := createMockExecutable(mockPlugin, "main")
+					exe := newExe(t, "test-empty-input", content, &mockMapProvider{data: tt.data})
+
+					_, err := New(handler, exe).Eval(t.Context())
+					require.NoError(t, err)
+					require.True(t, mockInstance.wasCalled, "guest should be called")
+					assert.JSONEq(t, `{}`, string(mockInstance.gotInput),
+						"guest should receive an empty JSON object")
+					mockPlugin.AssertExpectations(t)
+				})
+			}
 		})
 	})
 
@@ -757,6 +789,8 @@ func TestEvaluator_Evaluate(t *testing.T) {
 			_, _, err := execHelper(ctx, logger, mockInstance, "main", []byte(`{}`), 0)
 			require.ErrorIs(t, err, context.Canceled)
 			require.ErrorIs(t, err, callErr)
+			assert.Contains(t, err.Error(), callErr.Error(),
+				"the guest's own failure should stay visible in the message")
 		})
 	})
 }

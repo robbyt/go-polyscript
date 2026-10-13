@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/robbyt/go-polyscript/engines/starlark/compiler"
+	"github.com/robbyt/go-polyscript/engines/starlark/internal"
 	"github.com/robbyt/go-polyscript/internal/helpers"
 	"github.com/robbyt/go-polyscript/platform/constants"
 	"github.com/robbyt/go-polyscript/platform/data"
@@ -266,6 +267,27 @@ func TestEval_NoGoroutineLeak(t *testing.T) {
 			require.NoError(t, err)
 		}
 	})
+}
+
+// TestNew_UniverseMatchesCompilerPredeclared is a regression for issue #165:
+// every runtime global must also be predeclared at compile time, or no script
+// can reference it. The compiler predeclares the standard modules plus ctx.
+func TestNew_UniverseMatchesCompilerPredeclared(t *testing.T) {
+	t.Parallel()
+
+	stdModules := internal.StarlarkModules()
+	eval := New(nil, nil)
+
+	assert.True(t, eval.universe.Has(constants.Ctx), "ctx should be a runtime global")
+	assert.False(t, eval.universe.Has(string(constants.EvalData)),
+		"eval_data is never predeclared, so it must not be a runtime global")
+	for name := range eval.universe {
+		if name == constants.Ctx {
+			continue
+		}
+		assert.True(t, stdModules.Has(name),
+			"runtime global %q is not predeclared by the compiler", name)
+	}
 }
 
 // TestEvaluator_AddDataToContext tests the AddDataToContext method with various scenarios
