@@ -3,6 +3,7 @@ package script
 import (
 	"context"
 	"io"
+	"sync/atomic"
 
 	engineTypes "github.com/robbyt/go-polyscript/engines/types"
 	"github.com/stretchr/testify/mock"
@@ -41,4 +42,39 @@ func (m *MockExecutableContent) GetByteCode() any {
 func (m *MockExecutableContent) EngineType() engineTypes.Type {
 	args := m.Called()
 	return args.Get(0).(engineTypes.Type)
+}
+
+// MockClosableExecutableContent is a MockExecutableContent that also
+// implements Close, standing in for compiled content that holds resources.
+type MockClosableExecutableContent struct {
+	MockExecutableContent
+}
+
+func (m *MockClosableExecutableContent) Close(ctx context.Context) error {
+	args := m.Called(ctx)
+	return args.Error(0)
+}
+
+// countingClosableContent is closable content that counts Close calls and
+// returns err from each.
+type countingClosableContent struct {
+	MockExecutableContent
+	closeCalls atomic.Int32
+	err        error
+}
+
+func (c *countingClosableContent) Close(context.Context) error {
+	c.closeCalls.Add(1)
+	return c.err
+}
+
+// watchingContent is closable content that also watches its lifetime,
+// recording each channel passed to WatchLifetime.
+type watchingContent struct {
+	countingClosableContent
+	watched []<-chan struct{}
+}
+
+func (c *watchingContent) WatchLifetime(done <-chan struct{}) {
+	c.watched = append(c.watched, done)
 }

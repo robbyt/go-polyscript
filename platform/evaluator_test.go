@@ -54,6 +54,11 @@ func (m *mockEvaluatorWithPreparer) AddDataToContext(
 	return args.Get(0).(context.Context), args.Error(1)
 }
 
+func (m *mockEvaluatorWithPreparer) Close(ctx context.Context) error {
+	args := m.Called(ctx)
+	return args.Error(0)
+}
+
 func TestEvaluatorInterface(t *testing.T) {
 	t.Parallel()
 	// Create a mock evaluator response

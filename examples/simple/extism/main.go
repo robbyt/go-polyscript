@@ -32,6 +32,12 @@ func runExtismExample(logger *slog.Logger) (map[string]any, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create evaluator: %w", err)
 	}
+	// Release the compiled module's wazero runtime when done
+	defer func() {
+		if err := evaluator.Close(context.Background()); err != nil {
+			logger.Warn("Failed to close evaluator", "error", err)
+		}
+	}()
 
 	// Set a timeout for script execution
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)

@@ -32,6 +32,9 @@
 //   - [WithDataProvider] — a custom [data.Provider] that bypasses the
 //     ContextProvider/CompositeProvider composition; mutually exclusive
 //     with [WithStaticData]
+//   - [WithLifetime] — the ctx that bounds the evaluator's lifetime, in
+//     place of the ctx passed to [FromRisorLoader]; accepted for parity with
+//     other engines, since the evaluator holds nothing to release
 package risor
 
 import (
@@ -59,7 +62,11 @@ import (
 //	)
 //
 // The supplied ctx flows into the loader's I/O and the Risor parser;
-// cancelling it halts compilation in flight.
+// cancelling it halts compilation in flight. It also stands for the
+// evaluator's lifetime, unless [WithLifetime] supplies another, but a Risor
+// evaluator holds nothing to release, so cancelling it after construction
+// changes nothing and Eval keeps working. A lifetime ctx that is already
+// done when construction finishes makes FromRisorLoader return an error.
 //
 // All options are optional. With no options the evaluator inherits the
 // default slog handler (via [helpers.SetupLogger]) and uses a
@@ -94,6 +101,14 @@ func FromRisorLoader(ctx context.Context, ldr loader.Loader, opts ...Option) (*e
 
 	execUnit, err := script.NewExecutableUnit(ctx, cfg.handler, execUnitID, ldr, comp, provider)
 	if err != nil {
+		return nil, err
+	}
+
+	bindLifetime := cfg.bindLifetime
+	if bindLifetime == nil {
+		bindLifetime = func(u *script.ExecutableUnit) error { return u.BindLifetime(ctx) }
+	}
+	if err := bindLifetime(execUnit); err != nil {
 		return nil, err
 	}
 

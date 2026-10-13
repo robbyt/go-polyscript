@@ -83,6 +83,32 @@ func (m *MockProvider) AddDataToContext(
 	return ctx, args.Error(1)
 }
 
+// TestEvaluator_Close verifies Close is a no-op for Starlark, which holds no
+// releasable resources.
+func TestEvaluator_Close(t *testing.T) {
+	t.Parallel()
+
+	t.Run("compiled script", func(t *testing.T) {
+		_, evaluator := evalBuilder(t, `_ = 1`)
+		require.NoError(t, evaluator.Close(t.Context()))
+		require.NoError(t, evaluator.Close(t.Context()), "second Close should be a no-op")
+
+		_, err := evaluator.Eval(t.Context())
+		require.NoError(t, err, "Eval should keep working after Close")
+	})
+
+	t.Run("nil executable unit", func(t *testing.T) {
+		evaluator := New(nil, nil)
+		require.NoError(t, evaluator.Close(t.Context()))
+	})
+
+	t.Run("nil evaluator", func(t *testing.T) {
+		var evaluator *Evaluator
+		require.NoError(t, evaluator.Close(t.Context()),
+			"Close on a nil evaluator (e.g. from a failed constructor) must not panic")
+	})
+}
+
 // TestEvaluator_Evaluate tests evaluating starlark scripts
 func TestEvaluator_Evaluate(t *testing.T) {
 	t.Parallel()

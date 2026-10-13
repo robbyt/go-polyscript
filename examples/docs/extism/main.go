@@ -28,6 +28,8 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	// release the compiled module's wazero runtime when done
+	defer evaluator.Close(ctx)
 
 	// Execute, and print the result
 	result, err := evaluator.Eval(ctx)

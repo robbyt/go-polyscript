@@ -25,7 +25,7 @@ func (m *mockEvaluator) Reload(path string) error {
 	return args.Error(0)
 }
 
-func (m *mockEvaluator) Load(newVersion script.ExecutableUnit) error {
+func (m *mockEvaluator) Load(newVersion *script.ExecutableUnit) error {
 	args := m.Called(newVersion)
 	return args.Error(0)
 }
@@ -36,6 +36,11 @@ func (m *mockEvaluator) AddDataToContext(
 ) (context.Context, error) {
 	args := m.Called(ctx, d)
 	return args.Get(0).(context.Context), args.Error(1)
+}
+
+func (m *mockEvaluator) Close(ctx context.Context) error {
+	args := m.Called(ctx)
+	return args.Error(0)
 }
 
 type mockEvaluatorResponse struct {

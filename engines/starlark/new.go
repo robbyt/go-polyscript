@@ -32,6 +32,9 @@
 //   - [WithDataProvider] — a custom [data.Provider] that bypasses the
 //     ContextProvider/CompositeProvider composition; mutually exclusive
 //     with [WithStaticData]
+//   - [WithLifetime] — the ctx that bounds the evaluator's lifetime, in
+//     place of the ctx passed to [FromStarlarkLoader]; accepted for parity with
+//     other engines, since the evaluator holds nothing to release
 package starlark
 
 import (
@@ -67,7 +70,12 @@ import (
 // call to keep intent unambiguous.
 //
 // The supplied ctx flows into the loader's I/O; Starlark's parser is
-// synchronous and does not observe ctx during compile.
+// synchronous and does not observe ctx during compile. It also stands for
+// the evaluator's lifetime, unless [WithLifetime] supplies another, but a
+// Starlark evaluator holds nothing to release, so cancelling it after
+// construction changes nothing and Eval keeps working. A lifetime ctx that is
+// already done when construction finishes makes FromStarlarkLoader return an
+// error.
 func FromStarlarkLoader(ctx context.Context, ldr loader.Loader, opts ...Option) (*evaluator.Evaluator, error) {
 	cfg := &config{}
 	for _, opt := range opts {
@@ -94,6 +102,14 @@ func FromStarlarkLoader(ctx context.Context, ldr loader.Loader, opts ...Option) 
 
 	execUnit, err := script.NewExecutableUnit(ctx, cfg.handler, execUnitID, ldr, comp, provider)
 	if err != nil {
+		return nil, err
+	}
+
+	bindLifetime := cfg.bindLifetime
+	if bindLifetime == nil {
+		bindLifetime = func(u *script.ExecutableUnit) error { return u.BindLifetime(ctx) }
+	}
+	if err := bindLifetime(execUnit); err != nil {
 		return nil, err
 	}
 

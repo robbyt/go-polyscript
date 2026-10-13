@@ -92,7 +92,39 @@ The older `FromRisorString*`, `FromStarlark*`, and `FromExtism*` constructors st
 
 ## API at a glance
 
-`polyscript.New[E]` is the single entry point. `E` selects the engine, the first argument is a `context.Context` (used while loading and compiling the script), the second is a `Source`, and the remaining arguments are `Option[E]`s.
+`polyscript.New[E]` is the single entry point. `E` selects the engine, the first argument is a `context.Context` (used while loading and compiling the script, and bounding the evaluator's lifetime), the second is a `Source`, and the remaining arguments are `Option[E]`s.
+
+Release an evaluator you no longer need with `defer evaluator.Close(ctx)`, placed after the error check. For an engine that holds resources, `Close` stops new `Eval` calls at once and frees what the engine holds; for one that holds none, `Close` changes nothing and `Eval` keeps working. See [engines/README.md](engines/README.md) for what each engine does. `Close` waits for in-flight `Eval` calls only until its `ctx` is done: if that comes first, `Close` returns the ctx's error and the resources are released when the last in-flight `Eval` returns. With nothing in flight it releases them at once, even with a cancelled `ctx`. Like `http.Server.Shutdown`, `Close` is safe to call more than once and concurrently: the resources are released once, and each call's `ctx` bounds only its wait for in-flight `Eval` calls, not the release itself.
+
+### Evaluator lifetime
+
+The `ctx` passed to `New` also bounds the evaluator's lifetime: when it is done, the evaluator closes itself as if `Close` had been called. For an engine that holds resources, an evaluator built with a per-request or timeout `ctx` is therefore closed when that `ctx` ends; for one that holds none, the end of the lifetime changes nothing. For compile-once-run-many, pass a long-lived `ctx`, or keep a short one for loading and compiling and pass the long-lived one with `WithLifetime[E]`. Call `Close` or let the lifetime end: an evaluator that is neither closed nor bound to a lifetime that ends keeps what its engine holds, since nothing releases it when the evaluator is garbage collected. If the lifetime `ctx` is already done when construction finishes, `New` closes what it built and returns an error; a lifetime that ends later, even before `New` returns, closes the evaluator as described above.
+
+<!-- snippet: examples/docs/snippets/lifetime.go#lifetime -->
+```go
+import (
+	"context"
+	"time"
+
+	"github.com/robbyt/go-polyscript"
+)
+
+// Give loading and compiling a deadline, but keep the evaluator
+// open until appCtx ends or Close is called.
+loadCtx, cancel := context.WithTimeout(appCtx, 10*time.Second)
+defer cancel()
+
+evaluator, err := polyscript.New[polyscript.Extism](
+	loadCtx,
+	polyscript.FromBytes(wasmBytes),
+	polyscript.WithEntryPoint("greet"),
+	polyscript.WithLifetime[polyscript.Extism](appCtx),
+)
+if err != nil {
+	return err
+}
+defer evaluator.Close(appCtx)
+```
 
 ### Engines
 
@@ -117,10 +149,11 @@ The older `FromRisorString*`, `FromStarlark*`, and `FromExtism*` constructors st
 | ---------------------------------- | ----------------------- | ------------------------------------------------------------------- |
 | `WithStaticData[E](map)`           | All engines             | Bakes a fixed data map into the evaluator at construction time      |
 | `WithLogHandler[E](handler)`       | All engines             | Routes diagnostic logs through the given `slog.Handler`             |
+| `WithLifetime[E](ctx)`             | All engines             | Bounds the evaluator's lifetime by `ctx` instead of the `ctx` passed to `New` |
 | `WithEntryPoint(name)`             | `Extism` only (compile-time enforced) | Sets the WASM function name to invoke; required for Extism |
 | `WithContextTermination(bool)`     | `Extism` only (compile-time enforced) | Whether cancelling the `Eval` ctx stops a running guest. On by default; wazero's termination checks roughly double per-call time on small modules, so pass `false` for trusted modules on hot paths that never need a timeout |
 
-> **Note on type arguments.** `WithStaticData` and `WithLogHandler` are generic over the engine. Go's current type inference can't always infer `E` for them when the surrounding `New[E]` call has a non-variadic `Source` parameter, so these helpers usually need an explicit type argument: `polyscript.WithStaticData[polyscript.Risor](data)`. `WithEntryPoint` is bound to `Extism` and never needs one — passing it to `New[polyscript.Risor]` or `New[polyscript.Starlark]` is a compile error rather than a silent no-op.
+> **Note on type arguments.** `WithStaticData`, `WithLogHandler` and `WithLifetime` are generic over the engine. Go's current type inference can't always infer `E` for them when the surrounding `New[E]` call has a non-variadic `Source` parameter, so these helpers usually need an explicit type argument: `polyscript.WithStaticData[polyscript.Risor](data)`. `WithEntryPoint` is bound to `Extism` and never needs one — passing it to `New[polyscript.Risor]` or `New[polyscript.Starlark]` is a compile error rather than a silent no-op.
 
 ## Loading Scripts
 
@@ -389,6 +422,8 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	// release the compiled module's wazero runtime when done
+	defer evaluator.Close(ctx)
 
 	// Execute, and print the result
 	result, err := evaluator.Eval(ctx)
@@ -401,7 +436,7 @@ func main() {
 
 ## Direct engine subpackage usage
 
-Most callers should use `polyscript.New[E]`. For finer-grained control over a single engine — for example, plugging in a custom `data.Provider` — each engine subpackage exposes the same shape: `FromXxxLoader(ctx, ldr, opts...)`, with engine-scoped `WithLogHandler`, `WithStaticData`, `WithDataProvider`, and (Extism only) `WithEntryPoint` options.
+Most callers should use `polyscript.New[E]`. For finer-grained control over a single engine — for example, plugging in a custom `data.Provider` — each engine subpackage exposes the same shape: `FromXxxLoader(ctx, ldr, opts...)`, with engine-scoped `WithLogHandler`, `WithStaticData`, `WithDataProvider`, `WithLifetime`, and (Extism only) `WithEntryPoint` options.
 
 <!-- snippet: examples/docs/snippets/direct_risor.go#direct-risor -->
 ```go

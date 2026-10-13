@@ -1,9 +1,11 @@
 package risor
 
 import (
+	"context"
 	"log/slog"
 
 	"github.com/robbyt/go-polyscript/platform/data"
+	"github.com/robbyt/go-polyscript/platform/script"
 )
 
 // Option configures [FromRisorLoader]. Apply in any order; later options
@@ -14,6 +16,10 @@ type config struct {
 	handler      slog.Handler
 	staticData   map[string]any
 	dataProvider data.Provider
+	// bindLifetime, set by WithLifetime, binds the executable unit to the
+	// lifetime ctx; nil means the constructor's ctx. It is a func so that no
+	// context.Context is kept in a struct.
+	bindLifetime func(*script.ExecutableUnit) error
 }
 
 // WithLogHandler sets the slog.Handler used for diagnostic logging by the
@@ -40,4 +46,20 @@ func WithStaticData(d map[string]any) Option {
 // one of them per call.
 func WithDataProvider(p data.Provider) Option {
 	return func(c *config) { c.dataProvider = p }
+}
+
+// WithLifetime sets the ctx that bounds the evaluator's lifetime, in place
+// of the ctx passed to [FromRisorLoader]. A Risor evaluator holds nothing
+// to release, so the end of its lifetime changes nothing and Eval keeps
+// working; the option exists so that code written for every engine can pass
+// it. If the ctx is already done when construction finishes,
+// [FromRisorLoader] returns an error. A nil ctx means the constructor's ctx.
+func WithLifetime(ctx context.Context) Option {
+	return func(c *config) {
+		if ctx == nil {
+			c.bindLifetime = nil
+			return
+		}
+		c.bindLifetime = func(u *script.ExecutableUnit) error { return u.BindLifetime(ctx) }
+	}
 }

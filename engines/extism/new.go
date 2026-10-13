@@ -34,6 +34,9 @@
 //   - [WithDataProvider] — a custom [data.Provider] that bypasses the
 //     ContextProvider/CompositeProvider composition; mutually exclusive
 //     with [WithStaticData]
+//   - [WithLifetime] — the ctx that bounds the evaluator's lifetime, in
+//     place of the ctx passed to [FromExtismLoader]; when it is done the
+//     evaluator closes itself and releases the wazero runtime
 package extism
 
 import (
@@ -80,6 +83,15 @@ var ErrEntryPointRequired = errors.New("extism: entry point is required (use Wit
 // cancelled, and into the Extism SDK's WASM compile and entry-point probe,
 // which wazero does not interrupt. Cancelling the ctx passed to Eval stops a
 // running guest.
+//
+// The supplied ctx also bounds the evaluator's lifetime, unless
+// [WithLifetime] supplies another: when it is done, the evaluator closes
+// itself as if Close had been called, and the wazero runtime is released
+// once in-flight Evals return. For an evaluator that is reused (compile once,
+// run many), pass a long-lived ctx or use [WithLifetime], not a per-request
+// or timeout ctx. If the lifetime ctx is already done when construction
+// finishes, the evaluator is closed and an error wrapping the ctx's error is
+// returned.
 func FromExtismLoader(ctx context.Context, ldr loader.Loader, opts ...Option) (*evaluator.Evaluator, error) {
 	cfg := &config{}
 	for _, opt := range opts {
@@ -110,6 +122,14 @@ func FromExtismLoader(ctx context.Context, ldr loader.Loader, opts ...Option) (*
 
 	execUnit, err := script.NewExecutableUnit(ctx, cfg.handler, execUnitID, ldr, comp, provider)
 	if err != nil {
+		return nil, err
+	}
+
+	bindLifetime := cfg.bindLifetime
+	if bindLifetime == nil {
+		bindLifetime = func(u *script.ExecutableUnit) error { return u.BindLifetime(ctx) }
+	}
+	if err := bindLifetime(execUnit); err != nil {
 		return nil, err
 	}
 

@@ -10,8 +10,10 @@ import (
 	"net/url"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/robbyt/go-polyscript/engines/extism/compiler"
+	"github.com/robbyt/go-polyscript/engines/extism/evaluator"
 	"github.com/robbyt/go-polyscript/engines/extism/wasmdata"
 	"github.com/robbyt/go-polyscript/platform/data"
 	"github.com/robbyt/go-polyscript/platform/script/loader"
@@ -252,4 +254,108 @@ func TestFromExtismLoader_LoaderCancelled(t *testing.T) {
 	require.Error(t, err)
 	require.Nil(t, eval)
 	require.ErrorIs(t, err, context.Canceled)
+}
+
+// lifetimeTestTimeout bounds the waits in the lifetime tests.
+const lifetimeTestTimeout = 5 * time.Second
+
+// newGreetEvaluator builds an Extism evaluator for the greet entry point
+// from the embedded test module.
+func newGreetEvaluator(t *testing.T, ctx context.Context, opts ...Option) (*evaluator.Evaluator, error) {
+	t.Helper()
+	ldr, err := loader.NewFromBytes(wasmdata.TestModule)
+	require.NoError(t, err)
+	opts = append([]Option{
+		WithEntryPoint(wasmdata.EntrypointGreet),
+		WithStaticData(map[string]any{"input": "World"}),
+	}, opts...)
+	return FromExtismLoader(ctx, ldr, opts...)
+}
+
+// requireEvalWorks fails the test unless eval still evaluates.
+func requireEvalWorks(t *testing.T, eval *evaluator.Evaluator) {
+	t.Helper()
+	res, err := eval.Eval(t.Context())
+	require.NoError(t, err)
+	got, err := res.AsMap()
+	require.NoError(t, err)
+	assert.Equal(t, "Hello, World!", got["greeting"])
+}
+
+// requireClosedEventually fails the test unless Eval starts failing with
+// compiler.ErrExecutableClosed within lifetimeTestTimeout.
+func requireClosedEventually(t *testing.T, eval *evaluator.Evaluator) {
+	t.Helper()
+	require.Eventually(t, func() bool {
+		_, err := eval.Eval(t.Context())
+		return errors.Is(err, compiler.ErrExecutableClosed)
+	}, lifetimeTestTimeout, time.Millisecond, "the evaluator should close when its lifetime ends")
+}
+
+func TestFromExtismLoader_Lifetime(t *testing.T) {
+	t.Parallel()
+
+	t.Run("cancelling the constructor ctx closes the evaluator", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(t.Context())
+		defer cancel()
+		eval, err := newGreetEvaluator(t, ctx)
+		require.NoError(t, err)
+		requireEvalWorks(t, eval)
+
+		cancel()
+		requireClosedEventually(t, eval)
+		require.NoError(t, eval.Close(t.Context()), "Close after the lifetime ended should succeed")
+	})
+
+	t.Run("WithLifetime outlives the constructor ctx", func(t *testing.T) {
+		setupCtx, cancelSetup := context.WithCancel(t.Context())
+		lifetime, cancelLifetime := context.WithCancel(t.Context())
+		defer cancelLifetime()
+
+		eval, err := newGreetEvaluator(t, setupCtx, WithLifetime(lifetime))
+		require.NoError(t, err)
+		// Eval checks the lifetime synchronously, so a watcher bound to the
+		// wrong ctx would make it fail at once.
+		cancelSetup()
+		requireEvalWorks(t, eval)
+
+		cancelLifetime()
+		requireClosedEventually(t, eval)
+	})
+
+	t.Run("Close before lifetime end", func(t *testing.T) {
+		lifetime, cancelLifetime := context.WithCancel(t.Context())
+		defer cancelLifetime()
+
+		eval, err := newGreetEvaluator(t, t.Context(), WithLifetime(lifetime))
+		require.NoError(t, err)
+		require.NoError(t, eval.Close(t.Context()))
+		cancelLifetime()
+
+		_, err = eval.Eval(t.Context())
+		require.ErrorIs(t, err, compiler.ErrExecutableClosed)
+		require.NoError(t, eval.Close(t.Context()))
+	})
+
+	t.Run("Close racing the lifetime watcher waits for its release", func(t *testing.T) {
+		// The common shutdown pattern: the same ctx is the lifetime and the
+		// Close ctx. The watcher and Close race to release the runtime; Close
+		// must not give up just because its ctx is done.
+		for range 25 {
+			ctx, cancel := context.WithCancel(t.Context())
+			eval, err := newGreetEvaluator(t, ctx)
+			require.NoError(t, err)
+			cancel()
+			require.NoError(t, eval.Close(ctx), "with nothing in flight, Close should report the release")
+		}
+	})
+
+	t.Run("already-cancelled lifetime fails construction", func(t *testing.T) {
+		lifetime, cancelLifetime := context.WithCancel(t.Context())
+		cancelLifetime()
+
+		eval, err := newGreetEvaluator(t, t.Context(), WithLifetime(lifetime))
+		require.ErrorIs(t, err, context.Canceled)
+		require.Nil(t, eval)
+	})
 }
