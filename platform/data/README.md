@@ -180,6 +180,27 @@ During evaluation, the `CompositeProvider`:
 - Merges the results (later providers override earlier ones)
 - Passes the merged data to the script engine
 
+`GetData()` on `StaticProvider` and `ContextProvider` returns a deep copy (nested
+`map[string]any` and `[]any` values included), so the caller or engine can mutate
+the result without changing the provider's data. `NewStaticProvider` likewise keeps
+its own copy of the map you pass in, and `ContextProvider.AddDataToContext()` stores
+a copy of the data you pass in.
+
+`CompositeProvider.AddDataToContext()` passes the data to every provider. A
+`data.ErrStaticProviderNoRuntimeUpdates` rejection (from a `StaticProvider`, or a
+nested `CompositeProvider` holding only static providers) is ignored when another
+provider stores the data. Any other failure is returned (joined with `errors.Join`)
+together with the original context; the data stored by the providers that
+succeeded is discarded with their contexts. A composite with nothing to store into
+(no non-nil providers, or only empty nested composites) returns `data.ErrNoProviders`.
+
+Every provider follows the same rule: on any error, `AddDataToContext()` returns
+the context it was given, never one carrying part of the data. `ContextProvider`
+stores none of the data when any entry is invalid (an empty key, or a request
+it cannot convert). This is not a rollback: the composite still calls every
+provider, and side effects such as `ContextProvider` reading an HTTP request body
+are not undone.
+
 Example of the provider chain:
 
 ```go
