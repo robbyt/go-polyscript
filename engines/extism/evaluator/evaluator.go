@@ -184,14 +184,9 @@ func (be *Evaluator) Eval(ctx context.Context) (platform.EvaluatorResponse, erro
 		return nil, fmt.Errorf("executable unit is nil")
 	}
 
-	if be.execUnit.GetContent() == nil {
+	content := be.execUnit.GetContent()
+	if content == nil {
 		return nil, fmt.Errorf("content is nil")
-	}
-
-	// Get bytecode from executable unit
-	bytecode := be.execUnit.GetContent().GetByteCode()
-	if bytecode == nil {
-		return nil, fmt.Errorf("bytecode is nil")
 	}
 
 	// Get execution ID
@@ -201,44 +196,51 @@ func (be *Evaluator) Eval(ctx context.Context) (platform.EvaluatorResponse, erro
 	}
 	logger = logger.With("exeID", exeID)
 
-	// 1. Type assert to WASM module, and get the compiled plugin object
-	wasmExe, ok := be.execUnit.GetContent().(*compiler.Executable)
+	// 1. Type assert to WASM module
+	wasmExe, ok := content.(*compiler.Executable)
 	if !ok {
 		return nil, fmt.Errorf(
 			"invalid executable type: expected *Executable, got %T",
-			be.execUnit.GetContent(),
+			content,
 		)
 	}
-	plugin := wasmExe.GetExtismByteCode()
-	if plugin == nil {
-		return nil, fmt.Errorf("compiled plugin is nil")
-	}
 
-	// 2. Get the raw input data
-	rawInputData, err := be.loadInputData(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get input data: %w", err)
-	}
+	// 2. Load the input data, convert it to JSON and execute the program
+	// inside WithPlugin. It keeps the plugin open until fn returns, so a
+	// concurrent Close does not release it during data loading either. Once
+	// Close has been called it returns compiler.ErrExecutableClosed without
+	// calling fn, so the data provider is never called. Its error is returned
+	// unwrapped; each step inside fn wraps its own.
+	var result *execResult
+	err := wasmExe.WithPlugin(ctx, func(plugin adapters.CompiledPlugin) error {
+		rawInputData, loadErr := be.loadInputData(ctx)
+		if loadErr != nil {
+			return fmt.Errorf("failed to get input data: %w", loadErr)
+		}
 
-	// 3. Convert input data to JSON for passing into the WASM engine
-	runtimeData, err := internal.ConvertToExtismFormat(rawInputData)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal input data: %w", err)
-	}
+		runtimeData, convErr := internal.ConvertToExtismFormat(rawInputData)
+		if convErr != nil {
+			return fmt.Errorf("failed to marshal input data: %w", convErr)
+		}
 
-	// 4. Execute the program
-	result, err := be.exec(
-		ctx, plugin,
-		wasmExe.GetEntryPoint(),
-		adapters.NewPluginInstanceConfig(),
-		runtimeData,
-	)
+		var execErr error
+		result, execErr = be.exec(
+			ctx, plugin,
+			wasmExe.GetEntryPoint(),
+			adapters.NewPluginInstanceConfig(),
+			runtimeData,
+		)
+		if execErr != nil {
+			return fmt.Errorf("exec error: %w", execErr)
+		}
+		return nil
+	})
 	if err != nil {
-		return nil, fmt.Errorf("exec error: %w", err)
+		return nil, err
 	}
 	logger.DebugContext(ctx, "exec completed", "result", result)
 
-	// 5. Collect results
+	// 3. Collect results
 	result.scriptExeID = exeID
 	return result, nil
 }
@@ -250,4 +252,36 @@ func (be *Evaluator) AddDataToContext(
 	d map[string]any,
 ) (context.Context, error) {
 	return data.AddDataToContextFromProvider(ctx, be.logHandler.WithGroup("Evaluator"), be.getDataProvider(), d)
+}
+
+// Close implements platform.Evaluator. It releases the compiled plugin and
+// its wazero runtime, like [net/http.Server.Shutdown]: as soon as Close is
+// called, new Eval calls return an error wrapping
+// compiler.ErrExecutableClosed without calling the data provider. Close then
+// waits for in-flight Evals, including their data loading, until ctx is
+// done; if ctx ends first, Close returns an error wrapping ctx's error and
+// the runtime is released when the last of those Evals returns. With no Eval
+// in flight, Close releases the runtime and returns the release error, even
+// if ctx is already done. Cancelling an Eval's ctx shortens the wait only if
+// the guest stops and the data provider honours cancellation. Close is safe
+// to call more than once and concurrently: the runtime is released once,
+// and each call's ctx bounds only its wait for in-flight Evals. The last
+// Eval counts as in flight until it has released the runtime. A Close that
+// finds no Eval in flight runs the release, or waits for one already under
+// way, regardless of ctx, so a plugin close that hangs blocks it.
+//
+// The evaluator also closes itself this way when its lifetime ctx is done:
+// the ctx passed to the constructor, or the one given to WithLifetime. Only
+// that ctx's Done channel is kept. Call Close or let the lifetime end: an
+// evaluator that is neither closed nor bound to a lifetime that ends keeps
+// its runtime, since nothing releases it when it is garbage collected.
+//
+// A data provider must not call Close with a ctx that is never done, or Eval,
+// on the same Evaluator, since Close would wait for the Eval that is calling
+// it. It is safe on a nil Evaluator.
+func (be *Evaluator) Close(ctx context.Context) error {
+	if be == nil {
+		return nil
+	}
+	return be.execUnit.Close(ctx)
 }

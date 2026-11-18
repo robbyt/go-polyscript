@@ -38,10 +38,11 @@ func godocExtism(ctx context.Context, wasmBytes []byte) error {
 		polyscript.FromBytes(wasmBytes),
 		polyscript.WithEntryPoint("greet"),
 	)
-	// snippet:end
 	if err != nil {
 		return err
 	}
+	defer eval.Close(ctx)
+	// snippet:end
 	enrichedCtx, err := eval.AddDataToContext(ctx, map[string]any{"input": "World"})
 	return evalAndPrint(enrichedCtx, eval, err)
 }

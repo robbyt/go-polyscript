@@ -31,16 +31,48 @@
 //		polyscript.FromBytes(wasmBytes),
 //		polyscript.WithEntryPoint("greet"),
 //	)
+//	if err != nil {
+//		return err
+//	}
+//	defer eval.Close(ctx)
 //
 // All engine constructors return a [platform.Evaluator]. For direct access to
 // the underlying engine, see the per-engine packages under engines/.
 //
+// Call Close on an evaluator once it is no longer needed, to release any
+// resources its engine holds; each engine's Evaluator.Close documents what
+// that means for it. On error, New returns a nil evaluator, so defer Close
+// only after checking err. For an engine that holds resources, Close
+// rejects new Evals at once and waits for in-flight ones only until its ctx
+// is done; if that comes first, it returns the ctx's error and the resources
+// are released when the last in-flight Eval returns. Close is safe to call
+// more than once and concurrently; the resources are released once, and
+// each call's ctx bounds only its wait for in-flight Evals, not the release
+// itself. For an engine that holds none, Close
+// changes nothing and Eval keeps working.
+//
+// # Evaluator lifetime
+//
+// The ctx passed to [New] also bounds the evaluator's lifetime: when it is
+// done, the evaluator closes itself as if Close had been called. For an
+// engine that holds resources, an evaluator built with a per-request or
+// timeout ctx is therefore closed when that ctx ends; for one that holds
+// none, the end of the lifetime changes nothing. To compile once and run
+// many times, pass a long-lived ctx, or keep a short ctx for loading and
+// compiling and pass the long-lived one with [WithLifetime]. Call Close or
+// let the lifetime end: an evaluator that is neither closed nor bound to a
+// lifetime that ends keeps what its engine holds, since nothing releases it
+// when the evaluator is garbage collected. If the lifetime ctx is already
+// done when construction finishes, New closes what it built and returns an
+// error; a lifetime that ends later, even before New returns, closes the
+// evaluator as described above.
+//
 // # A note on type arguments
 //
-// [WithStaticData] and [WithLogHandler] are generic over the engine type. Go's
-// current type inference cannot propagate the [New] call's type argument into
-// these helpers when the [Source] sits between them as a non-variadic
-// parameter, so an explicit type argument is usually required:
+// [WithStaticData], [WithLogHandler] and [WithLifetime] are generic over the
+// engine type. Go's current type inference cannot propagate the [New] call's
+// type argument into these helpers when the [Source] sits between them as a
+// non-variadic parameter, so an explicit type argument is usually required:
 //
 //	opt := polyscript.WithStaticData[polyscript.Risor](data)
 //
@@ -169,8 +201,8 @@ func (s Source) resolve() (loader.Loader, error) {
 // Option configures construction of an engine of type E. Engine-specific
 // options (e.g. [WithEntryPoint]) bind to a single engine and are rejected
 // at compile time when passed to [New] for the wrong engine. Shared options
-// (e.g. [WithStaticData], [WithLogHandler]) are generic in E and work with
-// any engine.
+// (e.g. [WithStaticData], [WithLogHandler], [WithLifetime]) are generic in E
+// and work with any engine.
 type Option[E Engine] func(*config)
 
 type config struct {
@@ -179,6 +211,18 @@ type config struct {
 	entryPoint         string
 	exitOutputMaxBytes int
 	noCtxTermination   bool
+	// lifetime holds each engine's WithLifetime option, built by
+	// [WithLifetime], so that no context.Context is kept in a struct. Only
+	// the one for the engine being built is used.
+	lifetime lifetimeOptions
+}
+
+// lifetimeOptions carries the engine options for [WithLifetime]; a nil
+// option leaves the engine's default, the ctx passed to [New].
+type lifetimeOptions struct {
+	risor    risorMachine.Option
+	starlark starlarkMachine.Option
+	extism   extismMachine.Option
 }
 
 // WithStaticData attaches a fixed map of values that the script will see
@@ -196,6 +240,27 @@ func WithStaticData[E Engine](data map[string]any) Option[E] {
 // The type parameter is normally inferred from the surrounding [New] call.
 func WithLogHandler[E Engine](h slog.Handler) Option[E] {
 	return func(c *config) { c.handler = h }
+}
+
+// WithLifetime sets the ctx that bounds the evaluator's lifetime, in place of
+// the ctx passed to [New]. When it is done, the evaluator closes itself as if
+// Close had been called, releasing whatever its engine holds. Use it when the
+// ctx passed to New is short-lived, such as a timeout for loading the script,
+// and pass a long-lived ctx, or context.Background() for no limit. If the ctx
+// is already done when construction finishes, New closes what it built and
+// returns an error. A nil ctx means the ctx passed to New. With a ctx that
+// is never done, only Close releases what the engine holds.
+//
+// The type parameter usually needs to be explicit; see "A note on type
+// arguments" in the package doc.
+func WithLifetime[E Engine](ctx context.Context) Option[E] {
+	return func(c *config) {
+		c.lifetime = lifetimeOptions{
+			risor:    risorMachine.WithLifetime(ctx),
+			starlark: starlarkMachine.WithLifetime(ctx),
+			extism:   extismMachine.WithLifetime(ctx),
+		}
+	}
 }
 
 // WithEntryPoint sets the WASM function name to invoke. It is required for
@@ -251,11 +316,17 @@ func WithContextTermination(enabled bool) Option[Extism] {
 //
 // The supplied ctx flows into the loader's I/O (e.g. HTTP fetch) and the
 // compiler's parser (Risor, Extism); cancelling it halts those operations.
+// It also bounds the evaluator's lifetime, unless [WithLifetime] supplies
+// another ctx: when the lifetime ctx is done, the evaluator closes itself.
+// See "Evaluator lifetime" in the package doc.
 //
-// Shared options ([WithStaticData], [WithLogHandler]) work for any engine but
-// usually need an explicit type argument; see "A note on type arguments" in
-// the package doc. [WithEntryPoint] is bound to [Extism]; passing it to
-// [Risor] or [Starlark] is a compile error.
+// Shared options ([WithStaticData], [WithLogHandler], [WithLifetime]) work
+// for any engine but usually need an explicit type argument; see "A note on
+// type arguments" in the package doc. [WithEntryPoint] is bound to [Extism];
+// passing it to [Risor] or [Starlark] is a compile error.
+//
+// On error the returned evaluator is nil. Otherwise the caller owns it and
+// should Close it when done.
 func New[E Engine](ctx context.Context, src Source, opts ...Option[E]) (platform.Evaluator, error) {
 	cfg := &config{}
 	for _, o := range opts {
@@ -285,20 +356,40 @@ func New[E Engine](ctx context.Context, src Source, opts ...Option[E]) (platform
 	}
 }
 
+// asEvaluator converts an engine constructor's result to a
+// platform.Evaluator, returning an untyped nil on error so callers never get
+// an interface wrapping a nil engine pointer.
+func asEvaluator[T platform.Evaluator](ev T, err error) (platform.Evaluator, error) {
+	if err != nil {
+		return nil, err
+	}
+	return ev, nil
+}
+
 func newRisor(ctx context.Context, ldr loader.Loader, cfg *config) (platform.Evaluator, error) {
-	opts := []risorMachine.Option{risorMachine.WithLogHandler(cfg.handler)}
+	opts := []risorMachine.Option{
+		risorMachine.WithLogHandler(cfg.handler),
+	}
 	if cfg.staticData != nil {
 		opts = append(opts, risorMachine.WithStaticData(cfg.staticData))
 	}
-	return risorMachine.FromRisorLoader(ctx, ldr, opts...)
+	if cfg.lifetime.risor != nil {
+		opts = append(opts, cfg.lifetime.risor)
+	}
+	return asEvaluator(risorMachine.FromRisorLoader(ctx, ldr, opts...))
 }
 
 func newStarlark(ctx context.Context, ldr loader.Loader, cfg *config) (platform.Evaluator, error) {
-	opts := []starlarkMachine.Option{starlarkMachine.WithLogHandler(cfg.handler)}
+	opts := []starlarkMachine.Option{
+		starlarkMachine.WithLogHandler(cfg.handler),
+	}
 	if cfg.staticData != nil {
 		opts = append(opts, starlarkMachine.WithStaticData(cfg.staticData))
 	}
-	return starlarkMachine.FromStarlarkLoader(ctx, ldr, opts...)
+	if cfg.lifetime.starlark != nil {
+		opts = append(opts, cfg.lifetime.starlark)
+	}
+	return asEvaluator(starlarkMachine.FromStarlarkLoader(ctx, ldr, opts...))
 }
 
 func newExtism(ctx context.Context, ldr loader.Loader, cfg *config) (platform.Evaluator, error) {
@@ -311,5 +402,8 @@ func newExtism(ctx context.Context, ldr loader.Loader, cfg *config) (platform.Ev
 	if cfg.staticData != nil {
 		opts = append(opts, extismMachine.WithStaticData(cfg.staticData))
 	}
-	return extismMachine.FromExtismLoader(ctx, ldr, opts...)
+	if cfg.lifetime.extism != nil {
+		opts = append(opts, cfg.lifetime.extism)
+	}
+	return asEvaluator(extismMachine.FromExtismLoader(ctx, ldr, opts...))
 }

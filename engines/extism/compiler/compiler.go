@@ -59,7 +59,7 @@ func (c *Compiler) String() string {
 // for WASM compilation and the entry-point probe; wazero does not check it
 // during compilation, so cancelling it does not interrupt a compile in
 // progress.
-func (c *Compiler) Compile(ctx context.Context, scriptReader io.ReadCloser) (script.ExecutableContent, error) {
+func (c *Compiler) Compile(ctx context.Context, scriptReader io.ReadCloser) (_ script.ExecutableContent, retErr error) {
 	logger := c.logger.WithGroup("compile")
 
 	if scriptReader == nil {
@@ -92,6 +92,17 @@ func (c *Compiler) Compile(ctx context.Context, scriptReader io.ReadCloser) (scr
 	if plugin == nil {
 		return nil, ErrBytecodeNil
 	}
+	defer func() {
+		// The plugin owns a wazero runtime; on success the returned Executable
+		// takes ownership, otherwise release it here. Use a cancel-immune ctx
+		// so a cancelled compile ctx doesn't abort the cleanup.
+		if retErr == nil {
+			return
+		}
+		if err := plugin.Close(context.WithoutCancel(ctx)); err != nil {
+			logger.Warn("Failed to close Extism compiled plugin after failed compile", "error", err)
+		}
+	}()
 
 	// Create a temporary instance to verify the entry point exists
 	instance, err := plugin.Instance(ctx, extismSDK.PluginInstanceConfig{})

@@ -30,6 +30,18 @@ type ExecutableUnit struct {
 	logger     *slog.Logger
 }
 
+// contentCloser is implemented by content that holds resources.
+type contentCloser interface {
+	Close(context.Context) error
+}
+
+// lifetimeWatcher is implemented by content that releases its resources
+// when a lifetime ends. Like [io.WriterTo], it is optional: BindLifetime
+// passes the lifetime's Done channel to content that implements it.
+type lifetimeWatcher interface {
+	WatchLifetime(done <-chan struct{})
+}
+
 // NewExecutableUnit creates a new ExecutableUnit from the provided loader and compiler.
 // The dataProvider parameter provides runtime data for script evaluation.
 // A nil handler is permitted and inherits from slog.Default.
@@ -117,4 +129,69 @@ func (exe *ExecutableUnit) GetLoader() loader.Loader {
 // GetDataProvider returns the data provider for this executable unit.
 func (exe *ExecutableUnit) GetDataProvider() data.Provider {
 	return exe.dataProvider
+}
+
+// BindLifetime ties the content's resources to lifetime. Content that
+// implements WatchLifetime(done <-chan struct{}) is given lifetime.Done(),
+// and closes itself once that channel is closed. Only the channel is passed
+// on; lifetime itself is not stored. Engine constructors call BindLifetime
+// once, with the ctx passed to them or the one given to their WithLifetime
+// option. It must not be called again.
+//
+// After handing over the channel, BindLifetime checks lifetime once more. If
+// lifetime is already done, it closes the content and returns an error that
+// wraps lifetime's error and, when it differs, its cause, joined with any
+// error from closing the content; the caller should then discard the unit.
+// Content that does not watch its lifetime gets the same error. A lifetime
+// that ends after that check, even before the constructor returns, closes
+// the content just as if it ended later; only a lifetime already over at the
+// check fails construction. It returns an error for a nil lifetime and is a
+// no-op on a nil unit.
+func (exe *ExecutableUnit) BindLifetime(lifetime context.Context) error {
+	if exe == nil {
+		return nil
+	}
+	if lifetime == nil {
+		return errors.New("lifetime context is nil")
+	}
+	if w, ok := exe.content.(lifetimeWatcher); ok {
+		if done := lifetime.Done(); done != nil {
+			w.WatchLifetime(done)
+		}
+	}
+	if lifetime.Err() == nil {
+		return nil
+	}
+	return lifetimeEndedError(lifetime, exe.Close(context.WithoutCancel(lifetime)))
+}
+
+// lifetimeEndedError reports that lifetime was done before the unit could be
+// bound to it. It wraps both ctx.Err() and, when it differs, the cause, so
+// errors.Is matches either, joined with closeErr from closing the content.
+func lifetimeEndedError(lifetime context.Context, closeErr error) error {
+	err := lifetime.Err()
+	if cause := context.Cause(lifetime); cause != nil && !errors.Is(err, cause) {
+		err = fmt.Errorf("lifetime context ended before construction finished: %w (cause: %w)", err, cause)
+	} else {
+		err = fmt.Errorf("lifetime context ended before construction finished: %w", err)
+	}
+	if closeErr != nil {
+		err = errors.Join(err, fmt.Errorf("failed to close content: %w", closeErr))
+	}
+	return err
+}
+
+// Close releases resources held by the compiled content by calling its
+// Close, for content that implements Close(context.Context) error; for other
+// content it is a no-op. The content makes repeated and concurrent calls
+// safe, and ctx bounds only this caller's wait (see [ExecutableContent]).
+// Safe on a nil unit.
+func (exe *ExecutableUnit) Close(ctx context.Context) error {
+	if exe == nil {
+		return nil
+	}
+	if c, ok := exe.content.(contentCloser); ok {
+		return c.Close(ctx)
+	}
+	return nil
 }

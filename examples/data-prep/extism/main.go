@@ -119,6 +119,12 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("failed to create evaluator: %w", err)
 	}
+	// Release the compiled module's wazero runtime when done
+	defer func() {
+		if err := evaluator.Close(context.Background()); err != nil {
+			logger.Warn("Failed to close evaluator", "error", err)
+		}
+	}()
 
 	// Prepare runtime data
 	ctx, err := prepareRuntimeData(context.Background(), logger, evaluator)

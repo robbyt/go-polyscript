@@ -8,6 +8,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **BREAKING:** `Close(ctx)` on `platform.Evaluator`, implemented by every
+  engine, and on `script.ExecutableUnit`. For Extism it releases the compiled
+  module's wazero runtime. Once `Close` has been called, any new `Eval` fails
+  with `compiler.ErrExecutableClosed` without calling the data provider.
+  `Close` waits for in-flight `Eval` calls, including their data loading,
+  only until its ctx is done: it then returns an error wrapping the ctx's
+  error, and the runtime is released when the last in-flight `Eval` returns.
+  With nothing in flight it releases the runtime at once, even with a
+  cancelled ctx. A data provider must not call `Eval`, or `Close` with a ctx
+  that is never done, on the same evaluator. Like `http.Server.Shutdown`,
+  `Close` is safe to call more than once and concurrently: the runtime is
+  released once, and each call's ctx bounds only its wait for in-flight
+  `Eval` calls, not the release itself. For Risor and Starlark
+  it is a no-op. Code that implements `platform.Evaluator` itself must add
+  the method.
+  ([#162](https://github.com/robbyt/go-polyscript/issues/162))
+- `WithLifetime` option (`polyscript.WithLifetime[E]` and each engine's
+  `WithLifetime`) to bound an evaluator's lifetime by a ctx other than the
+  one passed to its constructor, and `script.ExecutableUnit.BindLifetime`,
+  which implements the binding by passing the ctx's `Done()` channel to
+  content that implements `WatchLifetime`.
+  ([#162](https://github.com/robbyt/go-polyscript/issues/162))
 - `data.BYTES` and `data.UNKNOWN` result types.
   ([#157](https://github.com/robbyt/go-polyscript/issues/157),
   [#161](https://github.com/robbyt/go-polyscript/issues/161))
@@ -28,6 +50,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ([#115](https://github.com/robbyt/go-polyscript/pull/115))
 
 ### Changed
+- **BREAKING:** the ctx passed to `polyscript.New` and the engine
+  constructors (`FromRisorLoader`, `FromStarlarkLoader`, `FromExtismLoader`)
+  now bounds the evaluator's lifetime: when it is done, an evaluator whose
+  engine holds resources (Extism) closes itself as if `Close` had been
+  called. Evaluators reused beyond a request or timeout ctx must be built
+  with a long-lived ctx or given one with `WithLifetime`. A lifetime ctx
+  that is already done when construction finishes makes the constructor
+  close what it built and return an error wrapping the ctx's error, on
+  every engine. Call `Close` or let the lifetime end: nothing releases an
+  evaluator's resources when it is garbage collected.
+  ([#162](https://github.com/robbyt/go-polyscript/issues/162))
+- **BREAKING:** Extism `compiler.Executable.ByteCode` is unexported; use
+  `GetExtismByteCode()` or the new `WithPlugin(ctx, fn)`, which holds the
+  plugin open while `fn` runs.
+  ([#162](https://github.com/robbyt/go-polyscript/issues/162))
+- `polyscript.New` returns an untyped `nil` evaluator on error, instead of a
+  non-nil interface wrapping a nil engine pointer.
+  ([#162](https://github.com/robbyt/go-polyscript/issues/162))
 - **BREAKING:** `EvaluatorResponse.Type()` now always returns a `data.Types`
   constant, the same one on every engine for the same kind of value, and
   `data.UNKNOWN` for values with no counterpart (previously `data.ERROR`, or
@@ -173,6 +213,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   directly can still hit it; see `engines/README.md` for workarounds.
 
 ### Fixed
+- Extism leaked wazero runtimes: nothing could close a compiled module, and
+  the compiler did not close the plugin when the entry-point check or the
+  test instance failed after a successful compile.
+  ([#162](https://github.com/robbyt/go-polyscript/issues/162))
 - Extism results that decode to a plain Go `int` (any bare JSON integer)
   reported `data.ERROR`; they now report `data.INT`.
   ([#161](https://github.com/robbyt/go-polyscript/issues/161))
