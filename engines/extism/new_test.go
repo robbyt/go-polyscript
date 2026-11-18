@@ -201,6 +201,28 @@ func TestFromExtismLoader_RunsEndToEnd(t *testing.T) {
 	assert.Equal(t, "Hello, World!", got["greeting"])
 }
 
+// TestFromExtismLoader_EmptyInputSendsEmptyObject is a regression for issue
+// #165: Eval with no static or context data must hand the guest "{}" rather
+// than zero bytes, which a JSON-parsing guest rejects.
+func TestFromExtismLoader_EmptyInputSendsEmptyObject(t *testing.T) {
+	scriptLoader, err := loader.NewFromBytes(wasmdata.TestModule)
+	require.NoError(t, err)
+
+	eval, err := FromExtismLoader(
+		t.Context(),
+		scriptLoader,
+		WithEntryPoint(wasmdata.EntrypointProcessComplex),
+	)
+	require.NoError(t, err)
+
+	res, err := eval.Eval(t.Context())
+	require.NoError(t, err, "guest should parse empty input as an empty object")
+	got, err := res.AsMap()
+	require.NoError(t, err)
+	assert.Empty(t, got["requestId"], "empty object should decode to a zero Request")
+	assert.Equal(t, 0, got["tagCount"])
+}
+
 // Mutates slog.Default — must not call t.Parallel(). Cross-package safe
 // because `go test ./...` runs each package in its own process.
 func TestFromExtismLoader_DefaultsToSlogDefault(t *testing.T) {

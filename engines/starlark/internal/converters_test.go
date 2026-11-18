@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"errors"
 	"math"
 	"math/big"
 	"net/url"
@@ -677,5 +678,101 @@ func TestConvertToStarlarkValue(t *testing.T) {
 		require.True(t, found)
 		expectedKeyVal := starlarkLib.String("value")
 		require.Equal(t, expectedKeyVal, keyVal)
+	})
+}
+
+// errHashFailed is returned by flakyHashKey once its first Hash call is spent.
+var errHashFailed = errors.New("hash failed")
+
+// flakyHashKey is a Starlark value whose Hash succeeds once (so it can be
+// inserted into a dict) and fails afterwards, forcing a Dict.Get error.
+type flakyHashKey struct {
+	calls *int
+}
+
+func (k flakyHashKey) String() string          { return "flaky" }
+func (k flakyHashKey) Type() string            { return "flaky" }
+func (k flakyHashKey) Freeze()                 {}
+func (k flakyHashKey) Truth() starlarkLib.Bool { return starlarkLib.True }
+func (k flakyHashKey) Hash() (uint32, error) {
+	*k.calls++
+	if *k.calls > 1 {
+		return 0, errHashFailed
+	}
+	return 1, nil
+}
+
+func TestConvertStarlarkValueToInterface_DictKeys(t *testing.T) {
+	t.Parallel()
+
+	newDict := func(t *testing.T, kvs ...starlarkLib.Value) *starlarkLib.Dict {
+		t.Helper()
+		d := starlarkLib.NewDict(len(kvs) / 2)
+		for i := 0; i < len(kvs); i += 2 {
+			require.NoError(t, d.SetKey(kvs[i], kvs[i+1]))
+		}
+		return d
+	}
+
+	t.Run("distinct non-string keys are stringified", func(t *testing.T) {
+		d := newDict(t,
+			starlarkLib.MakeInt(1), starlarkLib.String("a"),
+			starlarkLib.MakeInt(2), starlarkLib.String("b"),
+		)
+		got, err := ConvertStarlarkValueToInterface(d)
+		require.NoError(t, err)
+		require.Equal(t, map[string]any{"1": "a", "2": "b"}, got)
+	})
+
+	collisions := []struct {
+		name  string
+		input func(t *testing.T) starlarkLib.Value
+	}{
+		{
+			name: "int key then string key",
+			input: func(t *testing.T) starlarkLib.Value {
+				t.Helper()
+				return newDict(t,
+					starlarkLib.MakeInt(1), starlarkLib.String("a"),
+					starlarkLib.String("1"), starlarkLib.String("b"),
+				)
+			},
+		},
+		{
+			name: "string key then int key",
+			input: func(t *testing.T) starlarkLib.Value {
+				t.Helper()
+				return newDict(t,
+					starlarkLib.String("1"), starlarkLib.String("b"),
+					starlarkLib.MakeInt(1), starlarkLib.String("a"),
+				)
+			},
+		},
+		{
+			name: "collision in nested dict",
+			input: func(t *testing.T) starlarkLib.Value {
+				t.Helper()
+				inner := newDict(t,
+					starlarkLib.Bool(true), starlarkLib.MakeInt(1),
+					starlarkLib.String("True"), starlarkLib.MakeInt(2),
+				)
+				return newDict(t, starlarkLib.String("outer"), inner)
+			},
+		},
+	}
+	for _, tc := range collisions {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := ConvertStarlarkValueToInterface(tc.input(t))
+			require.ErrorIs(t, err, ErrDictKeyCollision)
+			require.Nil(t, got, "no partial map should be returned on collision")
+		})
+	}
+
+	t.Run("dict get error is propagated", func(t *testing.T) {
+		calls := 0
+		d := newDict(t, flakyHashKey{calls: &calls}, starlarkLib.String("v"))
+		got, err := ConvertStarlarkValueToInterface(d)
+		require.ErrorIs(t, err, errHashFailed)
+		require.Nil(t, got)
 	})
 }

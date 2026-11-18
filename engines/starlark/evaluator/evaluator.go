@@ -39,9 +39,9 @@ func New(
 	// Get universe with standard modules
 	universe := internal.StarlarkModules()
 
-	// Add eval-time contextual globals
+	// Add the eval-time ctx global. It must match the compiler's predeclared
+	// set, or scripts referencing it fail to compile.
 	universe[constants.Ctx] = starlarkLib.None
-	universe[string(constants.EvalData)] = starlarkLib.None
 
 	return &Evaluator{
 		universe:   universe,
