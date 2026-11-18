@@ -214,3 +214,34 @@ func TestStaticProvider_ErrorIdentification(t *testing.T) {
 	require.NoError(t, getErr, "GetData should never return an error")
 	assert.Equal(t, simpleData, data, "Static data should be available after error")
 }
+
+// TestStaticProvider_GetData_Isolation checks that GetData returns a deep
+// copy (#159): mutating the result at any nesting level must not change
+// what later GetData calls return.
+func TestStaticProvider_GetData_Isolation(t *testing.T) {
+	t.Parallel()
+
+	provider := NewStaticProvider(nestedFixtureHelper())
+	assertGetDataIsolatedHelper(t, provider, t.Context(), nestedFixtureHelper())
+}
+
+// TestStaticProvider_Creation_CopiesInput checks that NewStaticProvider
+// keeps its own deep copy, so later changes to the caller's map do not leak
+// into the provider.
+func TestStaticProvider_Creation_CopiesInput(t *testing.T) {
+	t.Parallel()
+
+	for _, m := range fixtureMutationsHelper {
+		t.Run(m.name, func(t *testing.T) {
+			input := nestedFixtureHelper()
+			provider := NewStaticProvider(input)
+
+			m.mutate(input)
+
+			got, err := provider.GetData(t.Context())
+			require.NoError(t, err)
+			assert.Equal(t, nestedFixtureHelper(), got,
+				"mutating the caller's map must not change provider state")
+		})
+	}
+}
