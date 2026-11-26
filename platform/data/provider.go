@@ -21,6 +21,11 @@ type Setter interface {
 	// and other types should be wrapped in maps with descriptive keys. Pass a single
 	// map; merge ahead of time when you have multiple sources.
 	//
+	// On error, implementations return the input ctx itself, never a context
+	// carrying part of the data. This is not a rollback: side effects of
+	// processing the data, such as reading an HTTP request body, are not
+	// undone.
+	//
 	// Example:
 	//
 	//	scriptData := map[string]any{"greeting": "Hello, World!", "request": request}

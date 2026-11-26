@@ -23,8 +23,13 @@ import (
 //   - d: The data map to add to the context
 //
 // Returns:
-//   - enrichedCtx: The context with added data
+//   - enrichedCtx: The context with added data, or the original ctx on any
+//     error, whatever context the provider returned alongside it
 //   - err: Any error encountered during the operation
+//
+// Returning the original ctx is not a rollback: side effects of the
+// provider's AddDataToContext, such as a ContextProvider reading an HTTP
+// request body, are not undone.
 func AddDataToContextHelper(
 	ctx context.Context,
 	handler slog.Handler,

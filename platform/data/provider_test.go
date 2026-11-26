@@ -2,6 +2,7 @@ package data
 
 import (
 	"context"
+	"sync"
 	"testing"
 
 	"github.com/robbyt/go-polyscript/platform/constants"
@@ -391,4 +392,117 @@ func TestProvider_DeepMerge(t *testing.T) {
 		assert.Equal(t, srcCopy, src)
 		assert.Equal(t, dstCopy, dst)
 	})
+}
+
+// TestProvider_GetData_ConcurrentMutation is the -race regression test for
+// #159. Reader goroutines mutate their GetData results in place while writer
+// goroutines derive new contexts from the same parent with AddDataToContext.
+// When GetData handed out shared storage this raced and corrupted the
+// provider's data; with deep copies every goroutine owns its own maps.
+func TestProvider_GetData_ConcurrentMutation(t *testing.T) {
+	t.Parallel()
+
+	static := NewStaticProvider(map[string]any{"static": nestedFixtureHelper()})
+	ctxProvider := NewContextProvider(constants.EvalData)
+	composite := NewCompositeProvider(static, ctxProvider)
+
+	parent, err := composite.AddDataToContext(t.Context(), nestedFixtureHelper())
+	require.NoError(t, err)
+
+	wantComposite := nestedFixtureHelper()
+	wantComposite["static"] = nestedFixtureHelper()
+	readers := []concurrentReader{
+		{"static", static, map[string]any{"static": nestedFixtureHelper()}},
+		{"context", ctxProvider, nestedFixtureHelper()},
+		{"composite", composite, wantComposite},
+	}
+
+	const goroutinesPerRole = 8
+	const iterations = 50
+
+	var wg sync.WaitGroup
+	for _, r := range readers {
+		for range goroutinesPerRole {
+			wg.Go(func() { mutateGetDataHelper(t, parent, r, iterations) })
+		}
+	}
+	for range goroutinesPerRole {
+		wg.Go(func() { addAndVerifyHelper(t, parent, composite, iterations) })
+	}
+	wg.Wait()
+
+	for _, r := range readers {
+		got, err := r.getter.GetData(parent)
+		require.NoError(t, err)
+		assert.Equal(t, r.want, got, "%s provider state must be unchanged", r.name)
+	}
+}
+
+// concurrentReader is a provider that TestProvider_GetData_ConcurrentMutation
+// reads from concurrently, with the data it must still return afterwards.
+type concurrentReader struct {
+	name   string
+	getter Getter
+	want   map[string]any
+}
+
+// mutateGetDataHelper calls GetData on parent iterations times and applies
+// every fixtureMutationsHelper mutation to each fixture-shaped map in the result.
+// It runs on a non-test goroutine, so failures use t.Errorf, never FailNow.
+func mutateGetDataHelper(t *testing.T, parent context.Context, r concurrentReader, iterations int) {
+	t.Helper()
+	for range iterations {
+		got, err := r.getter.GetData(parent)
+		if err != nil {
+			t.Errorf("%s GetData: %v", r.name, err)
+			return
+		}
+		for _, target := range fixtureTargetsHelper(got) {
+			for _, m := range fixtureMutationsHelper {
+				m.mutate(target)
+			}
+		}
+	}
+}
+
+// fixtureTargetsHelper returns got and its "static" sub-map, keeping only the
+// maps shaped like nestedFixtureHelper (those with a "cfg" key).
+func fixtureTargetsHelper(got map[string]any) []map[string]any {
+	candidates := []map[string]any{got}
+	if nested, ok := got["static"].(map[string]any); ok {
+		candidates = append(candidates, nested)
+	}
+	var targets []map[string]any
+	for _, c := range candidates {
+		if _, ok := c["cfg"]; ok {
+			targets = append(targets, c)
+		}
+	}
+	return targets
+}
+
+// addAndVerifyHelper derives a new context from parent iterations times with
+// AddDataToContext and checks that GetData on it returns the value just added.
+// It runs on a non-test goroutine, so failures use t.Errorf, never FailNow.
+func addAndVerifyHelper(t *testing.T, parent context.Context, composite *CompositeProvider, iterations int) {
+	t.Helper()
+	for j := range iterations {
+		next, err := composite.AddDataToContext(parent, map[string]any{
+			"cfg": map[string]any{"x": j},
+		})
+		if err != nil {
+			t.Errorf("AddDataToContext iter %d: %v", j, err)
+			return
+		}
+		got, err := composite.GetData(next)
+		if err != nil {
+			t.Errorf("GetData iter %d: %v", j, err)
+			return
+		}
+		cfg, ok := got["cfg"].(map[string]any)
+		if !assert.True(t, ok, "cfg should be a map") {
+			return
+		}
+		assert.Equal(t, j, cfg["x"])
+	}
 }
