@@ -97,6 +97,42 @@ func createTestExecutable(
 	return script.NewExecutableUnit(ctx, handler, "test-id", ld, c, provider)
 }
 
+// TestEvaluator_Close verifies Close is a no-op for Risor, which holds no
+// releasable resources.
+func TestEvaluator_Close(t *testing.T) {
+	t.Parallel()
+
+	t.Run("compiled script", func(t *testing.T) {
+		handler := slog.NewTextHandler(io.Discard, nil)
+		ld, err := loader.NewFromString(`1 + 1`)
+		require.NoError(t, err)
+		exe, err := createTestExecutable(
+			t.Context(), handler, ld, []string{constants.Ctx},
+			data.NewContextProvider(constants.EvalData),
+		)
+		require.NoError(t, err)
+
+		evaluator := New(handler, exe)
+		require.NoError(t, evaluator.Close(t.Context()))
+		require.NoError(t, evaluator.Close(t.Context()), "second Close should be a no-op")
+
+		result, err := evaluator.Eval(t.Context())
+		require.NoError(t, err, "Eval should keep working after Close")
+		assert.Equal(t, int64(2), result.Interface())
+	})
+
+	t.Run("nil executable unit", func(t *testing.T) {
+		evaluator := New(nil, nil)
+		require.NoError(t, evaluator.Close(t.Context()))
+	})
+
+	t.Run("nil evaluator", func(t *testing.T) {
+		var evaluator *Evaluator
+		require.NoError(t, evaluator.Close(t.Context()),
+			"Close on a nil evaluator (e.g. from a failed constructor) must not panic")
+	})
+}
+
 // TestEvaluator_Evaluate tests evaluating Risor scripts
 func TestEvaluator_Evaluate(t *testing.T) {
 	t.Parallel()

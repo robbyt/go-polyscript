@@ -185,3 +185,15 @@ func (be *Evaluator) AddDataToContext(
 ) (context.Context, error) {
 	return data.AddDataToContextFromProvider(ctx, be.logHandler.WithGroup("Evaluator"), be.getDataProvider(), d)
 }
+
+// Close implements platform.Evaluator. Compiled Risor bytecode holds no
+// releasable resources, so this is effectively a no-op and Eval keeps working.
+// For the same reason, the end of the evaluator's lifetime ctx (the ctx
+// passed to the constructor, or the one given to WithLifetime) changes
+// nothing. Safe on a nil Evaluator.
+func (be *Evaluator) Close(ctx context.Context) error {
+	if be == nil {
+		return nil
+	}
+	return be.execUnit.Close(ctx)
+}

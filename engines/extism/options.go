@@ -1,9 +1,11 @@
 package extism
 
 import (
+	"context"
 	"log/slog"
 
 	"github.com/robbyt/go-polyscript/platform/data"
+	"github.com/robbyt/go-polyscript/platform/script"
 )
 
 // Option configures [FromExtismLoader]. Apply in any order; later options
@@ -17,6 +19,10 @@ type config struct {
 	entryPoint         string
 	exitOutputMaxBytes int
 	noCtxTermination   bool
+	// bindLifetime, set by WithLifetime, binds the executable unit to the
+	// lifetime ctx; nil means the constructor's ctx. It is a func so that no
+	// context.Context is kept in a struct.
+	bindLifetime func(*script.ExecutableUnit) error
 }
 
 // WithLogHandler sets the slog.Handler used for diagnostic logging by the
@@ -73,4 +79,24 @@ func WithExitOutputMaxBytes(n int) Option {
 // that never need a timeout.
 func WithContextTermination(enabled bool) Option {
 	return func(c *config) { c.noCtxTermination = !enabled }
+}
+
+// WithLifetime sets the ctx that bounds the evaluator's lifetime, in place
+// of the ctx passed to [FromExtismLoader]. When it is done, the evaluator
+// closes itself as if Close had been called: new Evals fail with
+// compiler.ErrExecutableClosed, and the wazero runtime is released once
+// in-flight Evals return. Use it when the constructor's ctx is short-lived,
+// such as a timeout for loading the module, and pass a long-lived ctx, or
+// context.Background() for no limit, in which case only Close releases the
+// runtime. If the ctx is already done when construction finishes,
+// [FromExtismLoader] closes what it built and returns an error. A nil ctx
+// means the constructor's ctx.
+func WithLifetime(ctx context.Context) Option {
+	return func(c *config) {
+		if ctx == nil {
+			c.bindLifetime = nil
+			return
+		}
+		c.bindLifetime = func(u *script.ExecutableUnit) error { return u.BindLifetime(ctx) }
+	}
 }

@@ -8,12 +8,14 @@ import (
 	"log/slog"
 	"net/url"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
 	engineTypes "github.com/robbyt/go-polyscript/engines/types"
 	"github.com/robbyt/go-polyscript/platform/data"
 	"github.com/robbyt/go-polyscript/platform/script/loader"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
@@ -502,4 +504,235 @@ func TestNewExecutableUnit_NilHandler(t *testing.T) {
 
 	mockLdr.AssertExpectations(t)
 	comp.AssertExpectations(t)
+}
+
+func TestExecutableUnit_Close(t *testing.T) {
+	t.Parallel()
+
+	t.Run("closes content that implements Close", func(t *testing.T) {
+		ctx := t.Context()
+		content := new(MockClosableExecutableContent)
+		content.On("Close", ctx).Return(nil).Once()
+
+		exe := &ExecutableUnit{content: content}
+		require.NoError(t, exe.Close(ctx))
+		content.AssertExpectations(t)
+	})
+
+	t.Run("propagates content Close error", func(t *testing.T) {
+		ctx := t.Context()
+		closeErr := errors.New("close kaboom")
+		content := new(MockClosableExecutableContent)
+		content.On("Close", ctx).Return(closeErr).Once()
+
+		exe := &ExecutableUnit{content: content}
+		require.ErrorIs(t, exe.Close(ctx), closeErr)
+		content.AssertExpectations(t)
+	})
+
+	t.Run("every Close is passed to the content", func(t *testing.T) {
+		content := &countingClosableContent{}
+		exe := &ExecutableUnit{content: content}
+
+		require.NoError(t, exe.Close(t.Context()))
+		require.NoError(t, exe.Close(t.Context()))
+		assert.Equal(t, int32(2), content.closeCalls.Load(),
+			"the content, not the unit, makes repeated Close calls safe")
+	})
+
+	t.Run("no-op for content without Close", func(t *testing.T) {
+		content := new(MockExecutableContent)
+		exe := &ExecutableUnit{content: content}
+		require.NoError(t, exe.Close(t.Context()))
+		content.AssertExpectations(t)
+	})
+
+	t.Run("nil content", func(t *testing.T) {
+		exe := &ExecutableUnit{}
+		require.NoError(t, exe.Close(t.Context()))
+	})
+
+	t.Run("nil unit", func(t *testing.T) {
+		var exe *ExecutableUnit
+		require.NoError(t, exe.Close(t.Context()))
+	})
+}
+
+// newUnitWithContent builds an ExecutableUnit around content through
+// NewExecutableUnit.
+func newUnitWithContent(t *testing.T, content ExecutableContent) *ExecutableUnit {
+	t.Helper()
+	ldr := new(mockLoader)
+	ldr.On("GetReader", mock.Anything).Return(io.NopCloser(strings.NewReader("script")), nil)
+	comp := new(MockCompiler)
+	comp.On("Compile", mock.Anything, mock.Anything).Return(content, nil)
+
+	exe, err := NewExecutableUnit(
+		t.Context(), nil, t.Name(), ldr, comp, data.NewStaticProvider(emptyScriptData),
+	)
+	require.NoError(t, err)
+	ldr.AssertExpectations(t)
+	comp.AssertExpectations(t)
+	return exe
+}
+
+func TestExecutableUnit_BindLifetime(t *testing.T) {
+	t.Parallel()
+
+	t.Run("passes the lifetime's Done channel to a watcher", func(t *testing.T) {
+		content := &watchingContent{}
+		exe := newUnitWithContent(t, content)
+		lifetime, cancel := context.WithCancel(t.Context())
+		defer cancel()
+
+		require.NoError(t, exe.BindLifetime(lifetime))
+		require.Len(t, content.watched, 1, "BindLifetime should call WatchLifetime once")
+		assert.Equal(t, lifetime.Done(), content.watched[0], "the watcher should get the lifetime's Done channel")
+		assert.Equal(t, int32(0), content.closeCalls.Load(), "a live lifetime must not close the content")
+	})
+
+	t.Run("lifetime that is never done is not watched", func(t *testing.T) {
+		content := &watchingContent{}
+		exe := newUnitWithContent(t, content)
+
+		require.NoError(t, exe.BindLifetime(context.WithoutCancel(t.Context())))
+		assert.Empty(t, content.watched, "a nil Done channel should not be passed on")
+		assert.Equal(t, int32(0), content.closeCalls.Load())
+	})
+
+	t.Run("content without a watcher accepts a live lifetime", func(t *testing.T) {
+		content := &countingClosableContent{}
+		exe := newUnitWithContent(t, content)
+		lifetime, cancel := context.WithCancel(t.Context())
+
+		require.NoError(t, exe.BindLifetime(lifetime))
+		cancel()
+		assert.Equal(t, int32(0), content.closeCalls.Load(),
+			"only content that watches its lifetime closes when it ends")
+	})
+
+	t.Run("nil lifetime", func(t *testing.T) {
+		content := &watchingContent{}
+		exe := newUnitWithContent(t, content)
+		var lifetime context.Context
+		require.Error(t, exe.BindLifetime(lifetime))
+		assert.Empty(t, content.watched)
+		assert.Equal(t, int32(0), content.closeCalls.Load())
+	})
+
+	t.Run("nil unit", func(t *testing.T) {
+		var exe *ExecutableUnit
+		require.NoError(t, exe.BindLifetime(t.Context()))
+	})
+}
+
+// endsWhenWatched is a lifetime that is still live until something asks
+// for its Done channel, and then ends at once. It models a lifetime that
+// ends during BindLifetime, after the watcher got the channel but before the
+// final check.
+type endsWhenWatched struct {
+	context.Context
+	cancel context.CancelFunc
+}
+
+func (c endsWhenWatched) Done() <-chan struct{} {
+	c.cancel()
+	return c.Context.Done()
+}
+
+func TestExecutableUnit_BindLifetime_AlreadyDone(t *testing.T) {
+	t.Parallel()
+
+	errShutdown := errors.New("shutting down")
+	closeErr := errors.New("close kaboom")
+
+	tests := []struct {
+		name     string
+		lifetime func() context.Context
+		closeErr error
+		wantErrs []error
+	}{
+		{
+			name: "cancelled",
+			lifetime: func() context.Context {
+				ctx, cancel := context.WithCancel(t.Context())
+				cancel()
+				return ctx
+			},
+			wantErrs: []error{context.Canceled},
+		},
+		{
+			name: "cancelled with a cause",
+			lifetime: func() context.Context {
+				ctx, cancel := context.WithCancelCause(t.Context())
+				cancel(errShutdown)
+				return ctx
+			},
+			wantErrs: []error{context.Canceled, errShutdown},
+		},
+		{
+			name: "deadline exceeded",
+			lifetime: func() context.Context {
+				ctx, cancel := context.WithDeadline(t.Context(), time.Now().Add(-time.Second))
+				cancel()
+				return ctx
+			},
+			wantErrs: []error{context.DeadlineExceeded},
+		},
+		{
+			name: "ends after the watcher got the channel",
+			lifetime: func() context.Context {
+				ctx, cancel := context.WithCancel(t.Context())
+				t.Cleanup(cancel)
+				return endsWhenWatched{Context: ctx, cancel: cancel}
+			},
+			wantErrs: []error{context.Canceled},
+		},
+		{
+			name: "content close error is joined",
+			lifetime: func() context.Context {
+				ctx, cancel := context.WithCancel(t.Context())
+				cancel()
+				return ctx
+			},
+			closeErr: closeErr,
+			wantErrs: []error{context.Canceled, closeErr},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			content := &watchingContent{countingClosableContent: countingClosableContent{err: tc.closeErr}}
+			exe := newUnitWithContent(t, content)
+
+			err := exe.BindLifetime(tc.lifetime())
+			require.Error(t, err)
+			for _, want := range tc.wantErrs {
+				require.ErrorIs(t, err, want)
+			}
+			assert.Len(t, content.watched, 1, "the watcher should get the channel before the final check")
+			assert.Equal(t, int32(1), content.closeCalls.Load(),
+				"an already-done lifetime should close the content before returning")
+		})
+	}
+
+	t.Run("content without a watcher fails the same way", func(t *testing.T) {
+		content := &countingClosableContent{}
+		exe := newUnitWithContent(t, content)
+		ctx, cancel := context.WithCancel(t.Context())
+		cancel()
+
+		require.ErrorIs(t, exe.BindLifetime(ctx), context.Canceled)
+		assert.Equal(t, int32(1), content.closeCalls.Load(), "the content should still be closed")
+	})
+
+	t.Run("content without Close fails the same way", func(t *testing.T) {
+		content := new(MockExecutableContent)
+		exe := newUnitWithContent(t, content)
+		ctx, cancel := context.WithCancel(t.Context())
+		cancel()
+
+		require.ErrorIs(t, exe.BindLifetime(ctx), context.Canceled)
+		content.AssertExpectations(t)
+	})
 }

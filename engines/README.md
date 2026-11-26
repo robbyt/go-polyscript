@@ -50,6 +50,17 @@ This package contains engine implementations for executing scripts in various la
    - There are several type conversions, and the result is accessible with the `Interface()` method
    - The `platform.EvaluatorResponse` also contains metadata about the execution
 
+7. **Shutdown**
+   - `Evaluator.Close(ctx)` releases resources held by the compiled script by calling `ExecutableUnit.Close`, which calls the `ExecutableContent`'s `Close(context.Context) error` if it has one. The content makes repeated and concurrent calls safe and releases its resources once; like `http.Server.Shutdown`, each call's `ctx` bounds only that caller's wait
+   - The evaluator's lifetime is bound to a ctx: the one passed to `FromXxxLoader` (or `polyscript.New`), or the one given to `WithLifetime`. The engine constructor calls `ExecutableUnit.BindLifetime` once, which passes the ctx's `Done()` channel to content that implements `WatchLifetime(done <-chan struct{})`; no ctx is stored. Then it checks the ctx once more: if it is already done, it closes the content and the constructor returns an error wrapping the ctx's error, on every engine. A lifetime that ends after that check, even before the constructor returns, closes the evaluator as if it ended later
+   - Call `Close` or let the lifetime end. Nothing releases resources when an evaluator or its content is garbage collected, so an evaluator that is neither closed nor bound to a lifetime that ends keeps them, the way an `exec.Cmd` needs `Wait`
+   - Extism: `compiler.Executable` owns the compiled plugin and its wazero runtime. `WatchLifetime` starts one goroutine that closes the `Executable` as `Close` does, without waiting, when the lifetime ends, and exits once the runtime is released; `WithPlugin` (and so `Eval`) is rejected with `compiler.ErrExecutableClosed` as soon as the lifetime is done, even before that goroutine runs. `Close` rejects new `Eval` calls at once, without calling the data provider, and waits for in-flight ones, including any still loading data from the provider, until its `ctx` is done. If they return first, the last one releases the runtime and `Close` returns the release error; if the `ctx` is done first, `Close` returns an error wrapping the ctx's error and the runtime is released when the last in-flight `Eval` returns. With nothing in flight, `Close` releases the runtime and returns the release error, even with a cancelled `ctx`. The release uses the caller's `ctx` values but never its cancellation, and runs once. The last in-flight `Eval` counts as in flight until it has released the runtime, so each `Close` waits for it, too, only until its own `ctx` is done. A `Close` that finds nothing in flight runs the release, or waits for one already under way, regardless of its `ctx`, so a plugin close that hangs blocks it, like the synchronous listener close in `http.Server.Shutdown`. `compiler.Executable.IsClosed` reports `true` once the runtime has been released, not while `Close` is still waiting
+   - Extism: when the lifetime ctx ends, the evaluator closes itself the same way, so an evaluator built with a request or timeout ctx stops working when that ctx ends. Build a reused evaluator with a long-lived ctx, or pass one with `WithLifetime`
+   - Cancelling an `Eval`'s `ctx` shortens the wait only if the guest stops and the data provider honours cancellation
+   - A data provider must not call `Eval` on the same evaluator, or `Close` with a `ctx` that is never done: `Close` would wait for the `Eval` that is calling it
+   - Risor and Starlark hold no releasable resources, so `Close` and the end of the lifetime ctx are no-ops and `Eval` keeps working. A lifetime ctx that is already done when construction finishes still makes the constructor return an error
+   - `Close` is safe to call more than once and concurrently; call it (e.g. `defer evaluator.Close(ctx)`) when an evaluator is discarded, especially for evaluators built dynamically at runtime
+
 ## Engine-Specific Data Handling
 
 While all engines receive the same `map[string]any` input data, **each engine processes and exposes this data differently** to the script runtime. Understanding these differences is important for structuring your data correctly.
@@ -180,6 +191,21 @@ compile. Two workarounds:
 `engines/extism/wazero_race_test.go` fails as soon as the wazero dependency
 changes, as a reminder to remove this note, `internal/wazerorace` and its
 callers once a release with the fix lands.
+
+### Testing: Mock Plugins and Lifetimes
+
+Nothing closes a `compiler.Executable` when it is garbage collected. But an `Executable` bound to a lifetime, by `WatchLifetime` or an evaluator constructor, calls `Close` on its plugin when that ctx ends. In a test that is often `t.Context()`, which ends when the test does, so the mock plugin's `Close` runs after the test body, from the watcher goroutine.
+
+- A testify mock panics on a call it was not told to expect, and a panic in that goroutine crashes the whole test binary.
+
+**Rules for Extism tests:**
+
+- Give every mock plugin on an `Executable` whose lifetime may end during the test a `Close` expectation:
+  ```go
+  mockPlugin.On("Close", mock.Anything).Return(nil).Maybe()
+  ```
+  Or close the `Executable` (or its evaluator) in the test, with a matching `Close` expectation. A mock on an `Executable` that is never bound to a lifetime and never closed needs no `Close` expectation.
+- Never use `recover()` to hide the panic; fix the expectation.
 
 ## Script Return Value Handling
 

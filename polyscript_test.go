@@ -67,7 +67,10 @@ func evalAndExtractMap(
 func prepareAndEval(
 	t *testing.T,
 	ctx context.Context,
-	evaluator platform.Evaluator,
+	evaluator interface {
+		platform.EvalOnly
+		data.Setter
+	},
 	runtimeData map[string]any,
 ) (platform.EvaluatorResponse, error) {
 	t.Helper()
@@ -173,6 +176,73 @@ func TestResultTypesAcrossEngines(t *testing.T) {
 				require.NoError(t, err, "%s: eval", eng.name)
 				assert.Equal(t, tc.expectedType, result.Type(), "%s: Type() for %q", eng.name, eng.content)
 				assert.Equal(t, tc.expectedValue, result.Interface(), "%s: Interface() for %q", eng.name, eng.content)
+			}
+		})
+	}
+}
+
+// TestEvaluatorClose_NoResourceEngines verifies Close is a harmless no-op for
+// engines whose compiled scripts hold no releasable resources.
+func TestEvaluatorClose_NoResourceEngines(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		content string
+		creator stringEngineFn
+	}{
+		{"Starlark", `print("Hello, World!")`, starlarkString},
+		{"Risor", `"Hello, World!"`, risorString},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			eval, err := tc.creator(t.Context(), tc.content, nil)
+			require.NoError(t, err)
+
+			require.NoError(t, eval.Close(t.Context()), "first Close should succeed")
+			require.NoError(t, eval.Close(t.Context()), "second Close should be a no-op")
+
+			_, err = eval.Eval(t.Context())
+			require.NoError(t, err, "Eval should keep working after Close on engines without resources")
+		})
+	}
+}
+
+// TestNew_FailureReturnsNilEvaluator verifies a failed New returns an untyped
+// nil platform.Evaluator rather than an interface wrapping a nil engine
+// pointer, so the usual `if err != nil` / `eval != nil` checks hold and no
+// caller ends up calling Close on a typed nil.
+func TestNew_FailureReturnsNilEvaluator(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		create func(ctx context.Context) (platform.Evaluator, error)
+	}{
+		{"Risor compile error", func(ctx context.Context) (platform.Evaluator, error) {
+			return polyscript.New[polyscript.Risor](ctx, polyscript.FromString("func ("))
+		}},
+		{"Starlark compile error", func(ctx context.Context) (platform.Evaluator, error) {
+			return polyscript.New[polyscript.Starlark](ctx, polyscript.FromString("def ("))
+		}},
+		{"Extism compile error", func(ctx context.Context) (platform.Evaluator, error) {
+			return polyscript.New[polyscript.Extism](
+				ctx, polyscript.FromBytes([]byte("not wasm")), polyscript.WithEntryPoint("greet"),
+			)
+		}},
+		{"Extism missing entry point", func(ctx context.Context) (platform.Evaluator, error) {
+			return polyscript.New[polyscript.Extism](ctx, polyscript.FromBytes([]byte("not wasm")))
+		}},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			eval, err := tc.create(t.Context())
+			require.Error(t, err)
+			// assert.Nil treats a typed nil as nil, so compare the interface directly.
+			if eval != nil {
+				t.Errorf("failed New should return an untyped nil evaluator, got %#v", eval)
 			}
 		})
 	}

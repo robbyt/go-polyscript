@@ -122,6 +122,14 @@ func Example_directExtism() {
 	// map[greeting:Hello, World!]
 }
 
+func Example_lifetime() {
+	appCtx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	check(lifetime(appCtx, wasmdata.TestModule))
+	// Output:
+	// map[greeting:Hello, World!]
+}
+
 func Example_godocNew() {
 	check(godocNew(context.Background(), `"Hello, World"`))
 	// Output:
